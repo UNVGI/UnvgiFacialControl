@@ -12,7 +12,7 @@ FacialControl は、VTuber 配信用フェイシャルキャプチャ連動や G
 - **スムーズな表情遷移** — 線形補間・イージング・カスタムカーブによる Expression 間の遷移。遷移中の割り込みにも GC フリーで対応
 - **OSC ネットワーク通信** — VRChat 互換の OSC（UDP + uOsc）による BlendShape データの送受信。ダブルバッファリングで低遅延
 - **ARKit / PerfectSync 対応** — ARKit 52 ブレンドシェイプと PerfectSync の自動検出・Expression 自動生成
-- **Editor 拡張** — Inspector カスタマイズ、プロファイル管理ウィンドウ、BlendShape スライダー付き Expression 作成ツール（UI Toolkit）
+- **Editor 拡張** — Inspector カスタマイズ（プロファイル管理を統合）、BlendShape スライダー付き Expression 作成ツール（UI Toolkit）
 - **JSON ファーストの永続化** — 表情設定は JSON で管理。ビルド後も差し替え可能。ScriptableObject は JSON への参照ポインター
 - **入力デバイス対応** — InputSystem によるコントローラ / キーボードからの Expression トリガー
 - **リップシンク連携** — 外部プラグイン（uLipSync 等）からの入力を受け付ける `ILipSyncProvider` インターフェース
