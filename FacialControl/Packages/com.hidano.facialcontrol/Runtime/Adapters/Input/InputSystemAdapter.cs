@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 using UnityEngine.InputSystem;
 using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Domain.Models;
@@ -13,14 +12,20 @@ namespace Hidano.FacialControl.Adapters.Input
     /// Button 型: ボタン押下で Expression をアクティブ/非アクティブにトグル切り替え。
     /// Value 型: 0 より大きい値でアクティブ化、0 で非アクティブ化。
     /// </summary>
-    [AddComponentMenu("FacialControl/Input System Adapter")]
-    public class InputSystemAdapter : MonoBehaviour
+    public class InputSystemAdapter : IDisposable
     {
-        [Tooltip("制御対象の FacialController")]
-        [SerializeField]
         private FacialController _facialController;
-
         private readonly Dictionary<InputAction, BindingEntry> _bindings = new Dictionary<InputAction, BindingEntry>();
+        private bool _disposed;
+
+        /// <summary>
+        /// 制御対象の FacialController を指定して生成する。
+        /// </summary>
+        /// <param name="facialController">制御対象の FacialController。null 許容。</param>
+        public InputSystemAdapter(FacialController facialController)
+        {
+            _facialController = facialController;
+        }
 
         /// <summary>
         /// 制御対象の FacialController
@@ -42,20 +47,17 @@ namespace Hidano.FacialControl.Adapters.Input
             if (action == null)
                 throw new ArgumentNullException(nameof(action));
 
-            // 既存バインディングがあれば先に解除
             UnbindExpression(action);
 
             var entry = new BindingEntry(expression, action);
             _bindings[action] = entry;
 
-            // コールバック登録
             if (action.type == InputActionType.Button)
             {
                 action.performed += entry.OnButtonPerformed;
             }
             else
             {
-                // Value 型
                 action.performed += entry.OnValuePerformed;
                 action.canceled += entry.OnValueCanceled;
             }
@@ -93,7 +95,6 @@ namespace Hidano.FacialControl.Adapters.Input
         /// </summary>
         public void UnbindAll()
         {
-            // コールバック解除のためにコピーしてイテレーション
             var actions = new List<InputAction>(_bindings.Keys);
             for (int i = 0; i < actions.Count; i++)
             {
@@ -101,9 +102,16 @@ namespace Hidano.FacialControl.Adapters.Input
             }
         }
 
-        private void OnDisable()
+        /// <summary>
+        /// アダプターを破棄し全バインディングを解除する。
+        /// </summary>
+        public void Dispose()
         {
+            if (_disposed)
+                return;
+
             UnbindAll();
+            _disposed = true;
         }
 
         private void HandleButtonToggle(BindingEntry entry)
@@ -114,7 +122,7 @@ namespace Hidano.FacialControl.Adapters.Input
             entry.IsActive = !entry.IsActive;
             if (entry.IsActive)
             {
-                　_facialController.Activate(entry.Expression);
+                _facialController.Activate(entry.Expression);
             }
             else
             {

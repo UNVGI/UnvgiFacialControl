@@ -15,8 +15,7 @@ namespace Samples
 
         private void Start()
         {
-            _adapter = gameObject.AddComponent<InputSystemAdapter>();
-            _adapter.FacialController = facialController;
+            _adapter = new InputSystemAdapter(facialController);
 
             // テスト用 Expression を手動で作成
             // ← BlendShape 名はモデルに合わせて変更
@@ -44,7 +43,7 @@ namespace Samples
         private void OnDestroy()
         {
             _smileAction?.Disable();
-            _adapter?.UnbindAll();
+            _adapter?.Dispose();
         }
     }
 }
