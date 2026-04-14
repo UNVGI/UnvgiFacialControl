@@ -443,6 +443,24 @@
 
 ---
 
+### Q8-3. InputAction と Expression の紐付けはどのように永続化しますか？
+
+**背景**: `InputSystemAdapter.BindExpression(InputAction, Expression)` API は存在するが、紐付けをコード記述以外で保存する仕組みがない。サンプル `TestExpressionToggle.cs` はコード直書きで運用に耐えない。preview.1 リリース前に実用的なキーコンフィグ手段が必要。
+
+**確認事項**:
+- InputAction 名 ↔ Expression ID の紐付けを ScriptableObject として永続化する設計で問題ないか？
+- 同梱するデフォルト InputActions の `Trigger1〜Trigger12` 方式（汎用スロット）を維持するか？
+- ランタイムでの Rebinding UI 提供は必要か？
+
+**回答**:
+- `InputBindingProfileSO` として ScriptableObject で永続化する。
+- デフォルト InputActions の `Trigger1〜Trigger12` 汎用スロット方式を維持。ユーザーは InputActions Asset を複製してキーバインドをカスタマイズ可能。
+- ランタイム Rebinding UI は提供しない（ライブラリとしてスコープ外）。InputActions Asset を Unity Editor で編集する運用とする。
+
+**決定日**: 2026-04-14
+
+---
+
 ## 9. タイムライン・アニメーション
 
 ### Q9-1. Timeline パッケージの使用目的は何ですか？
