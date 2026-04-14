@@ -48,7 +48,8 @@
       "mcp__unity-mcp__editorwindow_focus",
       "mcp__unity-mcp__selection_frame",
       "mcp__unity-mcp__transform_lookat",
-      "mcp__unity-mcp__gameobject_destroy"
+      "mcp__unity-mcp__gameobject_destroy",
+      "Bash(gh repo:*)"
     ]
   }
 }
