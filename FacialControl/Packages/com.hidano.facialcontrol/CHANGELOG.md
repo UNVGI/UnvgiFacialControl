@@ -19,6 +19,7 @@
 - `IJsonParser`、`IProfileRepository`、`ILipSyncProvider`、`IBlinkTrigger` インターフェース
 - `FacialControlConfig`、`FacialState`、`FacialOutputData` 構造体
 - `FacialProfile.RendererPaths` — Renderer パスの保持（JSON / SO 双方で同期）
+- `InputBinding`（readonly struct）— ActionName と ExpressionId を値ベースで保持する Domain 層の入力バインディングモデル
 
 #### Application 層
 - `ProfileUseCase` — プロファイル読み込み・再読み込み・Expression 取得
@@ -43,6 +44,8 @@
 - `FacialProfileMapper` — FacialProfile ⟷ FacialProfileSO 変換（RendererPaths 同期対応）
 - `FacialController`（MonoBehaviour）— メインコンポーネント（Activate / Deactivate / LoadProfile / ReloadProfile）
 - `InputSystemAdapter` — InputAction Asset との連携（Button / Value 両対応）
+- `InputBindingProfileSO`（ScriptableObject）— InputActionAsset・ActionMap 名・バインディングペア（Action ⟷ ExpressionId）を永続化するアセット
+- `FacialInputBinder`（MonoBehaviour）— `InputBindingProfileSO` を読み込み、`InputSystemAdapter` 経由で Action と Expression をバインドするシーン配置用コンポーネント
 - デフォルト InputAction Asset
 
 #### Editor 拡張
@@ -57,6 +60,12 @@
 - `ExpressionCreatorWindow` — BlendShape スライダーでリアルタイムプレビューしながら Expression 作成
 - `PreviewRenderUtility` ラッパー（カメラ / ライティング / RenderTexture 管理）
 - `ARKitDetectorWindow` — ARKit / PerfectSync 自動検出 Editor UI
+- `InputBindingProfileSOEditor` — UI Toolkit ベースの Inspector。ActionMap / Action / Expression ドロップダウンの自動列挙とバインディング行の追加・削除をサポート
+
+#### サンプル
+- `Assets/Samples/SampleFacialProfileSO.asset` — サンプル専用の最小 `FacialProfileSO`
+- `Assets/StreamingAssets/FacialControl/sample_profile.json` — まばたき Expression（固定 GUID）を含む最小 JSON
+- `Assets/Samples/SampleInputBinding.asset` — `Trigger1` をまばたき Expression にバインドする `InputBindingProfileSO`
 
 #### テンプレート
 - `default_profile.json` — デフォルト 3 レイヤー + 基本 Expression（default, blink, gaze_follow, gaze_camera）
@@ -86,9 +95,17 @@
 #### Domain 層
 - `ARKitDetector` の検出仕様を見直し、完全一致判定を修正
 
+### Breaking Changes
+
+- `InputSystemAdapter` を `MonoBehaviour` から純粋 C# クラス（`IDisposable`）へ変更
+  - 移行方法: GameObject へのアタッチを止め、`new InputSystemAdapter(facialController)` でインスタンスを生成する
+  - 終了処理は `OnDisable()` の代わりに `Dispose()` を呼び出す
+  - シーン内でキーコンフィグを扱う場合は新設の `FacialInputBinder` コンポーネントを使用する
+
 ### Removed
 
 - `ProfileManagerWindow`（Inspector 統合により不要）
 - プロファイル情報のレイヤー数・Expression 数の冗長な表示
 - JSON 読み込みボタン（Inspector 表示時の自動読み込みで代替）
 - クローン作成ボタン（Unity 標準のアセット複製で代替）
+- `Assets/Samples/TestExpressionToggle.cs`（`FacialInputBinder` + `SampleInputBinding.asset` への移行により不要）
