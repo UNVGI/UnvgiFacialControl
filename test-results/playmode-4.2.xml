@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="4" result="Passed" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-04-14 12:08:34Z" end-time="2026-04-14 12:08:35Z" duration="0.1218152">
+  <test-suite type="TestSuite" id="1271" name="FacialControl" fullname="FacialControl" runstate="Runnable" testcasecount="244" result="Passed" start-time="2026-04-14 12:08:34Z" end-time="2026-04-14 12:08:35Z" duration="0.121815" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1260" name="Hidano.FacialControl.Tests.PlayMode.dll" fullname="D:/Personal/Repositries/FacialControl/FacialControl/Library/ScriptAssemblies/Hidano.FacialControl.Tests.PlayMode.dll" runstate="Runnable" testcasecount="244" result="Passed" start-time="2026-04-14 12:08:34Z" end-time="2026-04-14 12:08:35Z" duration="0.114058" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="36564" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1261" name="Hidano" fullname="Hidano" runstate="Runnable" testcasecount="244" result="Passed" start-time="2026-04-14 12:08:34Z" end-time="2026-04-14 12:08:35Z" duration="0.111074" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1262" name="FacialControl" fullname="Hidano.FacialControl" runstate="Runnable" testcasecount="244" result="Passed" start-time="2026-04-14 12:08:34Z" end-time="2026-04-14 12:08:35Z" duration="0.107562" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1263" name="Tests" fullname="Hidano.FacialControl.Tests" runstate="Runnable" testcasecount="244" result="Passed" start-time="2026-04-14 12:08:34Z" end-time="2026-04-14 12:08:35Z" duration="0.104209" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1264" name="PlayMode" fullname="Hidano.FacialControl.Tests.PlayMode" runstate="Runnable" testcasecount="244" result="Passed" start-time="2026-04-14 12:08:34Z" end-time="2026-04-14 12:08:35Z" duration="0.100650" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestSuite" id="1266" name="Integration" fullname="Hidano.FacialControl.Tests.PlayMode.Integration" runstate="Runnable" testcasecount="99" result="Passed" start-time="2026-04-14 12:08:34Z" end-time="2026-04-14 12:08:35Z" duration="0.097232" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-suite type="TestFixture" id="1043" name="FacialInputBinderTests" fullname="Hidano.FacialControl.Tests.PlayMode.Integration.FacialInputBinderTests" classname="Hidano.FacialControl.Tests.PlayMode.Integration.FacialInputBinderTests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-04-14 12:08:34Z" end-time="2026-04-14 12:08:35Z" duration="0.094049" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="1047" name="OnDisable_UnbindsAllBindingsAndDisablesActionMap" fullname="Hidano.FacialControl.Tests.PlayMode.Integration.FacialInputBinderTests.OnDisable_UnbindsAllBindingsAndDisablesActionMap" methodname="OnDisable_UnbindsAllBindingsAndDisablesActionMap" classname="Hidano.FacialControl.Tests.PlayMode.Integration.FacialInputBinderTests" runstate="Runnable" seed="43060598" result="Passed" start-time="2026-04-14 12:08:35Z" end-time="2026-04-14 12:08:35Z" duration="0.061017" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1045" name="OnEnable_WithNullProfile_LogsWarningWithoutException" fullname="Hidano.FacialControl.Tests.PlayMode.Integration.FacialInputBinderTests.OnEnable_WithNullProfile_LogsWarningWithoutException" methodname="OnEnable_WithNullProfile_LogsWarningWithoutException" classname="Hidano.FacialControl.Tests.PlayMode.Integration.FacialInputBinderTests" runstate="Runnable" seed="1887513446" result="Passed" start-time="2026-04-14 12:08:35Z" end-time="2026-04-14 12:08:35Z" duration="0.007586" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[FacialInputBinder: _bindingProfile が未設定のためバインディング登録を行いません。
+]]></output>
+                  </test-case>
+                  <test-case id="1046" name="OnEnable_WithUnknownExpressionId_LogsWarningAndRegistersRemainingBindings" fullname="Hidano.FacialControl.Tests.PlayMode.Integration.FacialInputBinderTests.OnEnable_WithUnknownExpressionId_LogsWarningAndRegistersRemainingBindings" methodname="OnEnable_WithUnknownExpressionId_LogsWarningAndRegistersRemainingBindings" classname="Hidano.FacialControl.Tests.PlayMode.Integration.FacialInputBinderTests" runstate="Runnable" seed="574781361" result="Passed" start-time="2026-04-14 12:08:35Z" end-time="2026-04-14 12:08:35Z" duration="0.011315" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[FacialInputBinder: ExpressionId 'nonexistent-id' が FacialController のプロファイルに存在しないためバインディングをスキップします。
+]]></output>
+                  </test-case>
+                  <test-case id="1044" name="OnEnable_WithValidProfile_RegistersBindingsAndActivatesExpressionOnPress" fullname="Hidano.FacialControl.Tests.PlayMode.Integration.FacialInputBinderTests.OnEnable_WithValidProfile_RegistersBindingsAndActivatesExpressionOnPress" methodname="OnEnable_WithValidProfile_RegistersBindingsAndActivatesExpressionOnPress" classname="Hidano.FacialControl.Tests.PlayMode.Integration.FacialInputBinderTests" runstate="Runnable" seed="2111214412" result="Passed" start-time="2026-04-14 12:08:35Z" end-time="2026-04-14 12:08:35Z" duration="0.005075" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[Saving results to: C:/Users/Hidano/AppData/LocalLow/DefaultCompany/FacialControl\TestResults.xml
+]]></output>
+                  </test-case>
+                </test-suite>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>
