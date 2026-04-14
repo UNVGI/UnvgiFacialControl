@@ -148,3 +148,28 @@
   - バインディング追加・削除ボタンが要件 4.7 を満たすことを確認する
   - `InputActionAsset` / ActionMap 変更時の一覧再構築が要件 4.8 を満たすことを確認する
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8_
+
+---
+
+- [ ] 8. Documentation: クイックスタート・README・CHANGELOG の更新
+- [ ] 8.1 `quickstart.md` にキーコンフィグの設定セクションを追加する
+  - `Documentation~/quickstart.md` に「6. キーコンフィグの設定」セクションを追加する（既存セクションの番号は適宜繰り下げる）
+  - `InputBindingProfileSO` の作成手順（Project ウィンドウ → Create → FacialControl → Input Binding Profile）を記載する
+  - `FacialInputBinder` の配置と割り当て手順を記載する（FacialController と InputBindingProfileSO のアサイン）
+  - `FacialControlDefaultActions.inputactions` の `Trigger1〜Trigger12` 汎用スロットの説明を含める
+  - InputActions Asset を複製してキーバインドをカスタマイズする手順を記載する
+  - _Requirements: 6.1_
+  - _Boundary: Documentation_
+
+- [ ] 8.2 `README.md` の主要機能一覧に「キーコンフィグの永続化」を追記する
+  - パッケージ `README.md` の主要機能セクションに「キーコンフィグの永続化（`InputBindingProfileSO` + `FacialInputBinder`）」を追加する
+  - 簡潔な 1〜2 行の説明とともに、詳細は `quickstart.md` を参照させる
+  - _Requirements: 6.2_
+  - _Boundary: Documentation_
+
+- [ ] 8.3 `CHANGELOG.md` の preview.1 エントリに本機能の変更内容を記載する
+  - `CHANGELOG.md` の `[0.1.0-preview.1]` セクションに `### Added` として `InputBinding`、`InputBindingProfileSO`、`FacialInputBinder`、`InputBindingProfileSOEditor`、サンプルアセット一式の追加を記載する
+  - `### Breaking Changes` セクションを設け、`InputSystemAdapter` が MonoBehaviour から純粋 C# クラスへ変更されたことと、移行方法（`new InputSystemAdapter(facialController)` の使用）を明記する
+  - `### Removed` として `TestExpressionToggle.cs`（サンプル）の削除を記載する
+  - _Requirements: 6.3, 7.6_
+  - _Boundary: Documentation_
