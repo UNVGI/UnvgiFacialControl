@@ -50,7 +50,8 @@
       "mcp__unity-mcp__transform_lookat",
       "mcp__unity-mcp__gameobject_destroy",
       "Bash(gh repo:*)",
-      "Skill(kiro:spec-init)"
+      "Skill(kiro:spec-init)",
+      "Skill(kiro:spec-requirements)"
     ]
   }
 }
