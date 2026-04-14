@@ -91,8 +91,6 @@ namespace Hidano.FacialControl.Editor.Windows
             layerHeader.style.marginBottom = 4;
 
             var layerLabel = new Label("レイヤー定義");
-            layerLabel.style.fontSize = 13;
-            layerLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             layerHeader.Add(layerLabel);
 
             _addLayerButton = new Button(OnAddLayerClicked) { text = "レイヤー追加" };

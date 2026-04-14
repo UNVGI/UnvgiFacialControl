@@ -305,7 +305,6 @@ namespace Hidano.FacialControl.Editor.Tools
                 {
                     currentRenderer = entry.RendererName;
                     var header = new Label(entry.RendererName);
-                    header.style.unityFontStyleAndWeight = FontStyle.Bold;
                     header.style.marginTop = 8;
                     header.style.marginBottom = 2;
                     _blendShapeListView.Add(header);

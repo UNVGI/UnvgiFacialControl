@@ -342,12 +342,10 @@ namespace Hidano.FacialControl.Editor.Windows
             typeLabel.style.color = isARKit
                 ? new Color(0.4f, 0.8f, 1f)
                 : new Color(1f, 0.7f, 0.4f);
-            typeLabel.style.fontSize = 11;
             container.Add(typeLabel);
 
             var nameLabel = new Label(parameterName);
             nameLabel.style.flexGrow = 1;
-            nameLabel.style.fontSize = 12;
             container.Add(nameLabel);
 
             return container;

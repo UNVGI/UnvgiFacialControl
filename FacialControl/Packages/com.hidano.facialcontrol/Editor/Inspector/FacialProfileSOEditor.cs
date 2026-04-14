@@ -185,7 +185,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             var so0 = target as FacialProfileSO;
             string initialVersion = so0 != null && !string.IsNullOrEmpty(so0.SchemaVersion) ? so0.SchemaVersion : "---";
             _schemaVersionLabel = new Label($"スキーマバージョン: {initialVersion}");
-            _schemaVersionLabel.style.fontSize = 10;
             _schemaVersionLabel.style.color = new Color(0.5f, 0.5f, 0.5f, 1f);
             _schemaVersionLabel.style.marginBottom = 2;
             jsonFoldout.Add(_schemaVersionLabel);
@@ -1599,7 +1598,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             }
 
             var headerLabel = new Label($"RendererPaths ({paths.Length} 件)");
-            headerLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             headerLabel.style.marginBottom = 4;
             _rendererPathsContainer.Add(headerLabel);
 
@@ -1687,7 +1685,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             var placeholder = new Label("BlendShape を検索...");
             placeholder.style.position = Position.Absolute;
             placeholder.style.color = new Color(0.5f, 0.5f, 0.5f, 0.7f);
-            placeholder.style.fontSize = 11;
             placeholder.style.marginLeft = 4;
             placeholder.style.marginTop = 2;
             placeholder.pickingMode = PickingMode.Ignore;
