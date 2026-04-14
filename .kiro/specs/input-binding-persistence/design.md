@@ -54,7 +54,8 @@
 - `Hidano.FacialControl.Adapters`（`FacialController`、`FacialProfileSO`）
 - `UnityEngine.InputSystem`（`InputActionAsset`、`InputAction`、`InputActionMap`）
 - `UnityEditor`（Editor 層のみ。`InputBindingProfileSOEditor` など）
-- `FacialProfileSO._cachedProfile`（Editor がキャッシュとして参照する。変更は行わない）
+- `Hidano.FacialControl.Adapters.Json.SystemTextJsonParser`（Editor が JSON パーサーとして利用）
+- `Hidano.FacialControl.Adapters.FileSystem.FileProfileRepository`（Editor が JSON 読み込みに利用）
 
 ### Revalidation Triggers
 
@@ -71,7 +72,7 @@
 
 現状の `InputSystemAdapter` は `MonoBehaviour` として実装されており、`AddComponent<InputSystemAdapter>()` で生成される（`TestExpressionToggle.cs` 参照）。本設計ではこれを純粋 C# クラスへ変換し、`FacialInputBinder` が `new InputSystemAdapter(facialController)` で生成・保持する。
 
-`FacialProfileSO` は `_cachedProfile`（`FacialProfile?` 型）を `FacialProfileSOEditor` が保持しており、`InputBindingProfileSOEditor` はこのキャッシュを再利用して Expression 名リストを構築する（選択肢 2-B）。`FacialProfileSO` 本体には変更を加えない。
+`InputBindingProfileSOEditor` は割り当てられた `FacialProfileSO` の `JsonFilePath` を読み取り、Editor 内部で `SystemTextJsonParser` を用いて JSON を 1 度だけパースして Expression 名リストをキャッシュする（選択肢 2-B + C）。手動リフレッシュボタンを設けて JSON が外部編集された場合にも再読込できるようにする。`FacialProfileSO` 本体には一切変更を加えない（Boundary 維持）。
 
 クリーンアーキテクチャの依存方向（Domain → Application → Adapters → Editor）は維持する。`InputBinding` は Unity 非依存の Domain モデルとして定義し、`InputBindingProfileSO` が Adapters 層でシリアライズ表現を担う。
 
@@ -112,7 +113,8 @@ graph TB
     InputBindingProfileSO -->|converts to| InputBinding
     InputBindingProfileSO -->|refs| InputActionAsset
     InputBindingProfileSOEditor -->|inspects| InputBindingProfileSO
-    InputBindingProfileSOEditor -->|reads cache| FacialProfileSOEditor
+    InputBindingProfileSOEditor -->|reads JsonFilePath| FacialProfileSO_existing[FacialProfileSO\n既存・読み取り専用]
+    InputBindingProfileSOEditor -->|parses| JsonParser[SystemTextJsonParser]
     FacialController -->|uses| FacialProfile
     FacialProfile -->|contains| Expression
     InputBinding -->|ActionName + ExpressionId| Expression
@@ -121,7 +123,7 @@ graph TB
 **主要な設計決定**:
 - `InputSystemAdapter` は MonoBehaviour を廃止し、`IDisposable` による明示的なリソース管理へ移行する（選択肢 1-C）
 - `FacialInputBinder` が `InputSystemAdapter` のライフサイクルオーナーとなる（`OnEnable` で new、`OnDisable` で Dispose）
-- `InputBindingProfileSOEditor` は `FacialProfileSO` の参照を Editor 専用フィールドとして保持し、SO 本体には保存しない（選択肢 2-B）
+- `InputBindingProfileSOEditor` は `FacialProfileSO` の参照を Editor 専用フィールドとして保持し、SO 本体には保存しない。Expression 一覧は割り当て時に `JsonFilePath` から JSON を 1 度パースしてローカルキャッシュ。手動リフレッシュボタンで再読込（選択肢 2-B + C、`FacialProfileSO` 本体は不変）
 - サンプルは `NewFacialProfile.asset` から独立した最小構成とする（選択肢 3-B）
 
 ### Technology Stack
@@ -556,7 +558,9 @@ namespace Hidano.FacialControl.Adapters.Input
 - `[CustomEditor(typeof(InputBindingProfileSO))]` を付与し、UI Toolkit で実装する
 - `InputActionAsset` 参照 ObjectField を提供する（`_actionAsset` フィールドにバインド）
 - 参照用 `FacialProfileSO` は Editor 専用一時フィールドとして保持し、SO 本体には保存しない
-- `FacialProfileSO` が設定された場合、`_cachedProfile`（`FacialProfile?`）が利用可能であればそれを再利用して Expression 名リストを構築する。キャッシュが null の場合は手動リフレッシュボタンを表示する
+- `FacialProfileSO` が設定された場合、その `JsonFilePath`（`StreamingAssets/FacialControl/` 配下からの相対パス）を取得し、Editor 内部で `SystemTextJsonParser.ParseProfile()` を 1 度呼び出して Expression 名リスト・ID リストをローカルキャッシュする
+- 手動リフレッシュボタンを設け、JSON が外部編集された場合にユーザーが明示的に再読込できるようにする
+- `JsonFilePath` が空、ファイルが存在しない、パースに失敗した場合はキャッシュを空にして警告ラベルを表示する（Inspector のみの表示・例外スローしない）
 - `InputActionAsset` が設定されると ActionMap ドロップダウンを自動列挙する（`InputActionAsset.actionMaps`）
 - ActionMap が選択されると、そのマップ内の `InputAction` 名を各バインディング行の Action ドロップダウンに列挙する
 - バインディング行ごとに「削除」ボタン、一覧末尾に「追加」ボタンを提供する
@@ -565,16 +569,21 @@ namespace Hidano.FacialControl.Adapters.Input
 
 **Dependencies**
 - Outbound: `InputBindingProfileSO` — シリアライズフィールドの読み書き（P0）
-- Outbound: `FacialProfileSO._cachedProfile` — Expression 名リスト取得（P1）
+- Outbound: `FacialProfileSO.JsonFilePath` — JSON ファイルパスの取得（読み取りのみ、P0）
+- Outbound: `Hidano.FacialControl.Adapters.Json.SystemTextJsonParser` — JSON パース（P0）
 - External: `UnityEditor.UIElements`、`UnityEngine.UIElements` — UI Toolkit（P0）
 - External: `UnityEngine.InputSystem.InputActionAsset` — ActionMap / Action 名列挙（P0）
+- External: `System.IO.File` — JSON ファイル読み込み（P0）
+- External: `UnityEngine.Application.streamingAssetsPath` — JSON 絶対パス解決（P0）
 
 **Contracts**: （Editor のみ、ランタイム契約なし）
 
 **Implementation Notes**
-- `_cachedProfile` は `FacialProfileSOEditor` のプライベートフィールドであるため、直接参照不可。`FacialProfileSO` オブジェクトに対して `UnityEditor.Editor.CreateEditor(facialProfileSO)` を経由するか、`FacialProfileSO` に `CachedProfile` プロパティを追加して公開する方針のいずれかを実装時に選択する。本設計では `FacialProfileSO` に `#if UNITY_EDITOR` ガード付き `CachedProfile` プロパティを追加する方針を採用する
+- Expression 名リストは `InputBindingProfileSOEditor` のプライベートフィールドにキャッシュする。`FacialProfileSO` 本体には変更を加えない（Boundary 維持）
+- JSON 読み込み手順: `Path.Combine(Application.streamingAssetsPath, facialProfileSO.JsonFilePath)` で絶対パスを解決し、`File.ReadAllText` で UTF-8 読み込み、`SystemTextJsonParser.ParseProfile()` でパース。失敗時は `try/catch` でキャッシュを空にして Inspector に警告ラベル表示
 - Expression ドロップダウンに表示する値は Expression の `Name`（表示用）で、保存は `Id`（ExpressionId）を使用する
-- リスク: `FacialProfileSO` に JSON がロードされていない場合（`_cachedProfile == null`）、Expression ドロップダウンが空になる。手動リフレッシュボタンで対処する
+- リスク: `JsonFilePath` が外部で更新された場合、自動検知できないため手動リフレッシュボタンで対処する
+- パフォーマンス: JSON パースは `FacialProfileSO` 割り当て時とリフレッシュボタン押下時のみ実行されるため、Inspector 描画ごとの I/O は発生しない
 
 ---
 

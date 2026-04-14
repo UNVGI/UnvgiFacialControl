@@ -1,9 +1,9 @@
 {
   "feature_name": "input-binding-persistence",
   "created_at": "2026-04-14T10:55:00Z",
-  "updated_at": "2026-04-14T12:30:00Z",
+  "updated_at": "2026-04-14T13:10:00Z",
   "language": "ja",
-  "phase": "design-generated",
+  "phase": "design-approved",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -11,7 +11,7 @@
     },
     "design": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "tasks": {
       "generated": false,
