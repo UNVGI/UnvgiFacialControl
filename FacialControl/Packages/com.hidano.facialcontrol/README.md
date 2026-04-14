@@ -15,6 +15,7 @@ FacialControl は、VTuber 配信用フェイシャルキャプチャ連動や G
 - **Editor 拡張** — Inspector カスタマイズ（プロファイル管理を統合）、BlendShape スライダー付き Expression 作成ツール（UI Toolkit）
 - **JSON ファーストの永続化** — 表情設定は JSON で管理。ビルド後も差し替え可能。ScriptableObject は JSON への参照ポインター
 - **入力デバイス対応** — InputSystem によるコントローラ / キーボードからの Expression トリガー
+- **キーコンフィグの永続化**（`InputBindingProfileSO` + `FacialInputBinder`）— Action と Expression のバインディングを ScriptableObject として保存し、シーンに配置するだけでキーコンフィグを復元。詳細は [クイックスタートガイド](Documentation~/quickstart.md) を参照
 - **リップシンク連携** — 外部プラグイン（uLipSync 等）からの入力を受け付ける `ILipSyncProvider` インターフェース
 
 ## 動作要件
