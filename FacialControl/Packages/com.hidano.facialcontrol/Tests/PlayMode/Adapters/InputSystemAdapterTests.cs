@@ -20,6 +20,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters
     public class InputSystemAdapterTests : InputTestFixture
     {
         private GameObject _gameObject;
+        private InputSystemAdapter _adapter;
         private Keyboard _keyboard;
         private Gamepad _gamepad;
 
@@ -32,6 +33,11 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters
 
         public override void TearDown()
         {
+            if (_adapter != null)
+            {
+                _adapter.Dispose();
+                _adapter = null;
+            }
             if (_gameObject != null)
             {
                 UnityEngine.Object.DestroyImmediate(_gameObject);
@@ -56,10 +62,9 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters
         [Test]
         public void SetFacialController_Null_DoesNotThrow()
         {
-            _gameObject = new GameObject("InputAdapterTest");
-            var adapter = _gameObject.AddComponent<InputSystemAdapter>();
+            _adapter = new InputSystemAdapter(null);
 
-            Assert.DoesNotThrow(() => adapter.FacialController = null);
+            Assert.DoesNotThrow(() => _adapter.FacialController = null);
         }
 
         // ================================================================
@@ -255,20 +260,19 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters
         [Test]
         public void BindExpression_WithoutController_DoesNotThrow()
         {
-            _gameObject = new GameObject("InputAdapterTest");
-            var adapter = _gameObject.AddComponent<InputSystemAdapter>();
+            _adapter = new InputSystemAdapter(null);
             var expression = CreateTestExpression("expr-001", "Happy", "emotion");
 
             var action = CreateButtonAction("TriggerHappy", "<Keyboard>/1");
-            Assert.DoesNotThrow(() => adapter.BindExpression(action, expression));
+            Assert.DoesNotThrow(() => _adapter.BindExpression(action, expression));
         }
 
         // ================================================================
-        // OnDisable / OnDestroy
+        // Dispose
         // ================================================================
 
         [Test]
-        public void OnDisable_CleansUpBindings()
+        public void Dispose_CleansUpBindings()
         {
             var adapter = CreateAdapter(out var controller);
             var profile = controller.CurrentProfile.Value;
@@ -278,8 +282,9 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters
             adapter.BindExpression(action, expression);
             action.Enable();
 
-            // Adapter を無効化
-            adapter.enabled = false;
+            // Adapter を破棄
+            adapter.Dispose();
+            _adapter = null;
 
             // ボタン押下してもアクティブにならない
             Press(_keyboard.digit1Key);
@@ -299,9 +304,8 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters
             controller = _gameObject.AddComponent<FacialController>();
             controller.InitializeWithProfile(profile);
 
-            var adapter = _gameObject.AddComponent<InputSystemAdapter>();
-            adapter.FacialController = controller;
-            return adapter;
+            _adapter = new InputSystemAdapter(controller);
+            return _adapter;
         }
 
         private InputSystemAdapter CreateAdapterWithBlendLayer(out FacialController controller)
@@ -311,9 +315,8 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters
             controller = _gameObject.AddComponent<FacialController>();
             controller.InitializeWithProfile(profile);
 
-            var adapter = _gameObject.AddComponent<InputSystemAdapter>();
-            adapter.FacialController = controller;
-            return adapter;
+            _adapter = new InputSystemAdapter(controller);
+            return _adapter;
         }
 
         private static GameObject CreateGameObjectWithAnimatorAndRenderer()
