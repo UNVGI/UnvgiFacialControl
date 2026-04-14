@@ -6,7 +6,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Hidano.FacialControl.Adapters.ScriptableObject;
-using Hidano.FacialControl.Domain.Models;
+using InputBinding = Hidano.FacialControl.Domain.Models.InputBinding;
 
 namespace Hidano.FacialControl.Tests.EditMode.Adapters
 {
