@@ -8,9 +8,9 @@
 
 ## Boundary Context
 
-- **In scope**: `InputBinding` ドメインモデルの定義、`InputBindingProfileSO` ScriptableObject の新設、`FacialInputBinder` MonoBehaviour の新設、Inspector カスタマイズ（`InputBindingProfileSOEditor`）、サンプルシーンの更新、ドキュメント更新
-- **Out of scope**: ランタイム Rebinding UI の提供、InputActions Asset の自動生成・変更、`InputSystemAdapter` の変更、音声解析・リップシンク、VRM / タイムライン統合
-- **Adjacent expectations**: 既存の `InputSystemAdapter.BindExpression(InputAction, Expression)` API を内部で利用する。`FacialControlDefaultActions.inputactions` の `Trigger1〜Trigger12` 汎用スロット方式は維持する。
+- **In scope**: `InputBinding` ドメインモデルの定義、`InputBindingProfileSO` ScriptableObject の新設、`FacialInputBinder` MonoBehaviour の新設、Inspector カスタマイズ（`InputBindingProfileSOEditor`）、`InputSystemAdapter` の MonoBehaviour → 純粋 C# クラスへのリファクタリング、サンプルシーンの更新（専用の最小 `FacialProfile` 一式を新規作成）、ドキュメント更新
+- **Out of scope**: ランタイム Rebinding UI の提供、InputActions Asset の自動生成・変更、音声解析・リップシンク、VRM / タイムライン統合
+- **Adjacent expectations**: 既存の `InputSystemAdapter.BindExpression(InputAction, Expression)` API シグネチャは維持する（呼び出し方法は `AddComponent` から `new` に変わる）。`FacialControlDefaultActions.inputactions` の `Trigger1〜Trigger12` 汎用スロット方式は維持する。サンプルシーンは既存の `NewFacialProfile.asset` には依存させず、独立した最小サンプルプロファイルを新設して整合性を保証する。
 
 ## Requirements
 
@@ -77,14 +77,17 @@
 
 ### 5. サンプルシーンの更新
 
-**Objective:** As a Unity エンジニア, I want サンプルシーンが `FacialInputBinder` + `SampleInputBinding.asset` ベースで動作する, so that コード直書きなしのキーコンフィグの実用例を参照できる。
+**Objective:** As a Unity エンジニア, I want サンプルシーンが `FacialInputBinder` + 専用最小プロファイル + `SampleInputBinding.asset` で完結して動作する, so that 既存プロファイルに依存せずキーコンフィグの実用例を即座に参照できる。
 
 #### Acceptance Criteria
 
 1. When preview.1 リリース時, the FacialControl shall `TestExpressionToggle.cs` と対応する `.meta` ファイルを削除する。
-2. The FacialControl shall `SampleInputBinding.asset`（`InputBindingProfileSO`）を `FacialControl/Assets/Samples/` 配下に提供し、`FacialControlDefaultActions.inputactions` を参照した状態で `Trigger1` がまばたき Expression にバインドされていること。
-3. When サンプルシーンが実行された場合, the FacialControl shall キーボード `1` キー押下でまばたき表情がトグル動作することを確認できる。
-4. The FacialControl shall サンプルシーンの対象 GameObject から `TestExpressionToggle` コンポーネントを削除し、`FacialInputBinder` コンポーネントを設定した状態とする。
+2. The FacialControl shall サンプル専用の最小 `FacialProfile` JSON（`FacialControl/Assets/StreamingAssets/FacialControl/sample_profile.json`）を新設し、Donut-Chan モデルの「まばたき」BlendShape を使うまばたき Expression（固定 GUID）を含める。
+3. The FacialControl shall サンプル専用の `SampleFacialProfileSO.asset`（`FacialProfileSO`）を `FacialControl/Assets/Samples/` 配下に新設し、`sample_profile.json` を参照する。
+4. The FacialControl shall `SampleInputBinding.asset`（`InputBindingProfileSO`）を `FacialControl/Assets/Samples/` 配下に提供し、`FacialControlDefaultActions.inputactions` を参照した状態で `Trigger1` が手順 2 のまばたき Expression ID にバインドされていること。
+5. When サンプルシーンが実行された場合, the FacialControl shall キーボード `1` キー押下でまばたき表情がトグル動作することを確認できる。
+6. The FacialControl shall サンプルシーンの対象 GameObject から `TestExpressionToggle` コンポーネントを削除し、`FacialController` の Profile に `SampleFacialProfileSO` を設定し、`FacialInputBinder` コンポーネントを追加して `SampleInputBinding.asset` を割り当てた状態とする。
+7. The FacialControl shall 既存の `NewFacialProfile.asset` をサンプルシーンから参照しないようにし、サンプルが独立した状態を保つ（`NewFacialProfile.asset` は別の例として残置可能）。
 
 ---
 
@@ -97,3 +100,18 @@
 1. The FacialControl shall `quickstart.md` に「キーコンフィグの設定」セクションを追加し、`InputBindingProfileSO` の作成手順・`FacialInputBinder` の配置と割り当て・`Trigger1〜Trigger12` スロットの説明・カスタマイズ手順（InputActions Asset の複製方法）を含める。
 2. The FacialControl shall `README.md` の主要機能一覧に「キーコンフィグの永続化（`InputBindingProfileSO` + `FacialInputBinder`）」を追記する。
 3. The FacialControl shall `CHANGELOG.md` の preview.1 エントリに P23 の変更内容を記載する。
+
+---
+
+### 7. InputSystemAdapter のリファクタリング
+
+**Objective:** As a Unity エンジニア, I want `InputSystemAdapter` が MonoBehaviour ではなく純粋 C# クラスとして提供される, so that `FacialInputBinder` から `new` で生成・破棄でき、GameObject へのコンポーネント追加が不要になる。
+
+#### Acceptance Criteria
+
+1. The `InputSystemAdapter` shall MonoBehaviour 派生から純粋 C# クラスへ変更され、`[AddComponentMenu]` 属性を削除する。
+2. The `InputSystemAdapter` shall 既存の public API シグネチャ（`BindExpression(InputAction, Expression)`, `UnbindExpression(InputAction)`, `UnbindAll()`, `FacialController` プロパティ）を維持する。
+3. The `InputSystemAdapter` shall `FacialController` の参照を `[SerializeField]` ではなくコンストラクタ引数または public プロパティで受け取る。
+4. The `InputSystemAdapter` shall `OnDisable` MonoBehaviour ライフサイクルの代わりに `IDisposable` を実装し、`Dispose()` で `UnbindAll()` を呼び出す。
+5. The FacialControl shall 既存の `InputSystemAdapterTests`（PlayMode）を新しい API 形態に合わせて修正し、Green を維持する。
+6. When 既存の `InputSystemAdapter` をシーン内で `AddComponent` 経由で利用していた場合, the FacialControl shall コンパイルエラーとして検知され、CHANGELOG.md に破壊的変更として明記される。
