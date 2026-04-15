@@ -55,6 +55,15 @@ namespace Hidano.FacialControl.Editor.Common
             _previewInstance.transform.rotation = Quaternion.identity;
 
             _previewRenderUtility.AddSingleGO(_previewInstance);
+
+            var bounds = CalculateBounds(_previewInstance);
+            var pivotPoint = bounds.center;
+            var pivotDistance = bounds.extents.magnitude * 2f;
+            var rotation = Quaternion.identity;
+            var position = pivotPoint - rotation * Vector3.forward * pivotDistance;
+
+            _initialState = new CameraState(position, rotation, pivotPoint, pivotDistance);
+            _state = _initialState;
         }
 
         public void Cleanup()
