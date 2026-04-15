@@ -9,7 +9,8 @@
         "Unity.Collections",
         "Unity.InputSystem",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "SceneViewStyleCameraController"
     ],
     "includePlatforms": [
         "Editor"

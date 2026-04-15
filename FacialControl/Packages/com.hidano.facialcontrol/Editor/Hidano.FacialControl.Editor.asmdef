@@ -5,7 +5,8 @@
         "Hidano.FacialControl.Domain",
         "Hidano.FacialControl.Application",
         "Hidano.FacialControl.Adapters",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "SceneViewStyleCameraController"
     ],
     "includePlatforms": [
         "Editor"
