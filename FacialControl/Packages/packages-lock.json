@@ -9,6 +9,15 @@
         "com.hidano.uosc": "1.0.0"
       }
     },
+    "com.hidano.scene-view-style-camera-controller": {
+      "version": "1.0.0",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.inputsystem": "1.4.0"
+      },
+      "url": "https://registry.npmjs.org"
+    },
     "com.hidano.unity-mcp-custom-tools": {
       "version": "git+ssh://git@github-personal/NHidano/UnityMCPCustomTools.git?path=UnityMCPCustomTools/Packages/UnityMCPCustomTools",
       "depth": 0,
