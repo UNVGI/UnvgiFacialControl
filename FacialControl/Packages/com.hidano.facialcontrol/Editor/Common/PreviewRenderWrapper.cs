@@ -122,19 +122,21 @@ namespace Hidano.FacialControl.Editor.Common
 
             var previous = _state;
 
+            var verticalFlippedDelta = new Vector2(frame.Delta.x, -frame.Delta.y);
+
             switch (frame.EventType)
             {
                 case EventType.MouseDrag when frame.Button == 0 && frame.Alt:
-                    _state = OrbitHandler.Apply(_state, frame.Delta, OrbitSensitivity, MinPivotDistance);
+                    _state = OrbitHandler.Apply(_state, verticalFlippedDelta, OrbitSensitivity, MinPivotDistance);
                     break;
                 case EventType.MouseDrag when frame.Button == 2:
-                    _state = PanHandler.Apply(_state, frame.Delta, PanSensitivity, MinPivotDistance);
+                    _state = PanHandler.Apply(_state, verticalFlippedDelta, PanSensitivity, MinPivotDistance);
                     break;
                 case EventType.ScrollWheel:
                     _state = DollyHandler.Apply(_state, frame.ScrollDelta.y, DollyScrollSensitivity, MinPivotDistance);
                     break;
                 case EventType.MouseDrag when frame.Button == 1 && frame.Alt:
-                    _state = DollyHandler.Apply(_state, frame.Delta.y, DollyDragSensitivity, MinPivotDistance);
+                    _state = DollyHandler.Apply(_state, -frame.Delta.y, DollyDragSensitivity, MinPivotDistance);
                     break;
                 default:
                     return false;
