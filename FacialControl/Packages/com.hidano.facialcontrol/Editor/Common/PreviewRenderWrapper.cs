@@ -99,11 +99,50 @@ namespace Hidano.FacialControl.Editor.Common
         public bool HandleInput(Rect rect)
         {
             var evt = Event.current;
+            var scrollDelta = evt.type == EventType.ScrollWheel ? evt.delta : Vector2.zero;
+            var frame = new PreviewInputFrame(
+                evt.type,
+                evt.button,
+                evt.mousePosition,
+                evt.delta,
+                scrollDelta,
+                evt.alt);
 
-            if (!rect.Contains(evt.mousePosition))
+            var changed = HandleInput(rect, frame);
+            if (changed)
+                evt.Use();
+            return changed;
+        }
+
+        public bool HandleInput(Rect rect, PreviewInputFrame frame)
+        {
+            if (!rect.Contains(frame.MousePosition))
                 return false;
 
-            return false;
+            var previous = _state;
+
+            switch (frame.EventType)
+            {
+                case EventType.MouseDrag when frame.Button == 0 && frame.Alt:
+                    _state = OrbitHandler.Apply(_state, frame.Delta, OrbitSensitivity, MinPivotDistance);
+                    break;
+                case EventType.MouseDrag when frame.Button == 2:
+                    _state = PanHandler.Apply(_state, frame.Delta, PanSensitivity, MinPivotDistance);
+                    break;
+                case EventType.ScrollWheel:
+                    _state = DollyHandler.Apply(_state, frame.ScrollDelta.y, DollyScrollSensitivity, MinPivotDistance);
+                    break;
+                case EventType.MouseDrag when frame.Button == 1 && frame.Alt:
+                    _state = DollyHandler.Apply(_state, frame.Delta.y, DollyDragSensitivity, MinPivotDistance);
+                    break;
+                default:
+                    return false;
+            }
+
+            return _state.position != previous.position
+                || _state.rotation != previous.rotation
+                || _state.pivotPoint != previous.pivotPoint
+                || _state.pivotDistance != previous.pivotDistance;
         }
 
         public static Bounds CalculateBounds(GameObject go)
