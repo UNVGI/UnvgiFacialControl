@@ -35,7 +35,7 @@ ExpressionCreatorWindow のプレビューカメラ制御を、`PreviewRenderWra
 
 1. The PreviewRenderWrapper shall `_rotation`（`Vector2`）・`_zoom`（`float`）・`_isDragging`（`bool`）・`_lastMousePos`（`Vector2`）のフィールドを持たないこと。
 2. The PreviewRenderWrapper shall `SceneViewStyleCameraController.CameraState` 型のフィールドを内部状態として保持し、カメラ位置・姿勢の計算に使用すること。
-3. The PreviewRenderWrapper shall 初期 `CameraState` を「対象 GameObject のバウンディングボックス中心から一定距離後方」に設定し、`Setup()` 呼び出し時に初期化すること。
+3. The PreviewRenderWrapper shall 初期 `CameraState` を `pivotPoint = bounds.center`、`pivotDistance = bounds.extents.magnitude * 2f`、`rotation = Quaternion.identity`、`position = pivotPoint - rotation * Vector3.forward * pivotDistance` で算出し、`Setup()` 呼び出し時に初期化すること。
 4. When `Render(rect)` が呼ばれる, the PreviewRenderWrapper shall `CameraState` から `PreviewRenderUtility.camera` の `transform.position` および `transform.rotation` を設定してレンダリングすること。
 5. The PreviewRenderWrapper shall 既存の `public` プロパティ（`IsInitialized`・`PreviewInstance`）および `Setup()`・`Cleanup()`・`Render()`・`HandleInput()`・`Dispose()`・`CalculateBounds()` のシグネチャを維持すること（`Rotation` プロパティ・`Zoom` プロパティは削除してよい）。
 6. The PreviewRenderWrapper shall `RotationSensitivity`・`ZoomSensitivity`・`ZoomMin`・`ZoomMax`・`PitchLimit` の定数を廃止し、Handler が提供する感度パラメータで代替すること。
@@ -94,9 +94,9 @@ ExpressionCreatorWindow のプレビューカメラ制御を、`PreviewRenderWra
 
 #### Acceptance Criteria
 
-1. The PreviewRenderWrapper shall `HandleInput(Rect rect)` が `Event.current` を直接参照する形で実装され、テストからは偽の `Event` を注入できるよう内部ロジックを `HandleInput(Rect rect, Event evt)` 等のオーバーロードまたは protected 仮想メソッドに切り出すこと（EditMode テストが IMGUI コンテキスト外で呼び出せる形にする）。
+1. The PreviewRenderWrapper shall IMGUI 入力を表す独自 `PreviewInputFrame` 構造体（マウスボタン状態・座標・デルタ・スクロール量・modifier キー状態を持つ値型）を定義し、`HandleInput(Rect rect)` は内部で `Event.current` を `PreviewInputFrame` に変換して `HandleInput(Rect rect, PreviewInputFrame frame)` オーバーロードを呼び出す形で実装すること。EditMode テストは `HandleInput(Rect rect, PreviewInputFrame frame)` に直接 `PreviewInputFrame` インスタンスを渡すことで IMGUI コンテキスト外から Handler 結線を検証できること。
 2. When Alt+左ドラッグに相当する入力データが与えられる, the PreviewRenderWrapper shall `OrbitHandler.Apply` が呼ばれた後の `CameraState` がドラッグ前の状態と異なること（EditMode テストで検証可能）。
 3. When 中ドラッグに相当する入力データが与えられる, the PreviewRenderWrapper shall `PanHandler.Apply` が呼ばれた後の `CameraState` がパン前の状態と異なること（EditMode テストで検証可能）。
 4. When ホイールスクロールに相当する入力データが与えられる, the PreviewRenderWrapper shall `DollyHandler.Apply` が呼ばれた後の `CameraState` がドリー前の状態と異なること（EditMode テストで検証可能）。
 5. The PreviewRenderWrapper shall `ResetCamera()` 呼び出し後の `CameraState` が `Setup()` 直後の初期値と等しいこと（EditMode テストで検証可能）。
-6. The PreviewRenderWrapper shall EditMode テストが `FacialControl/Packages/com.hidano.facialcontrol/Tests/EditMode/Editor/Common/` に配置されること。
+6. The PreviewRenderWrapper shall EditMode テストが `FacialControl/Packages/com.hidano.facialcontrol/Tests/EditMode/Editor/` に配置されること（Common サブディレクトリは設けない）。
