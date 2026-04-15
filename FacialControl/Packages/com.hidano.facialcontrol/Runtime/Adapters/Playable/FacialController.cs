@@ -505,7 +505,7 @@ namespace Hidano.FacialControl.Adapters.Playable
                 return CreateDefaultProfile();
             }
 
-            var fullPath = Path.Combine(Application.streamingAssetsPath, so.JsonFilePath);
+            var fullPath = Path.Combine(UnityEngine.Application.streamingAssetsPath, so.JsonFilePath);
             if (!File.Exists(fullPath))
             {
                 Debug.LogWarning(
