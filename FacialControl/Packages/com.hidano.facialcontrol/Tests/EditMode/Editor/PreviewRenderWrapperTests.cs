@@ -103,5 +103,60 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
 
             Assert.IsFalse(result);
         }
+
+        [Test]
+        public void HandleInput_InsideRect_Changed_ReturnsTrue()
+        {
+            var frame = new PreviewInputFrame(
+                EventType.MouseDrag,
+                button: 2,
+                mousePosition: new Vector2(100, 100),
+                delta: new Vector2(5f, 5f),
+                scrollDelta: Vector2.zero,
+                alt: false);
+
+            var result = _wrapper.HandleInput(_rect, frame);
+
+            Assert.IsTrue(result);
+        }
+
+        [Test]
+        public void ResetCamera_RestoresInitialState()
+        {
+            var orbitFrame = new PreviewInputFrame(
+                EventType.MouseDrag,
+                button: 0,
+                mousePosition: new Vector2(256, 256),
+                delta: new Vector2(20f, 10f),
+                scrollDelta: Vector2.zero,
+                alt: true);
+            var scrollFrame = new PreviewInputFrame(
+                EventType.ScrollWheel,
+                button: 0,
+                mousePosition: new Vector2(256, 256),
+                delta: Vector2.zero,
+                scrollDelta: new Vector2(0f, 5f),
+                alt: false);
+
+            _wrapper.HandleInput(_rect, orbitFrame);
+            _wrapper.HandleInput(_rect, scrollFrame);
+
+            _wrapper.ResetCamera();
+
+            var verifyFrame = new PreviewInputFrame(
+                EventType.MouseDrag,
+                button: 0,
+                mousePosition: new Vector2(256, 256),
+                delta: new Vector2(20f, 10f),
+                scrollDelta: Vector2.zero,
+                alt: true);
+
+            var freshWrapper = new PreviewRenderWrapper();
+            var resultAfterReset = _wrapper.HandleInput(_rect, verifyFrame);
+            var resultFresh = freshWrapper.HandleInput(_rect, verifyFrame);
+            freshWrapper.Dispose();
+
+            Assert.AreEqual(resultFresh, resultAfterReset);
+        }
     }
 }
