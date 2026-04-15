@@ -145,6 +145,11 @@ namespace Hidano.FacialControl.Editor.Common
                 || _state.pivotDistance != previous.pivotDistance;
         }
 
+        public void ResetCamera()
+        {
+            _state = _initialState;
+        }
+
         public static Bounds CalculateBounds(GameObject go)
         {
             var renderers = go.GetComponentsInChildren<Renderer>(true);
