@@ -122,6 +122,12 @@ namespace Hidano.FacialControl.Editor.Tools
             _previewContainer.style.backgroundColor = new Color(0.15f, 0.15f, 0.15f, 1f);
             leftPanel.Add(_previewContainer);
 
+            // カメラリセットボタン
+            var cameraResetButton = new Button(OnCameraReset) { text = "カメラリセット" };
+            cameraResetButton.AddToClassList(FacialControlStyles.ActionButton);
+            cameraResetButton.style.marginTop = 4;
+            leftPanel.Add(cameraResetButton);
+
             // リセットボタン
             var resetButton = new Button(OnResetBlendShapes) { text = "全スライダーリセット" };
             resetButton.AddToClassList(FacialControlStyles.ActionButton);
@@ -385,6 +391,12 @@ namespace Hidano.FacialControl.Editor.Tools
 
             RebuildBlendShapeList();
             ApplyAllBlendShapesToPreview();
+        }
+
+        private void OnCameraReset()
+        {
+            _previewWrapper.ResetCamera();
+            _previewContainer.MarkDirtyRepaint();
         }
 
         // ========================================
