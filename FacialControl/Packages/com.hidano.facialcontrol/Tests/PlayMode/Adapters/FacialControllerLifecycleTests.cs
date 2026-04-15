@@ -127,6 +127,32 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters
         }
 
         // ================================================================
+        // JSON 読み込みによる初期化
+        // ================================================================
+
+        [UnityTest]
+        public IEnumerator Initialize_WithJsonFilePath_LoadsProfileFromStreamingAssets()
+        {
+            _gameObject = CreateGameObjectWithAnimatorAndRenderer();
+            var controller = _gameObject.AddComponent<FacialController>();
+            var profileSO = UnityEngine.ScriptableObject.CreateInstance<FacialProfileSO>();
+            profileSO.JsonFilePath = "FacialControl/sample_profile.json";
+            controller.ProfileSO = profileSO;
+
+            controller.Initialize();
+
+            yield return null;
+
+            Assert.IsTrue(controller.IsInitialized, "Initialize 後に IsInitialized が true になること");
+            Assert.IsTrue(controller.CurrentProfile.HasValue, "CurrentProfile が null でないこと");
+
+            var expression = controller.CurrentProfile.Value.FindExpressionById(
+                "11111111-1111-1111-1111-111111111111");
+            Assert.IsTrue(expression.HasValue, "JSON に定義された Expression が検索可能であること");
+            Assert.AreEqual("blink", expression.Value.Name);
+        }
+
+        // ================================================================
         // OnDisable 破棄
         // ================================================================
 

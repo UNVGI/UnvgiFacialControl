@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.Playables;
+using Hidano.FacialControl.Adapters.FileSystem;
+using Hidano.FacialControl.Adapters.Json;
 using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Application.UseCases;
 using Hidano.FacialControl.Domain.Models;
@@ -191,18 +194,8 @@ namespace Hidano.FacialControl.Adapters.Playable
             // BlendShape 名を収集
             _blendShapeNames = CollectBlendShapeNames(renderers);
 
-            // プロファイルを構築（JSON パスがない場合はデフォルトの空プロファイルを使用）
-            FacialProfile profile;
-            if (!string.IsNullOrWhiteSpace(_profileSO.JsonFilePath))
-            {
-                // 通常は IProfileRepository 経由だが、テスト用のフォールバック
-                // 実際のファイル読み込みは FacialProfileMapper を使用する
-                profile = CreateDefaultProfile();
-            }
-            else
-            {
-                profile = CreateDefaultProfile();
-            }
+            // プロファイルを構築（JSON パスが設定されていれば StreamingAssets から読み込む）
+            FacialProfile profile = LoadProfileFromSO(_profileSO);
 
             InitializeInternal(profile);
         }
@@ -302,8 +295,7 @@ namespace Hidano.FacialControl.Adapters.Playable
 
             _profileSO = profileSO;
 
-            // デフォルトプロファイルで再初期化
-            var profile = CreateDefaultProfile();
+            var profile = LoadProfileFromSO(profileSO);
             InitializeInternal(profile);
         }
 
@@ -504,6 +496,34 @@ namespace Hidano.FacialControl.Adapters.Playable
 
             _expressionUseCase = null;
             _isInitialized = false;
+        }
+
+        private static FacialProfile LoadProfileFromSO(FacialProfileSO so)
+        {
+            if (so == null || string.IsNullOrWhiteSpace(so.JsonFilePath))
+            {
+                return CreateDefaultProfile();
+            }
+
+            var fullPath = Path.Combine(Application.streamingAssetsPath, so.JsonFilePath);
+            if (!File.Exists(fullPath))
+            {
+                Debug.LogWarning(
+                    $"FacialController: プロファイル JSON が見つかりません: {fullPath}。デフォルトプロファイルで初期化します。");
+                return CreateDefaultProfile();
+            }
+
+            try
+            {
+                var repository = new FileProfileRepository(new SystemTextJsonParser());
+                return repository.LoadProfile(fullPath);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning(
+                    $"FacialController: プロファイル JSON の読み込みに失敗しました: {ex.Message}。デフォルトプロファイルで初期化します。");
+                return CreateDefaultProfile();
+            }
         }
 
         private static FacialProfile CreateDefaultProfile()
