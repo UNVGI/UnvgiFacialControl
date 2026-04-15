@@ -28,6 +28,9 @@ namespace Hidano.FacialControl.Editor.Common
         private CameraState _state;
         private CameraState _initialState;
 
+        private int _dragButton = -1;
+        private bool _dragAlt;
+
         public bool IsInitialized => _previewRenderUtility != null && _previewInstance != null;
 
         public GameObject PreviewInstance => _previewInstance;
@@ -58,9 +61,9 @@ namespace Hidano.FacialControl.Editor.Common
             _previewRenderUtility.AddSingleGO(_previewInstance);
 
             var bounds = CalculateBounds(_previewInstance);
-            var pivotPoint = bounds.center;
+            var pivotPoint = CalculatePivotPoint(_previewInstance, bounds);
             var pivotDistance = bounds.extents.magnitude * 2f;
-            var rotation = Quaternion.identity;
+            var rotation = Quaternion.Euler(0f, 180f, 0f);
             var position = pivotPoint - rotation * Vector3.forward * pivotDistance;
 
             _initialState = new CameraState(position, rotation, pivotPoint, pivotDistance);
@@ -117,7 +120,28 @@ namespace Hidano.FacialControl.Editor.Common
 
         public bool HandleInput(Rect rect, PreviewInputFrame frame)
         {
-            if (!rect.Contains(frame.MousePosition))
+            if (frame.EventType == EventType.MouseDown)
+            {
+                if (rect.Contains(frame.MousePosition))
+                {
+                    _dragButton = frame.Button;
+                    _dragAlt = frame.Alt;
+                }
+                return false;
+            }
+
+            if (frame.EventType == EventType.MouseUp)
+            {
+                if (_dragButton == frame.Button)
+                    _dragButton = -1;
+                return false;
+            }
+
+            bool isCapturedDrag = frame.EventType == EventType.MouseDrag && _dragButton >= 0;
+            int button = isCapturedDrag ? _dragButton : frame.Button;
+            bool alt = isCapturedDrag ? _dragAlt : frame.Alt;
+
+            if (!isCapturedDrag && !rect.Contains(frame.MousePosition))
                 return false;
 
             var previous = _state;
@@ -126,16 +150,16 @@ namespace Hidano.FacialControl.Editor.Common
 
             switch (frame.EventType)
             {
-                case EventType.MouseDrag when frame.Button == 0 && frame.Alt:
+                case EventType.MouseDrag when button == 0 && alt:
                     _state = OrbitHandler.Apply(_state, verticalFlippedDelta, OrbitSensitivity, MinPivotDistance);
                     break;
-                case EventType.MouseDrag when frame.Button == 2:
+                case EventType.MouseDrag when button == 2:
                     _state = PanHandler.Apply(_state, verticalFlippedDelta, PanSensitivity, MinPivotDistance);
                     break;
                 case EventType.ScrollWheel:
                     _state = DollyHandler.Apply(_state, frame.ScrollDelta.y, DollyScrollSensitivity, MinPivotDistance);
                     break;
-                case EventType.MouseDrag when frame.Button == 1 && frame.Alt:
+                case EventType.MouseDrag when button == 1 && alt:
                     _state = DollyHandler.Apply(_state, -frame.Delta.y, DollyDragSensitivity, MinPivotDistance);
                     break;
                 default:
@@ -151,6 +175,22 @@ namespace Hidano.FacialControl.Editor.Common
         public void ResetCamera()
         {
             _state = _initialState;
+        }
+
+        public static Vector3 CalculatePivotPoint(GameObject go, Bounds fallbackBounds)
+        {
+            var animator = go.GetComponentInChildren<Animator>();
+            if (animator != null && animator.isHuman)
+            {
+                var headBone = animator.GetBoneTransform(HumanBodyBones.Head);
+                if (headBone != null)
+                {
+                    var headHeight = headBone.position.y;
+                    return new Vector3(fallbackBounds.center.x, headHeight, fallbackBounds.center.z);
+                }
+            }
+
+            return fallbackBounds.center;
         }
 
         public static Bounds CalculateBounds(GameObject go)
