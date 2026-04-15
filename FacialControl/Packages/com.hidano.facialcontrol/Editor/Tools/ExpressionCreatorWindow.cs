@@ -479,8 +479,17 @@ namespace Hidano.FacialControl.Editor.Tools
 
             var rect = GUILayoutUtility.GetRect(PreviewSize, PreviewSize);
 
+            var evt = Event.current;
+            if (evt.type == EventType.MouseDown && rect.Contains(evt.mousePosition))
+                _previewContainer.CaptureMouse();
+            else if (evt.type == EventType.MouseUp && _previewContainer.HasMouseCapture())
+                _previewContainer.ReleaseMouse();
+
             if (_previewWrapper.HandleInput(rect))
+            {
+                _previewContainer.MarkDirtyRepaint();
                 Repaint();
+            }
 
             _previewWrapper.Render(rect);
         }
