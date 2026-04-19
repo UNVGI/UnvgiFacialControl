@@ -60,7 +60,8 @@
       "Read(//tmp/**)",
       "Bash(docfx build *)",
       "Bash(git rm *)",
-      "Bash(dotnet tool uninstall *)"
+      "Bash(dotnet tool uninstall *)",
+      "WebFetch(domain:docs.unity3d.com)"
     ]
   }
 }
