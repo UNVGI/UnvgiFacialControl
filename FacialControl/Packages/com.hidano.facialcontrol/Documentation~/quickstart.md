@@ -43,15 +43,7 @@ BlendShape を多数持つモデルであれば何でも動作しますが、以
 
 ### ローカルインストール
 
-リポジトリをクローンして `Packages/` ディレクトリに配置する場合:
-
-```json
-{
-    "dependencies": {
-        "com.hidano.facialcontrol": "file:com.hidano.facialcontrol"
-    }
-}
-```
+リポジトリをクローンして `Packages/com.hidano.facialcontrol/` に配置するだけで Unity が自動的に UPM パッケージとして認識します。`manifest.json` の編集は不要です。
 
 ## 2. プロファイル JSON の作成
 
