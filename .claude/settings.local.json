@@ -58,7 +58,9 @@
       "Bash(dotnet --version)",
       "Bash(docfx metadata *)",
       "Read(//tmp/**)",
-      "Bash(docfx build *)"
+      "Bash(docfx build *)",
+      "Bash(git rm *)",
+      "Bash(dotnet tool uninstall *)"
     ]
   }
 }

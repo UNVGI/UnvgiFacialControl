@@ -251,8 +251,3 @@ WiX.Toolset.DummyFile.txt
 GitHubVS.sln.DotSettings
 */UserSettings
 FacialControl/Assets/Samples/ARKitModel
-
-# DocFX build artifacts
-/_site/
-/api/*
-!/api/index.md
