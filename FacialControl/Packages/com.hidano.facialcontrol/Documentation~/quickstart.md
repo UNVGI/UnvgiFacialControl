@@ -20,16 +20,16 @@ BlendShape を多数持つモデルであれば何でも動作しますが、以
 
 ## 1. パッケージのインストール
 
-### OpenUPM 経由（推奨）
+### npm レジストリ経由（推奨）
 
-`Packages/manifest.json` に以下を追加してください。
+`Packages/manifest.json` に以下を追加してください。`com.hidano` スコープを npm レジストリ（registry.npmjs.org）に向ける設定です。
 
 ```json
 {
     "scopedRegistries": [
         {
-            "name": "OpenUPM",
-            "url": "https://package.openupm.com",
+            "name": "npmjs",
+            "url": "https://registry.npmjs.org",
             "scopes": [
                 "com.hidano"
             ]
