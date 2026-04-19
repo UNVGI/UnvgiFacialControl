@@ -539,7 +539,7 @@ JSON (FacialProfile)
 | Editor 拡張（フルエディタ） | 含む |
 | OSC 通信 | 含む |
 | ARKit / PerfectSync 完全対応 | 含む |
-| API ドキュメント（DocFX 自動生成） | 含む |
+| パッケージドキュメント（README / Documentation~ の Markdown） | 含む |
 | サンプルシーン | 含まない（別リポジトリまたは後のリリースで提供） |
 | OSC マッピング Editor UI | 含まない（JSON 直接編集のみ） |
 
