@@ -53,7 +53,12 @@
       "Skill(kiro:spec-init)",
       "Skill(kiro:spec-requirements)",
       "Skill(kiro:spec-design)",
-      "Bash(git mv *)"
+      "Bash(git mv *)",
+      "Bash(docfx --version)",
+      "Bash(dotnet --version)",
+      "Bash(docfx metadata *)",
+      "Read(//tmp/**)",
+      "Bash(docfx build *)"
     ]
   }
 }

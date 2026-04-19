@@ -3,13 +3,12 @@
     {
       "src": [
         {
-          "src": "FacialControl/Packages/com.hidano.facialcontrol",
+          "src": "FacialControl",
           "files": [
-            "Runtime/**/*.cs",
-            "Editor/**/*.cs"
-          ],
-          "exclude": [
-            "Tests/**"
+            "Hidano.FacialControl.Domain.csproj",
+            "Hidano.FacialControl.Application.csproj",
+            "Hidano.FacialControl.Adapters.csproj",
+            "Hidano.FacialControl.Editor.csproj"
           ]
         }
       ],
@@ -24,33 +23,33 @@
     "content": [
       {
         "files": [
+          "index.md",
+          "toc.yml"
+        ]
+      },
+      {
+        "files": [
           "api/**.yml",
           "api/index.md"
         ]
       },
       {
         "files": [
-          "docs/toc.yml",
-          "docs/*.md"
-        ]
-      },
-      {
-        "files": [
-          "toc.yml",
-          "index.md"
+          "manual/**.md",
+          "manual/toc.yml"
         ]
       }
     ],
     "resource": [
       {
         "files": [
-          "docs/images/**"
+          "manual/images/**"
         ]
       }
     ],
     "dest": "_site",
     "globalMetadata": {
-      "_appTitle": "FacialControl API Reference",
+      "_appTitle": "FacialControl",
       "_appName": "FacialControl",
       "_appFooter": "FacialControl - MIT License",
       "_enableSearch": true

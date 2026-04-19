@@ -15,6 +15,9 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+env:
+  UNITY_PROJECT_PATH: FacialControl
+
 jobs:
   build:
     name: API リファレンス生成
@@ -26,16 +29,30 @@ jobs:
       - name: .NET SDK セットアップ
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.x"
 
       - name: DocFX インストール
         run: dotnet tool install -g docfx
+        shell: pwsh
+
+      - name: Unity csproj 再生成
+        run: |
+          & "$env:UNITY_PATH/Unity.exe" `
+            -batchmode `
+            -nographics `
+            -projectPath "${{ env.UNITY_PROJECT_PATH }}" `
+            -executeMethod UnityEditor.SyncVS.SyncSolution `
+            -quit `
+            -logFile -
+        shell: pwsh
 
       - name: DocFX メタデータ生成
         run: docfx metadata docfx.json
+        shell: pwsh
 
       - name: DocFX ビルド
         run: docfx build docfx.json
+        shell: pwsh
 
       - name: GitHub Pages アーティファクト設定
         uses: actions/configure-pages@v4
