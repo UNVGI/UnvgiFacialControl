@@ -41,9 +41,27 @@ BlendShape を多数持つモデルであれば何でも動作しますが、以
 }
 ```
 
-### ローカルインストール
+### Git URL 経由
 
-リポジトリをクローンして `Packages/com.hidano.facialcontrol/` に配置するだけで Unity が自動的に UPM パッケージとして認識します。`manifest.json` の編集は不要です。
+npm レジストリを経由せず、GitHub から直接インポートする場合は `Packages/manifest.json` の `dependencies` に Git URL を指定します。
+
+```json
+{
+    "dependencies": {
+        "com.hidano.facialcontrol": "https://github.com/NHidano/FacialControl.git?path=FacialControl/Packages/com.hidano.facialcontrol"
+    }
+}
+```
+
+特定のバージョン（タグ）やブランチを指定する場合は URL の末尾に `#<tag-or-branch>` を付加します。
+
+```json
+{
+    "dependencies": {
+        "com.hidano.facialcontrol": "https://github.com/NHidano/FacialControl.git?path=FacialControl/Packages/com.hidano.facialcontrol#v0.1.0-preview.1"
+    }
+}
+```
 
 ## 2. プロファイル JSON の作成
 
