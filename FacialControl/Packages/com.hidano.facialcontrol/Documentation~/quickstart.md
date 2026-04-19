@@ -48,19 +48,17 @@ npm レジストリを経由せず、GitHub から直接インポートする場
 ```json
 {
     "dependencies": {
-        "com.hidano.facialcontrol": "https://github.com/NHidano/FacialControl.git?path=/FacialControl/Packages/com.hidano.facialcontrol"
+        "com.hidano.facialcontrol": "https://github.com/NHidano/FacialControl.git?path=FacialControl/Packages/com.hidano.facialcontrol"
     }
 }
 ```
 
-`?path=` にはリポジトリルートからパッケージディレクトリ（`package.json` を含むディレクトリ）までのパスを **先頭スラッシュ付き** で指定します。
-
-特定のバージョン（タグ）やブランチを指定する場合は URL の末尾に `#<tag-or-branch>` を付加します（`?path=` の後に `#revision` を書く順序が必須）。
+特定のバージョン（タグ）やブランチを指定する場合は URL の末尾に `#<tag-or-branch>` を付加します。
 
 ```json
 {
     "dependencies": {
-        "com.hidano.facialcontrol": "https://github.com/NHidano/FacialControl.git?path=/FacialControl/Packages/com.hidano.facialcontrol#v0.1.0-preview.1"
+        "com.hidano.facialcontrol": "https://github.com/NHidano/FacialControl.git?path=FacialControl/Packages/com.hidano.facialcontrol#v0.1.0-preview.1"
     }
 }
 ```

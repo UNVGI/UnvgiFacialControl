@@ -10,7 +10,8 @@
     },
     "dependencies": {
         "com.unity.inputsystem": "1.17.0",
-        "com.hidano.uosc": "1.0.0"
+        "com.hidano.uosc": "1.0.0",
+        "com.hidano.scene-view-style-camera-controller": "1.0.0"
     },
     "keywords": [
         "facial",
