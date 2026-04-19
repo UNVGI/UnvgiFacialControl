@@ -52,7 +52,8 @@
       "Bash(gh repo:*)",
       "Skill(kiro:spec-init)",
       "Skill(kiro:spec-requirements)",
-      "Skill(kiro:spec-design)"
+      "Skill(kiro:spec-design)",
+      "Bash(git mv *)"
     ]
   }
 }
