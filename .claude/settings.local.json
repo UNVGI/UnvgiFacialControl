@@ -62,7 +62,9 @@
       "Bash(git rm *)",
       "Bash(dotnet tool uninstall *)",
       "WebFetch(domain:docs.unity3d.com)",
-      "Skill(dig:dig)"
+      "Skill(dig:dig)",
+      "Read(//c/Users/Hidano/.claude/skills/**)",
+      "Read(//c/Users/Hidano/.claude/plugins/**)"
     ]
   }
 }
