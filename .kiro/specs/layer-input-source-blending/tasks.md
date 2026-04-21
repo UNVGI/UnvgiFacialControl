@@ -220,7 +220,7 @@
   - _Depends: 4.1, 6.5, 2.2_
   - _Boundary: Adapters.InputSources.OscInputSource_
 
-- [ ] 6.7 (P) `LipSyncInputSource` を実装する
+- [x] 6.7 (P) `LipSyncInputSource` を実装する
   - `ILipSyncProvider.GetLipSyncValues(Span<float>)` を呼び、値合計が 1e-4 未満なら IsValid=false を返す。
   - EditMode フェイク ILipSyncProvider で無音 / 発話時の IsValid 切替を検証する。
   - 観測完了条件: 無音時 `TryWriteValues == false`、発話時 `true` かつ output に provider の値がそのままコピーされることが EditMode で通る。
