@@ -25,6 +25,9 @@ namespace Hidano.FacialControl.Editor.Inspector
         private const string LayerDetailSectionLabel = "レイヤー一覧";
         private const string ExpressionDetailSectionLabel = "Expression 一覧";
         private const string ReferenceModelSectionLabel = "使用モデル";
+        private const string InputSourcesSectionLabel = "入力源ウェイト (読取専用)";
+
+        private FacialProfileSO_InputSourcesView _inputSourcesView;
 
         private Label _schemaVersionLabel;
         private Label _statusLabel;
@@ -97,6 +100,8 @@ namespace Hidano.FacialControl.Editor.Inspector
         private void OnDisable()
         {
             Undo.undoRedoPerformed -= OnUndoRedoPerformed;
+            _inputSourcesView?.Dispose();
+            _inputSourcesView = null;
         }
 
         public override VisualElement CreateInspectorGUI()
@@ -250,6 +255,19 @@ namespace Hidano.FacialControl.Editor.Inspector
             _expressionListButtonContainer.Add(removeButton);
 
             root.Add(_expressionListButtonContainer);
+
+            // ========================================
+            // 入力源ウェイトビュー（読取専用、Req 8.6 / タスク 9）
+            // ========================================
+            var inputSourcesFoldout = new Foldout { text = InputSourcesSectionLabel, value = false };
+            var so2 = target as FacialProfileSO;
+            _inputSourcesView?.Dispose();
+            _inputSourcesView = so2 != null ? new FacialProfileSO_InputSourcesView(so2) : null;
+            if (_inputSourcesView != null)
+            {
+                inputSourcesFoldout.Add(_inputSourcesView.RootElement);
+            }
+            root.Add(inputSourcesFoldout);
 
             // ========================================
             // JSON に保存ボタン

@@ -302,7 +302,7 @@
   - _Boundary: Application/Adapters 公開 API_
 
 - [ ] 9. Editor 層
-- [ ] 9. `FacialProfileSO` Inspector に読取専用の InputSources ビューを追加する
+- [x] 9. `FacialProfileSO` Inspector に読取専用の InputSources ビューを追加する
   - UI Toolkit の `ListView` で `LayerInputSourceAggregator.GetSnapshot()` を表示する `FacialProfileSO_InputSourcesView` を実装する。
   - Play Mode 外ではプレースホルダを表示し、Play Mode 中は現在の `FacialController` への参照をキャッシュ（`EditorApplication.update` 約 100ms 間隔で健全性確認）して、Inspector repaint は O(1) で済ませる。
   - Category=Controller のまま Keyboard デバイスのみの `InputBindingProfileSO` を参照しているレイヤーがあれば Inspector 上でも注意喚起を表示する（best-effort）。

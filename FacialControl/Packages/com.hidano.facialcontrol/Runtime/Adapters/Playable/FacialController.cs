@@ -436,6 +436,20 @@ namespace Hidano.FacialControl.Adapters.Playable
         }
 
         /// <summary>
+        /// 直近 Aggregate で観測された (layer, source) ウェイトの診断スナップショットを返す
+        /// (Req 8.1, 8.3, 8.6)。Editor の読取専用ビュー向け。
+        /// 未初期化の場合は空リストを返す。
+        /// </summary>
+        public IReadOnlyList<LayerSourceWeightEntry> GetInputSourceWeightsSnapshot()
+        {
+            if (!_isInitialized || _layerUseCase == null)
+            {
+                return Array.Empty<LayerSourceWeightEntry>();
+            }
+            return _layerUseCase.GetInputSourceWeightsSnapshot();
+        }
+
+        /// <summary>
         /// 現在アクティブな Expression のリストを返す。
         /// </summary>
         /// <returns>アクティブな Expression のリスト</returns>

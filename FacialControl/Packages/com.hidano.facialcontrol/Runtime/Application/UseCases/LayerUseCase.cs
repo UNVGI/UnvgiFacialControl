@@ -207,6 +207,20 @@ namespace Hidano.FacialControl.Application.UseCases
         }
 
         /// <summary>
+        /// 直近 <see cref="UpdateWeights"/> で観測された (layer, source) ウェイトの
+        /// 診断スナップショットを返す (Req 8.1, 8.3)。Editor の読取専用ビュー向け (Req 8.6)。
+        /// 未初期化 / Dispose 済 の場合は空リストを返す。
+        /// </summary>
+        public IReadOnlyList<LayerSourceWeightEntry> GetInputSourceWeightsSnapshot()
+        {
+            if (_aggregator == null)
+            {
+                return Array.Empty<LayerSourceWeightEntry>();
+            }
+            return _aggregator.GetSnapshot();
+        }
+
+        /// <summary>
         /// プロファイルを切り替え、遷移状態をリセットする。
         /// </summary>
         /// <param name="profile">新しいプロファイル</param>
