@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Unity.Collections;
+using UnityEngine;
 
 namespace Hidano.FacialControl.Domain.Services
 {
@@ -30,7 +31,9 @@ namespace Hidano.FacialControl.Domain.Services
     /// (= CommitBulk) で writeBuffer へ一括 flush される (Req 4.5)。
     /// CommitBulk は <c>_dirtyTick</c> を最大 1 回だけ進めるため、同スコープ内の
     /// 複数書込は atomic に観測される。
-    /// 範囲外キーの警告 (4.3) は後続タスクで実装する。
+    /// 範囲外 (layer, source) への <see cref="SetWeight"/> および
+    /// <see cref="BulkScope.SetWeight"/> は <see cref="Debug.LogWarning(object)"/>
+    /// + no-op として扱い、他の weight を一切変更しない (Req 4.3)。
     /// </para>
     /// </remarks>
     public sealed class LayerInputSourceWeightBuffer : IDisposable
@@ -91,11 +94,17 @@ namespace Hidano.FacialControl.Domain.Services
         /// <param name="layerIdx">レイヤーインデックス。<see cref="LayerCount"/> 未満を指定。</param>
         /// <param name="sourceIdx">入力源インデックス。<see cref="MaxSourcesPerLayer"/> 未満を指定。</param>
         /// <param name="weight">ウェイト値。範囲外は silent clamp される (Req 2.5)。</param>
+        /// <remarks>
+        /// (layerIdx, sourceIdx) が範囲外の場合は警告ログを出して no-op とし、
+        /// 他の weight を一切変更しない (Req 4.3)。
+        /// </remarks>
         public void SetWeight(int layerIdx, int sourceIdx, float weight)
         {
             if ((uint)layerIdx >= (uint)LayerCount ||
                 (uint)sourceIdx >= (uint)MaxSourcesPerLayer)
             {
+                Debug.LogWarning(
+                    $"LayerInputSourceWeightBuffer: SetWeight の (layerIdx={layerIdx}, sourceIdx={sourceIdx}) が範囲外のため書込をスキップします (LayerCount={LayerCount}, MaxSourcesPerLayer={MaxSourcesPerLayer})。");
                 return;
             }
 
@@ -239,7 +248,8 @@ namespace Hidano.FacialControl.Domain.Services
 
             /// <summary>
             /// スコープ内に (layerIdx, sourceIdx) の書込を蓄積する。値は 0〜1 に silent clamp。
-            /// 範囲外キーは silent no-op。Dispose まで外部からは観測されない。
+            /// 範囲外キーは警告ログを出して no-op とし、他の書込を一切変更しない (Req 4.3)。
+            /// Dispose まで外部からは観測されない。
             /// </summary>
             public void SetWeight(int layerIdx, int sourceIdx, float weight)
             {
@@ -251,6 +261,8 @@ namespace Hidano.FacialControl.Domain.Services
                 if ((uint)layerIdx >= (uint)_owner.LayerCount ||
                     (uint)sourceIdx >= (uint)_owner.MaxSourcesPerLayer)
                 {
+                    Debug.LogWarning(
+                        $"LayerInputSourceWeightBuffer: BulkScope.SetWeight の (layerIdx={layerIdx}, sourceIdx={sourceIdx}) が範囲外のため書込をスキップします (LayerCount={_owner.LayerCount}, MaxSourcesPerLayer={_owner.MaxSourcesPerLayer})。");
                     return;
                 }
 

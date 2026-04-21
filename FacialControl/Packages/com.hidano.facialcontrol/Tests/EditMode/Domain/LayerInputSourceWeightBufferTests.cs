@@ -1,16 +1,19 @@
+using System.Text.RegularExpressions;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
 using Hidano.FacialControl.Domain.Services;
 
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
     /// <summary>
     /// LayerInputSourceWeightBuffer の SetWeight / GetWeight / silent clamp /
-    /// SwapIfDirty (index flip + copy-forward) / BulkScope の契約テスト。
+    /// SwapIfDirty (index flip + copy-forward) / BulkScope / 範囲外警告 の契約テスト。
     /// </summary>
     /// <remarks>
     /// 3.1 の silent clamp (Req 2.5, 4.1)、3.2 の copy-forward (Critical 1 回帰防止,
-    /// Req 4.2, 4.4)、3.3 の BulkScope による atomic flush (Req 4.5) を検証する。
-    /// 範囲外キーの警告 (4.3) は後続タスクで扱う。
+    /// Req 4.2, 4.4)、3.3 の BulkScope による atomic flush (Req 4.5)、
+    /// 3.4 の範囲外 (layer, source) への Set で警告 + no-op (Req 4.3) を検証する。
     /// </remarks>
     [TestFixture]
     public class LayerInputSourceWeightBufferTests
@@ -295,20 +298,28 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         }
 
         [Test]
-        public void BulkScope_OutOfRangeIndex_IsSilentNoOp()
+        public void BulkScope_OutOfRangeIndex_WarnsAndDoesNotModifyExistingWeights()
         {
             using var buffer = new LayerInputSourceWeightBuffer(layerCount: 1, maxSourcesPerLayer: 1);
 
+            // 既知値を先行投入
+            buffer.SetWeight(0, 0, 0.5f);
+            buffer.SwapIfDirty();
+
+            LogAssert.Expect(LogType.Warning, new Regex("LayerInputSourceWeightBuffer.*BulkScope.*layerIdx=5"));
+            LogAssert.Expect(LogType.Warning, new Regex("LayerInputSourceWeightBuffer.*BulkScope.*sourceIdx=9"));
+            LogAssert.Expect(LogType.Warning, new Regex("LayerInputSourceWeightBuffer.*BulkScope.*layerIdx=-1"));
+
             using (var scope = buffer.BeginBulk())
             {
-                scope.SetWeight(5, 0, 0.5f);   // layerIdx 範囲外
-                scope.SetWeight(0, 9, 0.5f);   // sourceIdx 範囲外
-                scope.SetWeight(-1, -1, 0.5f); // 負数
+                scope.SetWeight(5, 0, 0.9f);   // layerIdx 範囲外
+                scope.SetWeight(0, 9, 0.9f);   // sourceIdx 範囲外
+                scope.SetWeight(-1, -1, 0.9f); // 負数
             }
             buffer.SwapIfDirty();
 
-            Assert.AreEqual(0f, buffer.GetWeight(0, 0),
-                "BulkScope でも範囲外キーは silent no-op で既存値を変更しないこと");
+            Assert.AreEqual(0.5f, buffer.GetWeight(0, 0),
+                "BulkScope でも範囲外キーは warning + no-op で既存値を変更しないこと (Req 4.3)");
         }
 
         [Test]
@@ -367,6 +378,91 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             // 3 巡目の値のみが観測できる。プール再利用時に前回値が残らないこと。
             Assert.AreEqual(0.3f, buffer.GetWeight(0, 0), 1e-6f);
             Assert.AreEqual(0.6f, buffer.GetWeight(0, 1), 1e-6f);
+        }
+
+        // ----- 3.4 範囲外 (layer, source) への Set で警告 + no-op (Req 4.3) -----
+
+        [Test]
+        public void SetWeight_LayerIdxBeyondLayerCount_LogsWarningAndLeavesWeightsUnchanged()
+        {
+            using var buffer = new LayerInputSourceWeightBuffer(layerCount: 2, maxSourcesPerLayer: 3);
+
+            // 既知値で範囲内を埋める
+            buffer.SetWeight(0, 0, 0.25f);
+            buffer.SetWeight(1, 2, 0.75f);
+            buffer.SwapIfDirty();
+
+            LogAssert.Expect(LogType.Warning,
+                new Regex("LayerInputSourceWeightBuffer.*layerIdx=2.*LayerCount=2"));
+
+            buffer.SetWeight(2, 0, 0.9f); // layerIdx == LayerCount は範囲外
+            buffer.SwapIfDirty();
+
+            // 既存値が不変であること、および範囲外で書こうとしたキーが初期値 (0) のまま
+            Assert.AreEqual(0.25f, buffer.GetWeight(0, 0));
+            Assert.AreEqual(0f, buffer.GetWeight(0, 1));
+            Assert.AreEqual(0f, buffer.GetWeight(0, 2));
+            Assert.AreEqual(0f, buffer.GetWeight(1, 0));
+            Assert.AreEqual(0f, buffer.GetWeight(1, 1));
+            Assert.AreEqual(0.75f, buffer.GetWeight(1, 2));
+        }
+
+        [Test]
+        public void SetWeight_SourceIdxBeyondMaxSourcesPerLayer_LogsWarningAndLeavesWeightsUnchanged()
+        {
+            using var buffer = new LayerInputSourceWeightBuffer(layerCount: 2, maxSourcesPerLayer: 2);
+
+            buffer.SetWeight(0, 0, 0.5f);
+            buffer.SwapIfDirty();
+
+            LogAssert.Expect(LogType.Warning,
+                new Regex("LayerInputSourceWeightBuffer.*sourceIdx=5.*MaxSourcesPerLayer=2"));
+
+            buffer.SetWeight(0, 5, 0.9f); // sourceIdx 範囲外
+            buffer.SwapIfDirty();
+
+            Assert.AreEqual(0.5f, buffer.GetWeight(0, 0));
+            Assert.AreEqual(0f, buffer.GetWeight(0, 1));
+            Assert.AreEqual(0f, buffer.GetWeight(1, 0));
+            Assert.AreEqual(0f, buffer.GetWeight(1, 1));
+        }
+
+        [Test]
+        public void SetWeight_NegativeIndices_LogsWarningAndLeavesWeightsUnchanged()
+        {
+            using var buffer = new LayerInputSourceWeightBuffer(layerCount: 1, maxSourcesPerLayer: 1);
+
+            buffer.SetWeight(0, 0, 0.5f);
+            buffer.SwapIfDirty();
+
+            LogAssert.Expect(LogType.Warning,
+                new Regex("LayerInputSourceWeightBuffer.*layerIdx=-1"));
+
+            buffer.SetWeight(-1, 0, 0.9f);
+            buffer.SwapIfDirty();
+
+            Assert.AreEqual(0.5f, buffer.GetWeight(0, 0),
+                "負数 layerIdx への Set は警告 + no-op で既存値を変更しないこと (Req 4.3)");
+        }
+
+        [Test]
+        public void SetWeight_OutOfRange_DoesNotAdvanceDirtyTick()
+        {
+            // 範囲外 Set は no-op であり、dirtyTick を進めない。
+            // 従って後続の SwapIfDirty も no-op となり、readBuffer は不変のまま。
+            using var buffer = new LayerInputSourceWeightBuffer(layerCount: 1, maxSourcesPerLayer: 1);
+
+            buffer.SetWeight(0, 0, 0.4f);
+            buffer.SwapIfDirty();
+
+            LogAssert.Expect(LogType.Warning, new Regex("LayerInputSourceWeightBuffer.*layerIdx=9"));
+
+            buffer.SetWeight(9, 0, 0.9f); // 範囲外
+
+            // Swap を挟んでも readBuffer は不変。
+            buffer.SwapIfDirty();
+            Assert.AreEqual(0.4f, buffer.GetWeight(0, 0),
+                "範囲外 Set は dirtyTick を進めず、既存 weight を変更しないこと (Req 4.3)");
         }
 
         [Test]
