@@ -171,7 +171,8 @@ FacialControl/Packages/com.hidano.facialcontrol/
 ├── Runtime/
 │   ├── Domain/
 │   │   ├── Interfaces/
-│   │   │   └── IInputSource.cs                       # 新規: IInputSource 契約 + SnapshotResult
+│   │   │   ├── IInputSource.cs                       # 新規: IInputSource 契約 + SnapshotResult
+│   │   │   └── ITimeProvider.cs                      # 新規: 時刻抽象（EditMode 決定論化）
 │   │   ├── Models/
 │   │   │   ├── InputSourceId.cs                      # 新規: 識別子 value-object（規約検証含む）
 │   │   │   ├── LayerSourceWeightEntry.cs             # 新規: 診断 API 戻り値 DTO
@@ -191,7 +192,8 @@ FacialControl/Packages/com.hidano.facialcontrol/
 │       │   ├── KeyboardExpressionInputSource.cs      # 新規: 予約 id "keyboard-expr"
 │       │   ├── OscInputSource.cs                     # 新規: 予約 id "osc" + staleness
 │       │   ├── LipSyncInputSource.cs                 # 新規: 予約 id "lipsync"
-│       │   └── InputSourceFactory.cs                 # 新規: id → アダプタ インスタンス化
+│       │   ├── InputSourceFactory.cs                 # 新規: id → アダプタ インスタンス化
+│       │   └── UnityTimeProvider.cs                  # 新規: ITimeProvider 本番実装
 │       ├── Json/
 │       │   ├── SystemTextJsonParser.cs               # 変更: inputSources の parse
 │       │   ├── JsonSchemaDefinition.cs               # 変更: "inputSources" 定数追加
@@ -203,9 +205,12 @@ FacialControl/Packages/com.hidano.facialcontrol/
 │       │   └── OscDoubleBuffer.cs                    # 変更: WriteTick カウンタを追加
 │       └── ScriptableObject/
 │           └── InputBindingProfileSO.cs              # 変更: InputSourceCategory フィールド追加
-└── Editor/
-    └── Inspectors/
-        └── FacialProfileSO_InputSourcesView.cs       # 新規: 読取専用 snapshot 表示
+├── Editor/
+│   └── Inspectors/
+│       └── FacialProfileSO_InputSourcesView.cs       # 新規: 読取専用 snapshot 表示
+└── Tests/
+    └── Shared/
+        └── ManualTimeProvider.cs                     # 新規: ITimeProvider テストフェイク（書込可能 UnscaledTimeSeconds）
 ```
 
 ### Modified Files
@@ -277,7 +282,12 @@ sequenceDiagram
 
 - **Single Set**: 直接 `writeBuffer` に書込、`dirtyTick` を増加。
 - **Bulk Scope**: `BeginBulk()` で（プール化された）dict を取得、`CommitBulk()` で writeBuffer に一括反映。同フレーム内で Single Set と混在する場合、Single Set が先行しても Bulk Commit が後から writeBuffer を上書きする可能性あり（D-7 仕様）。
-- **Swap タイミング**: `Aggregate()` 入口で `SwapIfDirty`。Swap 後の `writeBuffer` は旧 `readBuffer` 内容をそのまま引き継ぐ（zero-clear しない。D-7 の last-writer-wins のため、書込がない source は既存値継続）。これは `OscDoubleBuffer` の zero-clear 挙動と **意図的に異なる**（OSC は毎フレーム届くが、ここは希少更新）。
+- **Swap タイミング**: `Aggregate()` 入口で `SwapIfDirty`。`SwapIfDirty` は以下の **2 ステップ** を原子的に実行する（これは `OscDoubleBuffer` の zero-clear 挙動と意図的に異なる）:
+  1. **Index flip**: `Interlocked.Exchange(ref _writeIndex, ...)` で読/書インデックスを入れ替え。これにより旧 writeBuffer が新 readBuffer に、旧 readBuffer が新 writeBuffer になる。
+  2. **Copy-forward**: 新 readBuffer（= 旧 writeBuffer）の内容を **新 writeBuffer（= 旧 readBuffer）にコピーする**。`NativeArray<float>.CopyTo(NativeArray<float>)` を使用し GC フリー。
+- **Copy-forward の必要性**: この 2 ステップ目を省略すると、新 writeBuffer には **2 フレーム前の旧 readBuffer 内容** が残る。Set が 1 回だけ発行された後に次のフレームで再 swap すると、新 readBuffer が古い値を読むことになり、「Set した値と旧値を交互に観測する」バグが発生する。copy-forward により新 writeBuffer は常に「現行 readBuffer と同一内容」からスタートし、その上にクライアントの新規 Set が差分として積まれる。
+- **Cost**: copy-forward は O(layerCount × maxSourcesPerLayer) の `float` コピー、GC フリー。典型値（3 layers × 4 sources = 12 floats = 48 bytes）は無視可能コスト。
+- **代替案**: 「単一バッファ + pending-diffs キュー」方式も検討したが、バルク API の同フレーム原子性（Req 4.5）を diff キューの順序規約で保証する複雑度が copy-forward よりも高いため棄却。copy-forward の方が実装も契約も単純。
 
 ## Requirements Traceability
 
@@ -314,7 +324,7 @@ sequenceDiagram
 | 5.2 | osc アダプタ | `OscInputSource` | `ValueProviderInputSourceBase.TryWriteValues` | Per-Frame Aggregation |
 | 5.3 | lipsync アダプタ | `LipSyncInputSource` | `ILipSyncProvider.GetLipSyncValues` | Per-Frame Aggregation |
 | 5.4 | osc 無受信は last valid | `OscInputSource` | `IsValid` 判定 | Per-Frame Aggregation |
-| 5.5 | osc staleness | `OscInputSource` | `OscDoubleBuffer.WriteTick` 監視 | Per-Frame Aggregation |
+| 5.5 | osc staleness | `OscInputSource`, `ITimeProvider` | `OscDoubleBuffer.WriteTick` 監視 + `ITimeProvider.UnscaledTimeSeconds` | Per-Frame Aggregation |
 | 5.6 | lipsync 無音 | `LipSyncInputSource` | `IsValid` 判定 | Per-Frame Aggregation |
 | 5.7 | options による設定 | 全アダプタ + `InputSourceFactory` | ctor 引数 | — |
 | 6.1 | per-frame GC ゼロ | `Aggregator`, `WeightBuffer`, `Registry` | Span ベース内部 | — |
@@ -327,7 +337,7 @@ sequenceDiagram
 | 7.3 | legacy 暗黙フォールバック禁止 | `SystemTextJsonParser` | `ParseProfile` | — |
 | 7.4 | preview 移行方針 | — (ドキュメント) | — | — |
 | 8.1 | 診断 API 2 種 | `LayerInputSourceAggregator` | `TryWriteSnapshot` / `GetSnapshot` | — |
-| 8.2 | EditMode でテスト可能 | `IInputSource` | Fake 実装可能 | — |
+| 8.2 | EditMode でテスト可能 | `IInputSource`, `ITimeProvider` (+ `ManualTimeProvider` fake) | Fake 実装可能、時刻決定論化 | — |
 | 8.3 | 変更が snapshot に反映 | `LayerInputSourceWeightBuffer` + Aggregator | Snapshot API | Runtime Weight Update |
 | 8.4 | JSON round-trip stable | `SystemTextJsonParser` | `SerializeProfile` | — |
 | 8.5 | verbose log rate-limit | `LayerInputSourceAggregator` | 内部診断（per-layer per-second） | — |
@@ -340,6 +350,8 @@ sequenceDiagram
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
 | `IInputSource` | Domain | 入力源の共通契約 | 1.1, 1.4 | — | Service |
+| `ITimeProvider` | Domain | 時刻抽象（EditMode テストで決定論化） | 8.2, 5.5 | — | Service |
+| `UnityTimeProvider` | Adapters | `Time.unscaledTimeAsDouble` ラッパー | 8.2, 5.5 | `UnityEngine.Time` (P0) | Service |
 | `InputSourceId` | Domain | 識別子の検証付き value-object | 1.7 | — | State |
 | `ExpressionTriggerInputSourceBase` | Domain | Expression トリガー型の共通基底 | 1.6, 1.8 | `TransitionCalculator` (P0), `ExclusionResolver` (P0) | Service |
 | `ValueProviderInputSourceBase` | Domain | 値提供型の共通基底 | 1.1, 1.4 | — | Service |
@@ -405,6 +417,50 @@ namespace Hidano.FacialControl.Domain.Interfaces
 - Integration: `LayerInputSourceAggregator` は各ソースに 1 本の `float[BlendShapeCount]` scratch バッファを `Registry` から借りる（D-14 プール）。
 - Validation: 具体アダプタは `TryWriteValues` を呼ばれる時点で `deltaTime >= 0` を前提にしない（`Tick` に任せる）。
 - Risks: 実装者が per-call `new float[]` を書くと GC 発生 → 基底クラスで scratch 参照を隠蔽し、派生は Span のみ受け取る形にする。
+
+#### `ITimeProvider`
+
+| Field | Detail |
+|-------|--------|
+| Intent | `UnityEngine.Time.unscaledTimeAsDouble` への直接依存を避け、EditMode テストで時刻を決定論的に前進させられるようにする時刻抽象 |
+| Requirements | 8.2, 5.5 (via OscInputSource) |
+
+**Responsibilities & Constraints**
+- 単調増加する秒単位の時刻 (`UnscaledTimeSeconds`) を返す。
+- Domain 層配置（Unity API 非依存、Req 1.5 と同原則）。具体実装のみ Unity API に触れる。
+- 消費者: `OscInputSource`（staleness 判定, Req 5.5）、`LayerInputSourceAggregator`（verbose log rate-limiter, Req 8.5、単調時刻が必要な場合のみ）。
+
+**Dependencies**
+- Inbound: `OscInputSource` (P0), `LayerInputSourceAggregator` (P1, verbose log の rate-limit にのみ使用)。
+- Outbound: なし（自己完結）。
+
+**Contracts**: Service [x]
+
+##### Service Interface
+
+```csharp
+namespace Hidano.FacialControl.Domain.Interfaces
+{
+    public interface ITimeProvider
+    {
+        // ゲーム内の Time.timeScale に影響されない経過秒数。単調増加。
+        double UnscaledTimeSeconds { get; }
+    }
+}
+```
+
+- **Preconditions**: なし。`UnscaledTimeSeconds` はどのスレッドからでも呼び出し可能（実装側で保証）。
+- **Postconditions**: 連続呼び出しで値が減少してはならない（単調性）。
+- **Invariants**: プロセス内で単一の時刻源（通常 1 インスタンスを DI で共有）。
+
+**Implementations**:
+- `UnityTimeProvider`（Adapters 層）: `UnityEngine.Time.unscaledTimeAsDouble` を直接返す。本番実装。
+- `ManualTimeProvider`（Tests/Shared）: `public double UnscaledTimeSeconds { get; set; }` の writable プロパティ。テストが明示的に前進させる。EditMode での staleness テスト (Req 8.2) で使用。
+
+**Implementation Notes**
+- Integration: `InputSourceFactory` は ctor で `ITimeProvider` を受け、`OscInputSource` の ctor に伝播する。
+- Validation: `OscInputSource` の staleness 判定 (Req 5.5) と、`LayerInputSourceAggregator` の verbose log rate-limiter (Req 8.5) で共通使用する。これにより両者の時刻ソースが一致し、テストでの時間制御が単純化する。
+- Risks: 複数インスタンスが存在すると時刻の整合が崩れる → DI コンテナ / `FacialController` 初期化で 1 つに束ねる。
 
 #### `ExpressionTriggerInputSourceBase` (abstract)
 
@@ -535,6 +591,7 @@ namespace Hidano.FacialControl.Domain.Services
 
 - **Preconditions**: `outputPerLayer.Length == registry.LayerCount`。各要素の `BlendShapeValues` は `registry` のプール参照。
 - **Postconditions**: 各 layer について `output[k] = clamp01(Σ wᵢ · values_i[k])`（Req 2.2）。Σw > 1 でもクランプのみ（Req 2.3）。空 layer は 0 + 警告ログ 1 回（Req 2.4）。
+- **Output semantics**（Span&lt;LayerInput&gt; の扱い）: `outputPerLayer` の各要素は **毎フレーム新しい `LayerInput` 値型で上書きされる**（既存要素をフィールド単位でミューテーションするわけではない）。`LayerInput` は `readonly struct` のため in-place 変更は不可能で、Aggregator は `outputPerLayer[i] = new LayerInput(priority, weight, pooledMemory)` の形で各スロットに代入する。`pooledMemory` (`ReadOnlyMemory<float>`) の backing array は `Registry` プール由来で毎フレーム同一インスタンスを使い回すため、struct の上書き自体は **ヒープ確保を一切伴わない**。呼出し側は outputPerLayer を `stackalloc` や事前確保配列の `Span` として提供し、フレーム間で再利用する。
 - **Invariants**: per-frame GC 0 alloc（verbose log 無効時）。計算量 O(layers × sources × blendShapes)（Req 6.3）。
 
 **Implementation Notes**
@@ -639,8 +696,20 @@ namespace Hidano.FacialControl.Domain.Services
 
 ##### State Management
 - **State model**: 2 本の `NativeArray<float>(layerCount * maxSourcesPerLayer, Allocator.Persistent)` (`_bufferA`, `_bufferB`) + `int _writeIndex` + `uint _dirtyTick`。
-- **Persistence & consistency**: OscDoubleBuffer 同等パターン。`Interlocked.Exchange(ref _writeIndex, ...)` で swap。
-- **Concurrency strategy**: Volatile read/write（既存 `OscDoubleBuffer` と同じ方針）。lock-free MPMC 強整合性は要求しない（D-7）。
+- **Persistence & consistency**: OscDoubleBuffer 同等パターン。`Interlocked.Exchange(ref _writeIndex, ...)` で index を flip し、続けて **新 readBuffer → 新 writeBuffer へ `NativeArray.CopyTo` で全内容コピー** する。これにより writeBuffer は常に「現行 readBuffer の複製 + 最新 Set」の状態を保つ。
+- **SwapIfDirty アルゴリズム**（疑似コード）:
+    ```
+    if (_dirtyTick == _observedTick) return;           // 変更なし: no-op
+    int newWriteIndex = 1 - _writeIndex;               // 次の書込先
+    Interlocked.Exchange(ref _writeIndex, newWriteIndex);
+    // ここで旧 writeBuffer が readBuffer になった
+    ReadBuffer.CopyTo(WriteBuffer);                    // GC フリー、O(layerCount × maxSourcesPerLayer)
+    _observedTick = _dirtyTick;
+    ```
+- **Why copy-forward is required**: zero-clear や no-op の場合、新 writeBuffer には 2 フレーム前の値が残る。その状態で次に同一 (layer, source) への Set が発行されないフレームがあると、`SwapIfDirty` により「Set した新値 / 古い値」が交互に観測されるスタレデータバグが発生する。copy-forward により新 writeBuffer は常に現行 readBuffer の複製からスタートし、クライアントは「現状値に対する差分書込」だけを意識すればよい契約となる。
+- **Concurrency strategy**: Volatile read/write（既存 `OscDoubleBuffer` と同じ方針）。lock-free MPMC 強整合性は要求しない（D-7）。copy-forward は swap 直後のメインスレッド区間で実行し、その間は writer スレッドの書込を受け付けない（`_writeIndex` はすでに新 index を指しているため writer 側は新 writeBuffer = 旧 readBuffer に向けて書き始めるが、copy-forward 中に書込が入った場合は copy で上書きされる可能性がある。これは D-7 の last-writer-wins 契約において「swap 直前の writer は次フレームで反映」として説明される許容損失）。
+- **Cost**: copy-forward は `layerCount × maxSourcesPerLayer` の `float` コピー（典型 48 bytes）、完全 GC フリー。
+- **Alternative considered**: 「単一バッファ + pending-diffs キュー」は Req 4.5 のバルクアトミック保証を diff キューの順序規約で表現する必要があり実装複雑度が増すため棄却。copy-forward 方式の方がシンプルで堅牢。
 
 ### Adapters
 
@@ -670,16 +739,30 @@ namespace Hidano.FacialControl.Domain.Services
 
 **Dependencies**
 - Inbound: `InputSourceFactory` (P0)。
-- Outbound: `ValueProviderInputSourceBase` (P0)。
+- Outbound: `ValueProviderInputSourceBase` (P0), `ITimeProvider` (P0, 時刻抽象)。
 - External: `OscDoubleBuffer` (P0, `WriteTick` カウンタ追加), `OscReceiver` (P0)。
 
 **Implementation Notes**
-- Integration: ctor で `OscDoubleBuffer` + `options.staleness_seconds` を受ける。
-- Validation: `TryWriteValues`: `if staleness > 0 && currentTime - lastWriteTime > staleness → return false`。lastWriteTime は前フレームからの `WriteTick` 差分で更新。
-- Risks: `Time.unscaledTimeAsDouble` は Unity 依存 → `ValueProviderInputSourceBase` にはこれを渡さず、`OscInputSource` 自身が参照する形に閉じる（Adapter 層内）。
+- Integration: ctor で `OscDoubleBuffer` + `OscOptionsDto`（`stalenessSeconds`）+ `ITimeProvider` を受ける。`ITimeProvider` は `UnityTimeProvider`（本番）または `ManualTimeProvider`（テスト）の派生を DI する。
+- Validation: `TryWriteValues` の骨子:
+    ```
+    uint currentTick = Volatile.Read(ref oscBuffer.WriteTick);
+    if (currentTick != _lastObservedTick) {
+        _lastDataTime = _timeProvider.UnscaledTimeSeconds;   // 新規受信を観測
+        _lastObservedTick = currentTick;
+    }
+    if (stalenessSeconds > 0 &&
+        _timeProvider.UnscaledTimeSeconds - _lastDataTime > stalenessSeconds)
+    {
+        return false;  // staleness 超過 → IsValid=false
+    }
+    // 有効: OSC readBuffer から output に値をコピー
+    ```
+- **Time abstraction の意図（Req 8.2, Critical 3）**: `UnityEngine.Time.unscaledTimeAsDouble` を直接参照すると EditMode テストで時刻を決定論的に進められない（Unity の static プロパティは EditMode で手動前進不可）。staleness 判定を EditMode fake のみで検証可能にするため、`ITimeProvider` 抽象を挟む。`ManualTimeProvider` は書込可能な `UnscaledTimeSeconds` プロパティを持ち、テストは `provider.UnscaledTimeSeconds = 1.5; source.TryWriteValues(buf); provider.UnscaledTimeSeconds = 3.0; source.TryWriteValues(buf);` のように時間を明示的に前進させる。
+- Risks: `UnityTimeProvider` は Adapters 層配置。Domain 層の `OscInputSource` は `ITimeProvider` のみに依存し Unity API を直接触らない。
 
 ##### State Management
-- `double _lastDataTime`、`uint _lastObservedTick`。毎 `TryWriteValues` で `Volatile.Read(ref buffer.WriteTick)` と比較。
+- `double _lastDataTime`、`uint _lastObservedTick`。毎 `TryWriteValues` で `Volatile.Read(ref buffer.WriteTick)` と比較し、`ITimeProvider.UnscaledTimeSeconds` で staleness を判定。
 
 #### `LipSyncInputSource`
 
@@ -705,30 +788,69 @@ namespace Hidano.FacialControl.Domain.Services
 ```csharp
 namespace Hidano.FacialControl.Adapters.InputSources
 {
+    // options DTO の共通基底。id 毎に派生 DTO を定義する（例: OscOptionsDto, ExpressionTriggerOptionsDto）。
+    // JsonUtility と互換のため class とし、フィールドは public または [SerializeField]。
+    public abstract class InputSourceOptionsDto
+    {
+    }
+
+    // id → DTO 型へのマッピングを Factory が保持し、Parser から渡された options JSON サブ文字列を
+    // JsonUtility.FromJson<TOptions> で逆シリアライズする。options が null / 空 JSON の場合は
+    // 対応 DTO のデフォルト値インスタンスを渡す。
     public interface IInputSourceFactory
     {
-        // 未登録 id は null を返す（呼出側は警告ログ + skip）。
-        IInputSource TryCreate(InputSourceId id, Dictionary<string, string> options, int blendShapeCount, FacialProfile profile);
+        // options は id に対応する DTO 型のインスタンス（未登録 id のときは null を返す。呼出側は警告ログ + skip）。
+        IInputSource TryCreate(InputSourceId id, InputSourceOptionsDto options, int blendShapeCount, FacialProfile profile);
+
+        // Parser が JSON の options 文字列を DTO にデシリアライズする際に使用。
+        // id が未登録なら null。呼出側は警告 + skip。
+        InputSourceOptionsDto TryDeserializeOptions(InputSourceId id, string optionsJson);
+
         bool IsRegistered(InputSourceId id);
     }
 
     public sealed class InputSourceFactory : IInputSourceFactory
     {
         public InputSourceFactory(
-            OscDoubleBuffer oscBuffer,            // osc 用
-            ILipSyncProvider lipSyncProvider,     // lipsync 用
+            OscDoubleBuffer oscBuffer,                 // osc 用
+            ITimeProvider timeProvider,                // osc staleness 判定用（Critical 3）
+            ILipSyncProvider lipSyncProvider,          // lipsync 用
             InputBindingProfileSO controllerBindings,  // controller-expr 用
             InputBindingProfileSO keyboardBindings);   // keyboard-expr 用
 
-        public void RegisterExtension(InputSourceId id, Func<...> creator);  // x-* 拡張
+        // サードパーティ (x-*) 拡張用登録 API。TOptions は JsonUtility でデシリアライズ可能な class。
+        // options が JSON 上で省略された場合は `new TOptions()` が creator に渡される。
+        public void RegisterExtension<TOptions>(
+            InputSourceId id,
+            Func<TOptions, int, FacialProfile, IInputSource> creator)
+            where TOptions : InputSourceOptionsDto, new();
     }
+
+    // 予約 id ごとの options DTO（各アダプタが自身の DTO 型を知る）。
+    public sealed class OscOptionsDto : InputSourceOptionsDto
+    {
+        public float stalenessSeconds;  // 0 = 無制限保持（D-8 の従来挙動）
+    }
+
+    public sealed class ExpressionTriggerOptionsDto : InputSourceOptionsDto
+    {
+        public int maxStackDepth;       // 0 = 既定値 8 を使用（D-14）
+    }
+
+    // lipsync は現時点で options 不要。preview では空 DTO。
+    public sealed class LipSyncOptionsDto : InputSourceOptionsDto { }
 }
 ```
 
 **Implementation Notes**
-- Integration: `SystemTextJsonParser` が parse した `InputSourceDto[]` を foreach して `Factory.TryCreate` を呼ぶ。
-- Validation: `options` は `Dictionary<string,string>` で pass-through（JsonUtility 制約下では `options` は固定 DTO 経由、Factory 内で id 別にパース）。
-- Risks: 未登録 id は warning + skip のみ。**profile 自体の load は続行**（Req 3.3）。
+- Integration: `SystemTextJsonParser` が parse した `InputSourceDto[]` を foreach し、各要素について以下を実行:
+  1. `factory.IsRegistered(id)` で登録確認。未登録なら警告 + skip（Req 3.3）。
+  2. `factory.TryDeserializeOptions(id, dto.optionsJson)` で typed DTO を生成。Parser 側は `options` フィールドを `string`（raw JSON サブ文字列）として保持しておき、Factory に渡す。
+  3. `factory.TryCreate(id, optionsDto, blendShapeCount, profile)` でアダプタを実体化。
+- **JsonUtility 制約の回避**: `Dictionary<string, string>` は `JsonUtility` では扱えない。そのため `options` は **id ごとに型付き DTO** を用いる（`OscOptionsDto`, `ExpressionTriggerOptionsDto`, `LipSyncOptionsDto` など）。Factory が id → DTO 型のマップを保持し、Parser から渡された生 JSON サブ文字列を `JsonUtility.FromJson<TOptions>` で逆シリアライズする。
+- **拡張性**: `x-*` サードパーティ拡張は `RegisterExtension<TOptions>(id, creator)` で DTO 型と creator 関数を同時に登録する。これにより拡張アダプタも typed DTO の恩恵を受けられる。
+- **Parser 側の JSON ハンドリング**: `InputSourceDto` の `options` フィールドは `string` として生 JSON を保持（`JsonUtility` 経由で 1 段ネストの object を取り出す際は `SerializeReference` 相当の工夫が必要）。preview 段階では「`options` を `{ ... }` ブロックの生 JSON 文字列として切り出すテキスト処理を `SystemTextJsonParser` 内に実装」することで対応する（`research.md` の JSON パーサ調査を参照）。
+- Risks: 未登録 id は warning + skip のみ。**profile 自体の load は続行**（Req 3.3）。`options` の DTO 不一致（余剰フィールド）は JsonUtility の挙動上 silently ignore される。
 
 ### Application
 
@@ -757,6 +879,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
 - Integration: UI Toolkit で `ListView` を出し、`Aggregator.GetSnapshot()` を Editor 用に呼ぶ（GC 許容、Play Mode のみ有効表示）。
 - Validation: Play Mode 外では「プレビューを開始するとここに表示されます」のプレースホルダ。
 - Risks: Aggregator インスタンスの取得経路（`FacialController` 等のシーン解決）→ `FacialProfileSO.LinkedController` のような弱参照を持たせるのは別 spec。preview では現在アクティブな `FacialController` を `FindObjectOfType` で探す簡易実装。
+- **Performance note (Nit 3)**: `FindObjectOfType<FacialController>()` は大規模シーンでは線形探索コストがかかるため、Inspector repaint のたびに呼び出すのは避ける。実装方針: `FacialController` への参照を private フィールドにキャッシュし、`EditorApplication.update` コールバック（典型 100 ms 間隔）で参照健全性を確認、null / 破棄済みなら再探索。これにより Inspector repaint は O(1) でアクセスでき、シーン規模に依存しない。
 
 ## Data Models
 
@@ -866,8 +989,26 @@ classDiagram
 ### Data Contracts & Integration
 
 **API Data Transfer**（内部 DTO）
-- `InputSourceDto { string id; float weight; object options; }` — JsonUtility 制約回避のため `options` は id 別 DTO（`OscOptionsDto { float stalenessSeconds; }`, `ExpressionTriggerOptionsDto { int maxStackDepth; }`）。
+- `InputSourceDto { string id; float weight; string optionsJson; }` — JSON から parse される直接 DTO。`optionsJson` は `options` フィールドの生 JSON サブ文字列（`{ ... }` ブロックそのもの）を保持する。`JsonUtility` の自由形式 `Dictionary<string,string>` 非対応を回避するため、`options` は id ごとの **typed DTO** (`OscOptionsDto`, `ExpressionTriggerOptionsDto`, `LipSyncOptionsDto`, 拡張 DTO) に後段でデシリアライズされる。
+- `InputSourceOptionsDto` (abstract base class) — 全 options DTO の共通基底（マーカー）。
+- `OscOptionsDto : InputSourceOptionsDto { float stalenessSeconds; }` — `osc` 用（D-8）。
+- `ExpressionTriggerOptionsDto : InputSourceOptionsDto { int maxStackDepth; }` — `controller-expr` / `keyboard-expr` 用（D-14）。
+- `LipSyncOptionsDto : InputSourceOptionsDto { }` — `lipsync` 用（preview では空）。
 - `LayerSourceWeightEntry (value-struct) { int LayerIdx; InputSourceId SourceId; float Weight; bool IsValid; bool Saturated; }` — 診断 API のスナップショット要素。
+
+**Options deserialization flow**（型契約）:
+1. Parser が JSON から `InputSourceDto { id, weight, optionsJson }` を取得。
+2. Parser は id ごとに `IInputSourceFactory.TryDeserializeOptions(id, optionsJson)` を呼び、`InputSourceOptionsDto` 派生インスタンスを受け取る。
+3. Parser は `IInputSourceFactory.TryCreate(id, optionsDto, blendShapeCount, profile)` で `IInputSource` を実体化。
+4. 各具体アダプタ ctor は自身の DTO 型 (`OscOptionsDto` など) に **ダウンキャスト** して options を読む（id と DTO 型は Factory 登録時に 1:1 対応しているため安全）。
+
+**拡張アダプタ (`x-*`) 登録例**:
+```csharp
+factory.RegisterExtension<MySensorOptionsDto>(
+    InputSourceId.Parse("x-mycompany-sensor"),
+    (options, blendShapeCount, profile) => new MySensorInputSource(options, blendShapeCount, profile));
+```
+拡張側は `MySensorOptionsDto : InputSourceOptionsDto` を自分で定義し、Parser は自動でこの DTO 型に `JsonUtility.FromJson` する。
 
 **Round-trip invariant**（Req 8.4）:
 - `JsonUtility.ToJson(JsonUtility.FromJson(src))` が同等プロファイルについて同一文字列を返す。順序保持・default 値の省略はテストで assert。
@@ -900,10 +1041,12 @@ classDiagram
 
 ### Unit Tests (EditMode, Req 8.2)
 1. `LayerInputSourceAggregator` の加重和 + clamp — 3 source × 2 layer × 固定値 で `output[k]` を手計算と比較（Req 2.2, 2.3）。
-2. `LayerInputSourceWeightBuffer` のダブルバッファ swap — `SetWeight` 後 `GetWeight`（swap 前）は旧値、`SwapIfDirty` 後は新値。Bulk scope の atomic flush（Req 4.4, 4.5）。
+2. `LayerInputSourceWeightBuffer` のダブルバッファ swap — `SetWeight` 後 `GetWeight`（swap 前）は旧値、`SwapIfDirty` 後は新値。**Copy-forward 検証**: 1 フレーム目に `SetWeight(0,0,0.5)` → Swap → 2 フレーム目は Set 無しで Swap → `GetWeight(0,0) == 0.5` であることを assert（スタレデータバグの回帰防止, Critical 1）。Bulk scope の atomic flush（Req 4.4, 4.5）。
 3. `ExpressionTriggerInputSourceBase` の独立 Transition — Controller/Keyboard fake 2 インスタンスで smile / angry を同時 ON 時、両 BlendShape が加算され LayerBlender 前の値が加算されていること（Req 1.6, D-12）。
 4. `SystemTextJsonParser` の `inputSources` parse — 必須違反が `FormatException`、重複 id が last-wins + warning、未知 id が warning + skip（Req 3.1〜3.4, 7.3）。
 5. `InputSourceId.TryParse` — 予約 ID / `x-` プレフィックス / regex 違反 / `legacy` が拒否されることを網羅（Req 1.7）。
+6. **OSC staleness — `ManualTimeProvider` による決定論的時間前進**: `OscInputSource` に `ManualTimeProvider` を注入し、`stalenessSeconds = 1.0` 設定下で `provider.UnscaledTimeSeconds = 0.0` → Write → `TryWriteValues` が true を返すこと、`provider.UnscaledTimeSeconds = 2.0`（OSC 受信なし）→ `TryWriteValues` が false を返すことを EditMode で検証（Req 5.5, 8.2, Critical 3）。従来 `Time.unscaledTimeAsDouble` 直参照では実現不可だったテストシナリオ。
+7. **Options DTO deserialization** — `InputSourceFactory.TryDeserializeOptions("osc", "{\"stalenessSeconds\":2.5}")` が `OscOptionsDto { stalenessSeconds = 2.5 }` を返すこと、拡張 id についても `RegisterExtension<TOptions>` で登録後同様に動作することを検証（Critical 2, Req 3.7）。
 
 ### Integration Tests (EditMode Fakes, Req 8.2)
 1. Fake `OscInputSource` + Fake `ControllerExpressionInputSource` が同一レイヤーで 50% + 50% 加重合成、結果を LayerBlender へ通して inter-layer blend と合わせた全パイプラインを end-to-end 検証（Req 2.6, 3 ユースケース）。
@@ -946,6 +1089,15 @@ flowchart LR
 ]
 ```
 （初期はコントローラ 100%、シーン切替で OSC に swap する運用を想定）
+
+**`InputBindingProfileSO` の `InputSourceCategory` フィールド追加に関する移行注意**（Nit 2）:
+- 既存の `InputBindingProfileSO` Asset は新フィールド `InputSourceCategory ∈ { Controller, Keyboard }` を持たないため、Unity の SerializedObject 機構により初回ロード時に **既定値 `Controller` が暗黙的に付与** される。
+- **問題**: 実質的にキーボード専用のバインディングを含む既存 Asset は、この既定値により「Controller 系統の `ControllerExpressionInputSource` としてバインドされる」ことになり、想定と異なるアダプタ経路にトリガーが流れる可能性がある。サイレントに挙動が変わる破壊的変更なので、ユーザーが気付きにくい。
+- **要対応項目**（本 spec の実装タスクで必須）:
+  1. **CHANGELOG 記載**: preview バージョン bump 時の CHANGELOG に「`InputBindingProfileSO` に `InputSourceCategory` フィールドを追加。既存 Asset は既定で `Controller` として扱われるため、キーボードバインディングの Asset は `Keyboard` に明示的に再設定が必要」と明記する（FR-001 の preview 破壊的変更ポリシー下）。
+  2. **ドキュメント／移行ガイド**: `docs/` 配下の移行ノートに「既存 `InputBindingProfileSO` Asset を `Project` ビューで開き、`InputSourceCategory` が用途と一致しているか手動レビューする」手順を追記。
+  3. **Editor 診断**: 可能なら `InputBindingProfileSO` の `OnValidate` で「Category=Controller だが InputAction のバインディングが Keyboard device のみ」のケースを検出し警告ログを出す（best-effort。実装が複雑なら本 spec の scope 外に逃す）。
+- 自動マイグレーションスクリプトは preview 段階では提供しない（FR-001 に従う）。
 
 **Rollback**: preview 版の限定配布範囲のため rollback は不要。配布前にサンプルプロファイル 3 種をリポジトリ同梱（emotion / lipsync / eye の既定構成）。
 

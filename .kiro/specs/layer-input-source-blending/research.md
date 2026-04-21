@@ -39,6 +39,7 @@
   - 入力源ウェイトは `(layerIndex, sourceIndex) → float` の 2 次元を 1 次元 `float[layerCount * maxSourcesPerLayer]` にフラット化してダブルバッファ化可能。
   - 「次 swap まで待つペンディング辞書」(D-7) は「write バッファへの直接上書き」でよい。Swap は `Aggregate()` 入口で行う。
   - バルク API は「複数 Write → 最後に Swap」で 1 フレーム内原子性を確保（D-7 Req 4.5）。
+  - **OscDoubleBuffer とは Swap 挙動が異なる**（design.md Critical 1 対応）: `OscDoubleBuffer` は毎フレーム OSC 受信があることを前提に swap 後の writeBuffer を zero-clear するが、入力源ウェイトバッファは「Set は稀な更新、観測は毎フレーム」というパターンのため zero-clear や no-op では **2 フレーム前の値を読むスタレデータバグ** が発生する。よって swap 時には `NativeArray.CopyTo` で現 readBuffer の内容を新 writeBuffer に **copy-forward** し、writeBuffer が常に「現行 readBuffer の複製 + 最新 Set」の状態を保つ。コストは O(layerCount × maxSourcesPerLayer)、完全 GC フリー。
 
 ### 既存 Expression パイプライン調査
 - **Context**: Expression トリガー型アダプタ (D-1 Option B) が「アダプタ内部に Expression スタックを持つ」とき、既存 `ExpressionUseCase` / `LayerUseCase` / `TransitionCalculator` / `ExclusionResolver` をどこまで再利用できるか。
@@ -60,8 +61,9 @@
   - `JsonSchemaDefinition.Profile.Layer` に `name`/`priority`/`exclusionMode` のフィールド名定数がある。ここに `inputSources` を追加する。
   - `options` マップは `JsonUtility` では扱えない（自由形式 dict 非対応）。`Newtonsoft.Json` 等の追加依存なしに実装するには「`options` 自身も型付き DTO とし、`options` 配下を `key/value` ペア配列で表現する」あるいは「adapter 固有 DTO クラスを型ごとに用意し、`type` ヒントを使わず `id` で分岐 DTO を選ぶ」のいずれかが必要。
 - **Implications**:
-  - 現状は `JsonUtility` に留まる方針（既存パターン踏襲・外部依存追加を避ける）。`options` は **`OscOptionsDto { float stalenessSeconds; }`** のような id 別 DTO を用意し、`inputSources[i].id` でディスパッチする。
-  - サードパーティ拡張 (`x-` プレフィックス) 向けの options は preview 段階ではドキュメント化のみ（設計時点では空の `options`={} として pass-through）。
+  - 現状は `JsonUtility` に留まる方針（既存パターン踏襲・外部依存追加を避ける）。`options` は **`OscOptionsDto { float stalenessSeconds; }`**、**`ExpressionTriggerOptionsDto { int maxStackDepth; }`** のような **id 別の typed DTO**（共通基底 `InputSourceOptionsDto` を継承）を用意し、`inputSources[i].id` でディスパッチする。`Dictionary<string, string>` 形式は `JsonUtility` が自由形式 dict を扱えないため採用しない（設計矛盾回避）。
+  - Factory は id → DTO 型のマップを保持し、Parser から渡された生 JSON サブ文字列を `JsonUtility.FromJson<TOptions>` で逆シリアライズする。Factory のシグネチャは `TryCreate(InputSourceId id, InputSourceOptionsDto options, ...)` と `TryDeserializeOptions(InputSourceId id, string optionsJson)` の 2 本。
+  - サードパーティ拡張 (`x-` プレフィックス) は `RegisterExtension<TOptions>(id, creator)` で DTO 型と creator 関数を同時に登録する API を提供する。これにより拡張アダプタも typed DTO の恩恵を受けつつ、コアは拡張の DTO 型を知らなくて済む（`where TOptions : InputSourceOptionsDto, new()` 制約）。
 
 ### InputSystem バインディング現状
 - **Context**: `controller-expr` / `keyboard-expr` を「独立 Expression スタックを持つアダプタ」として再設計する際、既存の `FacialInputBinder` / `InputSystemAdapter` がどう動いているかを把握する。
@@ -80,8 +82,9 @@
   - `OscReceiver` はすでに `OscDoubleBuffer` に直接書き込むフロー。staleness の計測には「受信のたびに `Time.unscaledTime` を記録する」必要がある。
   - `OscDoubleBuffer` はインデックス単位に値を書くが、「いつ書かれたか」の情報は持たない。
 - **Implications**:
-  - `OscInputSource` アダプタは「`OscReceiver` への参照 + 最終受信時刻タイムスタンプ」を持つ。アダプタが `Time.unscaledTimeAsDouble` を毎フレーム観測し、staleness 判定は `OscInputSource` 側で行う（`OscReceiver` 自体は非侵襲）。
+  - `OscInputSource` アダプタは「`OscReceiver` への参照 + 最終受信時刻タイムスタンプ」を持つ。アダプタが時刻を観測し、staleness 判定は `OscInputSource` 側で行う（`OscReceiver` 自体は非侵襲）。
   - 受信時刻の更新をアダプタが知るには、`OscReceiver` に「受信コールバック」のフックを 1 つ追加するか、`OscDoubleBuffer` の書き込みカウンタ（`Interlocked.Increment`）で更新を検知する。**後者（カウンタ）を採用**し `OscDoubleBuffer` への改修は `uint WriteTick { get; }` プロパティ追加のみに抑える。
+  - **時刻観測は `ITimeProvider` 経由に抽象化**（design.md Critical 3 対応）: `Time.unscaledTimeAsDouble` を直接参照すると EditMode テストで時刻を決定論的に前進できず、Req 8.2（EditMode-first testability）に違反する。Domain 層に `ITimeProvider { double UnscaledTimeSeconds { get; } }` を追加し、Adapters 層の `UnityTimeProvider` を本番実装、Tests/Shared の `ManualTimeProvider`（writable プロパティ）をテスト実装とする。`OscInputSource` は ctor で `ITimeProvider` を DI 受取し、staleness 判定と rate-limit 系ロジックで共通利用する。
 
 ## Architecture Pattern Evaluation
 
