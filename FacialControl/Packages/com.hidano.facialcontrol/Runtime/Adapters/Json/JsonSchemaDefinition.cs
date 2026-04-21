@@ -44,6 +44,26 @@ namespace Hidano.FacialControl.Adapters.Json
 
                 /// <summary>排他モード（"lastWins" | "blend"）</summary>
                 public const string ExclusionMode = "exclusionMode";
+
+                /// <summary>
+                /// 入力源ウェイトエントリの配列（必須フィールド、preview 破壊的変更 D-5 / Req 3.1, 3.2）。
+                /// </summary>
+                public const string InputSources = "inputSources";
+            }
+
+            /// <summary>
+            /// <c>layers[].inputSources[]</c> の 1 エントリのフィールド名。
+            /// </summary>
+            public static class InputSource
+            {
+                /// <summary>入力源 ID（予約 ID または <c>x-</c> プレフィックス）</summary>
+                public const string Id = "id";
+
+                /// <summary>ソースウェイト（0〜1、省略時 1.0）</summary>
+                public const string Weight = "weight";
+
+                /// <summary>アダプタ固有 options（任意）</summary>
+                public const string Options = "options";
             }
 
             /// <summary>
@@ -227,9 +247,16 @@ namespace Hidano.FacialControl.Adapters.Json
     ""schemaVersion"": ""1.0"",
     ""rendererPaths"": [""Armature/Body""],
     ""layers"": [
-        {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins""},
-        {""name"": ""lipsync"", ""priority"": 1, ""exclusionMode"": ""blend""},
-        {""name"": ""eye"", ""priority"": 2, ""exclusionMode"": ""lastWins""}
+        {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [
+            {""id"": ""controller-expr"", ""weight"": 0.5},
+            {""id"": ""osc"", ""weight"": 0.5, ""options"": {""stalenessSeconds"": 1.0}}
+        ]},
+        {""name"": ""lipsync"", ""priority"": 1, ""exclusionMode"": ""blend"", ""inputSources"": [
+            {""id"": ""lipsync"", ""weight"": 1.0}
+        ]},
+        {""name"": ""eye"", ""priority"": 2, ""exclusionMode"": ""lastWins"", ""inputSources"": [
+            {""id"": ""keyboard-expr"", ""weight"": 1.0, ""options"": {""maxStackDepth"": 4}}
+        ]}
     ],
     ""expressions"": [
         {

@@ -22,9 +22,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         private const string DefaultProfileJson = @"{
     ""schemaVersion"": ""1.0"",
     ""layers"": [
-        {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins""},
-        {""name"": ""lipsync"", ""priority"": 1, ""exclusionMode"": ""blend""},
-        {""name"": ""eye"", ""priority"": 2, ""exclusionMode"": ""lastWins""}
+        {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [{""id"": ""controller-expr"", ""weight"": 1.0}]},
+        {""name"": ""lipsync"", ""priority"": 1, ""exclusionMode"": ""blend"", ""inputSources"": [{""id"": ""lipsync"", ""weight"": 1.0}]},
+        {""name"": ""eye"", ""priority"": 2, ""exclusionMode"": ""lastWins"", ""inputSources"": [{""id"": ""keyboard-expr"", ""weight"": 1.0}]}
     ],
     ""expressions"": [
         {

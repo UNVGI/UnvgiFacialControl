@@ -4,17 +4,26 @@
         {
             "name": "emotion",
             "priority": 0,
-            "exclusionMode": "lastWins"
+            "exclusionMode": "lastWins",
+            "inputSources": [
+                {"id": "controller-expr", "weight": 1.0}
+            ]
         },
         {
             "name": "lipsync",
             "priority": 1,
-            "exclusionMode": "blend"
+            "exclusionMode": "blend",
+            "inputSources": [
+                {"id": "lipsync", "weight": 1.0}
+            ]
         },
         {
             "name": "eye",
             "priority": 2,
-            "exclusionMode": "lastWins"
+            "exclusionMode": "lastWins",
+            "inputSources": [
+                {"id": "keyboard-expr", "weight": 1.0}
+            ]
         }
     ],
     "expressions": [

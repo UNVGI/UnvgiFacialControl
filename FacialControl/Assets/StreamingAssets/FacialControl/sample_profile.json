@@ -4,7 +4,10 @@
         {
             "name": "eye",
             "priority": 0,
-            "exclusionMode": "lastWins"
+            "exclusionMode": "lastWins",
+            "inputSources": [
+                {"id": "keyboard-expr", "weight": 1.0}
+            ]
         }
     ],
     "expressions": [

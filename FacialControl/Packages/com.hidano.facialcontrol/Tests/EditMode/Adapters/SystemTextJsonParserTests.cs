@@ -42,8 +42,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             var json = @"{
                 ""schemaVersion"":""1.0"",
                 ""layers"":[
-                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""},
-                    {""name"":""lipsync"",""priority"":1,""exclusionMode"":""blend""}
+                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]},
+                    {""name"":""lipsync"",""priority"":1,""exclusionMode"":""blend"",""inputSources"":[{""id"":""lipsync"",""weight"":1.0}]}
                 ],
                 ""expressions"":[]
             }";
@@ -64,7 +64,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         {
             var json = @"{
                 ""schemaVersion"":""1.0"",
-                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""}],
+                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]}],
                 ""expressions"":[{
                     ""id"":""test-id-001"",
                     ""name"":""笑顔"",
@@ -96,7 +96,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         {
             var json = @"{
                 ""schemaVersion"":""1.0"",
-                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""}],
+                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]}],
                 ""expressions"":[{
                     ""id"":""test-id-002"",
                     ""name"":""test"",
@@ -123,7 +123,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         {
             var json = @"{
                 ""schemaVersion"":""1.0"",
-                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""}],
+                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]}],
                 ""expressions"":[{
                     ""id"":""test-id-003"",
                     ""name"":""test"",
@@ -149,8 +149,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             var json = @"{
                 ""schemaVersion"":""1.0"",
                 ""layers"":[
-                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""},
-                    {""name"":""lipsync"",""priority"":1,""exclusionMode"":""blend""}
+                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]},
+                    {""name"":""lipsync"",""priority"":1,""exclusionMode"":""blend"",""inputSources"":[{""id"":""lipsync"",""weight"":1.0}]}
                 ],
                 ""expressions"":[{
                     ""id"":""test-id-004"",
@@ -183,7 +183,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         {
             var json = @"{
                 ""schemaVersion"":""1.0"",
-                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""}],
+                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]}],
                 ""expressions"":[{
                     ""id"":""test-id-005"",
                     ""name"":""test"",
@@ -216,7 +216,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             {
                 var json = @"{
                     ""schemaVersion"":""1.0"",
-                    ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""}],
+                    ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]}],
                     ""expressions"":[{
                         ""id"":""test-id-curve-" + i + @""",
                         ""name"":""test"",
@@ -239,7 +239,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         {
             var json = @"{
                 ""schemaVersion"":""1.0"",
-                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""}],
+                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]}],
                 ""expressions"":[{
                     ""id"":""test-id-custom"",
                     ""name"":""test"",
@@ -273,7 +273,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         {
             var json = @"{
                 ""schemaVersion"":""1.0"",
-                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""}],
+                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]}],
                 ""expressions"":[{
                     ""id"":""test-id-jp"",
                     ""name"":""怒り顔"",
@@ -340,7 +340,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         {
             var json = @"{
                 ""schemaVersion"":""1.0"",
-                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""invalid""}],
+                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""invalid"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]}],
                 ""expressions"":[]
             }";
 
@@ -353,7 +353,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         {
             var json = @"{
                 ""schemaVersion"":""1.0"",
-                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""}],
+                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]}],
                 ""expressions"":[{
                     ""id"":""test-id-invalid"",
                     ""name"":""test"",
@@ -729,7 +729,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         {
             var json = @"{
                 ""schemaVersion"":""1.0"",
-                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""}],
+                ""layers"":[{""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]}],
                 ""expressions"":[]
             }";
 
@@ -743,7 +743,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         {
             var json = @"{
                 ""schemaVersion"":""1.0"",
-                ""layers"":[{""name"":""lipsync"",""priority"":1,""exclusionMode"":""blend""}],
+                ""layers"":[{""name"":""lipsync"",""priority"":1,""exclusionMode"":""blend"",""inputSources"":[{""id"":""lipsync"",""weight"":1.0}]}],
                 ""expressions"":[]
             }";
 
