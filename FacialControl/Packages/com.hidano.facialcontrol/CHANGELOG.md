@@ -2,7 +2,7 @@
 
 すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
 
-## [0.1.0-preview.1] - Unreleased
+## [0.1.0-preview.1] - 2026-04-21
 
 初回プレリリース。
 
