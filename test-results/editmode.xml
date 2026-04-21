@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="11" result="Passed" total="11" passed="11" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.1042698">
+  <test-suite type="TestSuite" id="1000" name="FacialControl" fullname="FacialControl" runstate="Runnable" testcasecount="770" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.104270" total="11" passed="11" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1812" name="Hidano.FacialControl.Tests.EditMode.dll" fullname="D:/Personal/Repositries/FacialControl/FacialControl/Library/ScriptAssemblies/Hidano.FacialControl.Tests.EditMode.dll" runstate="Runnable" testcasecount="770" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.088124" total="11" passed="11" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="76488" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1813" name="Hidano" fullname="Hidano" runstate="Runnable" testcasecount="770" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.076881" total="11" passed="11" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1814" name="FacialControl" fullname="Hidano.FacialControl" runstate="Runnable" testcasecount="770" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.066056" total="11" passed="11" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1815" name="Tests" fullname="Hidano.FacialControl.Tests" runstate="Runnable" testcasecount="770" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.054951" total="11" passed="11" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1816" name="EditMode" fullname="Hidano.FacialControl.Tests.EditMode" runstate="Runnable" testcasecount="770" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.043683" total="11" passed="11" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestSuite" id="1818" name="Domain" fullname="Hidano.FacialControl.Tests.EditMode.Domain" runstate="Runnable" testcasecount="307" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.031186" total="11" passed="11" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-suite type="TestFixture" id="1352" name="LayerSourceWeightEntryTests" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests" runstate="Runnable" testcasecount="11" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.023617" total="11" passed="11" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="1353" name="Constructor_StoresAllFiveFields" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests.Constructor_StoresAllFiveFields" methodname="Constructor_StoresAllFiveFields" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests" runstate="Runnable" seed="1981055740" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.009629" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1363" name="Default_HasZeroedFields" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests.Default_HasZeroedFields" methodname="Default_HasZeroedFields" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests" runstate="Runnable" seed="1559171105" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.000183" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1358" name="Equality_DifferentIsValid_AreNotEqual" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests.Equality_DifferentIsValid_AreNotEqual" methodname="Equality_DifferentIsValid_AreNotEqual" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests" runstate="Runnable" seed="402825267" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.001238" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1355" name="Equality_DifferentLayerIdx_AreNotEqual" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests.Equality_DifferentLayerIdx_AreNotEqual" methodname="Equality_DifferentLayerIdx_AreNotEqual" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests" runstate="Runnable" seed="92409694" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.000203" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1359" name="Equality_DifferentSaturated_AreNotEqual" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests.Equality_DifferentSaturated_AreNotEqual" methodname="Equality_DifferentSaturated_AreNotEqual" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests" runstate="Runnable" seed="1147701784" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.000166" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1356" name="Equality_DifferentSourceId_AreNotEqual" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests.Equality_DifferentSourceId_AreNotEqual" methodname="Equality_DifferentSourceId_AreNotEqual" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests" runstate="Runnable" seed="427821474" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.000229" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1357" name="Equality_DifferentWeight_AreNotEqual" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests.Equality_DifferentWeight_AreNotEqual" methodname="Equality_DifferentWeight_AreNotEqual" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests" runstate="Runnable" seed="1792251484" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.000166" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1354" name="Equality_SameValues_AreEqual" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests.Equality_SameValues_AreEqual" methodname="Equality_SameValues_AreEqual" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests" runstate="Runnable" seed="607163283" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.000348" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1360" name="ObjectEquals_MatchesEqualsContract" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests.ObjectEquals_MatchesEqualsContract" methodname="ObjectEquals_MatchesEqualsContract" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests" runstate="Runnable" seed="98098647" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.000213" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1362" name="SnapshotApi_ReceivesEntriesAsArray" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests.SnapshotApi_ReceivesEntriesAsArray" methodname="SnapshotApi_ReceivesEntriesAsArray" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests" runstate="Runnable" seed="917599942" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.000255" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1361" name="SnapshotApi_ReceivesEntriesAsSpan" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests.SnapshotApi_ReceivesEntriesAsSpan" methodname="SnapshotApi_ReceivesEntriesAsSpan" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerSourceWeightEntryTests" runstate="Runnable" seed="345682579" result="Passed" start-time="2026-04-21 03:50:15Z" end-time="2026-04-21 03:50:15Z" duration="0.000445" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[Saving results to: C:/Users/Hidano/AppData/LocalLow/DefaultCompany/FacialControl\TestResults.xml
+]]></output>
+                  </test-case>
+                </test-suite>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>
