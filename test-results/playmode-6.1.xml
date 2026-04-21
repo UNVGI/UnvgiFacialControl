@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="2" result="Passed" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-04-21 05:16:00Z" end-time="2026-04-21 05:16:00Z" duration="0.0461315">
+  <test-suite type="TestSuite" id="1275" name="FacialControl" fullname="FacialControl" runstate="Runnable" testcasecount="247" result="Passed" start-time="2026-04-21 05:16:00Z" end-time="2026-04-21 05:16:00Z" duration="0.046132" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1264" name="Hidano.FacialControl.Tests.PlayMode.dll" fullname="D:/Personal/Repositries/FacialControl/FacialControl/Library/ScriptAssemblies/Hidano.FacialControl.Tests.PlayMode.dll" runstate="Runnable" testcasecount="247" result="Passed" start-time="2026-04-21 05:16:00Z" end-time="2026-04-21 05:16:00Z" duration="0.038167" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="54960" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1265" name="Hidano" fullname="Hidano" runstate="Runnable" testcasecount="247" result="Passed" start-time="2026-04-21 05:16:00Z" end-time="2026-04-21 05:16:00Z" duration="0.035247" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1266" name="FacialControl" fullname="Hidano.FacialControl" runstate="Runnable" testcasecount="247" result="Passed" start-time="2026-04-21 05:16:00Z" end-time="2026-04-21 05:16:00Z" duration="0.032548" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1267" name="Tests" fullname="Hidano.FacialControl.Tests" runstate="Runnable" testcasecount="247" result="Passed" start-time="2026-04-21 05:16:00Z" end-time="2026-04-21 05:16:00Z" duration="0.030031" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1268" name="PlayMode" fullname="Hidano.FacialControl.Tests.PlayMode" runstate="Runnable" testcasecount="247" result="Passed" start-time="2026-04-21 05:16:00Z" end-time="2026-04-21 05:16:00Z" duration="0.027454" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestSuite" id="1271" name="Adapters" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters" runstate="Runnable" testcasecount="125" result="Passed" start-time="2026-04-21 05:16:00Z" end-time="2026-04-21 05:16:00Z" duration="0.022673" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-suite type="TestFixture" id="1261" name="UnityTimeProviderTests" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.UnityTimeProviderTests" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.UnityTimeProviderTests" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-04-21 05:16:00Z" end-time="2026-04-21 05:16:00Z" duration="0.018947" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="1262" name="UnscaledTimeSeconds_AfterOneFrame_IsGreaterThanBefore" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.UnityTimeProviderTests.UnscaledTimeSeconds_AfterOneFrame_IsGreaterThanBefore" methodname="UnscaledTimeSeconds_AfterOneFrame_IsGreaterThanBefore" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.UnityTimeProviderTests" runstate="Runnable" seed="1071596911" result="Passed" start-time="2026-04-21 05:16:00Z" end-time="2026-04-21 05:16:00Z" duration="0.008389" asserts="0">
+                    <properties>
+                      <property name="_JOINTYPE" value="UnityCombinatorial" />
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1263" name="UnscaledTimeSeconds_OverMultipleFrames_IsMonotonicallyIncreasing" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.UnityTimeProviderTests.UnscaledTimeSeconds_OverMultipleFrames_IsMonotonicallyIncreasing" methodname="UnscaledTimeSeconds_OverMultipleFrames_IsMonotonicallyIncreasing" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.UnityTimeProviderTests" runstate="Runnable" seed="523972718" result="Passed" start-time="2026-04-21 05:16:00Z" end-time="2026-04-21 05:16:00Z" duration="0.002400" asserts="0">
+                    <properties>
+                      <property name="_JOINTYPE" value="UnityCombinatorial" />
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[Saving results to: C:/Users/Hidano/AppData/LocalLow/DefaultCompany/FacialControl\TestResults.xml
+]]></output>
+                  </test-case>
+                </test-suite>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>
