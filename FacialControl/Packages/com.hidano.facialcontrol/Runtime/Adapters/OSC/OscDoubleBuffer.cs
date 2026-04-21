@@ -16,12 +16,20 @@ namespace Hidano.FacialControl.Adapters.OSC
         private NativeArray<float> _bufferB;
         private int _writeIndex; // 0 = A が書き込み, 1 = B が書き込み
         private int _size;
+        private int _writeTick;
         private bool _disposed;
 
         /// <summary>
         /// バッファの要素数。
         /// </summary>
         public int Size => _size;
+
+        /// <summary>
+        /// <see cref="Write"/> が成功した回数を示す単調増加カウンタ。
+        /// 新規 OSC データ受信を検出する staleness 判定に用いる。
+        /// <see cref="Volatile.Read(ref int)"/> 経由で安全に読み取られる。
+        /// </summary>
+        public int WriteTick => Volatile.Read(ref _writeTick);
 
         /// <summary>
         /// 指定サイズで OscDoubleBuffer を初期化する。
@@ -56,6 +64,7 @@ namespace Hidano.FacialControl.Adapters.OSC
 
             var writeBuffer = GetWriteBuffer();
             writeBuffer[index] = value;
+            Interlocked.Increment(ref _writeTick);
         }
 
         /// <summary>

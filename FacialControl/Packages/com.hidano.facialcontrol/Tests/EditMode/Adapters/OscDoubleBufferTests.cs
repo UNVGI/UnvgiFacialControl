@@ -399,5 +399,84 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             var readBuffer = buffer.GetReadBuffer();
             Assert.AreEqual(0.9f, readBuffer[7], 0.0001f);
         }
+
+        // ================================================================
+        // WriteTick — 書き込みカウンタ（staleness 判定用）
+        // ================================================================
+
+        [Test]
+        public void WriteTick_InitialValue_IsZero()
+        {
+            using var buffer = new OscDoubleBuffer(4);
+
+            Assert.AreEqual(0, buffer.WriteTick);
+        }
+
+        [Test]
+        public void Write_IncrementsWriteTick()
+        {
+            using var buffer = new OscDoubleBuffer(4);
+
+            var before = buffer.WriteTick;
+            buffer.Write(0, 0.5f);
+
+            Assert.AreEqual(before + 1, buffer.WriteTick);
+        }
+
+        [Test]
+        public void Write_MultipleTimes_IncrementsWriteTickPerCall()
+        {
+            using var buffer = new OscDoubleBuffer(4);
+
+            buffer.Write(0, 0.1f);
+            buffer.Write(1, 0.2f);
+            buffer.Write(2, 0.3f);
+            buffer.Write(3, 0.4f);
+
+            Assert.AreEqual(4, buffer.WriteTick);
+        }
+
+        [Test]
+        public void Write_IndexOutOfRange_DoesNotIncrementWriteTick()
+        {
+            using var buffer = new OscDoubleBuffer(4);
+
+            var before = buffer.WriteTick;
+            Assert.Throws<ArgumentOutOfRangeException>(() => buffer.Write(4, 0.5f));
+
+            Assert.AreEqual(before, buffer.WriteTick);
+        }
+
+        [Test]
+        public void Swap_DoesNotIncrementWriteTick()
+        {
+            using var buffer = new OscDoubleBuffer(4);
+
+            buffer.Write(0, 0.5f);
+            var afterWrite = buffer.WriteTick;
+
+            buffer.Swap();
+
+            Assert.AreEqual(afterWrite, buffer.WriteTick);
+        }
+
+        [Test]
+        public void WriteTick_FromDifferentThread_ReflectsIncrement()
+        {
+            using var buffer = new OscDoubleBuffer(4);
+
+            var before = buffer.WriteTick;
+            var writeThread = new Thread(() =>
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    buffer.Write(0, (float)i / 10f);
+                }
+            });
+            writeThread.Start();
+            writeThread.Join();
+
+            Assert.AreEqual(before + 10, buffer.WriteTick);
+        }
     }
 }
