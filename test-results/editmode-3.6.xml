@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="23" result="Passed" total="23" passed="23" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.1430555">
+  <test-suite type="TestSuite" id="1000" name="FacialControl" fullname="FacialControl" runstate="Runnable" testcasecount="821" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.143056" total="23" passed="23" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1865" name="Hidano.FacialControl.Tests.EditMode.dll" fullname="D:/Personal/Repositries/FacialControl/FacialControl/Library/ScriptAssemblies/Hidano.FacialControl.Tests.EditMode.dll" runstate="Runnable" testcasecount="821" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.127658" total="23" passed="23" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="36760" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1866" name="Hidano" fullname="Hidano" runstate="Runnable" testcasecount="821" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.116441" total="23" passed="23" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1867" name="FacialControl" fullname="Hidano.FacialControl" runstate="Runnable" testcasecount="821" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.102808" total="23" passed="23" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1868" name="Tests" fullname="Hidano.FacialControl.Tests" runstate="Runnable" testcasecount="821" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.090511" total="23" passed="23" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1869" name="EditMode" fullname="Hidano.FacialControl.Tests.EditMode" runstate="Runnable" testcasecount="821" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.060707" total="23" passed="23" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestSuite" id="1871" name="Domain" fullname="Hidano.FacialControl.Tests.EditMode.Domain" runstate="Runnable" testcasecount="358" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.048396" total="23" passed="23" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-suite type="TestFixture" id="1341" name="LayerInputSourceRegistryTests" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" testcasecount="23" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.039790" total="23" passed="23" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="1354" name="Constructor_EmptyBindings_AllocatesEmptyScratchWithoutThrowing" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.Constructor_EmptyBindings_AllocatesEmptyScratchWithoutThrowing" methodname="Constructor_EmptyBindings_AllocatesEmptyScratchWithoutThrowing" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="278715428" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.009677" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1342" name="Constructor_ExposesLayerCount_MaxSourcesPerLayer_BlendShapeCount" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.Constructor_ExposesLayerCount_MaxSourcesPerLayer_BlendShapeCount" methodname="Constructor_ExposesLayerCount_MaxSourcesPerLayer_BlendShapeCount" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="1950911354" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000529" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1353" name="Constructor_MaxSourcesPerLayer_IsDerivedFromHighestSourceIdx" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.Constructor_MaxSourcesPerLayer_IsDerivedFromHighestSourceIdx" methodname="Constructor_MaxSourcesPerLayer_IsDerivedFromHighestSourceIdx" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="862369553" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000416" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1352" name="Constructor_NegativeBlendShapeCount_Throws" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.Constructor_NegativeBlendShapeCount_Throws" methodname="Constructor_NegativeBlendShapeCount_Throws" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="975351279" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.001548" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1351" name="Constructor_NullBindings_Throws" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.Constructor_NullBindings_Throws" methodname="Constructor_NullBindings_Throws" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="557147359" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000254" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1356" name="Dispose_AfterDispose_GetScratchBufferReturnsEmpty" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.Dispose_AfterDispose_GetScratchBufferReturnsEmpty" methodname="Dispose_AfterDispose_GetScratchBufferReturnsEmpty" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="716531581" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000485" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1355" name="Dispose_CalledTwice_DoesNotThrow" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.Dispose_CalledTwice_DoesNotThrow" methodname="Dispose_CalledTwice_DoesNotThrow" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="2698884" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000604" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1348" name="GetScratchBuffer_AllSlicesAreContiguous_AndNonOverlapping" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.GetScratchBuffer_AllSlicesAreContiguous_AndNonOverlapping" methodname="GetScratchBuffer_AllSlicesAreContiguous_AndNonOverlapping" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="968280100" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.003732" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1347" name="GetScratchBuffer_LengthEqualsBlendShapeCount" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.GetScratchBuffer_LengthEqualsBlendShapeCount" methodname="GetScratchBuffer_LengthEqualsBlendShapeCount" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="1343057515" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000288" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1350" name="GetScratchBuffer_OutOfRange_ReturnsEmpty" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.GetScratchBuffer_OutOfRange_ReturnsEmpty" methodname="GetScratchBuffer_OutOfRange_ReturnsEmpty" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="508468792" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000242" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1349" name="GetScratchBuffer_RepeatedCalls_ReturnSameFixedRegion" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.GetScratchBuffer_RepeatedCalls_ReturnSameFixedRegion" methodname="GetScratchBuffer_RepeatedCalls_ReturnSameFixedRegion" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="1727247665" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000224" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1343" name="GetSource_ForRegisteredSlot_ReturnsRegisteredInstance" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.GetSource_ForRegisteredSlot_ReturnsRegisteredInstance" methodname="GetSource_ForRegisteredSlot_ReturnsRegisteredInstance" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="1869390605" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000306" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1344" name="GetSource_OutOfRange_ReturnsNull" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.GetSource_OutOfRange_ReturnsNull" methodname="GetSource_OutOfRange_ReturnsNull" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="2121677019" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000191" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1346" name="GetSourceCountForLayer_OutOfRange_ReturnsZero" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.GetSourceCountForLayer_OutOfRange_ReturnsZero" methodname="GetSourceCountForLayer_OutOfRange_ReturnsZero" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="659809260" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000219" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1345" name="GetSourceCountForLayer_ReturnsPerLayerCount" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.GetSourceCountForLayer_ReturnsPerLayerCount" methodname="GetSourceCountForLayer_ReturnsPerLayerCount" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="1682915229" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000223" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1359" name="TryAddSource_DuplicateId_LogsWarningAndReturnsFalse" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.TryAddSource_DuplicateId_LogsWarningAndReturnsFalse" methodname="TryAddSource_DuplicateId_LogsWarningAndReturnsFalse" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="311249827" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.002357" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[LayerInputSourceRegistry: TryAddSource の id='osc' は layerIdx=0 に既に登録されているためスキップします。
+]]></output>
+                  </test-case>
+                  <test-case id="1358" name="TryAddSource_ExceedsCapacity_ReallocatesScratchBuffer" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.TryAddSource_ExceedsCapacity_ReallocatesScratchBuffer" methodname="TryAddSource_ExceedsCapacity_ReallocatesScratchBuffer" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="589374703" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000495" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1361" name="TryAddSource_NullSource_LogsWarningAndReturnsFalse" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.TryAddSource_NullSource_LogsWarningAndReturnsFalse" methodname="TryAddSource_NullSource_LogsWarningAndReturnsFalse" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="405525077" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000676" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[LayerInputSourceRegistry: TryAddSource の source が null のためスキップします (layerIdx=0)。
+]]></output>
+                  </test-case>
+                  <test-case id="1360" name="TryAddSource_OutOfRangeLayer_LogsWarningAndReturnsFalse" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.TryAddSource_OutOfRangeLayer_LogsWarningAndReturnsFalse" methodname="TryAddSource_OutOfRangeLayer_LogsWarningAndReturnsFalse" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="541129893" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000609" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[LayerInputSourceRegistry: TryAddSource の layerIdx=5 が範囲外のためスキップします (LayerCount=1)。
+]]></output>
+                  </test-case>
+                  <test-case id="1357" name="TryAddSource_WithinExistingCapacity_ReusesFreedSlot" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.TryAddSource_WithinExistingCapacity_ReusesFreedSlot" methodname="TryAddSource_WithinExistingCapacity_ReusesFreedSlot" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="832822884" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000789" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1362" name="TryRemoveSource_ExistingId_CompactsAndDecrementsCount" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.TryRemoveSource_ExistingId_CompactsAndDecrementsCount" methodname="TryRemoveSource_ExistingId_CompactsAndDecrementsCount" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="922028733" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.001829" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1363" name="TryRemoveSource_NonExistentId_LogsWarningAndReturnsFalse" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.TryRemoveSource_NonExistentId_LogsWarningAndReturnsFalse" methodname="TryRemoveSource_NonExistentId_LogsWarningAndReturnsFalse" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="1001388750" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000697" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[LayerInputSourceRegistry: TryRemoveSource の id='x-missing' は layerIdx=0 に見つかりません。
+]]></output>
+                  </test-case>
+                  <test-case id="1364" name="TryRemoveSource_OutOfRangeLayer_LogsWarningAndReturnsFalse" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests.TryRemoveSource_OutOfRangeLayer_LogsWarningAndReturnsFalse" methodname="TryRemoveSource_OutOfRangeLayer_LogsWarningAndReturnsFalse" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceRegistryTests" runstate="Runnable" seed="692022115" result="Passed" start-time="2026-04-21 04:20:24Z" end-time="2026-04-21 04:20:24Z" duration="0.000650" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[LayerInputSourceRegistry: TryRemoveSource の layerIdx=9 が範囲外のためスキップします (LayerCount=1)。
+Saving results to: C:/Users/Hidano/AppData/LocalLow/DefaultCompany/FacialControl\TestResults.xml
+]]></output>
+                  </test-case>
+                </test-suite>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

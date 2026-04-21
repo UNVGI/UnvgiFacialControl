@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
@@ -310,6 +313,242 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
 
             Assert.IsTrue(registry.GetScratchBuffer(0, 0).IsEmpty,
                 "Dispose 後は scratch バッファが解放されるため IsEmpty を返すこと");
+        }
+
+        // ----- 3.6 低頻度ランタイム API: TryAddSource / TryRemoveSource (Req 1.2, 4.3) -----
+
+        [Test]
+        public void TryAddSource_WithinExistingCapacity_ReusesFreedSlot()
+        {
+            // シナリオ: 2 source 確保済みレイヤーから 1 source を削除し、
+            // 新しい source を追加すると MaxSourcesPerLayer の再確保を伴わず
+            // 同じスロットに配置される。
+            var profile = BuildProfile(layerCount: 1);
+            var a = new FakeInputSource("osc", InputSourceType.ValueProvider, 4);
+            var b = new FakeInputSource("lipsync", InputSourceType.ValueProvider, 4);
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, a),
+                (0, 1, b),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount: 4, bindings);
+
+            Assert.AreEqual(2, registry.MaxSourcesPerLayer);
+            Assert.AreEqual(2, registry.GetSourceCountForLayer(0));
+
+            Assert.IsTrue(registry.TryRemoveSource(0, InputSourceId.Parse("osc")),
+                "既存 id の削除は true を返すこと");
+
+            Assert.AreEqual(1, registry.GetSourceCountForLayer(0),
+                "削除後は GetSourceCountForLayer が 1 減ること");
+
+            var c = new FakeInputSource("x-added", InputSourceType.ValueProvider, 4);
+            Assert.IsTrue(registry.TryAddSource(0, c),
+                "追加は true を返すこと");
+
+            Assert.AreEqual(2, registry.MaxSourcesPerLayer,
+                "既存スロットに空きがあれば MaxSourcesPerLayer は変化しない");
+            Assert.AreEqual(2, registry.GetSourceCountForLayer(0));
+
+            // 追加後に GetSource(layerIdx, newSourceIdx) が新アダプタを返す
+            bool foundAdded = false;
+            for (int s = 0; s < registry.MaxSourcesPerLayer; s++)
+            {
+                if (ReferenceEquals(registry.GetSource(0, s), c))
+                {
+                    foundAdded = true;
+                    break;
+                }
+            }
+            Assert.IsTrue(foundAdded, "追加後に GetSource(layerIdx, newSourceIdx) が新アダプタを返すこと");
+        }
+
+        [Test]
+        public void TryAddSource_ExceedsCapacity_ReallocatesScratchBuffer()
+        {
+            // 2 source で初期化した Registry に 3 本目を追加すると
+            // MaxSourcesPerLayer が増加し scratch が再確保される (既存 Memory 参照は無効化許容)。
+            var profile = BuildProfile(layerCount: 2);
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, new FakeInputSource("osc", InputSourceType.ValueProvider, 4)),
+                (0, 1, new FakeInputSource("lipsync", InputSourceType.ValueProvider, 4)),
+                (1, 0, new FakeInputSource("controller-expr", InputSourceType.ExpressionTrigger, 4)),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount: 4, bindings);
+
+            int initialMax = registry.MaxSourcesPerLayer;
+            Assert.AreEqual(2, initialMax);
+
+            // layer 0 に 3 本目を追加
+            var added = new FakeInputSource("x-cam", InputSourceType.ValueProvider, 4);
+            Assert.IsTrue(registry.TryAddSource(0, added));
+
+            Assert.AreEqual(initialMax + 1, registry.MaxSourcesPerLayer,
+                "容量超過で追加すると MaxSourcesPerLayer が増加すること");
+            Assert.AreEqual(3, registry.GetSourceCountForLayer(0));
+
+            // 追加後の scratch は再確保されたが各 (layer, source) には
+            // BlendShapeCount 長の slice が配られていること。
+            for (int l = 0; l < registry.LayerCount; l++)
+            {
+                for (int s = 0; s < registry.GetSourceCountForLayer(l); s++)
+                {
+                    var mem = registry.GetScratchBuffer(l, s);
+                    Assert.AreEqual(registry.BlendShapeCount, mem.Length,
+                        $"再確保後も (l={l}, s={s}) の scratch 長は BlendShapeCount に等しいこと");
+                }
+            }
+
+            // 追加直後に GetSource が新アダプタを返す
+            bool foundAdded = false;
+            for (int s = 0; s < registry.MaxSourcesPerLayer; s++)
+            {
+                if (ReferenceEquals(registry.GetSource(0, s), added))
+                {
+                    foundAdded = true;
+                    break;
+                }
+            }
+            Assert.IsTrue(foundAdded, "容量拡張後に GetSource が新アダプタを返すこと");
+
+            // 既存 source も同じ参照で残っていること (layer 1 の controller-expr)
+            bool foundExisting = false;
+            for (int s = 0; s < registry.MaxSourcesPerLayer; s++)
+            {
+                var src = registry.GetSource(1, s);
+                if (src != null && src.Id == "controller-expr")
+                {
+                    foundExisting = true;
+                    break;
+                }
+            }
+            Assert.IsTrue(foundExisting, "容量拡張時に既存 source が保持されること");
+        }
+
+        [Test]
+        public void TryAddSource_DuplicateId_LogsWarningAndReturnsFalse()
+        {
+            var profile = BuildProfile(layerCount: 1);
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, new FakeInputSource("osc", InputSourceType.ValueProvider, 4)),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount: 4, bindings);
+
+            LogAssert.Expect(LogType.Warning,
+                new Regex("LayerInputSourceRegistry.*TryAddSource.*osc.*既に登録"));
+
+            var dup = new FakeInputSource("osc", InputSourceType.ValueProvider, 4);
+            Assert.IsFalse(registry.TryAddSource(0, dup),
+                "同 id が既に存在するレイヤーへの追加は false を返すこと");
+
+            Assert.AreEqual(1, registry.GetSourceCountForLayer(0),
+                "重複追加で count は変化しないこと");
+        }
+
+        [Test]
+        public void TryAddSource_OutOfRangeLayer_LogsWarningAndReturnsFalse()
+        {
+            var profile = BuildProfile(layerCount: 1);
+            var bindings = new List<(int, int, IInputSource)>();
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount: 4, bindings);
+
+            LogAssert.Expect(LogType.Warning,
+                new Regex("LayerInputSourceRegistry.*TryAddSource.*layerIdx=5"));
+
+            var src = new FakeInputSource("osc", InputSourceType.ValueProvider, 4);
+            Assert.IsFalse(registry.TryAddSource(5, src));
+        }
+
+        [Test]
+        public void TryAddSource_NullSource_LogsWarningAndReturnsFalse()
+        {
+            var profile = BuildProfile(layerCount: 1);
+            var bindings = new List<(int, int, IInputSource)>();
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount: 4, bindings);
+
+            LogAssert.Expect(LogType.Warning,
+                new Regex("LayerInputSourceRegistry.*TryAddSource.*null"));
+
+            Assert.IsFalse(registry.TryAddSource(0, null));
+        }
+
+        [Test]
+        public void TryRemoveSource_ExistingId_CompactsAndDecrementsCount()
+        {
+            // 3 sources を登録し、中間の 1 つを削除。
+            // 残り 2 source は詰めて配置され GetSourceCountForLayer が 1 減る。
+            var profile = BuildProfile(layerCount: 1);
+            var a = new FakeInputSource("osc", InputSourceType.ValueProvider, 4);
+            var b = new FakeInputSource("lipsync", InputSourceType.ValueProvider, 4);
+            var c = new FakeInputSource("controller-expr", InputSourceType.ExpressionTrigger, 4);
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, a),
+                (0, 1, b),
+                (0, 2, c),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount: 4, bindings);
+            Assert.AreEqual(3, registry.GetSourceCountForLayer(0));
+
+            Assert.IsTrue(registry.TryRemoveSource(0, InputSourceId.Parse("lipsync")));
+
+            Assert.AreEqual(2, registry.GetSourceCountForLayer(0),
+                "削除後は GetSourceCountForLayer が 1 減ること");
+
+            // 残った 2 source が参照可能であること
+            var remaining = new HashSet<string>();
+            for (int s = 0; s < registry.GetSourceCountForLayer(0); s++)
+            {
+                var src = registry.GetSource(0, s);
+                Assert.NotNull(src, $"compacted slot (0, {s}) は非 null であること");
+                remaining.Add(src.Id);
+            }
+            CollectionAssert.AreEquivalent(new[] { "osc", "controller-expr" }, remaining);
+        }
+
+        [Test]
+        public void TryRemoveSource_NonExistentId_LogsWarningAndReturnsFalse()
+        {
+            var profile = BuildProfile(layerCount: 1);
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, new FakeInputSource("osc", InputSourceType.ValueProvider, 4)),
+            };
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount: 4, bindings);
+
+            LogAssert.Expect(LogType.Warning,
+                new Regex("LayerInputSourceRegistry.*TryRemoveSource.*x-missing.*見つかりません"));
+
+            Assert.IsFalse(registry.TryRemoveSource(0, InputSourceId.Parse("x-missing")),
+                "存在しない id の削除は false を返すこと");
+
+            Assert.AreEqual(1, registry.GetSourceCountForLayer(0),
+                "存在しない id の削除は count を変化させないこと");
+            Assert.AreEqual("osc", registry.GetSource(0, 0)?.Id,
+                "存在しない id の削除は既存スロットを変更しないこと");
+        }
+
+        [Test]
+        public void TryRemoveSource_OutOfRangeLayer_LogsWarningAndReturnsFalse()
+        {
+            var profile = BuildProfile(layerCount: 1);
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, new FakeInputSource("osc", InputSourceType.ValueProvider, 4)),
+            };
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount: 4, bindings);
+
+            LogAssert.Expect(LogType.Warning,
+                new Regex("LayerInputSourceRegistry.*TryRemoveSource.*layerIdx=9"));
+
+            Assert.IsFalse(registry.TryRemoveSource(9, InputSourceId.Parse("osc")));
+            Assert.AreEqual(1, registry.GetSourceCountForLayer(0));
         }
     }
 }

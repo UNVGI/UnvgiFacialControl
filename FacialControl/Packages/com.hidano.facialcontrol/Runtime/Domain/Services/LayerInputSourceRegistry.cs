@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 
@@ -36,12 +37,17 @@ namespace Hidano.FacialControl.Domain.Services
         public int LayerCount { get; }
 
         /// <summary>1 レイヤー当たりの最大入力源スロット数。bindings の最大 sourceIdx + 1。</summary>
-        public int MaxSourcesPerLayer { get; }
+        /// <remarks>
+        /// 初期化後は原則不変だが、<see cref="TryAddSource"/> で容量を超える追加が行われた場合のみ
+        /// +1 されて scratch が再確保される (低頻度ランタイム操作、D-10 / D-14)。
+        /// </remarks>
+        public int MaxSourcesPerLayer => _maxSourcesPerLayer;
 
         /// <summary>1 入力源が書込む BlendShape の個数。scratch slice の長さに等しい。</summary>
         public int BlendShapeCount { get; }
 
-        private readonly IInputSource[] _sources;       // 2D を flat で [l * Max + s] に格納
+        private IInputSource[] _sources;                // 2D を flat で [l * Max + s] に格納
+        private int _maxSourcesPerLayer;                // MaxSourcesPerLayer の backing field
         private readonly int[] _sourceCounts;           // 各レイヤーの登録済みスロット数
         private float[] _scratchBuffer;                 // 連続 1 本の scratch プール
         private bool _disposed;
@@ -93,7 +99,7 @@ namespace Hidano.FacialControl.Domain.Services
                     maxSources = needed;
                 }
             }
-            MaxSourcesPerLayer = maxSources;
+            _maxSourcesPerLayer = maxSources;
 
             int slotCount = LayerCount * MaxSourcesPerLayer;
             _sources = slotCount == 0 ? Array.Empty<IInputSource>() : new IInputSource[slotCount];
@@ -180,6 +186,163 @@ namespace Hidano.FacialControl.Domain.Services
 
             int offset = ((layerIdx * MaxSourcesPerLayer) + sourceIdx) * BlendShapeCount;
             return new Memory<float>(_scratchBuffer, offset, BlendShapeCount);
+        }
+
+        /// <summary>
+        /// 低頻度ランタイム API: 指定レイヤーに入力源を追加する (D-10 / D-14)。
+        /// </summary>
+        /// <param name="layerIdx">レイヤーインデックス。<see cref="LayerCount"/> 未満。</param>
+        /// <param name="source">追加する入力源。非 null。同 layer 内に同 Id が既登録の場合は追加不可。</param>
+        /// <returns>追加できれば true。範囲外・null・重複 id のいずれかの場合 false。</returns>
+        /// <remarks>
+        /// <para>
+        /// 追加先スロットは該当レイヤーの末尾 (<see cref="GetSourceCountForLayer"/> 時点のインデックス)。
+        /// 既存容量 (<see cref="MaxSourcesPerLayer"/>) に空きがあればその末尾に置き、scratch バッファの
+        /// 再確保は行われない。容量を超える場合のみ <see cref="MaxSourcesPerLayer"/> を +1 に拡張し
+        /// <c>_sources</c> / <c>_scratchBuffer</c> を再確保する (低頻度、アロケーション許容)。
+        /// </para>
+        /// <para>
+        /// scratch の再確保後は既存 <see cref="GetScratchBuffer"/> から取得した
+        /// <see cref="Memory{T}"/> 参照は無効化される。呼出側は追加/削除後に再取得すること。
+        /// </para>
+        /// <para>
+        /// 範囲外 layer、null source、同 Id の重複はいずれも警告ログ + no-op として扱い、
+        /// 他のスロットを一切変更しない (Req 4.3)。
+        /// </para>
+        /// </remarks>
+        public bool TryAddSource(int layerIdx, IInputSource source)
+        {
+            if (_disposed)
+            {
+                Debug.LogWarning(
+                    "LayerInputSourceRegistry: TryAddSource は Dispose 済みの Registry では利用できません。");
+                return false;
+            }
+
+            if ((uint)layerIdx >= (uint)LayerCount)
+            {
+                Debug.LogWarning(
+                    $"LayerInputSourceRegistry: TryAddSource の layerIdx={layerIdx} が範囲外のためスキップします (LayerCount={LayerCount})。");
+                return false;
+            }
+
+            if (source == null)
+            {
+                Debug.LogWarning(
+                    $"LayerInputSourceRegistry: TryAddSource の source が null のためスキップします (layerIdx={layerIdx})。");
+                return false;
+            }
+
+            for (int s = 0; s < MaxSourcesPerLayer; s++)
+            {
+                var existing = _sources[(layerIdx * MaxSourcesPerLayer) + s];
+                if (existing != null && string.Equals(existing.Id, source.Id, StringComparison.Ordinal))
+                {
+                    Debug.LogWarning(
+                        $"LayerInputSourceRegistry: TryAddSource の id='{source.Id}' は layerIdx={layerIdx} に既に登録されているためスキップします。");
+                    return false;
+                }
+            }
+
+            int newSourceIdx = _sourceCounts[layerIdx];
+            if (newSourceIdx >= MaxSourcesPerLayer)
+            {
+                ExpandCapacityByOne();
+            }
+
+            int flat = (layerIdx * MaxSourcesPerLayer) + newSourceIdx;
+            _sources[flat] = source;
+            _sourceCounts[layerIdx]++;
+            return true;
+        }
+
+        /// <summary>
+        /// 低頻度ランタイム API: 指定レイヤーから id 一致の入力源を削除する (D-10)。
+        /// </summary>
+        /// <param name="layerIdx">レイヤーインデックス。<see cref="LayerCount"/> 未満。</param>
+        /// <param name="id">削除対象の入力源 id。</param>
+        /// <returns>削除できれば true。範囲外 layer・id 不一致のいずれかの場合は警告 + false。</returns>
+        /// <remarks>
+        /// <para>
+        /// 該当 id のスロットを開け、後続スロットを詰めて配置する (compact)。
+        /// <see cref="GetSourceCountForLayer"/> は 1 減る。<see cref="MaxSourcesPerLayer"/> は縮小しない。
+        /// </para>
+        /// <para>
+        /// 範囲外 layer、未登録 id はいずれも警告ログ + no-op として扱い、他のスロットを変更しない (Req 4.3)。
+        /// </para>
+        /// </remarks>
+        public bool TryRemoveSource(int layerIdx, InputSourceId id)
+        {
+            if (_disposed)
+            {
+                Debug.LogWarning(
+                    "LayerInputSourceRegistry: TryRemoveSource は Dispose 済みの Registry では利用できません。");
+                return false;
+            }
+
+            if ((uint)layerIdx >= (uint)LayerCount)
+            {
+                Debug.LogWarning(
+                    $"LayerInputSourceRegistry: TryRemoveSource の layerIdx={layerIdx} が範囲外のためスキップします (LayerCount={LayerCount})。");
+                return false;
+            }
+
+            string idValue = id.Value;
+            int removedIdx = -1;
+            for (int s = 0; s < MaxSourcesPerLayer; s++)
+            {
+                var existing = _sources[(layerIdx * MaxSourcesPerLayer) + s];
+                if (existing != null && string.Equals(existing.Id, idValue, StringComparison.Ordinal))
+                {
+                    removedIdx = s;
+                    break;
+                }
+            }
+
+            if (removedIdx < 0)
+            {
+                Debug.LogWarning(
+                    $"LayerInputSourceRegistry: TryRemoveSource の id='{idValue ?? "<null>"}' は layerIdx={layerIdx} に見つかりません。");
+                return false;
+            }
+
+            int count = _sourceCounts[layerIdx];
+            for (int s = removedIdx; s < count - 1; s++)
+            {
+                _sources[(layerIdx * MaxSourcesPerLayer) + s] = _sources[(layerIdx * MaxSourcesPerLayer) + s + 1];
+            }
+            _sources[(layerIdx * MaxSourcesPerLayer) + count - 1] = null;
+            _sourceCounts[layerIdx] = count - 1;
+
+            return true;
+        }
+
+        /// <summary>
+        /// <see cref="MaxSourcesPerLayer"/> を +1 に拡張し、<c>_sources</c> と <c>_scratchBuffer</c> を再確保する。
+        /// 既存登録は新しい stride に合わせて移植される。scratch は新バッファではゼロ初期化される
+        /// (フレーム内容は次 Aggregate 呼出時に上書きされるため保持不要)。
+        /// </summary>
+        private void ExpandCapacityByOne()
+        {
+            int oldMax = MaxSourcesPerLayer;
+            int newMax = oldMax + 1;
+
+            int newSlotCount = LayerCount * newMax;
+            var newSources = newSlotCount == 0 ? Array.Empty<IInputSource>() : new IInputSource[newSlotCount];
+            for (int l = 0; l < LayerCount; l++)
+            {
+                for (int s = 0; s < oldMax; s++)
+                {
+                    newSources[(l * newMax) + s] = _sources[(l * oldMax) + s];
+                }
+            }
+
+            int newScratchSize = LayerCount * newMax * BlendShapeCount;
+            var newScratch = newScratchSize == 0 ? Array.Empty<float>() : new float[newScratchSize];
+
+            _sources = newSources;
+            _scratchBuffer = newScratch;
+            _maxSourcesPerLayer = newMax;
         }
 
         /// <summary>
