@@ -61,6 +61,7 @@ namespace Hidano.FacialControl.Domain.Services
         private float _duration;
         private TransitionCurve _curve;
         private bool _isComplete;
+        private bool _hasWarnedStackDepthExceeded;
 
         /// <summary>
         /// 現在アクティブな Expression の ID リストを読取専用で公開する (診断/テスト用)。
@@ -138,8 +139,9 @@ namespace Hidano.FacialControl.Domain.Services
         /// <summary>
         /// 指定 Expression ID を内部スタックに push する。
         /// 既に積まれている場合は一旦 remove してから末尾に再配置する (LIFO 位置を最新化)。
-        /// 深度が <see cref="MaxStackDepth"/> を超える場合は最古の Expression が自動 drop される
-        /// (警告ログは task 4.3 で別途追加される)。
+        /// 深度が <see cref="MaxStackDepth"/> を超える場合は最古の Expression が自動 drop され、
+        /// 当該インスタンスで初回のみ <see cref="UnityEngine.Debug.LogWarning(object)"/> が出る
+        /// (per-instance 1 回のみ、Req 1.6)。
         /// push 後、現在値をスナップショットとして新ターゲットへの遷移を開始する。
         /// </summary>
         /// <param name="expressionId">push する Expression の ID。</param>
@@ -156,6 +158,7 @@ namespace Hidano.FacialControl.Domain.Services
             while (_activeExpressionIds.Count >= MaxStackDepth)
             {
                 OnStackDepthExceeded();
+                WarnStackDepthExceededOnce();
                 _activeExpressionIds.RemoveAt(0);
             }
 
@@ -233,12 +236,26 @@ namespace Hidano.FacialControl.Domain.Services
         }
 
         /// <summary>
-        /// スタック深度超過時に派生クラスで追加処理 (警告ログ等) を行うためのフック。
-        /// 基底実装は何もしない。task 4.3 で override して per-instance 1 回の警告を行う。
+        /// スタック深度超過時に派生クラスで追加処理を行うためのフック。
+        /// 基底実装は何もしない。基底は別途 <see cref="WarnStackDepthExceededOnce"/> で
+        /// per-instance 1 回の <see cref="UnityEngine.Debug.LogWarning(object)"/> を行う。
         /// </summary>
         protected virtual void OnStackDepthExceeded()
         {
-            // 基底では no-op。派生で警告ログを出す。
+            // 基底では no-op。警告ログは WarnStackDepthExceededOnce が担う。
+        }
+
+        private void WarnStackDepthExceededOnce()
+        {
+            if (_hasWarnedStackDepthExceeded)
+            {
+                return;
+            }
+            _hasWarnedStackDepthExceeded = true;
+            UnityEngine.Debug.LogWarning(
+                $"[ExpressionTriggerInputSource] id='{Id}': Expression stack depth exceeded " +
+                $"(maxStackDepth={MaxStackDepth}). Dropping oldest expression. " +
+                "This warning is emitted only once per instance.");
         }
 
         private void StartTransition()
