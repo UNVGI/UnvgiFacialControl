@@ -334,7 +334,7 @@
   - _Depends: 7.2_
   - _Boundary: Tests/EditMode/Adapters_
 
-- [ ] 10.4 PlayMode Performance: per-frame `SetWeight` 1000 回 × 60 frame で GC ゼロを検証する
+- [x] 10.4 PlayMode Performance: per-frame `SetWeight` 1000 回 × 60 frame で GC ゼロを検証する
   - `Profiler.GetTotalAllocatedMemoryLong` 差分でゼロアロケーションを確認する。
   - verbose logging OFF 前提で、Registry / WeightBuffer / Aggregator の全ホットパスが 0-alloc であることを確認する。
   - 観測完了条件: 60 フレーム × 1000 Set のシナリオで managed 差分が 0 バイトとなる PlayMode Performance テストが通る。
