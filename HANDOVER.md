@@ -1,61 +1,85 @@
-# HANDOVER (2026-04-15)
+# HANDOVER (2026-04-21)
 
 ## 今回やったこと
 
-- `/kiro:spec-run expression-preview-camera` で全 11 リーフタスクを自動実行（全 OK）
-- `/kiro:validate-impl` で GO 判定取得（要件・設計・実装の整合性確認、EditMode 7/7 Pass）
-- tasks.md チェックボックスを `[x]` に更新してコミット
-- 追加修正 4 件:
-  1. **マウス Y 反転**: `PreviewRenderWrapper.HandleInput` で `Delta.y` を反転（Orbit / Pan / Dolly drag 対象、Scroll は対象外）
-  2. **初期カメラ前面化**: `Setup()` の rotation を `Quaternion.Euler(0, 180, 0)` に変更
-  3. **Head ボーン pivot**: `CalculatePivotPoint()` 新設。Humanoid なら `Animator.GetBoneTransform(HumanBodyBones.Head)` の Y 高さを採用、それ以外は `bounds.center` フォールバック
-  4. **ドラッグキャプチャ**: `_dragButton` / `_dragAlt` で MouseDown→MouseUp 間のキャプチャ、`ExpressionCreatorWindow.OnPreviewGUI` で `_previewContainer.CaptureMouse()` / `ReleaseMouse()` を呼んで rect 外でも継続動作
-- 最終 EditMode テスト: **717/717 Passed**
+- `/kiro:spec-run layer-input-source-blending` で全 47 リーフタスク（1.1〜10.9）を順次バッチ実行
+- 各タスクを `claude -p` の子セッションで TDD 実装 → UnityTestRunner → 自動コミット
+- 全 47 タスクが OK で完了、47 件の commit を `feature/hidano/generate-prototype` に追加
+- `/kiro:validate-impl layer-input-source-blending` を実行して **GO 判定** を取得
+- EditMode **1045/1045 Passed**（editmode-10-8.xml）／ PlayMode 個別 suite 全 Passed
 
 ## 決定事項
 
-- マウス Y 軸は wrapper 側で反転し、外部パッケージ `SceneViewStyleCameraController` の Handler は変更しない
-- カメラ pivot 高さは Humanoid Head ボーン優先、フォールバックは bounds.center
-- ドラッグキャプチャは UI Toolkit の `CaptureMouse()` + wrapper 内 `_dragButton` 状態の二段構え
-- Scroll wheel は「マウス上下移動」の対象外として Y 反転しない
+- `claude -p` のサブセッションは `--max-turns 200` で実行（60 では TDD タスクが完結しない）
+- Bash の 10 分タイムアウト上限のため `run_in_background: true` で起動し完了通知を待つパターンを採用
+- 子セッションへのプロンプトは single-quoted で渡す（タスクタイトル内のバックティックを保護）
+- `tasks.md` の checkbox 更新はスキップ（git log を ground truth とする）
+- Feature は validation で GO 判定、preview リリース準備フェーズへ進行可
 
 ## 捨てた選択肢と理由
 
-- **Handler 側で Y 反転**: 外部パッケージを fork する必要があり依存管理が複雑化するため不採用。wrapper 側の反転で十分
-- **PreviewInputFrame 構築時に Y 反転**: テストが構築済み frame を直接渡すため、tests と production で意味が異なり混乱を招く。switch 直前の反転に統一
-- **GUIUtility.hotControl による IMGUI 内キャプチャ**: UI Toolkit の IMGUIContainer 内では領域外イベントが届かないため hotControl だけでは不十分。`CaptureMouse()` が必須
-- **Head 高さに加え X/Z も Head ボーン位置採用**: Head はキャラ中心線からズレることがあるため X/Z は bounds.center を維持
+- **`--max-turns 60`**: ファイル作成 + テスト実行 + コミットで使い切る。TDD タスクには不足
+- **Bash foreground で 30 分タイムアウト**: Bash ツール上限は 600000ms（10 分）のため物理的に不可
+- **Monitor ツールで出力ファイルを polling**: `grep` 利用が permission で拒否、シンプルな until-loop も拒否
+- **手動で未コミット状態から 1.1 を commit して continue**: ユーザが選択肢 1（リトライ）を採用
+- **TaskCreate/TaskUpdate による進捗追跡**: 47 タスクの機械的実行には過剰。commit history と OK/FAIL 出力で十分
 
 ## ハマりどころ
 
-- IMGUIContainer は UI Toolkit の hit testing でカーソルが領域外に出るとイベント自体届かない → wrapper 側のロジックだけでは不足、`CaptureMouse()` が必須だった
-- Unity Editor 起動中はバッチテスト実行不可（"Multiple Unity instances cannot open the same project"）
-- spec-run 実行中、tasks.md のチェックボックス更新は子 claude 側では行われず、親側で手動更新が必要
+- 初回 1.1 が max-turns 60 で打ち切り。ファイル生成済みだが未コミット状態で残った（再実行で解消）
+- 7.2（JSON parser）で foreground の 10 分 timeout に接触。harness が自動で background 化したが、それ以降は自発的に `run_in_background: true` で起動する運用に切替
+- 子セッションが task 1.1 の scope 外（`ITimeProvider.cs`）を先行作成（後続 2.2 の担当範囲）。依存関係上やむを得ず、検証で problem なし
+- `sleep` チェインや `tail` / `grep` を Bash 経由で使おうとして permission 拒否が頻発。Read / Grep の専用ツール経由が必須
+- タスクタイトルに `「`、バックティック、日本語全角記号が含まれ shell escape が複雑化（single-quote で統一）
 
 ## 学び
 
-- UI Toolkit 配下の IMGUIContainer でドラッグ継続を実現するには `VisualElement.CaptureMouse()` 拡張メソッドを使う
-- `Quaternion.Euler(0, 180, 0)` で「pivot 周回 180°」と「カメラ向き反転」を同時に達成できる（`pivotPoint - rotation * forward * dist` の幾何）
-- `validate-impl-agent` は実装後の総合検証として要件カバレッジ・設計整合性・テスト結果を一括レポートしてくれる
+- nested `claude -p` は `unset CLAUDECODE &&` + `echo "" |` + `--enable-auto-mode --verbose` が安定パターン
+- プロジェクトは hooks による自動 commit が稼働（test-results の .xml は hooks が随時 Add/Delete）
+- タスク間依存が `(P)` マーカーで明示されていない場合でも、子セッションは最短経路で先行実装しがち。スコープ境界を prompt に強く明記しても完全抑止は難しい
+- 47 タスク連続実行で FAIL ゼロは spec 品質と TDD の粒度設計が機能している証拠
+- `validate-impl-agent` は test-results artifact と commit history を合わせて検証する。artifact を残しておくと検証が高速化
 
 ## 次にやること
 
+優先度高:
+- **PlayMode 全体回帰の実行**: `Tests/PlayMode` を batchmode で一括実行して `playmode-full.xml` を残す（最後の完全 run は task 6.2 時点 = 247 Passed。以降は個別 suite のみ）
+- **tasks.md の checkbox 更新**: 全 47 タスクを `- [x]` に一括更新（`/kiro:spec-status` の整合性確保）
+- **preview リリース準備**: CHANGELOG のエントリを preview.N に束ね、`package.json` の version を bump、タグ付与
+
 優先度中:
-- PlayMode テストは未実行。必要に応じて実行
-- ドラッグキャプチャの EditMode テスト追加（MouseDown → 領域外 MouseDrag → MouseUp フローの検証）
+- **`FacialProfileSO_InputSourcesView` の自動テスト追加**: design どおり手動テスト前提だが、repaint O(1) を回帰から守るため将来補助テストを追加する余地
+- **D-12（controller + keyboard 同時押しの BlendShape 加算が意図挙動）の Tooltip 追加**: Inspector View に Help Box で明示
 
 優先度低:
-- VRM 対応（リリース後マイルストーン）
-- ARKit 52 / PerfectSync 自動検出 + プロファイル自動生成
+- ランタイムの PlayMode Performance を実機（セルフホストランナー）で再計測
 
 ## 関連ファイル
 
-- `FacialControl/Packages/com.hidano.facialcontrol/Editor/Common/PreviewRenderWrapper.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Editor/Common/PreviewInputFrame.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Editor/Tools/ExpressionCreatorWindow.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Editor/Hidano.FacialControl.Editor.asmdef`
-- `FacialControl/Packages/com.hidano.facialcontrol/Tests/EditMode/Editor/PreviewRenderWrapperTests.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Tests/EditMode/Hidano.FacialControl.Tests.EditMode.asmdef`
-- `FacialControl/Packages/manifest.json`
-- `.kiro/specs/expression-preview-camera/{requirements,design,tasks,research,spec}.md|json`
-- 外部パッケージ参照: `FacialControl/Library/PackageCache/com.hidano.scene-view-style-camera-controller@.../Runtime/Handlers/{Orbit,Pan,Dolly}Handler.cs`
+仕様 / ドキュメント:
+- `.kiro/specs/layer-input-source-blending/{requirements,design,tasks,research}.md`
+- `FacialControl/Packages/com.hidano.facialcontrol/CHANGELOG.md`
+- `docs/migration-guide.md`
+
+新規実装の主要ファイル:
+- `Runtime/Domain/Interfaces/{IInputSource,ITimeProvider}.cs`
+- `Runtime/Domain/Models/{InputSourceId,LayerSourceWeightEntry,InputSourceType}.cs`
+- `Runtime/Domain/Services/{LayerInputSourceAggregator,LayerInputSourceRegistry,LayerInputSourceWeightBuffer,ValueProviderInputSourceBase,ExpressionTriggerInputSourceBase}.cs`
+- `Runtime/Adapters/InputSources/{Controller,Keyboard}ExpressionInputSource.cs`
+- `Runtime/Adapters/InputSources/{Osc,LipSync}InputSource.cs`
+- `Runtime/Adapters/InputSources/{InputSourceFactory,UnityTimeProvider}.cs`
+- `Runtime/Adapters/Json/Dto/{InputSourceDto,InputSourceOptionsDto,OscOptionsDto,ExpressionTriggerOptionsDto,LipSyncOptionsDto}.cs`
+- `Editor/Inspector/FacialProfileSO_InputSourcesView.cs`
+- `Tests/Shared/ManualTimeProvider.cs` + asmdef
+
+変更ファイル（非破壊）:
+- `Runtime/Adapters/OSC/OscDoubleBuffer.cs`（WriteTick 追加）
+- `Runtime/Adapters/Json/{SystemTextJsonParser,JsonSchemaDefinition}.cs`（inputSources 必須化）
+- `Runtime/Adapters/ScriptableObject/InputBindingProfileSO.cs`（InputSourceCategory 追加）
+- `Runtime/Application/UseCases/LayerUseCase.cs`（Aggregator 委譲、API 非破壊）
+- `Runtime/Adapters/Playable/FacialController.cs`（weight API 公開）
+
+テスト成果物:
+- `FacialControl/test-results/editmode-10-8.xml`（1045 Passed、最新の完全 EditMode run）
+- `FacialControl/test-results/playmode-10-5.xml`（10 体 × 60 FPS Performance Passed）
+- `FacialControl/test-results/playmode-6.2.xml`（247 Passed、最後の完全 PlayMode run）
