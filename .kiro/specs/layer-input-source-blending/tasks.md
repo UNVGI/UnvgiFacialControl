@@ -373,7 +373,7 @@
   - _Depends: 6.2, 7.2_
   - _Boundary: ドキュメント_
 
-- [ ]* 10.9 (P) 診断ログ rate-limiter の長時間安定性の補助テスト
+- [x]* 10.9 (P) 診断ログ rate-limiter の長時間安定性の補助テスト
   - verbose logging を 10 分間 ON にした状態で、想定レート（per-layer per-second）以上のログが出ないことを EditMode で検証する補助テスト。
   - 観測完了条件: rate-limit が長時間でもドリフトしないことが EditMode テストで通る（MVP 後に追加可の補助カバレッジ）。
   - _Requirements: 8.5_

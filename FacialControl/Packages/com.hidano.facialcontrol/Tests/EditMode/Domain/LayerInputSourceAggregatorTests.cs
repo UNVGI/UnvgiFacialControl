@@ -1304,5 +1304,106 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
                 aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
             }
         }
+
+        // ----- 10.9 診断ログ rate-limiter の長時間安定性の補助テスト (Req 8.5) -----
+
+        /// <summary>
+        /// verbose ログを 10 分間 ON にした状態で、想定レート
+        /// (per-layer per-second) 以上のログが出ないことを検証する補助テスト
+        /// (tasks.md 10.9、Req 8.5 の長時間安定性カバレッジ)。
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <see cref="ManualTimeProvider"/> を 0〜600 秒まで 0.01 秒刻みで前進させ、
+        /// <see cref="LayerInputSourceAggregator.Aggregate(float, System.Span{LayerBlender.LayerInput})"/>
+        /// を 60,001 回呼び出したうえで、per-layer の verbose ログ件数がレートリミッタ契約
+        /// (1 秒 1 回) から長時間でもドリフトしていないことを
+        /// <see cref="UnityEngine.Application.logMessageReceived"/> でカウントして検証する。
+        /// </para>
+        /// <para>
+        /// 想定ログ件数: 秒境界 t = 0, 1, 2, ..., 600 の 601 回分が各レイヤーで出力される。
+        /// それ以上出ていれば「窓が崩れてドリフトしている」、それ未満であれば
+        /// 「ログが抜けている / 時刻比較がずれている」と判定し Fail させる。
+        /// </para>
+        /// <para>
+        /// 時刻は <c>i / stepsPerSecond</c> (double) で算出し、秒境界 i = 0, 100, 200, ...
+        /// でちょうど整数秒になるように整数演算ベースで前進させる。
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void Aggregate_VerboseLogging_10MinuteStability_RespectsRateLimitWithoutDrift()
+        {
+            const int blendShapeCount = 1;
+            const int layerCount = 2;
+            const int stepsPerSecond = 100;
+            const int totalSeconds = 600; // 10 分
+            const int expectedLogsPerLayer = totalSeconds + 1; // t=0,1,...,600 の 601 件
+            long totalSteps = (long)stepsPerSecond * totalSeconds;
+
+            var profile = BuildProfile(layerCount);
+            var l0s0 = new FixedValueSource("osc", blendShapeCount, value: 1f);
+            var l1s0 = new FixedValueSource("lipsync", blendShapeCount, value: 1f);
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, l0s0),
+                (1, 0, l1s0),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+            weightBuffer.SetWeight(0, 0, 0.5f);
+            weightBuffer.SetWeight(1, 0, 0.5f);
+
+            var time = new ManualTimeProvider { UnscaledTimeSeconds = 0.0 };
+            var aggregator = new LayerInputSourceAggregator(
+                registry, weightBuffer, blendShapeCount, time);
+
+            var layerLogCounts = new int[layerCount];
+            var logPattern = new Regex(@"\[LayerInputSourceAggregator\] layer (\d+): weights=");
+
+            UnityEngine.Application.LogCallback handler = (condition, stackTrace, type) =>
+            {
+                if (type != LogType.Log)
+                {
+                    return;
+                }
+                var match = logPattern.Match(condition);
+                if (!match.Success)
+                {
+                    return;
+                }
+                int idx = int.Parse(match.Groups[1].Value);
+                if ((uint)idx < (uint)layerLogCounts.Length)
+                {
+                    layerLogCounts[idx]++;
+                }
+            };
+
+            UnityEngine.Application.logMessageReceived += handler;
+            try
+            {
+                aggregator.SetVerboseLogging(true);
+                var outputPerLayer = new LayerBlender.LayerInput[layerCount];
+
+                float deltaTime = 1f / stepsPerSecond;
+                for (long i = 0; i <= totalSteps; i++)
+                {
+                    time.UnscaledTimeSeconds = (double)i / stepsPerSecond;
+                    aggregator.Aggregate(deltaTime, outputPerLayer);
+                }
+            }
+            finally
+            {
+                UnityEngine.Application.logMessageReceived -= handler;
+            }
+
+            for (int l = 0; l < layerCount; l++)
+            {
+                Assert.AreEqual(expectedLogsPerLayer, layerLogCounts[l],
+                    $"layer {l}: 10 分間 (60,001 回 Aggregate) の verbose ログ件数が " +
+                    $"想定レートからドリフトした (想定 {expectedLogsPerLayer} 件、実測 {layerLogCounts[l]} 件)");
+            }
+        }
     }
 }
