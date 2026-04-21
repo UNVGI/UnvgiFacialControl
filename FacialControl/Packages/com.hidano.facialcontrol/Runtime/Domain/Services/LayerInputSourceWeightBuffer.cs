@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Unity.Collections;
 
@@ -22,7 +23,14 @@ namespace Hidano.FacialControl.Domain.Services
     /// copy-forward する (Design §SwapIfDirty)。これにより「あるフレームで書いた
     /// 値が次フレームで別インデックスを書いた際に消える」スタレデータバグ
     /// (Critical 1) を防ぐ。
-    /// BulkScope (4.5) と範囲外キーの警告 (4.3) は後続タスクで実装する。
+    /// </para>
+    /// <para>
+    /// <see cref="BeginBulk"/> が返す <see cref="BulkScope"/> 中の書込は
+    /// プール化された pending dict に蓄積され、<see cref="BulkScope.Dispose"/>
+    /// (= CommitBulk) で writeBuffer へ一括 flush される (Req 4.5)。
+    /// CommitBulk は <c>_dirtyTick</c> を最大 1 回だけ進めるため、同スコープ内の
+    /// 複数書込は atomic に観測される。
+    /// 範囲外キーの警告 (4.3) は後続タスクで実装する。
     /// </para>
     /// </remarks>
     public sealed class LayerInputSourceWeightBuffer : IDisposable
@@ -39,6 +47,11 @@ namespace Hidano.FacialControl.Domain.Services
         private int _dirtyTick;
         private int _observedTick;
         private bool _disposed;
+
+        // BulkScope 用の pending dict プール。繰り返し BeginBulk → Dispose
+        // しても新規 Dictionary を確保しないよう再利用する。
+        private readonly Stack<Dictionary<int, float>> _bulkPool = new Stack<Dictionary<int, float>>();
+        private readonly object _bulkLock = new object();
 
         /// <summary>
         /// 指定の (layerCount × maxSourcesPerLayer) サイズでダブルバッファを確保する。
@@ -141,6 +154,52 @@ namespace Hidano.FacialControl.Domain.Services
         }
 
         /// <summary>
+        /// バルク書込スコープを開始する。返された <see cref="BulkScope"/> の
+        /// <see cref="BulkScope.SetWeight"/> で書いた値は <see cref="BulkScope.Dispose"/>
+        /// 時に writeBuffer へ一括反映される。
+        /// </summary>
+        /// <remarks>
+        /// 同スコープ内の書込は <see cref="BulkScope.Dispose"/> 時点で 1 回だけ
+        /// <c>_dirtyTick</c> を進めるため、次の <see cref="SwapIfDirty"/> 以降の
+        /// <see cref="GetWeight"/> で atomic に観測される (Req 4.5)。
+        /// Dispose 前のスコープ内書込は外部から観測されない。
+        /// pending dict はプールから貸与され、Dispose 時に返却される (GC フリー)。
+        /// </remarks>
+        public BulkScope BeginBulk()
+        {
+            Dictionary<int, float> pending;
+            lock (_bulkLock)
+            {
+                pending = _bulkPool.Count > 0 ? _bulkPool.Pop() : new Dictionary<int, float>();
+            }
+            return new BulkScope(this, pending);
+        }
+
+        private void CommitBulk(Dictionary<int, float> pending)
+        {
+            if (pending == null)
+            {
+                return;
+            }
+
+            if (pending.Count > 0)
+            {
+                var writeBuffer = Volatile.Read(ref _writeIndex) == 0 ? _bufferA : _bufferB;
+                foreach (var kvp in pending)
+                {
+                    writeBuffer[kvp.Key] = kvp.Value;
+                }
+                Interlocked.Increment(ref _dirtyTick);
+            }
+
+            pending.Clear();
+            lock (_bulkLock)
+            {
+                _bulkPool.Push(pending);
+            }
+        }
+
+        /// <summary>
         /// 両バッファを解放する。重複呼出しは無視される。
         /// </summary>
         public void Dispose()
@@ -160,6 +219,55 @@ namespace Hidano.FacialControl.Domain.Services
             }
 
             _disposed = true;
+        }
+
+        /// <summary>
+        /// バルク書込スコープ。<see cref="SetWeight"/> の呼出はプールから借りた
+        /// pending dict に蓄積され、<see cref="Dispose"/> (= CommitBulk) 時に
+        /// 親バッファへ一括 flush される (Req 4.5)。
+        /// </summary>
+        public readonly struct BulkScope : IDisposable
+        {
+            private readonly LayerInputSourceWeightBuffer _owner;
+            private readonly Dictionary<int, float> _pending;
+
+            internal BulkScope(LayerInputSourceWeightBuffer owner, Dictionary<int, float> pending)
+            {
+                _owner = owner;
+                _pending = pending;
+            }
+
+            /// <summary>
+            /// スコープ内に (layerIdx, sourceIdx) の書込を蓄積する。値は 0〜1 に silent clamp。
+            /// 範囲外キーは silent no-op。Dispose まで外部からは観測されない。
+            /// </summary>
+            public void SetWeight(int layerIdx, int sourceIdx, float weight)
+            {
+                if (_owner == null || _pending == null)
+                {
+                    return;
+                }
+
+                if ((uint)layerIdx >= (uint)_owner.LayerCount ||
+                    (uint)sourceIdx >= (uint)_owner.MaxSourcesPerLayer)
+                {
+                    return;
+                }
+
+                float clamped = weight < 0f ? 0f : (weight > 1f ? 1f : weight);
+                int flatIdx = (layerIdx * _owner.MaxSourcesPerLayer) + sourceIdx;
+                _pending[flatIdx] = clamped;
+            }
+
+            /// <summary>
+            /// スコープを終了し、蓄積された書込を writeBuffer へ一括 flush する
+            /// (CommitBulk)。書込があれば <c>_dirtyTick</c> を 1 回進める。
+            /// pending dict はプールへ返却される。
+            /// </summary>
+            public void Dispose()
+            {
+                _owner?.CommitBulk(_pending);
+            }
         }
     }
 }
