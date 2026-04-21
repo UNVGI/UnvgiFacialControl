@@ -97,10 +97,29 @@
 
 ### Breaking Changes
 
+> 本節の破壊的変更は preview 段階の破壊的変更ポリシー（`docs/requirements.md` の FR-001「表情プロファイル管理」内の「後方互換性: preview 段階では破壊的変更を許容」規定）に基づく。移行手順の詳細は [`docs/migration-guide.md`](../../../docs/migration-guide.md) を参照。
+
 - `InputSystemAdapter` を `MonoBehaviour` から純粋 C# クラス（`IDisposable`）へ変更
   - 移行方法: GameObject へのアタッチを止め、`new InputSystemAdapter(facialController)` でインスタンスを生成する
   - 終了処理は `OnDisable()` の代わりに `Dispose()` を呼び出す
   - シーン内でキーコンフィグを扱う場合は新設の `FacialInputBinder` コンポーネントを使用する
+
+- FacialProfile JSON の `layers[].inputSources` を**必須フィールド化**し、暗黙の `legacy` フォールバックを廃止
+  - `inputSources` が欠落または空配列のレイヤーは `FormatException` でロードが失敗する
+  - 予約 ID: `osc` / `lipsync` / `controller-expr` / `keyboard-expr` / `input`。サードパーティ拡張は `x-` プレフィックスを使用
+  - 移行方法: 既存プロファイル JSON の各レイヤーに `"inputSources": [{ "id": "controller-expr", "weight": 1.0 }]` 等の配列を明示的に追記する（同梱サンプルの移行例は `docs/migration-guide.md` および `StreamingAssets/FacialControl/*_profile.json` を参照）
+  - 根拠: `docs/requirements.md` FR-001（preview 段階の破壊的変更許容）、および spec `layer-input-source-blending` の D-5 / R3.2 / R7.3 / R7.4
+
+- 予約 ID `legacy` の廃止
+  - 旧バージョンで `legacy` を用いて Expression パイプライン全体を 1 本の入力源として温存していた挙動は削除された
+  - 移行方法: Expression 駆動のみを行うレイヤーは `inputSources: [{ "id": "controller-expr", "weight": 1.0 }]`（および必要に応じて `keyboard-expr`）へ置き換える
+  - 根拠: spec `layer-input-source-blending` の D-1 / D-5 / D-6 / R1.7
+
+- `InputBindingProfileSO` に `InputSourceCategory` フィールドを追加、既定値は `Controller`
+  - 既存 Asset は本フィールドを持たないため、Unity のシリアライズ機構により初回ロード時に既定値 `Controller` が暗黙的に付与される
+  - キーボード専用バインディングの Asset は `Keyboard` に明示変更しないと `ControllerExpressionInputSource` 側へトリガーが流れる挙動変更となるため、**全ての既存 Asset を Project ビューで一度レビューして Category を再設定する必要がある**
+  - 手順の詳細は [`docs/migration-guide.md`](../../../docs/migration-guide.md) を参照
+  - 根拠: spec `layer-input-source-blending` の R5.1 / R5.7 / R7.4
 
 ### Removed
 
