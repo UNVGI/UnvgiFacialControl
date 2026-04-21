@@ -624,5 +624,264 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount: -1));
         }
+
+        // ----- 5.4 2 段パイプライン: Aggregator → 既存 LayerBlender.Blend 接続 -----
+
+        [Test]
+        public void Aggregate_WithPrioritiesAndLayerWeights_AppliesThemToLayerInputs()
+        {
+            // priorities / layerWeights が LayerInput.Priority / LayerInput.Weight に直接載ること。
+            const int blendShapeCount = 2;
+            var profile = BuildProfile(layerCount: 2);
+
+            var l0s0 = new FixedValueSource("l0s0", blendShapeCount, value: 0.5f);
+            var l1s0 = new FixedValueSource("l1s0", blendShapeCount, value: 0.25f);
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, l0s0),
+                (1, 0, l1s0),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            weightBuffer.SetWeight(0, 0, 1f);
+            weightBuffer.SetWeight(1, 0, 1f);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[2];
+
+            ReadOnlySpan<int> priorities = new int[] { 42, 7 };
+            ReadOnlySpan<float> layerWeights = new float[] { 0.25f, 0.75f };
+
+            aggregator.Aggregate(deltaTime: 0f, priorities, layerWeights, outputPerLayer);
+
+            Assert.AreEqual(42, outputPerLayer[0].Priority, "layer 0 の priority はスパンから転写される");
+            Assert.AreEqual(7, outputPerLayer[1].Priority, "layer 1 の priority はスパンから転写される");
+            Assert.AreEqual(0.25f, outputPerLayer[0].Weight, 1e-6f, "layer 0 の inter-layer weight");
+            Assert.AreEqual(0.75f, outputPerLayer[1].Weight, 1e-6f, "layer 1 の inter-layer weight");
+        }
+
+        [Test]
+        public void Aggregate_SourceWeightAndLayerWeight_AreAppliedIndependently()
+        {
+            // Req 2.7 / D-4:
+            // source weight は intra-layer の加重和だけに効き、inter-layer weight とは乗算されない。
+            // Aggregator の per-layer 出力は source weight だけで決まり、inter-layer weight は
+            // LayerInput.Weight にそのまま載るだけであること。
+            const int blendShapeCount = 2;
+            var profile = BuildProfile(layerCount: 1);
+
+            var src = new FixedValueSource("s0", blendShapeCount, value: 1f);
+            var bindings = new List<(int, int, IInputSource)> { (0, 0, src) };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            // source weight = 0.4。inter-layer weight = 0.5。
+            // 独立適用なので per-layer 出力は 0.4、LayerInput.Weight は 0.5 でなければならない。
+            weightBuffer.SetWeight(0, 0, 0.4f);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[1];
+            ReadOnlySpan<int> priorities = new int[] { 0 };
+            ReadOnlySpan<float> layerWeights = new float[] { 0.5f };
+
+            aggregator.Aggregate(deltaTime: 0f, priorities, layerWeights, outputPerLayer);
+
+            var layerValues = outputPerLayer[0].BlendShapeValues.Span;
+            for (int k = 0; k < layerValues.Length; k++)
+            {
+                // per-layer バッファは source weight のみ適用 (0.4)。inter-layer weight は乗算しない。
+                Assert.AreEqual(0.4f, layerValues[k], 1e-6f,
+                    $"source weight のみが per-layer 出力に適用されること (k={k})");
+            }
+            Assert.AreEqual(0.5f, outputPerLayer[0].Weight, 1e-6f,
+                "inter-layer weight は LayerInput.Weight に独立に載ること");
+        }
+
+        [Test]
+        public void AggregateAndBlend_TwoLayersIndependentWeights_MatchesReferenceLayerBlender()
+        {
+            // 観測完了条件: per-layer 集約値が inter-layer blend を経由して最終出力に届くこと。
+            // 既存 LayerBlender の挙動を壊さないこと (参照実装との一致)。
+            const int blendShapeCount = 2;
+            var profile = BuildProfile(layerCount: 2);
+
+            // layer 0: source weight 1.0 × value 1.0 = 1.0
+            // layer 1: source weight 0.5 × value 1.0 = 0.5
+            var l0s0 = new FixedValueSource("l0s0", blendShapeCount, value: 1f);
+            var l1s0 = new FixedValueSource("l1s0", blendShapeCount, value: 1f);
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, l0s0),
+                (1, 0, l1s0),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            weightBuffer.SetWeight(0, 0, 1f);
+            weightBuffer.SetWeight(1, 0, 0.5f);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+
+            // inter-layer: layer 0 が低優先 (基底)、layer 1 が高優先 (上書き)。
+            // layer1.Weight=0.5 で lerp(1.0, 0.5, 0.5) = 0.75 を期待。
+            ReadOnlySpan<int> priorities = new int[] { 0, 1 };
+            ReadOnlySpan<float> layerWeights = new float[] { 1f, 0.5f };
+
+            Span<float> finalOutput = stackalloc float[blendShapeCount];
+            aggregator.AggregateAndBlend(deltaTime: 0f, priorities, layerWeights, finalOutput);
+
+            // 参照: 同じ per-layer 値と weight で LayerBlender.Blend を直接呼んだ結果。
+            var referenceLayers = new LayerBlender.LayerInput[]
+            {
+                new LayerBlender.LayerInput(
+                    priority: 0, weight: 1f, blendShapeValues: new float[] { 1f, 1f }),
+                new LayerBlender.LayerInput(
+                    priority: 1, weight: 0.5f, blendShapeValues: new float[] { 0.5f, 0.5f }),
+            };
+            Span<float> referenceOutput = stackalloc float[blendShapeCount];
+            LayerBlender.Blend(referenceLayers, referenceOutput);
+
+            for (int k = 0; k < blendShapeCount; k++)
+            {
+                Assert.AreEqual(0.75f, finalOutput[k], 1e-6f,
+                    $"2 段パイプラインの最終出力 (k={k})");
+                Assert.AreEqual(referenceOutput[k], finalOutput[k], 1e-6f,
+                    $"参照 LayerBlender.Blend と完全一致すること (k={k})");
+            }
+        }
+
+        [Test]
+        public void AggregateAndBlend_SourceWeightDoesNotMultiplyIntoLayerWeight()
+        {
+            // Req 2.7: source weight と LayerInput.Weight が乗算されない独立適用を最終出力レベルで検証。
+            // レイヤー 1 本構成なら LayerBlender.Blend は basis として values*weight を clamp01 する
+            // (LayerBlender.cs:85 "output[i] = Clamp01(firstValues[i] * firstWeight)")。
+            //   final = clamp01(perLayer * layerWeight)
+            //         = clamp01((source * sourceWeight) * layerWeight)
+            // もし「source weight が layer weight と乗算」されていれば perLayer に layerWeight が
+            // 既に入ってしまい、最終出力は source * sourceWeight * layerWeight^2 になって過小になる。
+            const int blendShapeCount = 1;
+            var profile = BuildProfile(layerCount: 1);
+
+            var src = new FixedValueSource("s0", blendShapeCount, value: 1f);
+            var bindings = new List<(int, int, IInputSource)> { (0, 0, src) };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            const float sourceWeight = 0.4f;
+            const float layerWeight = 0.5f;
+            weightBuffer.SetWeight(0, 0, sourceWeight);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            ReadOnlySpan<int> priorities = new int[] { 0 };
+            ReadOnlySpan<float> layerWeights = new float[] { layerWeight };
+
+            Span<float> finalOutput = stackalloc float[blendShapeCount];
+            aggregator.AggregateAndBlend(deltaTime: 0f, priorities, layerWeights, finalOutput);
+
+            // 期待値: clamp01(1.0 * 0.4) * 0.5 = 0.4 * 0.5 = 0.20
+            // もし乗算されていれば: clamp01(0.4 * 0.5) * 0.5 = 0.2 * 0.5 = 0.10 → 不一致で失敗
+            Assert.AreEqual(0.20f, finalOutput[0], 1e-6f,
+                "source weight と layer weight は独立適用される (乗算されない)");
+        }
+
+        [Test]
+        public void AggregateAndBlend_IsStableAcrossMultipleInvocations()
+        {
+            // 同一入力で複数回呼出しても安定した結果を返す (内部 LayerInput[] スクラッチが
+            // 前フレームの値に影響されないこと、GC-free 再利用の回帰防止)。
+            const int blendShapeCount = 3;
+            var profile = BuildProfile(layerCount: 2);
+
+            var l0 = new FixedValueSource("l0", blendShapeCount, value: 1f);
+            var l1 = new FixedValueSource("l1", blendShapeCount, value: 0.5f);
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, l0),
+                (1, 0, l1),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            weightBuffer.SetWeight(0, 0, 1f);
+            weightBuffer.SetWeight(1, 0, 1f);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            ReadOnlySpan<int> priorities = new int[] { 0, 1 };
+            ReadOnlySpan<float> layerWeights = new float[] { 1f, 1f };
+
+            Span<float> out1 = stackalloc float[blendShapeCount];
+            Span<float> out2 = stackalloc float[blendShapeCount];
+            aggregator.AggregateAndBlend(deltaTime: 0f, priorities, layerWeights, out1);
+            aggregator.AggregateAndBlend(deltaTime: 0f, priorities, layerWeights, out2);
+
+            // layer 1 が weight=1 で完全上書き → 0.5
+            for (int k = 0; k < blendShapeCount; k++)
+            {
+                Assert.AreEqual(0.5f, out1[k], 1e-6f, $"1 回目の出力 (k={k})");
+                Assert.AreEqual(out1[k], out2[k], 1e-6f, $"繰返し呼出しで安定 (k={k})");
+            }
+        }
+
+        [Test]
+        public void Aggregate_PrioritiesSpanTooShort_Throws()
+        {
+            const int blendShapeCount = 1;
+            var profile = BuildProfile(layerCount: 2);
+            var bindings = new List<(int, int, IInputSource)>();
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, Math.Max(1, registry.MaxSourcesPerLayer));
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+
+            var priorities = new int[] { 0 };           // 長さ 1 < LayerCount=2
+            var layerWeights = new float[] { 1f, 1f };
+            var output = new LayerBlender.LayerInput[2];
+            Assert.Throws<ArgumentException>(() =>
+            {
+                aggregator.Aggregate(
+                    deltaTime: 0f,
+                    new ReadOnlySpan<int>(priorities),
+                    new ReadOnlySpan<float>(layerWeights),
+                    new Span<LayerBlender.LayerInput>(output));
+            });
+        }
+
+        [Test]
+        public void Aggregate_LayerWeightsSpanTooShort_Throws()
+        {
+            const int blendShapeCount = 1;
+            var profile = BuildProfile(layerCount: 2);
+            var bindings = new List<(int, int, IInputSource)>();
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, Math.Max(1, registry.MaxSourcesPerLayer));
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+
+            var priorities = new int[] { 0, 1 };
+            var layerWeights = new float[] { 1f };      // 長さ 1 < LayerCount=2
+            var output = new LayerBlender.LayerInput[2];
+            Assert.Throws<ArgumentException>(() =>
+            {
+                aggregator.Aggregate(
+                    deltaTime: 0f,
+                    new ReadOnlySpan<int>(priorities),
+                    new ReadOnlySpan<float>(layerWeights),
+                    new Span<LayerBlender.LayerInput>(output));
+            });
+        }
     }
 }

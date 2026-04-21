@@ -24,7 +24,9 @@ namespace Hidano.FacialControl.Domain.Services
     /// <para>
     /// 本タスク時点での責務: per-layer 加重和 + 最終クランプ (5.1)、
     /// 長さ不一致時の overlap-only 処理 + 無効ソース (TryWriteValues=false) のゼロ寄与 (5.2、Req 1.3 / 1.4)、
-    /// および空レイヤー検出 + per-layer per-session 1 回 warning (5.3、Req 2.4)。
+    /// 空レイヤー検出 + per-layer per-session 1 回 warning (5.3、Req 2.4)、
+    /// および既存 <see cref="LayerBlender.Blend(System.ReadOnlySpan{LayerBlender.LayerInput}, System.Span{float})"/>
+    /// との 2 段パイプライン接続 (5.4、Req 2.6 / 2.7 / 6.4 / 7.1)。
     /// </para>
     /// <para>
     /// overlap-only 契約: 各 <c>source.TryWriteValues(scratch)</c> の直前に scratch を
@@ -42,8 +44,15 @@ namespace Hidano.FacialControl.Domain.Services
     /// 一度 warning を出したレイヤーは、以後 valid に戻って再び空になっても warning は再発しない。
     /// </para>
     /// <para>
-    /// LayerBlender 接続 (5.4) / 診断 snapshot API (5.5) /
-    /// verbose log rate-limit (5.6) は別タスクで積み増す。
+    /// 2 段パイプライン (5.4、Req 2.6 / 2.7): intra-layer の加重和 + クランプ (source weight による合成)
+    /// と inter-layer の <see cref="LayerBlender.LayerInput.Weight"/> による優先度ブレンドは独立に適用される。
+    /// Aggregator は source weight を per-layer float バッファに畳み込んだうえで、呼出側から渡された
+    /// inter-layer weight をそのまま <see cref="LayerBlender.LayerInput"/> の <c>weight</c> に載せる
+    /// (乗算しない、Req 2.7 / D-4)。<see cref="AggregateAndBlend"/> を使えば per-layer バッファから
+    /// 最終 BlendShape 配列までの経路を 1 呼出しで回せる。
+    /// </para>
+    /// <para>
+    /// 診断 snapshot API (5.5) / verbose log rate-limit (5.6) は別タスクで積み増す。
     /// </para>
     /// </remarks>
     public sealed class LayerInputSourceAggregator
@@ -53,6 +62,7 @@ namespace Hidano.FacialControl.Domain.Services
         private readonly int _blendShapeCount;
         private readonly float[][] _perLayerOutput;
         private readonly bool[] _emptyLayerWarned;
+        private readonly LayerBlender.LayerInput[] _layerInputScratch;
 
         /// <summary>
         /// Aggregator を構築する。per-layer 出力用の <c>float[]</c> を各レイヤー分
@@ -93,6 +103,9 @@ namespace Hidano.FacialControl.Domain.Services
                 _perLayerOutput[l] = blendShapeCount == 0 ? Array.Empty<float>() : new float[blendShapeCount];
             }
             _emptyLayerWarned = layerCount == 0 ? Array.Empty<bool>() : new bool[layerCount];
+            _layerInputScratch = layerCount == 0
+                ? Array.Empty<LayerBlender.LayerInput>()
+                : new LayerBlender.LayerInput[layerCount];
         }
 
         /// <summary>
@@ -115,10 +128,82 @@ namespace Hidano.FacialControl.Domain.Services
         /// </remarks>
         public void Aggregate(float deltaTime, Span<LayerBlender.LayerInput> outputPerLayer)
         {
+            AggregateInternal(deltaTime, priorities: default, layerWeights: default, outputPerLayer);
+        }
+
+        /// <summary>
+        /// priorities / layerWeights をレイヤー単位で指定する <see cref="Aggregate(float, Span{LayerBlender.LayerInput})"/>
+        /// の overload。2 段パイプラインの前段として使い、後段 (inter-layer blend) に渡す
+        /// <see cref="LayerBlender.LayerInput.Priority"/> / <see cref="LayerBlender.LayerInput.Weight"/> を
+        /// 呼出側が決めたい場合に用いる (Req 2.6 / 2.7 / 5.4)。
+        /// </summary>
+        /// <param name="deltaTime">前フレームからの経過秒数 (>= 0)。</param>
+        /// <param name="priorities">レイヤー毎の優先度。長さは <c>registry.LayerCount</c> 以上。</param>
+        /// <param name="layerWeights">レイヤー毎の inter-layer weight (0〜1 想定。<see cref="LayerBlender"/> 側で clamp)。
+        /// 長さは <c>registry.LayerCount</c> 以上。source weight とは独立適用される (Req 2.7 / D-4)。</param>
+        /// <param name="outputPerLayer">書込先。長さは <c>registry.LayerCount</c> と一致する必要がある。</param>
+        public void Aggregate(
+            float deltaTime,
+            ReadOnlySpan<int> priorities,
+            ReadOnlySpan<float> layerWeights,
+            Span<LayerBlender.LayerInput> outputPerLayer)
+        {
+            int layerCount = _registry.LayerCount;
+            if (priorities.Length < layerCount)
+            {
+                throw new ArgumentException(
+                    $"priorities.Length ({priorities.Length}) は registry.LayerCount ({layerCount}) 以上である必要があります。",
+                    nameof(priorities));
+            }
+            if (layerWeights.Length < layerCount)
+            {
+                throw new ArgumentException(
+                    $"layerWeights.Length ({layerWeights.Length}) は registry.LayerCount ({layerCount}) 以上である必要があります。",
+                    nameof(layerWeights));
+            }
+
+            AggregateInternal(deltaTime, priorities, layerWeights, outputPerLayer);
+        }
+
+        /// <summary>
+        /// 2 段パイプラインを 1 呼出しで回すエントリポイント (5.4)。
+        /// per-layer 加重和 + クランプを行った後、事前確保済みの
+        /// <see cref="LayerBlender.LayerInput"/> スクラッチ経由で
+        /// <see cref="LayerBlender.Blend(ReadOnlySpan{LayerBlender.LayerInput}, Span{float})"/>
+        /// を呼び、最終 BlendShape 配列 (<paramref name="finalOutput"/>) を書込む。
+        /// </summary>
+        /// <remarks>
+        /// source weight は intra-layer 段でのみ適用され、inter-layer 段には持ち越さない
+        /// (Req 2.7 / D-4)。<paramref name="layerWeights"/> は <see cref="LayerBlender.LayerInput.Weight"/>
+        /// としてそのまま載せられ、後段 <see cref="LayerBlender.Blend(ReadOnlySpan{LayerBlender.LayerInput}, Span{float})"/>
+        /// が優先度ブレンドを行う。内部スクラッチはコンストラクタで 1 度だけ確保され、本メソッドは
+        /// <see cref="LayerBlender"/> のシグネチャを一切変更しない (Req 7.1)。
+        /// </remarks>
+        public void AggregateAndBlend(
+            float deltaTime,
+            ReadOnlySpan<int> priorities,
+            ReadOnlySpan<float> layerWeights,
+            Span<float> finalOutput)
+        {
+            int layerCount = _registry.LayerCount;
+            var scratchSpan = new Span<LayerBlender.LayerInput>(_layerInputScratch, 0, layerCount);
+
+            Aggregate(deltaTime, priorities, layerWeights, scratchSpan);
+
+            LayerBlender.Blend((ReadOnlySpan<LayerBlender.LayerInput>)scratchSpan, finalOutput);
+        }
+
+        private void AggregateInternal(
+            float deltaTime,
+            ReadOnlySpan<int> priorities,
+            ReadOnlySpan<float> layerWeights,
+            Span<LayerBlender.LayerInput> outputPerLayer)
+        {
             _weightBuffer.SwapIfDirty();
 
             int layerCount = _registry.LayerCount;
-            int blendShapeCount = _blendShapeCount;
+            bool useCustomPriorities = priorities.Length >= layerCount;
+            bool useCustomWeights = layerWeights.Length >= layerCount;
 
             for (int l = 0; l < layerCount; l++)
             {
@@ -182,8 +267,10 @@ namespace Hidano.FacialControl.Domain.Services
 
                 if ((uint)l < (uint)outputPerLayer.Length)
                 {
+                    int priority = useCustomPriorities ? priorities[l] : l;
+                    float layerWeight = useCustomWeights ? layerWeights[l] : 1f;
                     outputPerLayer[l] = new LayerBlender.LayerInput(
-                        priority: l, weight: 1f, blendShapeValues: layerOutput);
+                        priority: priority, weight: layerWeight, blendShapeValues: layerOutput);
                 }
             }
         }
