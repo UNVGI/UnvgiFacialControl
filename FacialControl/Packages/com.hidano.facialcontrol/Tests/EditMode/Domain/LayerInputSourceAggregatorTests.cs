@@ -7,6 +7,7 @@ using UnityEngine.TestTools;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
+using Hidano.FacialControl.Tests.Shared;
 
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
@@ -1157,6 +1158,151 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             // GC.GetTotalMemory は厳密ではないが、1000 回呼出しで顕著な増加があれば検出可能。
             Assert.LessOrEqual(allocated, 0,
                 $"TryWriteSnapshot は 0-alloc であること (差分: {allocated} bytes)");
+        }
+
+        // ----- 5.6 verbose logging の per-layer per-second レートリミッタ (Req 8.5) -----
+
+        /// <summary>
+        /// <see cref="LayerInputSourceAggregator.SetVerboseLogging(bool)"/> を true にしたうえで
+        /// 1.0 秒のウィンドウ内に 100 回 <c>Aggregate</c> を回しても、同一レイヤーのログは
+        /// 1 回だけ出力されること (Req 8.5、タスク 5.6 の観測完了条件その 1)。
+        /// 1.0 秒経過後にもう 1 回出力できること (観測完了条件その 2)。
+        /// </summary>
+        [Test]
+        public void Aggregate_VerboseLogging_RateLimitsTo_OncePerSecondPerLayer()
+        {
+            const int blendShapeCount = 1;
+            var profile = BuildProfile(layerCount: 1);
+
+            var s0 = new FixedValueSource("osc", blendShapeCount, value: 1f);
+            var bindings = new List<(int, int, IInputSource)> { (0, 0, s0) };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+            weightBuffer.SetWeight(0, 0, 0.5f);
+
+            var time = new ManualTimeProvider { UnscaledTimeSeconds = 0.0 };
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount, time);
+
+            // 時刻 0.0 で verbose ON。次回ログ可能時刻は 0.0 にリセットされる。
+            aggregator.SetVerboseLogging(true);
+
+            // 1 回目: 時刻 0.0 でログ 1 回 (layer 0 について)。
+            LogAssert.Expect(LogType.Log,
+                new Regex(@"\[LayerInputSourceAggregator\] layer 0: weights=\[osc=0\.5\]"));
+
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[1];
+
+            // 1.0 秒以内に 100 回 Aggregate を回す。ログは最初の 1 回だけ。
+            // (時刻は固定 0.0 → 0.99 の範囲で段階的に進め、1.0 を越えないようにする)
+            for (int i = 0; i < 100; i++)
+            {
+                time.UnscaledTimeSeconds = 0.99 * i / 99.0; // 0.0 → 0.99
+                aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+            }
+
+            // 2 回目のログは 1.0 秒後に許可される。
+            LogAssert.Expect(LogType.Log,
+                new Regex(@"\[LayerInputSourceAggregator\] layer 0: weights=\[osc=0\.5\]"));
+
+            time.UnscaledTimeSeconds = 1.0;
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+
+            // さらに直後 (1.0 秒未満) の連続 Aggregate では追加ログは出ない。
+            for (int i = 0; i < 10; i++)
+            {
+                time.UnscaledTimeSeconds = 1.0 + 0.09 * i / 9.0; // 1.0 → 1.09
+                aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+            }
+        }
+
+        /// <summary>
+        /// 複数レイヤー構成で各レイヤーが独立にレート制限されること。
+        /// 1 秒ウィンドウ内は layer 0 / layer 1 がそれぞれ 1 回ずつしかログを出さない。
+        /// </summary>
+        [Test]
+        public void Aggregate_VerboseLogging_RateLimitsIndependentlyPerLayer()
+        {
+            const int blendShapeCount = 1;
+            var profile = BuildProfile(layerCount: 2);
+
+            var l0s0 = new FixedValueSource("osc", blendShapeCount, value: 1f);
+            var l1s0 = new FixedValueSource("lipsync", blendShapeCount, value: 1f);
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, l0s0),
+                (1, 0, l1s0),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+            weightBuffer.SetWeight(0, 0, 0.25f);
+            weightBuffer.SetWeight(1, 0, 0.75f);
+
+            var time = new ManualTimeProvider { UnscaledTimeSeconds = 5.0 };
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount, time);
+            aggregator.SetVerboseLogging(true);
+
+            LogAssert.Expect(LogType.Log,
+                new Regex(@"\[LayerInputSourceAggregator\] layer 0: weights=\[osc=0\.25\]"));
+            LogAssert.Expect(LogType.Log,
+                new Regex(@"\[LayerInputSourceAggregator\] layer 1: weights=\[lipsync=0\.75\]"));
+
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[2];
+
+            // 1 秒以内の多数回 Aggregate。各レイヤーのログはそれぞれ 1 回のみ。
+            for (int i = 0; i < 50; i++)
+            {
+                time.UnscaledTimeSeconds = 5.0 + 0.99 * i / 49.0;
+                aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+            }
+        }
+
+        /// <summary>
+        /// verbose OFF の間は <c>Aggregate</c> を何度呼んでも診断ログは出ないこと。
+        /// 再度 ON にすると、ON 時刻を起点にレート制限がリセットされ、次回 <c>Aggregate</c> でログが出せる。
+        /// </summary>
+        [Test]
+        public void Aggregate_VerboseLogging_WhenDisabled_DoesNotLog()
+        {
+            const int blendShapeCount = 1;
+            var profile = BuildProfile(layerCount: 1);
+            var s0 = new FixedValueSource("osc", blendShapeCount, value: 1f);
+            var bindings = new List<(int, int, IInputSource)> { (0, 0, s0) };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+            weightBuffer.SetWeight(0, 0, 1f);
+
+            var time = new ManualTimeProvider { UnscaledTimeSeconds = 0.0 };
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount, time);
+
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[1];
+
+            // verbose OFF 状態での Aggregate はログ禁止。LogAssert.Expect を記述せず、想定外ログを検知する。
+            for (int i = 0; i < 20; i++)
+            {
+                time.UnscaledTimeSeconds = 0.05 * i;
+                aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+            }
+
+            // ON 後、次の Aggregate でログが出る。
+            time.UnscaledTimeSeconds = 10.0;
+            aggregator.SetVerboseLogging(true);
+            LogAssert.Expect(LogType.Log,
+                new Regex(@"\[LayerInputSourceAggregator\] layer 0: weights=\[osc=1\]"));
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+
+            // OFF に戻すと以降ログは出ない。
+            aggregator.SetVerboseLogging(false);
+            for (int i = 0; i < 20; i++)
+            {
+                time.UnscaledTimeSeconds = 10.0 + 10.0 * i; // 長時間経過させてもログは出ない
+                aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+            }
         }
     }
 }

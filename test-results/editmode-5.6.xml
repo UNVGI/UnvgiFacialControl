@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="31" result="Passed" total="31" passed="31" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.3825344">
+  <test-suite type="TestSuite" id="1000" name="FacialControl" fullname="FacialControl" runstate="Runnable" testcasecount="889" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.382534" total="31" passed="31" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1937" name="Hidano.FacialControl.Tests.EditMode.dll" fullname="D:/Personal/Repositries/FacialControl/FacialControl/Library/ScriptAssemblies/Hidano.FacialControl.Tests.EditMode.dll" runstate="Runnable" testcasecount="889" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.366269" total="31" passed="31" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="78192" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1938" name="Hidano" fullname="Hidano" runstate="Runnable" testcasecount="889" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.352047" total="31" passed="31" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1939" name="FacialControl" fullname="Hidano.FacialControl" runstate="Runnable" testcasecount="889" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.339923" total="31" passed="31" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1940" name="Tests" fullname="Hidano.FacialControl.Tests" runstate="Runnable" testcasecount="889" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.310810" total="31" passed="31" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1941" name="EditMode" fullname="Hidano.FacialControl.Tests.EditMode" runstate="Runnable" testcasecount="889" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.298292" total="31" passed="31" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestSuite" id="1943" name="Domain" fullname="Hidano.FacialControl.Tests.EditMode.Domain" runstate="Runnable" testcasecount="426" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.285009" total="31" passed="31" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-suite type="TestFixture" id="1371" name="LayerInputSourceAggregatorTests" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" testcasecount="31" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.275002" total="31" passed="31" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="1380" name="Aggregate_AllSourcesInvalid_WarnsOnceAndOutputsZero" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_AllSourcesInvalid_WarnsOnceAndOutputsZero" methodname="Aggregate_AllSourcesInvalid_WarnsOnceAndOutputsZero" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="2143219566" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.015424" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[LayerInputSourceAggregator] layer 0: no valid input source (all sources reported IsValid=false or no source registered). Output will be zero. This warning is emitted only once per layer per session.
+]]></output>
+                  </test-case>
+                  <test-case id="1376" name="Aggregate_CallsTickOnSources" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_CallsTickOnSources" methodname="Aggregate_CallsTickOnSources" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1456686112" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000615" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1381" name="Aggregate_EmptyLayerCoexistsWithValidLayer_OnlyEmptyLayerWarns" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_EmptyLayerCoexistsWithValidLayer_OnlyEmptyLayerWarns" methodname="Aggregate_EmptyLayerCoexistsWithValidLayer_OnlyEmptyLayerWarns" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1727156499" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000895" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[LayerInputSourceAggregator] layer 1: no valid input source (all sources reported IsValid=false or no source registered). Output will be zero. This warning is emitted only once per layer per session.
+]]></output>
+                  </test-case>
+                  <test-case id="1378" name="Aggregate_InvalidSource_ContributesZeroWithoutException" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_InvalidSource_ContributesZeroWithoutException" methodname="Aggregate_InvalidSource_ContributesZeroWithoutException" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1929396147" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000380" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1383" name="Aggregate_LayerRecoversAfterBeingEmpty_DoesNotWarnAgain" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_LayerRecoversAfterBeingEmpty_DoesNotWarnAgain" methodname="Aggregate_LayerRecoversAfterBeingEmpty_DoesNotWarnAgain" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1089710525" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000986" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[LayerInputSourceAggregator] layer 0: no valid input source (all sources reported IsValid=false or no source registered). Output will be zero. This warning is emitted only once per layer per session.
+]]></output>
+                  </test-case>
+                  <test-case id="1393" name="Aggregate_LayerWeightsSpanTooShort_Throws" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_LayerWeightsSpanTooShort_Throws" methodname="Aggregate_LayerWeightsSpanTooShort_Throws" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1298314165" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.001917" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1374" name="Aggregate_MixedWeights_MatchesManualComputation" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_MixedWeights_MatchesManualComputation" methodname="Aggregate_MixedWeights_MatchesManualComputation" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1210364408" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000435" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1379" name="Aggregate_NoSourcesRegisteredForLayer_WarnsOnceAndOutputsZero" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_NoSourcesRegisteredForLayer_WarnsOnceAndOutputsZero" methodname="Aggregate_NoSourcesRegisteredForLayer_WarnsOnceAndOutputsZero" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="830346892" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000776" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[LayerInputSourceAggregator] layer 0: no valid input source (all sources reported IsValid=false or no source registered). Output will be zero. This warning is emitted only once per layer per session.
+]]></output>
+                  </test-case>
+                  <test-case id="1392" name="Aggregate_PrioritiesSpanTooShort_Throws" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_PrioritiesSpanTooShort_Throws" methodname="Aggregate_PrioritiesSpanTooShort_Throws" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1088051562" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000324" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1388" name="Aggregate_SourceWeightAndLayerWeight_AreAppliedIndependently" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_SourceWeightAndLayerWeight_AreAppliedIndependently" methodname="Aggregate_SourceWeightAndLayerWeight_AreAppliedIndependently" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1832659777" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000433" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1377" name="Aggregate_SourceWritesShorterSpan_UnwrittenIndicesContributeZero" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_SourceWritesShorterSpan_UnwrittenIndicesContributeZero" methodname="Aggregate_SourceWritesShorterSpan_UnwrittenIndicesContributeZero" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1883387183" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000435" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1373" name="Aggregate_SumExceedsOne_IsClamped" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_SumExceedsOne_IsClamped" methodname="Aggregate_SumExceedsOne_IsClamped" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1961426028" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000416" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1372" name="Aggregate_TwoSourcesHalfWeightEach_SumsToOne" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_TwoSourcesHalfWeightEach_SumsToOne" methodname="Aggregate_TwoSourcesHalfWeightEach_SumsToOne" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1585927386" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000406" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1382" name="Aggregate_ValidSourceWithZeroWeight_DoesNotWarn" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_ValidSourceWithZeroWeight_DoesNotWarn" methodname="Aggregate_ValidSourceWithZeroWeight_DoesNotWarn" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1980270685" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000339" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1401" name="Aggregate_VerboseLogging_RateLimitsIndependentlyPerLayer" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_VerboseLogging_RateLimitsIndependentlyPerLayer" methodname="Aggregate_VerboseLogging_RateLimitsIndependentlyPerLayer" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1031422240" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.001681" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[LayerInputSourceAggregator] layer 0: weights=[osc=0.25]
+[LayerInputSourceAggregator] layer 1: weights=[lipsync=0.75]
+]]></output>
+                  </test-case>
+                  <test-case id="1400" name="Aggregate_VerboseLogging_RateLimitsTo_OncePerSecondPerLayer" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_VerboseLogging_RateLimitsTo_OncePerSecondPerLayer" methodname="Aggregate_VerboseLogging_RateLimitsTo_OncePerSecondPerLayer" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="322814389" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.001281" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[LayerInputSourceAggregator] layer 0: weights=[osc=0.5]
+[LayerInputSourceAggregator] layer 0: weights=[osc=0.5]
+]]></output>
+                  </test-case>
+                  <test-case id="1402" name="Aggregate_VerboseLogging_WhenDisabled_DoesNotLog" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_VerboseLogging_WhenDisabled_DoesNotLog" methodname="Aggregate_VerboseLogging_WhenDisabled_DoesNotLog" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="548966678" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000808" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[LayerInputSourceAggregator] layer 0: weights=[osc=1]
+]]></output>
+                  </test-case>
+                  <test-case id="1387" name="Aggregate_WithPrioritiesAndLayerWeights_AppliesThemToLayerInputs" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_WithPrioritiesAndLayerWeights_AppliesThemToLayerInputs" methodname="Aggregate_WithPrioritiesAndLayerWeights_AppliesThemToLayerInputs" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1370374378" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000431" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1375" name="Aggregate_ZeroWeights_OutputsZero" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Aggregate_ZeroWeights_OutputsZero" methodname="Aggregate_ZeroWeights_OutputsZero" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="661743257" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000400" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1391" name="AggregateAndBlend_IsStableAcrossMultipleInvocations" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.AggregateAndBlend_IsStableAcrossMultipleInvocations" methodname="AggregateAndBlend_IsStableAcrossMultipleInvocations" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="807343306" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000927" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1390" name="AggregateAndBlend_SourceWeightDoesNotMultiplyIntoLayerWeight" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.AggregateAndBlend_SourceWeightDoesNotMultiplyIntoLayerWeight" methodname="AggregateAndBlend_SourceWeightDoesNotMultiplyIntoLayerWeight" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1132493451" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000330" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1389" name="AggregateAndBlend_TwoLayersIndependentWeights_MatchesReferenceLayerBlender" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.AggregateAndBlend_TwoLayersIndependentWeights_MatchesReferenceLayerBlender" methodname="AggregateAndBlend_TwoLayersIndependentWeights_MatchesReferenceLayerBlender" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="852561450" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000531" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1386" name="Constructor_NegativeBlendShapeCount_Throws" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Constructor_NegativeBlendShapeCount_Throws" methodname="Constructor_NegativeBlendShapeCount_Throws" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1134065006" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000344" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1384" name="Constructor_NullRegistry_Throws" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Constructor_NullRegistry_Throws" methodname="Constructor_NullRegistry_Throws" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="732726685" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000243" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1385" name="Constructor_NullWeightBuffer_Throws" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.Constructor_NullWeightBuffer_Throws" methodname="Constructor_NullWeightBuffer_Throws" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1924182625" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000251" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1398" name="GetSnapshot_ReturnsListMatchingTryWriteSnapshot" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.GetSnapshot_ReturnsListMatchingTryWriteSnapshot" methodname="GetSnapshot_ReturnsListMatchingTryWriteSnapshot" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="153336421" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.002178" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1394" name="TryWriteSnapshot_AfterAggregate_ReflectsCurrentWeightsAndValidity" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.TryWriteSnapshot_AfterAggregate_ReflectsCurrentWeightsAndValidity" methodname="TryWriteSnapshot_AfterAggregate_ReflectsCurrentWeightsAndValidity" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1053526043" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000685" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1397" name="TryWriteSnapshot_BufferTooShort_ReturnsFalseAndWrittenZero" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.TryWriteSnapshot_BufferTooShort_ReturnsFalseAndWrittenZero" methodname="TryWriteSnapshot_BufferTooShort_ReturnsFalseAndWrittenZero" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1102784553" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000288" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1395" name="TryWriteSnapshot_ReflectsWeightChangesAcrossFrames" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.TryWriteSnapshot_ReflectsWeightChangesAcrossFrames" methodname="TryWriteSnapshot_ReflectsWeightChangesAcrossFrames" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="364984530" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000333" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1399" name="TryWriteSnapshot_SteadyStateCalls_DoNotAllocate" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.TryWriteSnapshot_SteadyStateCalls_DoNotAllocate" methodname="TryWriteSnapshot_SteadyStateCalls_DoNotAllocate" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="1649408617" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.225246" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1396" name="TryWriteSnapshot_WeightSumExceedsOne_MarksAllEntriesSaturated" fullname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests.TryWriteSnapshot_WeightSumExceedsOne_MarksAllEntriesSaturated" methodname="TryWriteSnapshot_WeightSumExceedsOne_MarksAllEntriesSaturated" classname="Hidano.FacialControl.Tests.EditMode.Domain.LayerInputSourceAggregatorTests" runstate="Runnable" seed="277464485" result="Passed" start-time="2026-04-21 05:13:15Z" end-time="2026-04-21 05:13:15Z" duration="0.000606" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[Saving results to: C:/Users/Hidano/AppData/LocalLow/DefaultCompany/FacialControl\TestResults.xml
+]]></output>
+                  </test-case>
+                </test-suite>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

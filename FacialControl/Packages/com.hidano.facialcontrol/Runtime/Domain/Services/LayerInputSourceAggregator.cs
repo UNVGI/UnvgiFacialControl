@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 
@@ -68,7 +70,14 @@ namespace Hidano.FacialControl.Domain.Services
     /// が true を返した source の weight 合計) の場合に true となる。
     /// </para>
     /// <para>
-    /// verbose log rate-limit (5.6) は別タスクで積み増す。
+    /// verbose log rate-limit (5.6、Req 8.5): <see cref="SetVerboseLogging(bool)"/> を true にした場合、
+    /// 各レイヤーの現在 per-source weight を <see cref="UnityEngine.Debug.Log(object)"/> に出力するが、
+    /// 同一レイヤーの出力は <see cref="Hidano.FacialControl.Domain.Interfaces.ITimeProvider.UnscaledTimeSeconds"/>
+    /// ベースで 1 秒あたり最大 1 回にレート制限される。
+    /// <see cref="Hidano.FacialControl.Domain.Interfaces.ITimeProvider"/>
+    /// をコンストラクタで注入することでテストから決定論的に時刻を前進できる (既定では
+    /// <see cref="UnityEngine.Time.unscaledTimeAsDouble"/> を参照する内部プロバイダが使われる)。
+    /// verbose OFF 時は文字列生成経路に入らないため GC ゼロ契約 (Req 6.1) を壊さない。
     /// </para>
     /// </remarks>
     public sealed class LayerInputSourceAggregator
@@ -89,6 +98,16 @@ namespace Hidano.FacialControl.Domain.Services
         private readonly List<LayerSourceWeightEntry> _snapshotList;
         private readonly int _snapshotMaxSourcesPerLayer;
 
+        // verbose logging (Req 8.5、タスク 5.6) の状態。
+        // per-layer "次に出力可能な時刻" を秒単位で保持し、
+        // ITimeProvider.UnscaledTimeSeconds がこの値以上であれば出力する。
+        // StringBuilder は verbose 有効時のみ生成し、disabled 時の GC ゼロ契約を壊さない。
+        private readonly ITimeProvider _timeProvider;
+        private readonly double[] _layerNextLogTime;
+        private StringBuilder _verboseLogBuffer;
+        private bool _verboseLoggingEnabled;
+        private const double VerboseLogIntervalSeconds = 1.0;
+
         /// <summary>
         /// Aggregator を構築する。per-layer 出力用の <c>float[]</c> を各レイヤー分
         /// 1 本ずつ確保する (レイヤー数 × blendShapeCount のメモリコスト)。
@@ -96,10 +115,17 @@ namespace Hidano.FacialControl.Domain.Services
         /// <param name="registry">レイヤー × ソースの対応表 + scratch プール。非 null。</param>
         /// <param name="weightBuffer">入力源ウェイトのダブルバッファ。非 null。</param>
         /// <param name="blendShapeCount">1 レイヤーの出力 BlendShape 個数。0 以上。</param>
+        /// <param name="timeProvider">
+        /// verbose log rate-limit (Req 8.5) で使用する時刻源。省略または null の場合は
+        /// <see cref="UnityEngine.Time.unscaledTimeAsDouble"/> を参照する内部実装にフォールバックする。
+        /// EditMode テストでは <c>Tests.Shared.ManualTimeProvider</c> を注入することで
+        /// 1 秒ウィンドウを決定論的に検証できる。
+        /// </param>
         public LayerInputSourceAggregator(
             LayerInputSourceRegistry registry,
             LayerInputSourceWeightBuffer weightBuffer,
-            int blendShapeCount)
+            int blendShapeCount,
+            ITimeProvider timeProvider = null)
         {
             if (registry == null)
             {
@@ -120,6 +146,7 @@ namespace Hidano.FacialControl.Domain.Services
             _registry = registry;
             _weightBuffer = weightBuffer;
             _blendShapeCount = blendShapeCount;
+            _timeProvider = timeProvider ?? DefaultTimeProvider.Instance;
 
             int layerCount = registry.LayerCount;
             _perLayerOutput = layerCount == 0 ? Array.Empty<float[]>() : new float[layerCount][];
@@ -150,6 +177,12 @@ namespace Hidano.FacialControl.Domain.Services
             _snapshotList = new List<LayerSourceWeightEntry>(
                 snapshotSlotCount == 0 ? 4 : snapshotSlotCount);
             _snapshotWritten = 0;
+
+            // verbose log rate-limit: per-layer "次に出力可能な時刻" を 0 (= 即時可) で初期化する。
+            // StringBuilder は SetVerboseLogging(true) で lazy 確保し、verbose OFF 時はゼロアロケートに保つ。
+            _layerNextLogTime = layerCount == 0 ? Array.Empty<double>() : new double[layerCount];
+            _verboseLogBuffer = null;
+            _verboseLoggingEnabled = false;
         }
 
         /// <summary>
@@ -326,6 +359,11 @@ namespace Hidano.FacialControl.Domain.Services
                     WarnEmptyLayerOnce(l);
                 }
 
+                if (_verboseLoggingEnabled)
+                {
+                    MaybeLogLayerWeights(l, layerSnapshotStart, snapshotWritten);
+                }
+
                 for (int k = 0; k < layerOutput.Length; k++)
                 {
                     float v = layerOutput[k];
@@ -443,6 +481,104 @@ namespace Hidano.FacialControl.Domain.Services
                 $"[LayerInputSourceAggregator] layer {layerIdx}: no valid input source " +
                 "(all sources reported IsValid=false or no source registered). " +
                 "Output will be zero. This warning is emitted only once per layer per session.");
+        }
+
+        /// <summary>
+        /// verbose 診断ログの ON/OFF を切替える (Req 8.5、タスク 5.6)。
+        /// </summary>
+        /// <param name="enabled">
+        /// true にすると <see cref="Aggregate(float, System.Span{LayerBlender.LayerInput})"/> 呼出しごとに
+        /// 各レイヤーの現在 per-source weight を <see cref="UnityEngine.Debug.Log(object)"/> へ出力する。
+        /// 同一レイヤーの出力は <see cref="Hidano.FacialControl.Domain.Interfaces.ITimeProvider.UnscaledTimeSeconds"/>
+        /// ベースで 1 秒あたり最大 1 回にレート制限される。false にすると以降の verbose ログは抑止される。
+        /// </param>
+        /// <remarks>
+        /// 有効化時に per-layer 次回ログ許可時刻を現在時刻にリセットし、
+        /// 有効化直後の最初の <see cref="Aggregate(float, System.Span{LayerBlender.LayerInput})"/> で各レイヤーが 1 回ずつログを出せるようにする
+        /// (過去に OFF 中に蓄積した時刻差分が即時大量ログとして噴出するのを防ぐ)。
+        /// </remarks>
+        public void SetVerboseLogging(bool enabled)
+        {
+            _verboseLoggingEnabled = enabled;
+            if (!enabled)
+            {
+                return;
+            }
+
+            if (_verboseLogBuffer == null)
+            {
+                _verboseLogBuffer = new StringBuilder(128);
+            }
+
+            double now = _timeProvider.UnscaledTimeSeconds;
+            for (int l = 0; l < _layerNextLogTime.Length; l++)
+            {
+                _layerNextLogTime[l] = now;
+            }
+        }
+
+        /// <summary>
+        /// verbose log が有効な場合に呼ばれる per-layer レート制限つきログ出力 (Req 8.5)。
+        /// </summary>
+        /// <remarks>
+        /// 1 秒あたり最大 1 回契約。<see cref="Hidano.FacialControl.Domain.Interfaces.ITimeProvider.UnscaledTimeSeconds"/>
+        /// が <c>_layerNextLogTime[l]</c> 以上のときだけログを出し、次回許可時刻を
+        /// <c>now + VerboseLogIntervalSeconds</c> に前進させる。ログ本文は直前の Aggregate ループで
+        /// 埋まったスナップショット slice (layerSnapshotStart..snapshotWrittenExclusive)
+        /// から組み立てるため、追加の weight 再読み出しは行わない。
+        /// </remarks>
+        private void MaybeLogLayerWeights(int layerIdx, int layerSnapshotStart, int snapshotWrittenExclusive)
+        {
+            if ((uint)layerIdx >= (uint)_layerNextLogTime.Length)
+            {
+                return;
+            }
+
+            double now = _timeProvider.UnscaledTimeSeconds;
+            if (now < _layerNextLogTime[layerIdx])
+            {
+                return;
+            }
+            _layerNextLogTime[layerIdx] = now + VerboseLogIntervalSeconds;
+
+            var sb = _verboseLogBuffer;
+            var inv = CultureInfo.InvariantCulture;
+            sb.Clear();
+            sb.Append("[LayerInputSourceAggregator] layer ").Append(layerIdx).Append(": weights=[");
+            bool first = true;
+            for (int i = layerSnapshotStart; i < snapshotWrittenExclusive; i++)
+            {
+                if (!first)
+                {
+                    sb.Append(", ");
+                }
+                first = false;
+                var e = _snapshotBuffer[i];
+                sb.Append(e.SourceId.Value).Append('=');
+                sb.Append(e.Weight.ToString(inv));
+                if (!e.IsValid)
+                {
+                    sb.Append("(invalid)");
+                }
+            }
+            sb.Append(']');
+            UnityEngine.Debug.Log(sb.ToString());
+        }
+
+        /// <summary>
+        /// <see cref="Hidano.FacialControl.Domain.Interfaces.ITimeProvider"/> が注入されなかった場合に使う
+        /// 既定実装。<see cref="UnityEngine.Time.unscaledTimeAsDouble"/> を直接参照する。
+        /// </summary>
+        /// <remarks>
+        /// Adapters 層 <c>UnityTimeProvider</c> とほぼ同義だが、Domain 層 Aggregator 単体テスト (5.6) で
+        /// Adapters 依存を避けるために Domain 層内部に同梱する。本番コード (FacialController 初期化経路) では
+        /// Adapters 層の <c>UnityTimeProvider</c> を明示的に注入し、プロセス内で単一時刻源を共有する運用を推奨する。
+        /// </remarks>
+        private sealed class DefaultTimeProvider : ITimeProvider
+        {
+            public static readonly DefaultTimeProvider Instance = new DefaultTimeProvider();
+            private DefaultTimeProvider() { }
+            public double UnscaledTimeSeconds => UnityEngine.Time.unscaledTimeAsDouble;
         }
     }
 }
