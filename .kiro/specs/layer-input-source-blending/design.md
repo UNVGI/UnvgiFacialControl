@@ -759,7 +759,7 @@ namespace Hidano.FacialControl.Domain.Services
     // 有効: OSC readBuffer から output に値をコピー
     ```
 - **Time abstraction の意図（Req 8.2, Critical 3）**: `UnityEngine.Time.unscaledTimeAsDouble` を直接参照すると EditMode テストで時刻を決定論的に進められない（Unity の static プロパティは EditMode で手動前進不可）。staleness 判定を EditMode fake のみで検証可能にするため、`ITimeProvider` 抽象を挟む。`ManualTimeProvider` は書込可能な `UnscaledTimeSeconds` プロパティを持ち、テストは `provider.UnscaledTimeSeconds = 1.5; source.TryWriteValues(buf); provider.UnscaledTimeSeconds = 3.0; source.TryWriteValues(buf);` のように時間を明示的に前進させる。
-- Risks: `UnityTimeProvider` は Adapters 層配置。Domain 層の `OscInputSource` は `ITimeProvider` のみに依存し Unity API を直接触らない。
+- Risks: `UnityTimeProvider` は Adapters 層配置。Adapters 層の `OscInputSource` は Domain の `ITimeProvider` のみに依存し Unity API を直接触らない。
 
 ##### State Management
 - `double _lastDataTime`、`uint _lastObservedTick`。毎 `TryWriteValues` で `Volatile.Read(ref buffer.WriteTick)` と比較し、`ITimeProvider.UnscaledTimeSeconds` で staleness を判定。
