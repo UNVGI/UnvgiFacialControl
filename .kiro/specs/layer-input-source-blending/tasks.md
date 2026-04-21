@@ -342,7 +342,7 @@
   - _Depends: 3.3, 5.1, 8.3_
   - _Boundary: Tests/PlayMode/Performance_
 
-- [ ] 10.5 (P) PlayMode Performance: 10 体 × 3 layer × 4 source × 200 BlendShape で 60 FPS 維持
+- [x] 10.5 (P) PlayMode Performance: 10 体 × 3 layer × 4 source × 200 BlendShape で 60 FPS 維持
   - 複数 `FacialController` インスタンスを同時稼働させ、フレーム時間が目標内に収まることを計測する。
   - 観測完了条件: 平均フレーム時間が 16.6ms 以内、スパイクが許容範囲に収まることを PlayMode Performance テストで確認できる。
   - _Requirements: 6.3, 6.5_

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-04-21 07:55:04Z" end-time="2026-04-21 07:55:04Z" duration="0.2723736">
+  <test-suite type="TestSuite" id="1289" name="FacialControl" fullname="FacialControl" runstate="Runnable" testcasecount="258" result="Passed" start-time="2026-04-21 07:55:04Z" end-time="2026-04-21 07:55:04Z" duration="0.272374" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1278" name="Hidano.FacialControl.Tests.PlayMode.dll" fullname="D:/Personal/Repositries/FacialControl/FacialControl/Library/ScriptAssemblies/Hidano.FacialControl.Tests.PlayMode.dll" runstate="Runnable" testcasecount="258" result="Passed" start-time="2026-04-21 07:55:04Z" end-time="2026-04-21 07:55:04Z" duration="0.262482" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="56488" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1279" name="Hidano" fullname="Hidano" runstate="Runnable" testcasecount="258" result="Passed" start-time="2026-04-21 07:55:04Z" end-time="2026-04-21 07:55:04Z" duration="0.257579" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1280" name="FacialControl" fullname="Hidano.FacialControl" runstate="Runnable" testcasecount="258" result="Passed" start-time="2026-04-21 07:55:04Z" end-time="2026-04-21 07:55:04Z" duration="0.252851" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1281" name="Tests" fullname="Hidano.FacialControl.Tests" runstate="Runnable" testcasecount="258" result="Passed" start-time="2026-04-21 07:55:04Z" end-time="2026-04-21 07:55:04Z" duration="0.248059" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1282" name="PlayMode" fullname="Hidano.FacialControl.Tests.PlayMode" runstate="Runnable" testcasecount="258" result="Passed" start-time="2026-04-21 07:55:04Z" end-time="2026-04-21 07:55:04Z" duration="0.243405" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestSuite" id="1283" name="Performance" fullname="Hidano.FacialControl.Tests.PlayMode.Performance" runstate="Runnable" testcasecount="25" result="Passed" start-time="2026-04-21 07:55:04Z" end-time="2026-04-21 07:55:04Z" duration="0.238586" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-suite type="TestFixture" id="1010" name="MultiCharacterAggregatorPerformanceTests" fullname="Hidano.FacialControl.Tests.PlayMode.Performance.MultiCharacterAggregatorPerformanceTests" classname="Hidano.FacialControl.Tests.PlayMode.Performance.MultiCharacterAggregatorPerformanceTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-04-21 07:55:04Z" end-time="2026-04-21 07:55:04Z" duration="0.236587" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="1011" name="TenCharacters_3Layer_4Source_200BlendShape_MaintainsFrameBudget" fullname="Hidano.FacialControl.Tests.PlayMode.Performance.MultiCharacterAggregatorPerformanceTests.TenCharacters_3Layer_4Source_200BlendShape_MaintainsFrameBudget" methodname="TenCharacters_3Layer_4Source_200BlendShape_MaintainsFrameBudget" classname="Hidano.FacialControl.Tests.PlayMode.Performance.MultiCharacterAggregatorPerformanceTests" runstate="Runnable" seed="2137216847" result="Passed" start-time="2026-04-21 07:55:04Z" end-time="2026-04-21 07:55:04Z" duration="0.228439" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[10.5 perf] 10 体 × 3 layer × 4 source × 200 BS: avg=0.155ms, max=0.309ms, budget=16.6ms (spike<= 33.2ms)
+Saving results to: C:/Users/Hidano/AppData/LocalLow/DefaultCompany/FacialControl\TestResults.xml
+]]></output>
+                  </test-case>
+                </test-suite>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>
