@@ -203,6 +203,93 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters
         }
 
         // ================================================================
+        // inputSources 宣言付きプロファイル (タスク 8.2)
+        // ================================================================
+
+        [Test]
+        public void InitializeWithProfile_WithControllerExprDeclaration_InitializesSuccessfully()
+        {
+            _gameObject = CreateGameObjectWithAnimatorAndRenderer();
+            var controller = _gameObject.AddComponent<FacialController>();
+            var profile = CreateProfileWithControllerExpr();
+
+            Assert.DoesNotThrow(() => controller.InitializeWithProfile(profile));
+            Assert.IsTrue(controller.IsInitialized);
+        }
+
+        [Test]
+        public void InitializeWithProfile_WithUnknownId_SkipsAndInitializes()
+        {
+            _gameObject = CreateGameObjectWithAnimatorAndRenderer();
+            var controller = _gameObject.AddComponent<FacialController>();
+            var profile = CreateProfileWithUnknownId();
+
+            // 未登録 id は Factory が null を返し FacialController が警告 + skip。
+            // `LogAssert.Expect` で警告を事前宣言し、初期化自体は継続することを確認する。
+            LogAssert.Expect(
+                LogType.Warning,
+                new System.Text.RegularExpressions.Regex("inputSource id 'x-nonexistent'"));
+
+            Assert.DoesNotThrow(() => controller.InitializeWithProfile(profile));
+            Assert.IsTrue(controller.IsInitialized);
+        }
+
+        [UnityTest]
+        public IEnumerator LoadProfile_AfterInitialize_RebuildsAggregatorPipeline()
+        {
+            _gameObject = CreateGameObjectWithAnimatorAndRenderer();
+            var controller = _gameObject.AddComponent<FacialController>();
+            var initialProfile = CreateProfileWithControllerExpr();
+            controller.InitializeWithProfile(initialProfile);
+
+            yield return null;
+            Assert.IsTrue(controller.IsInitialized);
+
+            // 差し替え先プロファイルも inputSources 宣言を含む。
+            // LoadProfile は内部で Cleanup → 再構築 (LayerUseCase.Dispose → 再インスタンス化) を行う。
+            var replacementSO = UnityEngine.ScriptableObject.CreateInstance<FacialProfileSO>();
+
+            Assert.DoesNotThrow(() => controller.LoadProfile(replacementSO));
+            Assert.IsTrue(controller.IsInitialized);
+        }
+
+        private static FacialProfile CreateProfileWithControllerExpr()
+        {
+            var layers = new LayerDefinition[]
+            {
+                new LayerDefinition("emotion", 0, ExclusionMode.LastWins)
+            };
+            var expressions = new Expression[]
+            {
+                new Expression("expr-lifecycle-001", "Smile", "emotion")
+            };
+            var layerInputSources = new InputSourceDeclaration[][]
+            {
+                new InputSourceDeclaration[]
+                {
+                    new InputSourceDeclaration("controller-expr", 1.0f, null)
+                }
+            };
+            return new FacialProfile("1.0.0", layers, expressions, null, layerInputSources);
+        }
+
+        private static FacialProfile CreateProfileWithUnknownId()
+        {
+            var layers = new LayerDefinition[]
+            {
+                new LayerDefinition("emotion", 0, ExclusionMode.LastWins)
+            };
+            var layerInputSources = new InputSourceDeclaration[][]
+            {
+                new InputSourceDeclaration[]
+                {
+                    new InputSourceDeclaration("x-nonexistent", 0.5f, null)
+                }
+            };
+            return new FacialProfile("1.0.0", layers, null, null, layerInputSources);
+        }
+
+        // ================================================================
         // SkinnedMeshRenderer 自動検索
         // ================================================================
 

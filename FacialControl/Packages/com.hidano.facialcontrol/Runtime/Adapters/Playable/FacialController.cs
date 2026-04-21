@@ -4,9 +4,11 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.Playables;
 using Hidano.FacialControl.Adapters.FileSystem;
+using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.Json;
 using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Application.UseCases;
+using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 
 namespace Hidano.FacialControl.Adapters.Playable
@@ -54,9 +56,15 @@ namespace Hidano.FacialControl.Adapters.Playable
         private Animator _animator;
         private PlayableGraphBuilder.BuildResult _graphBuildResult;
         private ExpressionUseCase _expressionUseCase;
+        private LayerUseCase _layerUseCase;
+        private InputSourceFactory _inputSourceFactory;
         private FacialProfile? _currentProfile;
         private string[] _blendShapeNames;
         private bool _isInitialized;
+
+        // プロセス内で 1 インスタンスだけ保持する時刻源 (8.2)。
+        // 初期化経路 (InputSourceFactory / LayerInputSourceAggregator) で共有する。
+        private static ITimeProvider s_sharedTimeProvider;
 
         // BlendShape 出力インデックス → (Renderer, Renderer 上の BS index) のマッピング
         private BlendShapeTarget[][] _blendShapeTargets;
@@ -226,18 +234,87 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         private void InitializeInternal(FacialProfile profile)
         {
-            // 既存のリソースがあればクリーンアップ
+            // 既存のリソースがあればクリーンアップ (Registry / WeightBuffer の Dispose を含む)
             Cleanup();
 
             _currentProfile = profile;
             _expressionUseCase = new ExpressionUseCase(profile);
 
+            // UnityTimeProvider はプロセス内単一インスタンスを再利用する (8.2)
+            if (s_sharedTimeProvider == null)
+            {
+                s_sharedTimeProvider = new UnityTimeProvider();
+            }
+
+            // InputSourceFactory をプロファイルごとに構築する
+            // (blendShapeNames などプロファイル由来の依存を持つため)。
+            // OSC / LipSync は後続タスクで配線する想定で今は null を渡す
+            // (osc / lipsync 宣言は TryCreate が null を返して呼出側で skip される契約)。
+            var blendShapeNames = _blendShapeNames ?? Array.Empty<string>();
+            _inputSourceFactory = new InputSourceFactory(
+                oscBuffer: null,
+                timeProvider: s_sharedTimeProvider,
+                lipSyncProvider: null,
+                blendShapeNames: blendShapeNames);
+
+            // profile.LayerInputSources を Factory 経由で IInputSource 列に変換する。
+            var additionalSources = BuildAdditionalInputSources(profile, _inputSourceFactory, blendShapeNames.Length);
+
+            // LayerUseCase に組み立て済み IInputSource 列を注入し、
+            // 内部で LayerInputSourceRegistry / LayerInputSourceWeightBuffer / LayerInputSourceAggregator を再構築させる。
+            _layerUseCase = new LayerUseCase(profile, _expressionUseCase, blendShapeNames, additionalSources);
+
             // PlayableGraph を構築
             _graphBuildResult = PlayableGraphBuilder.Build(
-                _animator, profile, _blendShapeNames ?? Array.Empty<string>());
+                _animator, profile, blendShapeNames);
 
             _graphBuildResult.Graph.Play();
             _isInitialized = true;
+        }
+
+        private static List<(int layerIdx, IInputSource source, float weight)> BuildAdditionalInputSources(
+            FacialProfile profile,
+            InputSourceFactory factory,
+            int blendShapeCount)
+        {
+            var result = new List<(int layerIdx, IInputSource source, float weight)>();
+            var layerInputSourcesSpan = profile.LayerInputSources.Span;
+            int layerCount = profile.Layers.Length;
+            int declarationLayers = layerInputSourcesSpan.Length;
+            int upper = layerCount < declarationLayers ? layerCount : declarationLayers;
+
+            for (int l = 0; l < upper; l++)
+            {
+                var declarations = layerInputSourcesSpan[l];
+                if (declarations == null || declarations.Length == 0)
+                {
+                    continue;
+                }
+
+                for (int d = 0; d < declarations.Length; d++)
+                {
+                    var decl = declarations[d];
+                    if (!InputSourceId.TryParse(decl.Id, out var id))
+                    {
+                        Debug.LogWarning(
+                            $"FacialController: inputSource id '{decl.Id ?? "<null>"}' が識別子規約に合致しないため layer {l} でスキップします。");
+                        continue;
+                    }
+
+                    var options = factory.TryDeserializeOptions(id, decl.OptionsJson);
+                    var source = factory.TryCreate(id, options, blendShapeCount, profile);
+                    if (source == null)
+                    {
+                        Debug.LogWarning(
+                            $"FacialController: inputSource id '{decl.Id}' のアダプタ生成に失敗したため layer {l} でスキップします (未登録 id または必須依存未注入)。");
+                        continue;
+                    }
+
+                    result.Add((l, source, decl.Weight));
+                }
+            }
+
+            return result;
         }
 
         // ================================================================
@@ -494,6 +571,14 @@ namespace Hidano.FacialControl.Adapters.Playable
                 _graphBuildResult = null;
             }
 
+            // プロファイル再ロード時は Registry / WeightBuffer を Dispose して再構築する (8.2)
+            if (_layerUseCase != null)
+            {
+                _layerUseCase.Dispose();
+                _layerUseCase = null;
+            }
+
+            _inputSourceFactory = null;
             _expressionUseCase = null;
             _isInitialized = false;
         }

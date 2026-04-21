@@ -19,6 +19,7 @@ namespace Hidano.FacialControl.Application.UseCases
         private readonly ExpressionUseCase _expressionUseCase;
         private string[] _blendShapeNames;
         private readonly Dictionary<string, float> _layerWeights;
+        private IReadOnlyList<(int layerIdx, IInputSource source, float weight)> _additionalInputSources;
 
         private LayerInputSourceRegistry _registry;
         private LayerInputSourceWeightBuffer _weightBuffer;
@@ -38,6 +39,30 @@ namespace Hidano.FacialControl.Application.UseCases
         /// <param name="expressionUseCase">Expression 管理ユースケース</param>
         /// <param name="blendShapeNames">BlendShape 名の配列</param>
         public LayerUseCase(FacialProfile profile, ExpressionUseCase expressionUseCase, string[] blendShapeNames)
+            : this(profile, expressionUseCase, blendShapeNames, additionalInputSources: null)
+        {
+        }
+
+        /// <summary>
+        /// LayerUseCase を生成する (追加 <see cref="IInputSource"/> を組み込む overload, 8.2)。
+        /// </summary>
+        /// <param name="profile">対象の表情設定プロファイル</param>
+        /// <param name="expressionUseCase">Expression 管理ユースケース</param>
+        /// <param name="blendShapeNames">BlendShape 名の配列</param>
+        /// <param name="additionalInputSources">
+        /// 既定の per-layer Expression スロット (sourceIdx=0) に加えて
+        /// <see cref="LayerInputSourceRegistry"/> / <see cref="LayerInputSourceAggregator"/> に
+        /// 同レイヤー上で追加登録する <see cref="IInputSource"/> の列。
+        /// sourceIdx は各レイヤー内で 1 から昇順に自動割当される。<c>null</c> は空列と同義。
+        /// FacialController の初期化経路 (8.2) では
+        /// <c>InputSourceFactory.TryCreate</c> の結果をここに渡すことで、
+        /// osc / lipsync / controller-expr / keyboard-expr などを per-layer 加重和に合流できる。
+        /// </param>
+        public LayerUseCase(
+            FacialProfile profile,
+            ExpressionUseCase expressionUseCase,
+            string[] blendShapeNames,
+            IReadOnlyList<(int layerIdx, IInputSource source, float weight)> additionalInputSources)
         {
             if (blendShapeNames == null)
                 throw new ArgumentNullException(nameof(blendShapeNames));
@@ -45,6 +70,7 @@ namespace Hidano.FacialControl.Application.UseCases
             _profile = profile;
             _expressionUseCase = expressionUseCase;
             _blendShapeNames = blendShapeNames;
+            _additionalInputSources = additionalInputSources;
             _layerWeights = new Dictionary<string, float>();
 
             BuildAggregatorPipeline();
@@ -215,12 +241,40 @@ namespace Hidano.FacialControl.Application.UseCases
                 bindings.Add((l, 0, src));
             }
 
+            // 追加の IInputSource を各レイヤー内 sourceIdx=1,2,... に割当 (8.2)。
+            // sourceIdx=0 は LayerExpressionSource の予約枠。
+            var additionalWeights = new List<(int layerIdx, int sourceIdx, float weight)>();
+            if (_additionalInputSources != null && _additionalInputSources.Count > 0 && layerCount > 0)
+            {
+                var nextSourceIdx = new int[layerCount];
+                for (int l = 0; l < layerCount; l++)
+                {
+                    nextSourceIdx[l] = 1;
+                }
+                for (int i = 0; i < _additionalInputSources.Count; i++)
+                {
+                    var entry = _additionalInputSources[i];
+                    if ((uint)entry.layerIdx >= (uint)layerCount || entry.source == null)
+                    {
+                        continue;
+                    }
+                    int sourceIdx = nextSourceIdx[entry.layerIdx]++;
+                    bindings.Add((entry.layerIdx, sourceIdx, entry.source));
+                    additionalWeights.Add((entry.layerIdx, sourceIdx, entry.weight));
+                }
+            }
+
             _registry = new LayerInputSourceRegistry(_profile, bsCount, bindings);
             int maxSources = _registry.MaxSourcesPerLayer > 0 ? _registry.MaxSourcesPerLayer : 1;
             _weightBuffer = new LayerInputSourceWeightBuffer(layerCount, maxSources);
             for (int l = 0; l < layerCount; l++)
             {
                 _weightBuffer.SetWeight(l, 0, 1f);
+            }
+            for (int i = 0; i < additionalWeights.Count; i++)
+            {
+                var aw = additionalWeights[i];
+                _weightBuffer.SetWeight(aw.layerIdx, aw.sourceIdx, aw.weight);
             }
             _aggregator = new LayerInputSourceAggregator(_registry, _weightBuffer, bsCount);
         }
