@@ -22,9 +22,14 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         private const string DefaultProfileJson = @"{
     ""schemaVersion"": ""1.0"",
     ""layers"": [
-        {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [{""id"": ""controller-expr"", ""weight"": 1.0}]},
+        {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [
+            {""id"": ""controller-expr"", ""weight"": 0.5},
+            {""id"": ""osc"", ""weight"": 0.5, ""options"": {""stalenessSeconds"": 1.0}}
+        ]},
         {""name"": ""lipsync"", ""priority"": 1, ""exclusionMode"": ""blend"", ""inputSources"": [{""id"": ""lipsync"", ""weight"": 1.0}]},
-        {""name"": ""eye"", ""priority"": 2, ""exclusionMode"": ""lastWins"", ""inputSources"": [{""id"": ""keyboard-expr"", ""weight"": 1.0}]}
+        {""name"": ""eye"", ""priority"": 2, ""exclusionMode"": ""lastWins"", ""inputSources"": [
+            {""id"": ""keyboard-expr"", ""weight"": 1.0, ""options"": {""maxStackDepth"": 4}}
+        ]}
     ],
     ""expressions"": [
         {
@@ -129,6 +134,44 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             Assert.AreEqual("eye", layer.Name);
             Assert.AreEqual(2, layer.Priority);
             Assert.AreEqual(ExclusionMode.LastWins, layer.ExclusionMode);
+        }
+
+        // ================================================================
+        // inputSources 移行テスト（10.7: design.md 推奨テンプレート整合）
+        // ================================================================
+
+        [Test]
+        public void ParseProfile_DefaultTemplate_EmotionLayerHasControllerAndOscSources()
+        {
+            var emotionSources = _profile.LayerInputSources.Span[0];
+
+            Assert.AreEqual(2, emotionSources.Length, "emotion レイヤーは controller-expr + osc の 2 source 宣言を持つ");
+            Assert.AreEqual("controller-expr", emotionSources[0].Id);
+            Assert.AreEqual(0.5f, emotionSources[0].Weight, 0.001f);
+            Assert.AreEqual("osc", emotionSources[1].Id);
+            Assert.AreEqual(0.5f, emotionSources[1].Weight, 0.001f);
+            StringAssert.Contains("stalenessSeconds", emotionSources[1].OptionsJson);
+        }
+
+        [Test]
+        public void ParseProfile_DefaultTemplate_LipsyncLayerHasLipsyncSource()
+        {
+            var lipsyncSources = _profile.LayerInputSources.Span[1];
+
+            Assert.AreEqual(1, lipsyncSources.Length);
+            Assert.AreEqual("lipsync", lipsyncSources[0].Id);
+            Assert.AreEqual(1.0f, lipsyncSources[0].Weight, 0.001f);
+        }
+
+        [Test]
+        public void ParseProfile_DefaultTemplate_EyeLayerHasKeyboardSourceWithMaxStackDepth()
+        {
+            var eyeSources = _profile.LayerInputSources.Span[2];
+
+            Assert.AreEqual(1, eyeSources.Length);
+            Assert.AreEqual("keyboard-expr", eyeSources[0].Id);
+            Assert.AreEqual(1.0f, eyeSources[0].Weight, 0.001f);
+            StringAssert.Contains("maxStackDepth", eyeSources[0].OptionsJson);
         }
 
         // ================================================================

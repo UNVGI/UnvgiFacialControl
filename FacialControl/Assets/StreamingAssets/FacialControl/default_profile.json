@@ -6,7 +6,8 @@
             "priority": 0,
             "exclusionMode": "lastWins",
             "inputSources": [
-                {"id": "controller-expr", "weight": 1.0}
+                {"id": "controller-expr", "weight": 0.5},
+                {"id": "osc", "weight": 0.5, "options": {"stalenessSeconds": 1.0}}
             ]
         },
         {
@@ -22,7 +23,7 @@
             "priority": 2,
             "exclusionMode": "lastWins",
             "inputSources": [
-                {"id": "keyboard-expr", "weight": 1.0}
+                {"id": "keyboard-expr", "weight": 1.0, "options": {"maxStackDepth": 4}}
             ]
         }
     ],
