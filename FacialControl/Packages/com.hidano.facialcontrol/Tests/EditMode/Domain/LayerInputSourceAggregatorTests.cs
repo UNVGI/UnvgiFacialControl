@@ -883,5 +883,280 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
                     new Span<LayerBlender.LayerInput>(output));
             });
         }
+
+        // ----- 5.5 診断スナップショット API (TryWriteSnapshot / GetSnapshot, Req 8.1 / 8.3) -----
+
+        [Test]
+        public void TryWriteSnapshot_AfterAggregate_ReflectsCurrentWeightsAndValidity()
+        {
+            // 観測完了条件: 直近 Aggregate で反映された weight / isValid が snapshot に現れる。
+            const int blendShapeCount = 2;
+            var profile = BuildProfile(layerCount: 1);
+
+            var valid = new FixedValueSource("osc", blendShapeCount, value: 0.5f);
+            var invalid = new FixedValueSource("lipsync", blendShapeCount, value: 1f, isValid: false);
+
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, valid),
+                (0, 1, invalid),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            weightBuffer.SetWeight(0, 0, 0.4f);
+            weightBuffer.SetWeight(0, 1, 0.3f);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[1];
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+
+            Span<LayerSourceWeightEntry> snapshot = new LayerSourceWeightEntry[8];
+            Assert.IsTrue(
+                aggregator.TryWriteSnapshot(snapshot, out int written),
+                "十分な buffer 長なら TryWriteSnapshot は true を返す");
+            Assert.AreEqual(2, written, "登録されている 2 source 分のエントリが書込まれる");
+
+            Assert.AreEqual(0, snapshot[0].LayerIdx);
+            Assert.AreEqual(InputSourceId.Parse("osc"), snapshot[0].SourceId);
+            Assert.AreEqual(0.4f, snapshot[0].Weight, 1e-6f);
+            Assert.IsTrue(snapshot[0].IsValid, "valid source は IsValid=true を報告する");
+            Assert.IsFalse(snapshot[0].Saturated, "Σw=0.4+0.3=0.7 <= 1 なので Saturated=false");
+
+            Assert.AreEqual(0, snapshot[1].LayerIdx);
+            Assert.AreEqual(InputSourceId.Parse("lipsync"), snapshot[1].SourceId);
+            Assert.AreEqual(0.3f, snapshot[1].Weight, 1e-6f);
+            Assert.IsFalse(snapshot[1].IsValid, "invalid source は IsValid=false を報告する");
+            Assert.IsFalse(snapshot[1].Saturated, "Σw は invalid source を除外した 0.4 < 1 なので Saturated=false");
+        }
+
+        [Test]
+        public void TryWriteSnapshot_ReflectsWeightChangesAcrossFrames()
+        {
+            // 観測完了条件: SetWeight 後の次 Aggregate で snapshot が更新されること。
+            const int blendShapeCount = 1;
+            var profile = BuildProfile(layerCount: 1);
+
+            var src = new FixedValueSource("osc", blendShapeCount, value: 1f);
+            var bindings = new List<(int, int, IInputSource)> { (0, 0, src) };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            weightBuffer.SetWeight(0, 0, 0.25f);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[1];
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+
+            Span<LayerSourceWeightEntry> snapshot = new LayerSourceWeightEntry[4];
+            Assert.IsTrue(aggregator.TryWriteSnapshot(snapshot, out int written1));
+            Assert.AreEqual(1, written1);
+            Assert.AreEqual(0.25f, snapshot[0].Weight, 1e-6f);
+
+            // 次フレームで weight を変更し、再 Aggregate 後に snapshot が更新されていること。
+            weightBuffer.SetWeight(0, 0, 0.75f);
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+            Assert.IsTrue(aggregator.TryWriteSnapshot(snapshot, out int written2));
+            Assert.AreEqual(1, written2);
+            Assert.AreEqual(0.75f, snapshot[0].Weight, 1e-6f,
+                "SetWeight → 次 Aggregate の順で snapshot が更新されること");
+        }
+
+        [Test]
+        public void TryWriteSnapshot_WeightSumExceedsOne_MarksAllEntriesSaturated()
+        {
+            // 観測完了条件: Σw > 1 のレイヤーでは、当該レイヤーの全エントリの Saturated=true。
+            const int blendShapeCount = 1;
+            var profile = BuildProfile(layerCount: 2);
+
+            var l0s0 = new FixedValueSource("osc", blendShapeCount, value: 1f);
+            var l0s1 = new FixedValueSource("lipsync", blendShapeCount, value: 1f);
+            var l0s2 = new FixedValueSource("controller-expr", blendShapeCount, value: 1f);
+            var l1s0 = new FixedValueSource("keyboard-expr", blendShapeCount, value: 1f);
+
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, l0s0),
+                (0, 1, l0s1),
+                (0, 2, l0s2),
+                (1, 0, l1s0),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            // layer 0: Σw = 0.5 + 0.5 + 0.5 = 1.5 → Saturated
+            weightBuffer.SetWeight(0, 0, 0.5f);
+            weightBuffer.SetWeight(0, 1, 0.5f);
+            weightBuffer.SetWeight(0, 2, 0.5f);
+            // layer 1: Σw = 0.5 → not saturated
+            weightBuffer.SetWeight(1, 0, 0.5f);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[2];
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+
+            Span<LayerSourceWeightEntry> snapshot = new LayerSourceWeightEntry[8];
+            Assert.IsTrue(aggregator.TryWriteSnapshot(snapshot, out int written));
+            Assert.AreEqual(4, written);
+
+            for (int i = 0; i < written; i++)
+            {
+                if (snapshot[i].LayerIdx == 0)
+                {
+                    Assert.IsTrue(snapshot[i].Saturated,
+                        $"layer 0 (Σw=1.5) の全エントリは Saturated=true (i={i})");
+                }
+                else
+                {
+                    Assert.IsFalse(snapshot[i].Saturated,
+                        $"layer 1 (Σw=0.5) のエントリは Saturated=false (i={i})");
+                }
+            }
+        }
+
+        [Test]
+        public void TryWriteSnapshot_BufferTooShort_ReturnsFalseAndWrittenZero()
+        {
+            const int blendShapeCount = 1;
+            var profile = BuildProfile(layerCount: 1);
+
+            var s0 = new FixedValueSource("osc", blendShapeCount, value: 1f);
+            var s1 = new FixedValueSource("lipsync", blendShapeCount, value: 1f);
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, s0),
+                (0, 1, s1),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            weightBuffer.SetWeight(0, 0, 0.5f);
+            weightBuffer.SetWeight(0, 1, 0.5f);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[1];
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+
+            // buffer 長 1 < 書込予定 2 なので false + written=0。
+            Span<LayerSourceWeightEntry> tooShort = new LayerSourceWeightEntry[1];
+            bool result = aggregator.TryWriteSnapshot(tooShort, out int written);
+            Assert.IsFalse(result);
+            Assert.AreEqual(0, written);
+        }
+
+        [Test]
+        public void GetSnapshot_ReturnsListMatchingTryWriteSnapshot()
+        {
+            // 観測完了条件: GetSnapshot の内容が TryWriteSnapshot と一致すること。
+            const int blendShapeCount = 1;
+            var profile = BuildProfile(layerCount: 2);
+
+            var l0s0 = new FixedValueSource("osc", blendShapeCount, value: 1f);
+            var l0s1 = new FixedValueSource("lipsync", blendShapeCount, value: 0.5f);
+            var l1s0 = new FixedValueSource("keyboard-expr", blendShapeCount, value: 0.25f);
+
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, l0s0),
+                (0, 1, l0s1),
+                (1, 0, l1s0),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            weightBuffer.SetWeight(0, 0, 0.6f);
+            weightBuffer.SetWeight(0, 1, 0.5f);    // Σ = 1.1 → layer 0 Saturated
+            weightBuffer.SetWeight(1, 0, 0.2f);    // layer 1 not saturated
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[2];
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+
+            var listSnapshot = aggregator.GetSnapshot();
+            Assert.IsInstanceOf<IReadOnlyList<LayerSourceWeightEntry>>(listSnapshot);
+            Assert.AreEqual(3, listSnapshot.Count, "登録 source 分のエントリ数");
+
+            Span<LayerSourceWeightEntry> spanSnapshot = new LayerSourceWeightEntry[4];
+            Assert.IsTrue(aggregator.TryWriteSnapshot(spanSnapshot, out int written));
+            Assert.AreEqual(3, written);
+
+            for (int i = 0; i < written; i++)
+            {
+                Assert.AreEqual(spanSnapshot[i], listSnapshot[i],
+                    $"TryWriteSnapshot と GetSnapshot の内容が一致すること (i={i})");
+            }
+
+            // layer 0 のエントリは Saturated=true, layer 1 のエントリは false
+            Assert.IsTrue(listSnapshot[0].Saturated);
+            Assert.IsTrue(listSnapshot[1].Saturated);
+            Assert.IsFalse(listSnapshot[2].Saturated);
+        }
+
+        [Test]
+        public void TryWriteSnapshot_SteadyStateCalls_DoNotAllocate()
+        {
+            // 観測完了条件: TryWriteSnapshot が pre-allocated バッファコピーで 0-alloc。
+            const int blendShapeCount = 8;
+            var profile = BuildProfile(layerCount: 2);
+
+            var l0s0 = new FixedValueSource("osc", blendShapeCount, value: 1f);
+            var l0s1 = new FixedValueSource("lipsync", blendShapeCount, value: 0.5f);
+            var l1s0 = new FixedValueSource("keyboard-expr", blendShapeCount, value: 0.25f);
+
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, l0s0),
+                (0, 1, l0s1),
+                (1, 0, l1s0),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            weightBuffer.SetWeight(0, 0, 0.5f);
+            weightBuffer.SetWeight(0, 1, 0.5f);
+            weightBuffer.SetWeight(1, 0, 0.5f);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[2];
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+
+            var snapshotBuffer = new LayerSourceWeightEntry[8];
+
+            // ウォームアップ (JIT / 初回 Id キャッシュ構築等を排除)
+            for (int i = 0; i < 10; i++)
+            {
+                aggregator.TryWriteSnapshot(snapshotBuffer, out _);
+            }
+
+            // 計測: 多数回呼出しで GC アロケーションが発生しないこと。
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            long before = GC.GetTotalMemory(false);
+
+            for (int i = 0; i < 1000; i++)
+            {
+                aggregator.TryWriteSnapshot(snapshotBuffer, out _);
+            }
+
+            long after = GC.GetTotalMemory(false);
+            long allocated = after - before;
+
+            // GC.GetTotalMemory は厳密ではないが、1000 回呼出しで顕著な増加があれば検出可能。
+            Assert.LessOrEqual(allocated, 0,
+                $"TryWriteSnapshot は 0-alloc であること (差分: {allocated} bytes)");
+        }
     }
 }

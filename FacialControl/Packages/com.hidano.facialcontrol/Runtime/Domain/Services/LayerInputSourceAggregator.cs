@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using Hidano.FacialControl.Domain.Interfaces;
+using Hidano.FacialControl.Domain.Models;
 
 namespace Hidano.FacialControl.Domain.Services
 {
@@ -52,7 +55,20 @@ namespace Hidano.FacialControl.Domain.Services
     /// 最終 BlendShape 配列までの経路を 1 呼出しで回せる。
     /// </para>
     /// <para>
-    /// 診断 snapshot API (5.5) / verbose log rate-limit (5.6) は別タスクで積み増す。
+    /// 診断 snapshot API (5.5、Req 8.1 / 8.3):
+    /// <see cref="TryWriteSnapshot"/> は呼出側が確保した
+    /// <see cref="Span{T}"/> (<see cref="LayerSourceWeightEntry"/>) に、直近の
+    /// <see cref="Aggregate"/> で観測された (layer, source) ウェイトを 0-alloc でコピーする。
+    /// <see cref="GetSnapshot"/> は Editor / デバッグ用途に
+    /// <see cref="IReadOnlyList{T}"/> (<see cref="LayerSourceWeightEntry"/>) を返す (GC 許容)。
+    /// <see cref="LayerInputSourceWeightBuffer.SetWeight"/> の直後に
+    /// <see cref="Aggregate"/> を呼ぶことで最新 weight が反映される。
+    /// <see cref="LayerSourceWeightEntry.Saturated"/> は当該レイヤーで
+    /// Σwᵢ &gt; 1 (<see cref="Hidano.FacialControl.Domain.Interfaces.IInputSource.TryWriteValues"/>
+    /// が true を返した source の weight 合計) の場合に true となる。
+    /// </para>
+    /// <para>
+    /// verbose log rate-limit (5.6) は別タスクで積み増す。
     /// </para>
     /// </remarks>
     public sealed class LayerInputSourceAggregator
@@ -63,6 +79,15 @@ namespace Hidano.FacialControl.Domain.Services
         private readonly float[][] _perLayerOutput;
         private readonly bool[] _emptyLayerWarned;
         private readonly LayerBlender.LayerInput[] _layerInputScratch;
+
+        // 診断 snapshot (Req 8.1 / 8.3) 用の事前確保バッファと
+        // InputSourceId の slot 単位キャッシュ (regex 再評価を避ける)。
+        private readonly LayerSourceWeightEntry[] _snapshotBuffer;
+        private int _snapshotWritten;
+        private readonly IInputSource[] _cachedSources;
+        private readonly InputSourceId[] _cachedSourceIds;
+        private readonly List<LayerSourceWeightEntry> _snapshotList;
+        private readonly int _snapshotMaxSourcesPerLayer;
 
         /// <summary>
         /// Aggregator を構築する。per-layer 出力用の <c>float[]</c> を各レイヤー分
@@ -106,6 +131,25 @@ namespace Hidano.FacialControl.Domain.Services
             _layerInputScratch = layerCount == 0
                 ? Array.Empty<LayerBlender.LayerInput>()
                 : new LayerBlender.LayerInput[layerCount];
+
+            // 診断 snapshot のバッファ / Id キャッシュを最大エントリ数で確保する。
+            // 容量は「構築時点の registry.LayerCount × registry.MaxSourcesPerLayer」。
+            // 以後 registry が TryAddSource で拡張された場合、超過した slot 分の
+            // Id は ResolveCachedSourceId 側でフォールバック経路を取る。
+            _snapshotMaxSourcesPerLayer = registry.MaxSourcesPerLayer;
+            int snapshotSlotCount = layerCount * _snapshotMaxSourcesPerLayer;
+            _snapshotBuffer = snapshotSlotCount == 0
+                ? Array.Empty<LayerSourceWeightEntry>()
+                : new LayerSourceWeightEntry[snapshotSlotCount];
+            _cachedSources = snapshotSlotCount == 0
+                ? Array.Empty<IInputSource>()
+                : new IInputSource[snapshotSlotCount];
+            _cachedSourceIds = snapshotSlotCount == 0
+                ? Array.Empty<InputSourceId>()
+                : new InputSourceId[snapshotSlotCount];
+            _snapshotList = new List<LayerSourceWeightEntry>(
+                snapshotSlotCount == 0 ? 4 : snapshotSlotCount);
+            _snapshotWritten = 0;
         }
 
         /// <summary>
@@ -205,11 +249,15 @@ namespace Hidano.FacialControl.Domain.Services
             bool useCustomPriorities = priorities.Length >= layerCount;
             bool useCustomWeights = layerWeights.Length >= layerCount;
 
+            int snapshotWritten = 0;
+
             for (int l = 0; l < layerCount; l++)
             {
                 var layerOutput = _perLayerOutput[l];
                 Array.Clear(layerOutput, 0, layerOutput.Length);
 
+                int layerSnapshotStart = snapshotWritten;
+                float layerWeightSum = 0f;
                 bool hasAnyValidSource = false;
                 int sourceCount = _registry.GetSourceCountForLayer(l);
                 for (int s = 0; s < sourceCount; s++)
@@ -225,25 +273,51 @@ namespace Hidano.FacialControl.Domain.Services
                     var scratchSpan = _registry.GetScratchBuffer(l, s).Span;
                     scratchSpan.Clear();
 
-                    if (!source.TryWriteValues(scratchSpan))
-                    {
-                        continue;
-                    }
-
-                    hasAnyValidSource = true;
-
+                    bool sourceIsValid = source.TryWriteValues(scratchSpan);
                     float w = _weightBuffer.GetWeight(l, s);
-                    if (w <= 0f)
+
+                    if (sourceIsValid)
                     {
-                        continue;
+                        hasAnyValidSource = true;
+                        layerWeightSum += w;
+                        if (w > 0f)
+                        {
+                            int len = layerOutput.Length < scratchSpan.Length
+                                ? layerOutput.Length
+                                : scratchSpan.Length;
+                            for (int k = 0; k < len; k++)
+                            {
+                                layerOutput[k] += scratchSpan[k] * w;
+                            }
+                        }
                     }
 
-                    int len = layerOutput.Length < scratchSpan.Length
-                        ? layerOutput.Length
-                        : scratchSpan.Length;
-                    for (int k = 0; k < len; k++)
+                    // Snapshot エントリを staging (Saturated は layer loop 完了後に確定)。
+                    if (snapshotWritten < _snapshotBuffer.Length)
                     {
-                        layerOutput[k] += scratchSpan[k] * w;
+                        InputSourceId sourceId = ResolveCachedSourceId(l, s, source);
+                        _snapshotBuffer[snapshotWritten] = new LayerSourceWeightEntry(
+                            layerIdx: l,
+                            sourceId: sourceId,
+                            weight: w,
+                            isValid: sourceIsValid,
+                            saturated: false);
+                        snapshotWritten++;
+                    }
+                }
+
+                // Σwᵢ > 1 のレイヤーの全エントリに Saturated=true を焼き付ける (Req 8.1)。
+                if (layerWeightSum > 1f)
+                {
+                    for (int i = layerSnapshotStart; i < snapshotWritten; i++)
+                    {
+                        var e = _snapshotBuffer[i];
+                        _snapshotBuffer[i] = new LayerSourceWeightEntry(
+                            layerIdx: e.LayerIdx,
+                            sourceId: e.SourceId,
+                            weight: e.Weight,
+                            isValid: e.IsValid,
+                            saturated: true);
                     }
                 }
 
@@ -273,6 +347,89 @@ namespace Hidano.FacialControl.Domain.Services
                         priority: priority, weight: layerWeight, blendShapeValues: layerOutput);
                 }
             }
+
+            _snapshotWritten = snapshotWritten;
+        }
+
+        /// <summary>
+        /// (layer, source) slot に対する <see cref="InputSourceId"/> を返す。
+        /// 同一 source 参照が連続で観測される限りは regex 検証を繰返さずキャッシュを返す
+        /// (Aggregate 経路の per-frame 0-alloc 契約、Req 6.1 への寄与)。
+        /// </summary>
+        /// <remarks>
+        /// 構築時点の MaxSourcesPerLayer を超える slot (registry が TryAddSource で拡張)
+        /// は cache 対象外。その場合のみフォールバックで都度 <see cref="InputSourceId.TryParse"/>
+        /// を呼ぶが、<see cref="TryWriteSnapshot"/> 自体は pre-allocated バッファの
+        /// コピーしか行わないため 0-alloc 契約に影響しない。
+        /// </remarks>
+        private InputSourceId ResolveCachedSourceId(int layerIdx, int sourceIdx, IInputSource source)
+        {
+            int slot = (layerIdx * _snapshotMaxSourcesPerLayer) + sourceIdx;
+            if ((uint)slot >= (uint)_cachedSources.Length)
+            {
+                InputSourceId.TryParse(source.Id, out var fallback);
+                return fallback;
+            }
+
+            if (!ReferenceEquals(_cachedSources[slot], source))
+            {
+                _cachedSources[slot] = source;
+                InputSourceId.TryParse(source.Id, out var parsed);
+                _cachedSourceIds[slot] = parsed;
+            }
+
+            return _cachedSourceIds[slot];
+        }
+
+        /// <summary>
+        /// 直近 <see cref="Aggregate"/> で観測された (layer, source) ウェイトを
+        /// 呼出側の <see cref="Span{T}"/> にコピーする (Req 8.1)。
+        /// </summary>
+        /// <param name="buffer">書込先。<paramref name="written"/> 個以上の長さが必要。</param>
+        /// <param name="written">書込まれたエントリ数。<paramref name="buffer"/> 不足時は 0。</param>
+        /// <returns>
+        /// 全エントリの書込に成功した場合 true。
+        /// <paramref name="buffer"/> が不足した場合は false を返し、<paramref name="buffer"/> は変更されない。
+        /// </returns>
+        /// <remarks>
+        /// 内部 pre-allocated バッファからのコピーのみのため GC アロケーションは発生しない。
+        /// </remarks>
+        public bool TryWriteSnapshot(Span<LayerSourceWeightEntry> buffer, out int written)
+        {
+            int count = _snapshotWritten;
+            if (buffer.Length < count)
+            {
+                written = 0;
+                return false;
+            }
+            for (int i = 0; i < count; i++)
+            {
+                buffer[i] = _snapshotBuffer[i];
+            }
+            written = count;
+            return true;
+        }
+
+        /// <summary>
+        /// 直近 <see cref="Aggregate"/> で観測された (layer, source) ウェイトを
+        /// <see cref="IReadOnlyList{T}"/> として返す (Req 8.3)。
+        /// </summary>
+        /// <remarks>
+        /// Editor / デバッグ用途向けで GC 許容。内部 <see cref="List{T}"/> を再利用するため
+        /// 通常はアロケーション無しだが、スナップショット件数が初期 capacity を
+        /// 超えた場合はリサイズのためのアロケーションが発生し得る (初期 capacity は
+        /// 構築時の <c>LayerCount × MaxSourcesPerLayer</c>)。
+        /// 戻り値は次回 <see cref="GetSnapshot"/> 呼出しで上書きされるため、呼出側は必要なら
+        /// スナップショットをコピーして保持する。
+        /// </remarks>
+        public IReadOnlyList<LayerSourceWeightEntry> GetSnapshot()
+        {
+            _snapshotList.Clear();
+            for (int i = 0; i < _snapshotWritten; i++)
+            {
+                _snapshotList.Add(_snapshotBuffer[i]);
+            }
+            return _snapshotList;
         }
 
         private void WarnEmptyLayerOnce(int layerIdx)
