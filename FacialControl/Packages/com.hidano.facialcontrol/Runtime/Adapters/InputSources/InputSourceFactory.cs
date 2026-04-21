@@ -27,7 +27,8 @@ namespace Hidano.FacialControl.Adapters.InputSources
     ///   <item><c>controller-expr</c> → <see cref="ExpressionTriggerOptionsDto"/> → <see cref="ControllerExpressionInputSource"/></item>
     ///   <item><c>keyboard-expr</c> → <see cref="ExpressionTriggerOptionsDto"/> → <see cref="KeyboardExpressionInputSource"/></item>
     /// </list>
-    /// サードパーティ <c>x-*</c> 拡張は別タスク (7.6) で <c>RegisterExtension</c> API を追加予定。
+    /// サードパーティ <c>x-*</c> 拡張は <see cref="InputSourceFactory.RegisterExtension{TOptions}"/>
+    /// で typed DTO と creator を同時に登録する（Req 1.7, 3.7）。
     /// </para>
     /// </remarks>
     public interface IInputSourceFactory
@@ -187,6 +188,68 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
             var effectiveOptions = options ?? entry.DefaultFactory();
             return entry.Creator(effectiveOptions, blendShapeCount, profile);
+        }
+
+        /// <summary>
+        /// サードパーティ (<c>x-*</c> プレフィックス推奨) 拡張アダプタを登録する (Req 1.7, 3.7)。
+        /// </summary>
+        /// <typeparam name="TOptions">
+        /// 拡張アダプタが用いる options DTO 型。<see cref="InputSourceOptionsDto"/> 派生で、
+        /// JsonUtility でデシリアライズ可能な public 無引数コンストラクタを持つ必要がある。
+        /// </typeparam>
+        /// <param name="id">登録対象の識別子。予約 id は登録できず警告 + no-op となる。</param>
+        /// <param name="creator">
+        /// 型付き options・BlendShape 個数・<see cref="FacialProfile"/> から
+        /// <see cref="IInputSource"/> を生成する関数。
+        /// </param>
+        /// <exception cref="ArgumentException">
+        /// <paramref name="id"/> が未初期化（<c>default</c>）で <see cref="InputSourceId.Value"/>
+        /// が <c>null</c>／空の場合。
+        /// </exception>
+        /// <exception cref="ArgumentNullException"><paramref name="creator"/> が <c>null</c> の場合。</exception>
+        /// <remarks>
+        /// <para>
+        /// 予約 id (<c>osc</c> / <c>lipsync</c> / <c>controller-expr</c> / <c>keyboard-expr</c> /
+        /// <c>input</c>) の上書きは許容せず、警告ログを出して既存のビルトイン登録を維持する。
+        /// </para>
+        /// <para>
+        /// 同一の拡張 id を再登録した場合は後勝ち（警告なし）。開発時の差替えを容易にするための選択。
+        /// </para>
+        /// </remarks>
+        public void RegisterExtension<TOptions>(
+            InputSourceId id,
+            Func<TOptions, int, FacialProfile, IInputSource> creator)
+            where TOptions : InputSourceOptionsDto, new()
+        {
+            if (string.IsNullOrEmpty(id.Value))
+            {
+                throw new ArgumentException(
+                    "RegisterExtension requires a valid InputSourceId (Value must not be null or empty).",
+                    nameof(id));
+            }
+
+            if (creator == null)
+            {
+                throw new ArgumentNullException(nameof(creator));
+            }
+
+            if (id.IsReserved)
+            {
+                Debug.LogWarning(
+                    $"[InputSourceFactory] Reserved id '{id.Value}' cannot be overridden by " +
+                    "RegisterExtension. Use a 'x-' prefix for third-party extensions (Req 1.7).");
+                return;
+            }
+
+            Register(
+                id.Value,
+                typeof(TOptions),
+                () => new TOptions(),
+                (options, blendShapeCount, profile) =>
+                {
+                    var typedOptions = options as TOptions ?? new TOptions();
+                    return creator(typedOptions, blendShapeCount, profile);
+                });
         }
 
         private void Register(

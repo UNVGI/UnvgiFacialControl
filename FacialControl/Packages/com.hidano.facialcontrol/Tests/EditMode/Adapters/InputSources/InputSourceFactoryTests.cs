@@ -1,4 +1,7 @@
+using System;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Adapters.OSC;
@@ -336,6 +339,259 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
                 profile: BuildProfile());
 
             Assert.IsNull(source);
+        }
+
+        // =====================================================================
+        // tasks.md 7.6: RegisterExtension<TOptions> 契約テスト (Req 1.7, 3.7)
+        // =====================================================================
+
+        [System.Serializable]
+        private sealed class TestSensorOptionsDto : InputSourceOptionsDto
+        {
+            public float threshold;
+            public int channels;
+        }
+
+        private sealed class TestExtensionInputSource : IInputSource
+        {
+            public string Id { get; }
+            public InputSourceType Type => InputSourceType.ValueProvider;
+            public int BlendShapeCount { get; }
+            public TestSensorOptionsDto CapturedOptions { get; }
+
+            public TestExtensionInputSource(string id, int blendShapeCount, TestSensorOptionsDto options)
+            {
+                Id = id;
+                BlendShapeCount = blendShapeCount;
+                CapturedOptions = options;
+            }
+
+            public void Tick(float deltaTime) { }
+
+            public bool TryWriteValues(System.Span<float> output) => false;
+        }
+
+        [Test]
+        public void RegisterExtension_XPrefixId_IsRegistered()
+        {
+            var factory = CreateFactory();
+            var id = InputSourceId.Parse("x-test-sensor");
+
+            factory.RegisterExtension<TestSensorOptionsDto>(
+                id,
+                (options, blendShapeCount, profile) =>
+                    new TestExtensionInputSource(id.Value, blendShapeCount, options));
+
+            Assert.IsTrue(factory.IsRegistered(id));
+        }
+
+        [Test]
+        public void RegisterExtension_XPrefixIdWithTypedOptions_DeserializesAsTOptions()
+        {
+            var factory = CreateFactory();
+            var id = InputSourceId.Parse("x-test-sensor");
+
+            factory.RegisterExtension<TestSensorOptionsDto>(
+                id,
+                (options, blendShapeCount, profile) =>
+                    new TestExtensionInputSource(id.Value, blendShapeCount, options));
+
+            var deserialized = factory.TryDeserializeOptions(
+                id,
+                "{\"threshold\":0.75,\"channels\":3}");
+
+            Assert.IsNotNull(deserialized);
+            Assert.IsInstanceOf<TestSensorOptionsDto>(deserialized);
+            var typed = (TestSensorOptionsDto)deserialized;
+            Assert.AreEqual(0.75f, typed.threshold, 1e-5f);
+            Assert.AreEqual(3, typed.channels);
+        }
+
+        [Test]
+        public void RegisterExtension_XPrefixIdWithNullOptionsJson_ReturnsDefaultDto()
+        {
+            var factory = CreateFactory();
+            var id = InputSourceId.Parse("x-test-sensor");
+
+            factory.RegisterExtension<TestSensorOptionsDto>(
+                id,
+                (options, blendShapeCount, profile) =>
+                    new TestExtensionInputSource(id.Value, blendShapeCount, options));
+
+            var deserialized = factory.TryDeserializeOptions(id, null);
+
+            Assert.IsNotNull(deserialized);
+            Assert.IsInstanceOf<TestSensorOptionsDto>(deserialized);
+            var typed = (TestSensorOptionsDto)deserialized;
+            Assert.AreEqual(0f, typed.threshold, 1e-5f);
+            Assert.AreEqual(0, typed.channels);
+        }
+
+        [Test]
+        public void RegisterExtension_TryCreate_InvokesCreatorWithTypedOptions()
+        {
+            var factory = CreateFactory();
+            var id = InputSourceId.Parse("x-test-sensor");
+
+            factory.RegisterExtension<TestSensorOptionsDto>(
+                id,
+                (options, blendShapeCount, profile) =>
+                    new TestExtensionInputSource(id.Value, blendShapeCount, options));
+
+            var options = new TestSensorOptionsDto { threshold = 0.5f, channels = 2 };
+            var source = factory.TryCreate(
+                id,
+                options,
+                blendShapeCount: 4,
+                profile: BuildProfile());
+
+            Assert.IsNotNull(source);
+            Assert.IsInstanceOf<TestExtensionInputSource>(source);
+            var ext = (TestExtensionInputSource)source;
+            Assert.AreEqual(id.Value, ext.Id);
+            Assert.AreEqual(4, ext.BlendShapeCount);
+            Assert.AreSame(options, ext.CapturedOptions);
+        }
+
+        [Test]
+        public void RegisterExtension_TryCreateWithNullOptions_PassesDefaultTOptionsToCreator()
+        {
+            var factory = CreateFactory();
+            var id = InputSourceId.Parse("x-test-sensor");
+
+            factory.RegisterExtension<TestSensorOptionsDto>(
+                id,
+                (options, blendShapeCount, profile) =>
+                    new TestExtensionInputSource(id.Value, blendShapeCount, options));
+
+            var source = factory.TryCreate(
+                id,
+                options: null,
+                blendShapeCount: 4,
+                profile: BuildProfile());
+
+            Assert.IsNotNull(source);
+            Assert.IsInstanceOf<TestExtensionInputSource>(source);
+            var ext = (TestExtensionInputSource)source;
+            Assert.IsNotNull(ext.CapturedOptions);
+            Assert.AreEqual(0f, ext.CapturedOptions.threshold, 1e-5f);
+            Assert.AreEqual(0, ext.CapturedOptions.channels);
+        }
+
+        [Test]
+        public void RegisterExtension_FullRoundTrip_JsonToAdapter()
+        {
+            // Critical 2 相当の経路を x-* 拡張側で検証:
+            // TryDeserializeOptions → TryCreate が一貫して typed DTO を運ぶ。
+            var factory = CreateFactory();
+            var id = InputSourceId.Parse("x-test-sensor");
+
+            factory.RegisterExtension<TestSensorOptionsDto>(
+                id,
+                (options, blendShapeCount, profile) =>
+                    new TestExtensionInputSource(id.Value, blendShapeCount, options));
+
+            var options = factory.TryDeserializeOptions(id, "{\"threshold\":0.9,\"channels\":5}");
+            var source = factory.TryCreate(id, options, blendShapeCount: 8, profile: BuildProfile());
+
+            Assert.IsInstanceOf<TestExtensionInputSource>(source);
+            var ext = (TestExtensionInputSource)source;
+            Assert.AreEqual(0.9f, ext.CapturedOptions.threshold, 1e-5f);
+            Assert.AreEqual(5, ext.CapturedOptions.channels);
+            Assert.AreEqual(8, ext.BlendShapeCount);
+        }
+
+        [Test]
+        public void RegisterExtension_NullCreator_ThrowsArgumentNullException()
+        {
+            var factory = CreateFactory();
+
+            Assert.Throws<ArgumentNullException>(() =>
+                factory.RegisterExtension<TestSensorOptionsDto>(
+                    InputSourceId.Parse("x-test-sensor"),
+                    creator: null));
+        }
+
+        [Test]
+        public void RegisterExtension_UninitializedId_ThrowsArgumentException()
+        {
+            var factory = CreateFactory();
+
+            Assert.Throws<ArgumentException>(() =>
+                factory.RegisterExtension<TestSensorOptionsDto>(
+                    id: default,
+                    (options, blendShapeCount, profile) =>
+                        new TestExtensionInputSource("x", blendShapeCount, options)));
+        }
+
+        [Test]
+        public void RegisterExtension_ReservedId_WarnsAndDoesNotOverrideBuiltin()
+        {
+            // 予約 id (例: osc) は RegisterExtension で上書きできない。
+            // 警告ログを出し、既存ビルトインの OscOptionsDto マッピングを維持する (Req 1.7)。
+            using var buffer = new OscDoubleBuffer(4);
+            var time = new ManualTimeProvider();
+            var factory = CreateFactory(oscBuffer: buffer, timeProvider: time);
+
+            LogAssert.Expect(LogType.Warning,
+                new System.Text.RegularExpressions.Regex(
+                    "\\[InputSourceFactory\\].*Reserved id 'osc'.*cannot be overridden"));
+
+            factory.RegisterExtension<TestSensorOptionsDto>(
+                InputSourceId.Parse(OscInputSource.ReservedId),
+                (options, blendShapeCount, profile) =>
+                    new TestExtensionInputSource(OscInputSource.ReservedId, blendShapeCount, options));
+
+            // 上書きされていないので OSC は OscOptionsDto を返し、OscInputSource を生成できる。
+            var deserialized = factory.TryDeserializeOptions(
+                InputSourceId.Parse(OscInputSource.ReservedId),
+                "{\"stalenessSeconds\":1.25}");
+            Assert.IsInstanceOf<OscOptionsDto>(deserialized);
+            Assert.AreEqual(1.25f, ((OscOptionsDto)deserialized).stalenessSeconds, 1e-5f);
+
+            var source = factory.TryCreate(
+                InputSourceId.Parse(OscInputSource.ReservedId),
+                deserialized,
+                blendShapeCount: buffer.Size,
+                profile: BuildProfile());
+            Assert.IsInstanceOf<OscInputSource>(source);
+        }
+
+        [Test]
+        public void RegisterExtension_SameIdTwice_LastRegistrationWins()
+        {
+            // preview 段階では extension の重複登録を警告せずに後勝ちで上書きする。
+            // （開発/テスト時の再登録を許容するための選択。Req 1.7 には明示なし。）
+            var factory = CreateFactory();
+            var id = InputSourceId.Parse("x-test-sensor");
+
+            var firstCalled = false;
+            factory.RegisterExtension<TestSensorOptionsDto>(
+                id,
+                (options, blendShapeCount, profile) =>
+                {
+                    firstCalled = true;
+                    return new TestExtensionInputSource("first", blendShapeCount, options);
+                });
+
+            var secondCalled = false;
+            factory.RegisterExtension<TestSensorOptionsDto>(
+                id,
+                (options, blendShapeCount, profile) =>
+                {
+                    secondCalled = true;
+                    return new TestExtensionInputSource("second", blendShapeCount, options);
+                });
+
+            var source = factory.TryCreate(
+                id,
+                new TestSensorOptionsDto(),
+                blendShapeCount: 2,
+                profile: BuildProfile());
+
+            Assert.IsFalse(firstCalled);
+            Assert.IsTrue(secondCalled);
+            Assert.AreEqual("second", source.Id);
         }
     }
 }
