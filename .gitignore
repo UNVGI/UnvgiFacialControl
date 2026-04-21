@@ -238,6 +238,9 @@ coverage.xml
 #Msbuild binary log output
 output.binlog
 
+# Unity test runner log output
+test-results/unity-log-*.txt
+
 # KDiff3
 *_BACKUP_*
 *_BASE_*
