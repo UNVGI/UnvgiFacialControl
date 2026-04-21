@@ -5,6 +5,7 @@
         "Hidano.FacialControl.Domain",
         "Hidano.FacialControl.Application",
         "Hidano.FacialControl.Adapters",
+        "Hidano.FacialControl.Tests.Shared",
         "Unity.Collections",
         "Unity.InputSystem",
         "Unity.InputSystem.TestFramework",
