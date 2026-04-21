@@ -2,9 +2,11 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.TestTools;
 using Hidano.FacialControl.Adapters.ScriptableObject;
 using InputBinding = Hidano.FacialControl.Domain.Models.InputBinding;
 
@@ -80,6 +82,87 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             Assert.AreEqual("expression-id-001", bindings[0].ExpressionId);
             Assert.AreEqual("Trigger2", bindings[1].ActionName);
             Assert.AreEqual("expression-id-002", bindings[1].ExpressionId);
+        }
+
+        [Test]
+        public void InputSourceCategory_DefaultOnFreshInstance_IsController()
+        {
+            _so = UnityEngine.ScriptableObject.CreateInstance<InputBindingProfileSO>();
+
+            Assert.AreEqual(InputSourceCategory.Controller, _so.InputSourceCategory);
+        }
+
+        [Test]
+        public void OnValidate_ControllerCategoryWithKeyboardOnlyBindings_EmitsWarning()
+        {
+            _so = UnityEngine.ScriptableObject.CreateInstance<InputBindingProfileSO>();
+            _actionAsset = CreateActionAssetWithBinding("Trigger1", "<Keyboard>/a");
+            SetActionAsset(_so, _actionAsset);
+            SetActionMapName(_so, "Expression");
+            SetInputSourceCategory(_so, InputSourceCategory.Controller);
+
+            LogAssert.Expect(LogType.Warning, new Regex(@"InputSourceCategory が Controller.*Keyboard"));
+            InvokeOnValidate(_so);
+        }
+
+        [Test]
+        public void OnValidate_KeyboardCategoryWithKeyboardOnlyBindings_NoWarning()
+        {
+            _so = UnityEngine.ScriptableObject.CreateInstance<InputBindingProfileSO>();
+            _actionAsset = CreateActionAssetWithBinding("Trigger1", "<Keyboard>/a");
+            SetActionAsset(_so, _actionAsset);
+            SetActionMapName(_so, "Expression");
+            SetInputSourceCategory(_so, InputSourceCategory.Keyboard);
+
+            InvokeOnValidate(_so);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [Test]
+        public void OnValidate_ControllerCategoryWithGamepadBindings_NoWarning()
+        {
+            _so = UnityEngine.ScriptableObject.CreateInstance<InputBindingProfileSO>();
+            _actionAsset = CreateActionAssetWithBinding("Trigger1", "<Gamepad>/buttonSouth");
+            SetActionAsset(_so, _actionAsset);
+            SetActionMapName(_so, "Expression");
+            SetInputSourceCategory(_so, InputSourceCategory.Controller);
+
+            InvokeOnValidate(_so);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        private static InputActionAsset CreateActionAssetWithBinding(string actionName, string bindingPath)
+        {
+            var asset = UnityEngine.ScriptableObject.CreateInstance<InputActionAsset>();
+            var map = new InputActionMap("Expression");
+            var action = map.AddAction(actionName, InputActionType.Button);
+            action.AddBinding(bindingPath);
+            asset.AddActionMap(map);
+            return asset;
+        }
+
+        private static void SetActionMapName(InputBindingProfileSO so, string actionMapName)
+        {
+            FieldInfo field = typeof(InputBindingProfileSO).GetField(
+                "_actionMapName", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(field, "_actionMapName フィールドが InputBindingProfileSO に見つかりません。");
+            field.SetValue(so, actionMapName);
+        }
+
+        private static void SetInputSourceCategory(InputBindingProfileSO so, InputSourceCategory category)
+        {
+            FieldInfo field = typeof(InputBindingProfileSO).GetField(
+                "_inputSourceCategory", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(field, "_inputSourceCategory フィールドが InputBindingProfileSO に見つかりません。");
+            field.SetValue(so, category);
+        }
+
+        private static void InvokeOnValidate(InputBindingProfileSO so)
+        {
+            MethodInfo method = typeof(InputBindingProfileSO).GetMethod(
+                "OnValidate", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(method, "OnValidate メソッドが InputBindingProfileSO に見つかりません。");
+            method.Invoke(so, null);
         }
 
         private static void SetActionAsset(InputBindingProfileSO so, InputActionAsset asset)
