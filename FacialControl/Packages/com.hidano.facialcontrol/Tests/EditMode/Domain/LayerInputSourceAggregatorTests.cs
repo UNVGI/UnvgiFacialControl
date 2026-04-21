@@ -250,6 +250,123 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
                 "Aggregate 呼出しごとに Tick が 1 回呼ばれること");
         }
 
+        /// <summary>
+        /// 書込長を制限できる <see cref="IInputSource"/> フェイク。
+        /// <c>writeLength</c> で指定した先頭 N インデックスにのみ値を書込む。
+        /// 残余は <see cref="TryWriteValues"/> 内で一切触らず、Aggregator のゼロクリア契約
+        /// (overlap-only) を検証するために使う。
+        /// </summary>
+        private sealed class PartialWriteSource : IInputSource
+        {
+            private readonly float _value;
+            private readonly int _writeLength;
+
+            public PartialWriteSource(string id, int blendShapeCount, int writeLength, float value)
+            {
+                Id = id;
+                BlendShapeCount = blendShapeCount;
+                _writeLength = writeLength;
+                _value = value;
+            }
+
+            public string Id { get; }
+            public InputSourceType Type => InputSourceType.ValueProvider;
+            public int BlendShapeCount { get; }
+
+            public void Tick(float deltaTime) { }
+
+            public bool TryWriteValues(Span<float> output)
+            {
+                int len = Math.Min(_writeLength, output.Length);
+                for (int i = 0; i < len; i++)
+                {
+                    output[i] = _value;
+                }
+                return true;
+            }
+        }
+
+        [Test]
+        public void Aggregate_SourceWritesShorterSpan_UnwrittenIndicesContributeZero()
+        {
+            // Req 1.3 (overlap-only): source が BlendShape 個数未満しか書込まない場合、
+            // Aggregator 側で scratch が事前ゼロクリアされるため、未書込インデックスの
+            // 寄与は 0 になり、前フレームの値が残らない契約を検証する。
+            const int blendShapeCount = 4;
+            var profile = BuildProfile(layerCount: 1);
+
+            // 先頭 2 indices のみ 1.0 を書込む。残余 (index 2, 3) は触らない。
+            var partial = new PartialWriteSource("partial", blendShapeCount, writeLength: 2, value: 1f);
+            var bindings = new List<(int, int, IInputSource)> { (0, 0, partial) };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            weightBuffer.SetWeight(0, 0, 1f);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[1];
+
+            // 1 フレーム目
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+            var values1 = outputPerLayer[0].BlendShapeValues.Span;
+            Assert.AreEqual(1f, values1[0], 1e-6f, "overlap 範囲の index 0 は書込値");
+            Assert.AreEqual(1f, values1[1], 1e-6f, "overlap 範囲の index 1 は書込値");
+            Assert.AreEqual(0f, values1[2], 1e-6f, "未書込 index 2 はゼロ (事前クリア済み)");
+            Assert.AreEqual(0f, values1[3], 1e-6f, "未書込 index 3 はゼロ (事前クリア済み)");
+
+            // 2 フレーム目 (前フレーム値の leakage が無いことを確認)
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+            var values2 = outputPerLayer[0].BlendShapeValues.Span;
+            Assert.AreEqual(0f, values2[2], 1e-6f, "前フレーム値が leakage しないこと");
+            Assert.AreEqual(0f, values2[3], 1e-6f, "前フレーム値が leakage しないこと");
+        }
+
+        [Test]
+        public void Aggregate_InvalidSource_ContributesZeroWithoutException()
+        {
+            // Req 1.4 観測完了条件:
+            // 3 source のうち 1 source だけ IsValid=false のとき、残り 2 source の
+            // 加重和のみが出力され、例外が発生しないこと。
+            const int blendShapeCount = 3;
+            var profile = BuildProfile(layerCount: 1);
+
+            var valid0 = new FixedValueSource("valid0", blendShapeCount, value: 0.5f);
+            var invalid = new FixedValueSource("invalid", blendShapeCount, value: 1f, isValid: false);
+            var valid1 = new FixedValueSource("valid1", blendShapeCount, value: 0.25f);
+
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, valid0),
+                (0, 1, invalid),
+                (0, 2, valid1),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            weightBuffer.SetWeight(0, 0, 0.4f);
+            weightBuffer.SetWeight(0, 1, 1f);    // 無効ソースに何らかの weight が設定されていても
+            weightBuffer.SetWeight(0, 2, 0.2f);  // 寄与ゼロであることを確認する。
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[1];
+
+            // 無効ソースが混在していても Aggregate は例外を出してはならない
+            // (Span<T> は ref struct で Assert.DoesNotThrow のラムダに捕捉できないため直呼び出しで検証)
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+
+            var values = outputPerLayer[0].BlendShapeValues.Span;
+            // 期待値: 0.4 * 0.5 + 0 * 1 + 0.2 * 0.25 = 0.2 + 0 + 0.05 = 0.25
+            for (int k = 0; k < values.Length; k++)
+            {
+                Assert.AreEqual(0.25f, values[k], 1e-6f,
+                    $"無効ソース (isValid=false) の寄与は 0、残り 2 source の加重和のみ (k={k})");
+            }
+        }
+
         [Test]
         public void Constructor_NullRegistry_Throws()
         {

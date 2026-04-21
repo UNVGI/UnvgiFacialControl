@@ -22,9 +22,19 @@ namespace Hidano.FacialControl.Domain.Services
     /// <c>float[]</c> を使い回すため GC アロケーションは発生しない (Design §Output semantics)。
     /// </para>
     /// <para>
-    /// 本タスク (5.1) の責務は per-layer 加重和 + 最終クランプの主ループのみ。
-    /// 長さ不一致の overlap 処理 (5.2) / 空レイヤー警告 (5.3) / LayerBlender 接続 (5.4) /
-    /// 診断 snapshot API (5.5) / verbose log rate-limit (5.6) は別タスクで積み増す。
+    /// 本タスク時点での責務: per-layer 加重和 + 最終クランプ (5.1) と、
+    /// 長さ不一致時の overlap-only 処理 + 無効ソース (TryWriteValues=false) のゼロ寄与 (5.2、Req 1.3 / 1.4)。
+    /// </para>
+    /// <para>
+    /// overlap-only 契約: 各 <c>source.TryWriteValues(scratch)</c> の直前に scratch を
+    /// <see cref="Span{T}.Clear"/> でゼロ初期化し、source が BlendShape 個数未満しか書込まない場合も
+    /// 未書込インデックスはゼロ寄与として加算されるようにする (前フレームの値が leak しない)。
+    /// 無効ソース (戻り値 false) は scratch が全ゼロのまま加算ループを <c>continue</c> でスキップし、
+    /// 例外を出さず寄与 0 として扱う (Req 1.4)。
+    /// </para>
+    /// <para>
+    /// 空レイヤー警告 (5.3) / LayerBlender 接続 (5.4) / 診断 snapshot API (5.5) /
+    /// verbose log rate-limit (5.6) は別タスクで積み増す。
     /// </para>
     /// </remarks>
     public sealed class LayerInputSourceAggregator
