@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
@@ -364,6 +367,230 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             {
                 Assert.AreEqual(0.25f, values[k], 1e-6f,
                     $"無効ソース (isValid=false) の寄与は 0、残り 2 source の加重和のみ (k={k})");
+            }
+        }
+
+        // ----- 5.3 空レイヤー検出とセッション 1 回 warning (Req 2.4) -----
+
+        [Test]
+        public void Aggregate_NoSourcesRegisteredForLayer_WarnsOnceAndOutputsZero()
+        {
+            // source 登録ゼロのレイヤーはセッション 1 回だけ warning を出し、出力はゼロ。
+            const int blendShapeCount = 3;
+            var profile = BuildProfile(layerCount: 1);
+            var bindings = new List<(int, int, IInputSource)>();
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, Math.Max(1, registry.MaxSourcesPerLayer));
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[1];
+
+            // 複数フレーム Aggregate を回しても warning は 1 回のみ。
+            LogAssert.Expect(LogType.Warning,
+                new Regex("LayerInputSourceAggregator.*layer 0.*no valid input source"));
+
+            for (int frame = 0; frame < 5; frame++)
+            {
+                aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+            }
+
+            var values = outputPerLayer[0].BlendShapeValues.Span;
+            for (int k = 0; k < values.Length; k++)
+            {
+                Assert.AreEqual(0f, values[k], 1e-6f,
+                    $"空レイヤーの出力はゼロであること (k={k})");
+            }
+        }
+
+        [Test]
+        public void Aggregate_AllSourcesInvalid_WarnsOnceAndOutputsZero()
+        {
+            // 全 source が IsValid=false のレイヤーもセッション 1 回だけ warning。
+            const int blendShapeCount = 3;
+            var profile = BuildProfile(layerCount: 1);
+
+            var invalid0 = new FixedValueSource("invalid0", blendShapeCount, value: 1f, isValid: false);
+            var invalid1 = new FixedValueSource("invalid1", blendShapeCount, value: 0.5f, isValid: false);
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, invalid0),
+                (0, 1, invalid1),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            weightBuffer.SetWeight(0, 0, 1f);
+            weightBuffer.SetWeight(0, 1, 1f);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[1];
+
+            LogAssert.Expect(LogType.Warning,
+                new Regex("LayerInputSourceAggregator.*layer 0.*no valid input source"));
+
+            for (int frame = 0; frame < 10; frame++)
+            {
+                aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+            }
+
+            var values = outputPerLayer[0].BlendShapeValues.Span;
+            for (int k = 0; k < values.Length; k++)
+            {
+                Assert.AreEqual(0f, values[k], 1e-6f,
+                    $"全 source が IsValid=false のレイヤー出力はゼロであること (k={k})");
+            }
+        }
+
+        [Test]
+        public void Aggregate_EmptyLayerCoexistsWithValidLayer_OnlyEmptyLayerWarns()
+        {
+            // 2 レイヤー構成: layer 0 は valid、layer 1 は全 source 無効。
+            // warning は layer 1 について 1 回だけ。layer 0 は warning 不要。
+            const int blendShapeCount = 2;
+            var profile = BuildProfile(layerCount: 2);
+
+            var valid = new FixedValueSource("valid", blendShapeCount, value: 0.5f);
+            var invalid = new FixedValueSource("invalid", blendShapeCount, value: 1f, isValid: false);
+
+            var bindings = new List<(int, int, IInputSource)>
+            {
+                (0, 0, valid),
+                (1, 0, invalid),
+            };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            weightBuffer.SetWeight(0, 0, 1f);
+            weightBuffer.SetWeight(1, 0, 1f);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[2];
+
+            LogAssert.Expect(LogType.Warning,
+                new Regex("LayerInputSourceAggregator.*layer 1.*no valid input source"));
+
+            for (int frame = 0; frame < 3; frame++)
+            {
+                aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+            }
+
+            var layer0Values = outputPerLayer[0].BlendShapeValues.Span;
+            var layer1Values = outputPerLayer[1].BlendShapeValues.Span;
+            for (int k = 0; k < layer0Values.Length; k++)
+            {
+                Assert.AreEqual(0.5f, layer0Values[k], 1e-6f,
+                    $"valid レイヤーは通常通り出力 (k={k})");
+                Assert.AreEqual(0f, layer1Values[k], 1e-6f,
+                    $"空レイヤー出力はゼロ (k={k})");
+            }
+        }
+
+        [Test]
+        public void Aggregate_ValidSourceWithZeroWeight_DoesNotWarn()
+        {
+            // IsValid=true だが weight=0 のソースは「空レイヤー」ではない。warning を出してはならない。
+            const int blendShapeCount = 2;
+            var profile = BuildProfile(layerCount: 1);
+
+            var valid = new FixedValueSource("valid", blendShapeCount, value: 1f);
+            var bindings = new List<(int, int, IInputSource)> { (0, 0, valid) };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            // weight=0 のまま。IsValid=true だが寄与は 0。
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[1];
+
+            // LogAssert.Expect は何も記載しない。想定外 warning が出れば Unity Test Runner が検知する。
+            for (int frame = 0; frame < 5; frame++)
+            {
+                aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+            }
+
+            var values = outputPerLayer[0].BlendShapeValues.Span;
+            for (int k = 0; k < values.Length; k++)
+            {
+                Assert.AreEqual(0f, values[k], 1e-6f,
+                    $"weight=0 なので出力はゼロ (k={k})");
+            }
+        }
+
+        [Test]
+        public void Aggregate_LayerRecoversAfterBeingEmpty_DoesNotWarnAgain()
+        {
+            // セッション 1 回の契約: 一度 empty 警告が出たレイヤーは、後続フレームで valid に
+            // 戻っても再度 warning を出さない (per-layer per-session)。
+            const int blendShapeCount = 2;
+            var profile = BuildProfile(layerCount: 1);
+
+            // 途中から valid に切替可能なフェイク。
+            var source = new ToggleableValidSource("toggle", blendShapeCount, value: 1f, initialValid: false);
+            var bindings = new List<(int, int, IInputSource)> { (0, 0, source) };
+
+            using var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount, registry.MaxSourcesPerLayer);
+
+            weightBuffer.SetWeight(0, 0, 1f);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
+            Span<LayerBlender.LayerInput> outputPerLayer = new LayerBlender.LayerInput[1];
+
+            LogAssert.Expect(LogType.Warning,
+                new Regex("LayerInputSourceAggregator.*layer 0.*no valid input source"));
+
+            // 空状態で 1 フレーム → warning
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+
+            // valid に切替後、復帰フレームでは warning が出ないこと。
+            source.IsValid = true;
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+
+            // 再度空に戻しても、per-session 1 回契約により追加 warning は出ない。
+            source.IsValid = false;
+            aggregator.Aggregate(deltaTime: 0f, outputPerLayer);
+        }
+
+        /// <summary>IsValid を外部から切替できる <see cref="IInputSource"/> フェイク。</summary>
+        private sealed class ToggleableValidSource : IInputSource
+        {
+            private readonly float _value;
+
+            public ToggleableValidSource(string id, int blendShapeCount, float value, bool initialValid)
+            {
+                Id = id;
+                BlendShapeCount = blendShapeCount;
+                _value = value;
+                IsValid = initialValid;
+            }
+
+            public string Id { get; }
+            public InputSourceType Type => InputSourceType.ValueProvider;
+            public int BlendShapeCount { get; }
+            public bool IsValid { get; set; }
+
+            public void Tick(float deltaTime) { }
+
+            public bool TryWriteValues(Span<float> output)
+            {
+                if (!IsValid)
+                {
+                    return false;
+                }
+                int len = Math.Min(output.Length, BlendShapeCount);
+                for (int i = 0; i < len; i++)
+                {
+                    output[i] = _value;
+                }
+                return true;
             }
         }
 

@@ -22,8 +22,9 @@ namespace Hidano.FacialControl.Domain.Services
     /// <c>float[]</c> を使い回すため GC アロケーションは発生しない (Design §Output semantics)。
     /// </para>
     /// <para>
-    /// 本タスク時点での責務: per-layer 加重和 + 最終クランプ (5.1) と、
-    /// 長さ不一致時の overlap-only 処理 + 無効ソース (TryWriteValues=false) のゼロ寄与 (5.2、Req 1.3 / 1.4)。
+    /// 本タスク時点での責務: per-layer 加重和 + 最終クランプ (5.1)、
+    /// 長さ不一致時の overlap-only 処理 + 無効ソース (TryWriteValues=false) のゼロ寄与 (5.2、Req 1.3 / 1.4)、
+    /// および空レイヤー検出 + per-layer per-session 1 回 warning (5.3、Req 2.4)。
     /// </para>
     /// <para>
     /// overlap-only 契約: 各 <c>source.TryWriteValues(scratch)</c> の直前に scratch を
@@ -33,7 +34,15 @@ namespace Hidano.FacialControl.Domain.Services
     /// 例外を出さず寄与 0 として扱う (Req 1.4)。
     /// </para>
     /// <para>
-    /// 空レイヤー警告 (5.3) / LayerBlender 接続 (5.4) / 診断 snapshot API (5.5) /
+    /// 空レイヤー契約 (Req 2.4): 当該レイヤーに登録された source が 0 本、または全 source が
+    /// <see cref="Hidano.FacialControl.Domain.Interfaces.IInputSource.TryWriteValues"/> で
+    /// false を返した場合、そのレイヤーの出力はゼロに保たれ、<see cref="UnityEngine.Debug.LogWarning(object)"/>
+    /// がそのレイヤーについてセッション (= Aggregator インスタンス) あたり 1 回だけ発火する。
+    /// weight=0 の valid source は「空レイヤー」とはみなさない (IsValid が基準、Req 2.4 / design §Edge Cases)。
+    /// 一度 warning を出したレイヤーは、以後 valid に戻って再び空になっても warning は再発しない。
+    /// </para>
+    /// <para>
+    /// LayerBlender 接続 (5.4) / 診断 snapshot API (5.5) /
     /// verbose log rate-limit (5.6) は別タスクで積み増す。
     /// </para>
     /// </remarks>
@@ -43,6 +52,7 @@ namespace Hidano.FacialControl.Domain.Services
         private readonly LayerInputSourceWeightBuffer _weightBuffer;
         private readonly int _blendShapeCount;
         private readonly float[][] _perLayerOutput;
+        private readonly bool[] _emptyLayerWarned;
 
         /// <summary>
         /// Aggregator を構築する。per-layer 出力用の <c>float[]</c> を各レイヤー分
@@ -82,6 +92,7 @@ namespace Hidano.FacialControl.Domain.Services
             {
                 _perLayerOutput[l] = blendShapeCount == 0 ? Array.Empty<float>() : new float[blendShapeCount];
             }
+            _emptyLayerWarned = layerCount == 0 ? Array.Empty<bool>() : new bool[layerCount];
         }
 
         /// <summary>
@@ -114,6 +125,7 @@ namespace Hidano.FacialControl.Domain.Services
                 var layerOutput = _perLayerOutput[l];
                 Array.Clear(layerOutput, 0, layerOutput.Length);
 
+                bool hasAnyValidSource = false;
                 int sourceCount = _registry.GetSourceCountForLayer(l);
                 for (int s = 0; s < sourceCount; s++)
                 {
@@ -133,6 +145,8 @@ namespace Hidano.FacialControl.Domain.Services
                         continue;
                     }
 
+                    hasAnyValidSource = true;
+
                     float w = _weightBuffer.GetWeight(l, s);
                     if (w <= 0f)
                     {
@@ -146,6 +160,11 @@ namespace Hidano.FacialControl.Domain.Services
                     {
                         layerOutput[k] += scratchSpan[k] * w;
                     }
+                }
+
+                if (!hasAnyValidSource)
+                {
+                    WarnEmptyLayerOnce(l);
                 }
 
                 for (int k = 0; k < layerOutput.Length; k++)
@@ -167,6 +186,19 @@ namespace Hidano.FacialControl.Domain.Services
                         priority: l, weight: 1f, blendShapeValues: layerOutput);
                 }
             }
+        }
+
+        private void WarnEmptyLayerOnce(int layerIdx)
+        {
+            if (_emptyLayerWarned[layerIdx])
+            {
+                return;
+            }
+            _emptyLayerWarned[layerIdx] = true;
+            UnityEngine.Debug.LogWarning(
+                $"[LayerInputSourceAggregator] layer {layerIdx}: no valid input source " +
+                "(all sources reported IsValid=false or no source registered). " +
+                "Output will be zero. This warning is emitted only once per layer per session.");
         }
     }
 }
