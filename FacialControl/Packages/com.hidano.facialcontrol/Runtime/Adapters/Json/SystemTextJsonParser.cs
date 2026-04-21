@@ -96,29 +96,83 @@ namespace Hidano.FacialControl.Adapters.Json
             }
         }
 
+        // Req 1.7, 3.3, 3.4 / D-5, D-6: inputSources エントリの識別子検証と重複解決。
+        // - regex 違反 (InputSourceId.TryParse が false) → 警告 + skip
+        // - 予約 ID でも x- プレフィックスでもない id (= 仕様上未登録) → 警告 + skip
+        // - 同レイヤー内の重複 id → 警告 + last-wins (最後の出現を採用し、最後の位置で保持)
+        // いずれの場合も例外は投げず、他レイヤー・他エントリの parse は継続する。
         private static InputSourceDto[][] ExtractInputSources(ProfileDto dto)
         {
             if (dto.layers == null || dto.layers.Count == 0)
                 return Array.Empty<InputSourceDto[]>();
 
             var result = new InputSourceDto[dto.layers.Count][];
+            var lastValidIndexById = new Dictionary<string, int>(StringComparer.Ordinal);
+            var duplicateWarned = new HashSet<string>(StringComparer.Ordinal);
+
             for (int i = 0; i < dto.layers.Count; i++)
             {
-                var entries = dto.layers[i].inputSources;
-                var array = new InputSourceDto[entries.Count];
+                var layer = dto.layers[i];
+                var entries = layer.inputSources;
+                lastValidIndexById.Clear();
+                duplicateWarned.Clear();
+
+                // 1 pass 目: 各エントリを検証し、有効なもののみ「id → 最終インデックス」を記録する。
+                var validSchema = new bool[entries.Count];
                 for (int j = 0; j < entries.Count; j++)
                 {
                     var src = entries[j];
+                    var rawId = src.id;
+
+                    if (!InputSourceId.TryParse(rawId, out var parsedId))
+                    {
+                        Debug.LogWarning(
+                            $"SystemTextJsonParser: レイヤー '{layer.name}' の inputSources[{j}] に不正な識別子 '{rawId ?? "<null>"}' が指定されました。" +
+                            "識別子は [a-zA-Z0-9_.-]{1,64} を満たす必要があります (D-5 により 'legacy' は受理されません)。スキップします。");
+                        continue;
+                    }
+
+                    if (!parsedId.IsReserved && !parsedId.IsThirdPartyExtension)
+                    {
+                        Debug.LogWarning(
+                            $"SystemTextJsonParser: レイヤー '{layer.name}' の inputSources[{j}] に未登録の識別子 '{rawId}' が指定されました。" +
+                            "予約 ID (osc / lipsync / controller-expr / keyboard-expr / input) または 'x-' プレフィックス拡張のみ使用できます。スキップします。");
+                        continue;
+                    }
+
+                    validSchema[j] = true;
+                    lastValidIndexById[rawId] = j;
+                }
+
+                // 2 pass 目: 最後の出現位置のみを採用し、宣言順を保った結果リストを構築する。
+                var accepted = new List<InputSourceDto>(entries.Count);
+                for (int j = 0; j < entries.Count; j++)
+                {
+                    if (!validSchema[j])
+                        continue;
+
+                    var src = entries[j];
+                    if (lastValidIndexById[src.id] != j)
+                    {
+                        if (duplicateWarned.Add(src.id))
+                        {
+                            Debug.LogWarning(
+                                $"SystemTextJsonParser: レイヤー '{layer.name}' に同一識別子 '{src.id}' の inputSources エントリが重複しています。最後の出現を採用します (last-wins)。");
+                        }
+                        continue;
+                    }
+
                     // JsonUtility はフィールドの初期化子を尊重しないケースがあるため、
                     // optionsJson が未設定のときは空文字列として扱わない（null のまま返す）。
-                    array[j] = new InputSourceDto
+                    accepted.Add(new InputSourceDto
                     {
                         id = src.id,
                         weight = src.weight,
                         optionsJson = string.IsNullOrEmpty(src.optionsJson) ? null : src.optionsJson
-                    };
+                    });
                 }
-                result[i] = array;
+
+                result[i] = accepted.ToArray();
             }
             return result;
         }
