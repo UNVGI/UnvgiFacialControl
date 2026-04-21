@@ -32,17 +32,29 @@ namespace Hidano.FacialControl.Domain.Models
         public ReadOnlyMemory<string> RendererPaths { get; }
 
         /// <summary>
+        /// レイヤー毎の <c>inputSources</c> 宣言配列。外側のインデックスは <see cref="Layers"/> と揃う。
+        /// null / 空配列の場合は Serializer 側が placeholder（<c>controller-expr, weight=1.0</c>）を出力する。
+        /// JSON round-trip 安定性 (Req 3.5, 8.4) の担体。
+        /// </summary>
+        public ReadOnlyMemory<InputSourceDeclaration[]> LayerInputSources { get; }
+
+        /// <summary>
         /// 表情設定プロファイルを生成する。配列パラメータは防御的コピーされる。
         /// </summary>
         /// <param name="schemaVersion">JSON スキーマバージョン（空文字不可）</param>
         /// <param name="layers">レイヤー定義の配列。null の場合は空配列</param>
         /// <param name="expressions">Expression の配列。null の場合は空配列</param>
         /// <param name="rendererPaths">SkinnedMeshRenderer パスの配列。null の場合は空配列</param>
+        /// <param name="layerInputSources">
+        /// レイヤー毎の <c>inputSources</c> 宣言（外側インデックスは <paramref name="layers"/> と揃える想定）。
+        /// null の場合は空配列。round-trip 用の担体として Parser が設定する。
+        /// </param>
         public FacialProfile(
             string schemaVersion,
             LayerDefinition[] layers = null,
             Expression[] expressions = null,
-            string[] rendererPaths = null)
+            string[] rendererPaths = null,
+            InputSourceDeclaration[][] layerInputSources = null)
         {
             if (schemaVersion == null)
                 throw new ArgumentNullException(nameof(schemaVersion));
@@ -83,6 +95,30 @@ namespace Hidano.FacialControl.Domain.Models
             else
             {
                 RendererPaths = Array.Empty<string>();
+            }
+
+            if (layerInputSources != null)
+            {
+                var lisCopy = new InputSourceDeclaration[layerInputSources.Length][];
+                for (int i = 0; i < layerInputSources.Length; i++)
+                {
+                    var inner = layerInputSources[i];
+                    if (inner == null)
+                    {
+                        lisCopy[i] = Array.Empty<InputSourceDeclaration>();
+                    }
+                    else
+                    {
+                        var innerCopy = new InputSourceDeclaration[inner.Length];
+                        Array.Copy(inner, innerCopy, inner.Length);
+                        lisCopy[i] = innerCopy;
+                    }
+                }
+                LayerInputSources = lisCopy;
+            }
+            else
+            {
+                LayerInputSources = Array.Empty<InputSourceDeclaration[]>();
             }
         }
 

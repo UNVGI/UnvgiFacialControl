@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="9" result="Passed" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-04-21 06:20:04Z" end-time="2026-04-21 06:20:05Z" duration="0.101732">
+  <test-suite type="TestSuite" id="1000" name="FacialControl" fullname="FacialControl" runstate="Runnable" testcasecount="987" result="Passed" start-time="2026-04-21 06:20:04Z" end-time="2026-04-21 06:20:05Z" duration="0.101732" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="2043" name="Hidano.FacialControl.Tests.EditMode.dll" fullname="D:/Personal/Repositries/FacialControl/FacialControl/Library/ScriptAssemblies/Hidano.FacialControl.Tests.EditMode.dll" runstate="Runnable" testcasecount="987" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.088856" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="79224" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="2044" name="Hidano" fullname="Hidano" runstate="Runnable" testcasecount="987" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.069679" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="2045" name="FacialControl" fullname="Hidano.FacialControl" runstate="Runnable" testcasecount="987" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.065441" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="2046" name="Tests" fullname="Hidano.FacialControl.Tests" runstate="Runnable" testcasecount="987" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.061576" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="2047" name="EditMode" fullname="Hidano.FacialControl.Tests.EditMode" runstate="Runnable" testcasecount="987" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.058074" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestSuite" id="2051" name="Adapters" fullname="Hidano.FacialControl.Tests.EditMode.Adapters" runstate="Runnable" testcasecount="380" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.043444" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-suite type="TestSuite" id="2052" name="Json" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.Json" runstate="Runnable" testcasecount="46" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.034817" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-suite type="TestFixture" id="1987" name="SystemTextJsonParserRoundTripTests" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests" classname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests" runstate="Runnable" testcasecount="9" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.032638" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0">
+                    <properties />
+                    <test-case id="1996" name="FacialProfile_WithExplicitLayerInputSources_RoundTripsThroughParser" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.FacialProfile_WithExplicitLayerInputSources_RoundTripsThroughParser" methodname="FacialProfile_WithExplicitLayerInputSources_RoundTripsThroughParser" classname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests" runstate="Runnable" seed="1468714767" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.014679" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1995" name="ParseProfile_PopulatesLayerInputSourcesAlignedWithLayers" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.ParseProfile_PopulatesLayerInputSourcesAlignedWithLayers" methodname="ParseProfile_PopulatesLayerInputSourcesAlignedWithLayers" classname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests" runstate="Runnable" seed="1351601285" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.001539" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1992" name="ParseProfile_PreservesInputSourceDeclarationOrder" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.ParseProfile_PreservesInputSourceDeclarationOrder" methodname="ParseProfile_PreservesInputSourceDeclarationOrder" classname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests" runstate="Runnable" seed="1728363709" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.000271" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1989" name="SerializeParseSerialize_MinimalProfile_ProducesIdenticalString" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.SerializeParseSerialize_MinimalProfile_ProducesIdenticalString" methodname="SerializeParseSerialize_MinimalProfile_ProducesIdenticalString" classname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests" runstate="Runnable" seed="1606224888" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.000373" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1990" name="SerializeParseSerialize_MultipleInputSourcesPerLayer_PreservesOrderAndString" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.SerializeParseSerialize_MultipleInputSourcesPerLayer_PreservesOrderAndString" methodname="SerializeParseSerialize_MultipleInputSourcesPerLayer_PreservesOrderAndString" classname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests" runstate="Runnable" seed="1456965661" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.000360" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1988" name="SerializeParseSerialize_SampleJson_ProducesIdenticalString" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.SerializeParseSerialize_SampleJson_ProducesIdenticalString" methodname="SerializeParseSerialize_SampleJson_ProducesIdenticalString" classname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests" runstate="Runnable" seed="1273667919" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.001794" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1991" name="SerializeParseSerialize_WithOscOptions_PreservesOptionsAndString" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.SerializeParseSerialize_WithOscOptions_PreservesOptionsAndString" methodname="SerializeParseSerialize_WithOscOptions_PreservesOptionsAndString" classname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests" runstate="Runnable" seed="572105201" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.001390" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1993" name="SerializeProfile_EmitsInputSourcesInDeclarationOrder" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.SerializeProfile_EmitsInputSourcesInDeclarationOrder" methodname="SerializeProfile_EmitsInputSourcesInDeclarationOrder" classname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests" runstate="Runnable" seed="563170897" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.001655" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1994" name="SerializeProfile_WeightIsAlwaysEmittedConsistently" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.SerializeProfile_WeightIsAlwaysEmittedConsistently" methodname="SerializeProfile_WeightIsAlwaysEmittedConsistently" classname="Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests" runstate="Runnable" seed="599553099" result="Passed" start-time="2026-04-21 06:20:05Z" end-time="2026-04-21 06:20:05Z" duration="0.000206" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                      <output><![CDATA[Saving results to: C:/Users/Hidano/AppData/LocalLow/DefaultCompany/FacialControl\TestResults.xml
+]]></output>
+                    </test-case>
+                  </test-suite>
+                </test-suite>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

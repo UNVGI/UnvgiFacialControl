@@ -21,7 +21,8 @@ namespace Hidano.FacialControl.Adapters.Json
         public FacialProfile ParseProfile(string json)
         {
             var dto = ParseProfileDto(json);
-            return ConvertToProfile(dto);
+            var inputSources = ExtractInputSources(dto);
+            return ConvertToProfile(dto, inputSources);
         }
 
         /// <summary>
@@ -181,7 +182,11 @@ namespace Hidano.FacialControl.Adapters.Json
         public string SerializeProfile(FacialProfile profile)
         {
             var dto = ConvertToProfileDto(profile);
-            return JsonUtility.ToJson(dto, true);
+            var raw = JsonUtility.ToJson(dto, true);
+            // JsonUtility は optionsJson を文字列フィールドとして常時出力する。
+            // スキーマ上は "options": {...} 形式であり、round-trip 安定性 (Req 3.5, 8.4) のため
+            // 出力側で optionsJson を options に戻す（空値フィールドは削除、非空は JSON オブジェクトに展開）。
+            return PostprocessInputSourceOptions(raw);
         }
 
         /// <inheritdoc/>
@@ -350,14 +355,222 @@ namespace Hidano.FacialControl.Adapters.Json
             }
         }
 
+        // InputSourceDeclaration[] → List<InputSourceDto>。宣言が空の場合は placeholder を返す。
+        private static List<InputSourceDto> BuildInputSourceDtoList(InputSourceDeclaration[] declarations)
+        {
+            if (declarations != null && declarations.Length > 0)
+            {
+                var list = new List<InputSourceDto>(declarations.Length);
+                for (int j = 0; j < declarations.Length; j++)
+                {
+                    var d = declarations[j];
+                    list.Add(new InputSourceDto
+                    {
+                        id = d.Id,
+                        weight = d.Weight,
+                        optionsJson = string.IsNullOrEmpty(d.OptionsJson) ? null : d.OptionsJson
+                    });
+                }
+                return list;
+            }
+
+            return new List<InputSourceDto>
+            {
+                new InputSourceDto { id = "controller-expr", weight = 1.0f }
+            };
+        }
+
+        // "optionsJson" フィールドを "options" に戻す後処理 (PreprocessInputSourceOptions の逆変換)。
+        // - "optionsJson": "" → フィールドごと削除（直前のカンマも含めて）
+        // - "optionsJson": "<escaped JSON>" → "options": <unescaped JSON>
+        // InputSourceDto では optionsJson が最後のフィールドなので、基本形は「カンマ + 空白 + key」。
+        private static string PostprocessInputSourceOptions(string json)
+        {
+            if (string.IsNullOrEmpty(json))
+                return json;
+
+            const string KeyQuoted = "\"optionsJson\"";
+            var sb = new StringBuilder(json.Length);
+            int cursor = 0;
+
+            while (cursor < json.Length)
+            {
+                int keyStart = json.IndexOf(KeyQuoted, cursor, StringComparison.Ordinal);
+                if (keyStart < 0)
+                {
+                    sb.Append(json, cursor, json.Length - cursor);
+                    break;
+                }
+
+                int afterKey = keyStart + KeyQuoted.Length;
+                int colonIdx = afterKey;
+                while (colonIdx < json.Length && char.IsWhiteSpace(json[colonIdx]))
+                    colonIdx++;
+
+                if (colonIdx >= json.Length || json[colonIdx] != ':')
+                {
+                    sb.Append(json, cursor, afterKey - cursor);
+                    cursor = afterKey;
+                    continue;
+                }
+
+                int valueStart = colonIdx + 1;
+                while (valueStart < json.Length && char.IsWhiteSpace(json[valueStart]))
+                    valueStart++;
+
+                if (valueStart >= json.Length || json[valueStart] != '"')
+                {
+                    sb.Append(json, cursor, valueStart - cursor);
+                    cursor = valueStart;
+                    continue;
+                }
+
+                int valueEnd = FindMatchingQuote(json, valueStart);
+                if (valueEnd < 0)
+                {
+                    sb.Append(json, cursor, json.Length - cursor);
+                    cursor = json.Length;
+                    break;
+                }
+
+                string escaped = json.Substring(valueStart + 1, valueEnd - valueStart - 1);
+
+                if (escaped.Length == 0)
+                {
+                    // フィールド削除: 直前のカンマから後ろを捨てる。先頭フィールドの場合は後続カンマを飛ばす。
+                    int removeFromBack = keyStart;
+                    int p = keyStart - 1;
+                    while (p >= 0 && char.IsWhiteSpace(json[p]))
+                        p--;
+
+                    int afterValue = valueEnd + 1;
+                    if (p >= 0 && json[p] == ',')
+                    {
+                        removeFromBack = p;
+                    }
+                    else
+                    {
+                        // 先頭フィールドなので後続カンマをスキップする。
+                        int q = afterValue;
+                        while (q < json.Length && char.IsWhiteSpace(json[q]))
+                            q++;
+                        if (q < json.Length && json[q] == ',')
+                            afterValue = q + 1;
+                    }
+
+                    sb.Append(json, cursor, removeFromBack - cursor);
+                    cursor = afterValue;
+                }
+                else
+                {
+                    // 置換: "optionsJson":"..." → "options":<unescaped JSON>
+                    sb.Append(json, cursor, keyStart - cursor);
+                    sb.Append("\"options\":");
+                    sb.Append(UnescapeJsonString(escaped));
+                    cursor = valueEnd + 1;
+                }
+            }
+
+            return sb.ToString();
+        }
+
+        private static int FindMatchingQuote(string json, int openIndex)
+        {
+            int p = openIndex + 1;
+            bool escaped = false;
+            while (p < json.Length)
+            {
+                char c = json[p];
+                if (escaped) { escaped = false; }
+                else if (c == '\\') { escaped = true; }
+                else if (c == '"') { return p; }
+                p++;
+            }
+            return -1;
+        }
+
+        private static string UnescapeJsonString(string escaped)
+        {
+            var sb = new StringBuilder(escaped.Length);
+            int i = 0;
+            while (i < escaped.Length)
+            {
+                char c = escaped[i];
+                if (c == '\\' && i + 1 < escaped.Length)
+                {
+                    char next = escaped[i + 1];
+                    switch (next)
+                    {
+                        case '\\': sb.Append('\\'); i += 2; break;
+                        case '"': sb.Append('"'); i += 2; break;
+                        case 'b': sb.Append('\b'); i += 2; break;
+                        case 'f': sb.Append('\f'); i += 2; break;
+                        case 'n': sb.Append('\n'); i += 2; break;
+                        case 'r': sb.Append('\r'); i += 2; break;
+                        case 't': sb.Append('\t'); i += 2; break;
+                        case 'u':
+                            if (i + 5 < escaped.Length)
+                            {
+                                string hex = escaped.Substring(i + 2, 4);
+                                if (int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out int code))
+                                {
+                                    sb.Append((char)code);
+                                    i += 6;
+                                    break;
+                                }
+                            }
+                            sb.Append(c);
+                            i++;
+                            break;
+                        default:
+                            sb.Append(c);
+                            i++;
+                            break;
+                    }
+                }
+                else
+                {
+                    sb.Append(c);
+                    i++;
+                }
+            }
+            return sb.ToString();
+        }
+
         // --- Profile 変換 ---
 
-        private static FacialProfile ConvertToProfile(ProfileDto dto)
+        private static FacialProfile ConvertToProfile(ProfileDto dto, InputSourceDto[][] inputSourceDtos)
         {
             var layers = ConvertLayers(dto.layers);
             var expressions = ConvertExpressions(dto.expressions);
             var rendererPaths = ConvertRendererPaths(dto.rendererPaths);
-            return new FacialProfile(dto.schemaVersion, layers, expressions, rendererPaths);
+            var layerInputSources = ConvertLayerInputSources(inputSourceDtos);
+            return new FacialProfile(dto.schemaVersion, layers, expressions, rendererPaths, layerInputSources);
+        }
+
+        // InputSourceDto[][] → InputSourceDeclaration[][] 変換。round-trip 担体用。
+        private static InputSourceDeclaration[][] ConvertLayerInputSources(InputSourceDto[][] dtos)
+        {
+            if (dtos == null || dtos.Length == 0)
+                return null;
+
+            var result = new InputSourceDeclaration[dtos.Length][];
+            for (int i = 0; i < dtos.Length; i++)
+            {
+                var inner = dtos[i];
+                if (inner == null || inner.Length == 0)
+                {
+                    result[i] = Array.Empty<InputSourceDeclaration>();
+                    continue;
+                }
+                var arr = new InputSourceDeclaration[inner.Length];
+                for (int j = 0; j < inner.Length; j++)
+                {
+                    arr[j] = new InputSourceDeclaration(inner[j].id, inner[j].weight, inner[j].optionsJson);
+                }
+                result[i] = arr;
+            }
+            return result;
         }
 
         private static string[] ConvertRendererPaths(List<string> paths)
@@ -514,21 +727,19 @@ namespace Hidano.FacialControl.Adapters.Json
             }
 
             var layerSpan = profile.Layers.Span;
+            var lisSpan = profile.LayerInputSources.Span;
             for (int i = 0; i < layerSpan.Length; i++)
             {
                 // preview 破壊的変更 (D-5, Req 3.2): inputSources は必須フィールドのため、
-                // FacialProfile が inputSources を保持していない段階では round-trip を壊さないよう
-                // 最小の既定エントリ（controller-expr, weight=1.0）を placeholder として出力する。
-                // 実際の inputSources の round-trip (Req 3.5, 8.4, 7.4) は後続タスクで本 DTO パイプラインに統合する。
+                // FacialProfile に保持された inputSources 宣言 (round-trip 担体) を使って復元する。
+                // 宣言が無い / 空のレイヤーは最小の placeholder (controller-expr, weight=1.0) を出力する
+                // (Req 3.5, 8.4: SerializeProfile 出力はスキーマ上 inputSources 非空を保証する)。
                 dto.layers.Add(new LayerDto
                 {
                     name = layerSpan[i].Name,
                     priority = layerSpan[i].Priority,
                     exclusionMode = SerializeExclusionMode(layerSpan[i].ExclusionMode),
-                    inputSources = new List<InputSourceDto>
-                    {
-                        new InputSourceDto { id = "controller-expr", weight = 1.0f }
-                    }
+                    inputSources = BuildInputSourceDtoList(i < lisSpan.Length ? lisSpan[i] : null)
                 });
             }
 
