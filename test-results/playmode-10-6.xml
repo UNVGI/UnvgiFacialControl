@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="3" result="Passed" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-04-21 08:02:47Z" end-time="2026-04-21 08:02:48Z" duration="1.2772375">
+  <test-suite type="TestSuite" id="1293" name="FacialControl" fullname="FacialControl" runstate="Runnable" testcasecount="261" result="Passed" start-time="2026-04-21 08:02:47Z" end-time="2026-04-21 08:02:48Z" duration="1.277238" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1282" name="Hidano.FacialControl.Tests.PlayMode.dll" fullname="D:/Personal/Repositries/FacialControl/FacialControl/Library/ScriptAssemblies/Hidano.FacialControl.Tests.PlayMode.dll" runstate="Runnable" testcasecount="261" result="Passed" start-time="2026-04-21 08:02:47Z" end-time="2026-04-21 08:02:48Z" duration="1.266973" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="65972" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1283" name="Hidano" fullname="Hidano" runstate="Runnable" testcasecount="261" result="Passed" start-time="2026-04-21 08:02:47Z" end-time="2026-04-21 08:02:48Z" duration="1.262396" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1284" name="FacialControl" fullname="Hidano.FacialControl" runstate="Runnable" testcasecount="261" result="Passed" start-time="2026-04-21 08:02:47Z" end-time="2026-04-21 08:02:48Z" duration="1.258074" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1285" name="Tests" fullname="Hidano.FacialControl.Tests" runstate="Runnable" testcasecount="261" result="Passed" start-time="2026-04-21 08:02:47Z" end-time="2026-04-21 08:02:48Z" duration="1.253738" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1286" name="PlayMode" fullname="Hidano.FacialControl.Tests.PlayMode" runstate="Runnable" testcasecount="261" result="Passed" start-time="2026-04-21 08:02:47Z" end-time="2026-04-21 08:02:48Z" duration="1.249457" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestSuite" id="1288" name="Integration" fullname="Hidano.FacialControl.Tests.PlayMode.Integration" runstate="Runnable" testcasecount="108" result="Passed" start-time="2026-04-21 08:02:47Z" end-time="2026-04-21 08:02:48Z" duration="1.244303" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-suite type="TestFixture" id="1127" name="OscStalenessAndMixedWeightAtomicityTests" fullname="Hidano.FacialControl.Tests.PlayMode.Integration.OscStalenessAndMixedWeightAtomicityTests" classname="Hidano.FacialControl.Tests.PlayMode.Integration.OscStalenessAndMixedWeightAtomicityTests" runstate="Runnable" testcasecount="3" result="Passed" start-time="2026-04-21 08:02:47Z" end-time="2026-04-21 08:02:48Z" duration="1.240776" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="1129" name="MixedBulkAndSingle_DifferentSources_BothReflectedNextFrame" fullname="Hidano.FacialControl.Tests.PlayMode.Integration.OscStalenessAndMixedWeightAtomicityTests.MixedBulkAndSingle_DifferentSources_BothReflectedNextFrame" methodname="MixedBulkAndSingle_DifferentSources_BothReflectedNextFrame" classname="Hidano.FacialControl.Tests.PlayMode.Integration.OscStalenessAndMixedWeightAtomicityTests" runstate="Runnable" seed="1018911813" result="Passed" start-time="2026-04-21 08:02:47Z" end-time="2026-04-21 08:02:47Z" duration="0.021273" asserts="0">
+                    <properties>
+                      <property name="_JOINTYPE" value="UnityCombinatorial" />
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1130" name="MixedBulkAndSingle_SameSource_LastWriterWins" fullname="Hidano.FacialControl.Tests.PlayMode.Integration.OscStalenessAndMixedWeightAtomicityTests.MixedBulkAndSingle_SameSource_LastWriterWins" methodname="MixedBulkAndSingle_SameSource_LastWriterWins" classname="Hidano.FacialControl.Tests.PlayMode.Integration.OscStalenessAndMixedWeightAtomicityTests" runstate="Runnable" seed="97631972" result="Passed" start-time="2026-04-21 08:02:47Z" end-time="2026-04-21 08:02:47Z" duration="0.001739" asserts="0">
+                    <properties>
+                      <property name="_JOINTYPE" value="UnityCombinatorial" />
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1128" name="OscInputSource_WithUnityTimeProvider_ExceedsOneSecond_ReturnsFalse" fullname="Hidano.FacialControl.Tests.PlayMode.Integration.OscStalenessAndMixedWeightAtomicityTests.OscInputSource_WithUnityTimeProvider_ExceedsOneSecond_ReturnsFalse" methodname="OscInputSource_WithUnityTimeProvider_ExceedsOneSecond_ReturnsFalse" classname="Hidano.FacialControl.Tests.PlayMode.Integration.OscStalenessAndMixedWeightAtomicityTests" runstate="Runnable" seed="1299132447" result="Passed" start-time="2026-04-21 08:02:47Z" end-time="2026-04-21 08:02:48Z" duration="1.209554" asserts="0">
+                    <properties>
+                      <property name="_JOINTYPE" value="UnityCombinatorial" />
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[Saving results to: C:/Users/Hidano/AppData/LocalLow/DefaultCompany/FacialControl\TestResults.xml
+]]></output>
+                  </test-case>
+                </test-suite>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

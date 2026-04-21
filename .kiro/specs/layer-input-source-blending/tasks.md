@@ -349,7 +349,7 @@
   - _Depends: 8.2_
   - _Boundary: Tests/PlayMode/Performance_
 
-- [ ] 10.6 (P) PlayMode: OSC staleness タイムアウト実時間動作と Bulk/Single 混在の原子性を検証
+- [x] 10.6 (P) PlayMode: OSC staleness タイムアウト実時間動作と Bulk/Single 混在の原子性を検証
   - 実 `UnityTimeProvider` 下で `stalenessSeconds=1.0` の 1 秒超過で `IsValid=false` になることを確認する。
   - 同フレーム内 Bulk と Single Set の混在が次フレームで期待どおり観測できることを確認する。
   - 観測完了条件: 上記 2 シナリオが PlayMode 統合テストで通る。
