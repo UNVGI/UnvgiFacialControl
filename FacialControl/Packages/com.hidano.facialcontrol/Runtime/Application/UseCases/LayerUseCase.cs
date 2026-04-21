@@ -173,6 +173,40 @@ namespace Hidano.FacialControl.Application.UseCases
         }
 
         /// <summary>
+        /// (layer, source) スロットの入力源ウェイトをランタイムで書込む (8.3)。
+        /// 任意スレッドから呼出可能で、書込は次回 <see cref="UpdateWeights"/>
+        /// (内部の <c>Aggregator.Aggregate</c> 入口の <c>SwapIfDirty</c>) 以降に観測される。
+        /// 値は 0〜1 に silent clamp され、範囲外 (layer, source) は警告 + no-op (Req 4.3)。
+        /// 未初期化 (Dispose 済 / 空プロファイル) の場合は no-op。
+        /// </summary>
+        /// <param name="layerIdx">レイヤーインデックス。</param>
+        /// <param name="sourceIdx">入力源インデックス。<c>0</c> は <see cref="LayerExpressionSource"/> の予約枠、
+        /// 追加 <see cref="IInputSource"/> は登録順に <c>1, 2, ...</c> を取る (8.2 と整合)。</param>
+        /// <param name="weight">ウェイト値。範囲外は silent clamp される (Req 2.5)。</param>
+        public void SetInputSourceWeight(int layerIdx, int sourceIdx, float weight)
+        {
+            _weightBuffer?.SetWeight(layerIdx, sourceIdx, weight);
+        }
+
+        /// <summary>
+        /// 入力源ウェイトのバルク書込スコープを開始する (8.3)。
+        /// 返された <see cref="LayerInputSourceWeightBuffer.BulkScope"/> の
+        /// <c>SetWeight</c> で書いた値はスコープの <c>Dispose</c> (= CommitBulk) 時に
+        /// writeBuffer へ一括 flush される (Req 4.5)。
+        /// 未初期化の場合は no-op となる <c>default(BulkScope)</c> を返す
+        /// (内部の owner 参照が null のため <c>SetWeight</c> / <c>Dispose</c> は安全)。
+        /// </summary>
+        /// <returns><see cref="IDisposable"/> として <c>using</c> 文で利用可能なスコープ。</returns>
+        public LayerInputSourceWeightBuffer.BulkScope BeginInputSourceWeightBatch()
+        {
+            if (_weightBuffer == null)
+            {
+                return default;
+            }
+            return _weightBuffer.BeginBulk();
+        }
+
+        /// <summary>
         /// プロファイルを切り替え、遷移状態をリセットする。
         /// </summary>
         /// <param name="profile">新しいプロファイル</param>

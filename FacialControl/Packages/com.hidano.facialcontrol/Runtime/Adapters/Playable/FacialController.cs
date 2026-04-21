@@ -10,6 +10,7 @@ using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Application.UseCases;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
 
 namespace Hidano.FacialControl.Adapters.Playable
 {
@@ -391,6 +392,47 @@ namespace Hidano.FacialControl.Adapters.Playable
             {
                 InitializeInternal(_currentProfile.Value);
             }
+        }
+
+        /// <summary>
+        /// (layer, source) スロットの入力源ウェイトをランタイムで書込む (8.3)。
+        /// 任意スレッドから呼出可能で、書込は次回の <c>LayerInputSourceAggregator.Aggregate</c>
+        /// 入口の <c>SwapIfDirty</c> 以降に観測される (Req 4.1, 4.2, 4.4)。
+        /// 値は 0〜1 に silent clamp され、範囲外 (layer, source) は警告 + no-op (Req 4.3)。
+        /// 未初期化の場合は警告ログを出して何もしない。
+        /// </summary>
+        /// <param name="layerIdx">レイヤーインデックス。</param>
+        /// <param name="sourceIdx">入力源インデックス。<c>0</c> は内部 Expression スロットの予約枠、
+        /// プロファイル宣言 (<c>inputSources</c>) で追加された入力源は登録順に <c>1, 2, ...</c> を取る (8.2)。</param>
+        /// <param name="weight">ウェイト値 (範囲外は silent clamp)。</param>
+        public void SetInputSourceWeight(int layerIdx, int sourceIdx, float weight)
+        {
+            if (!_isInitialized || _layerUseCase == null)
+            {
+                Debug.LogWarning("FacialController が初期化されていません。SetInputSourceWeight は無視されます。");
+                return;
+            }
+
+            _layerUseCase.SetInputSourceWeight(layerIdx, sourceIdx, weight);
+        }
+
+        /// <summary>
+        /// 入力源ウェイトのバルク書込スコープを開始する (8.3)。
+        /// 返された <see cref="LayerInputSourceWeightBuffer.BulkScope"/> の
+        /// <c>SetWeight</c> で書いた値はスコープの <c>Dispose</c> 時に一括 flush され、
+        /// 次回 Aggregate で atomic に観測される (Req 4.5)。
+        /// 戻り値は <see cref="IDisposable"/> として <c>using</c> 文で利用可能。
+        /// 未初期化の場合は no-op となるスコープを返す。
+        /// </summary>
+        public LayerInputSourceWeightBuffer.BulkScope BeginInputSourceWeightBatch()
+        {
+            if (!_isInitialized || _layerUseCase == null)
+            {
+                Debug.LogWarning("FacialController が初期化されていません。BeginInputSourceWeightBatch は no-op スコープを返します。");
+                return default;
+            }
+
+            return _layerUseCase.BeginInputSourceWeightBatch();
         }
 
         /// <summary>
