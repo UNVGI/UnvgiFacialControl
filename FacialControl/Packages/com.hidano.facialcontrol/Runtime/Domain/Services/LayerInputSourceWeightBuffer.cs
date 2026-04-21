@@ -17,10 +17,12 @@ namespace Hidano.FacialControl.Domain.Services
     /// <para>
     /// 本クラスは <c>OscDoubleBuffer</c> と同じ 2 本の <see cref="NativeArray{T}"/>
     /// + <c>writeIndex</c> + <c>dirtyTick</c> の構造を採る (Design D-7)。
-    /// 3.1 の段階では <see cref="SwapIfDirty"/> の copy-forward アルゴリズム
-    /// (スタレデータバグ防止のための read → write コピー) は未実装であり、
-    /// 書込なしフレームでの一貫性保証はタスク 3.2 で追加する。
-    /// 同様に BulkScope (4.5) と範囲外キーの警告 (4.3) も後続タスクで実装する。
+    /// <see cref="SwapIfDirty"/> は index flip の後に新 readBuffer の内容を
+    /// 新 writeBuffer へ <see cref="NativeArray{T}.CopyTo(NativeArray{T})"/> で
+    /// copy-forward する (Design §SwapIfDirty)。これにより「あるフレームで書いた
+    /// 値が次フレームで別インデックスを書いた際に消える」スタレデータバグ
+    /// (Critical 1) を防ぐ。
+    /// BulkScope (4.5) と範囲外キーの警告 (4.3) は後続タスクで実装する。
     /// </para>
     /// </remarks>
     public sealed class LayerInputSourceWeightBuffer : IDisposable
@@ -94,9 +96,16 @@ namespace Hidano.FacialControl.Domain.Services
         }
 
         /// <summary>
-        /// 書込が発生していればダブルバッファの read/write を入れ替える。
+        /// 書込が発生していればダブルバッファの read/write を入れ替え、
+        /// index flip 後に新 readBuffer → 新 writeBuffer へ全内容を copy-forward する。
         /// 書込がなければ no-op。Aggregator がフレーム先頭で呼ぶことを想定。
         /// </summary>
+        /// <remarks>
+        /// copy-forward は <see cref="NativeArray{T}.CopyTo(NativeArray{T})"/> を用い
+        /// GC フリーで O(layerCount × maxSourcesPerLayer) (Design §SwapIfDirty)。
+        /// これにより writeBuffer は常に「現行 readBuffer の複製 + 最新 Set」の
+        /// 状態を保ち、Critical 1 のスタレデータバグを防ぐ。
+        /// </remarks>
         public void SwapIfDirty()
         {
             int dirty = Volatile.Read(ref _dirtyTick);
@@ -107,6 +116,11 @@ namespace Hidano.FacialControl.Domain.Services
 
             int newWriteIndex = 1 - _writeIndex;
             Interlocked.Exchange(ref _writeIndex, newWriteIndex);
+
+            var newReadBuffer = newWriteIndex == 0 ? _bufferB : _bufferA;
+            var newWriteBuffer = newWriteIndex == 0 ? _bufferA : _bufferB;
+            newReadBuffer.CopyTo(newWriteBuffer);
+
             _observedTick = dirty;
         }
 
