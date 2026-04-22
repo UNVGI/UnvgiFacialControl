@@ -214,6 +214,13 @@ Tests/
 - `FacialControl/Packages/manifest.json` でパッケージ更新
 - `packages-lock.json` を同期維持
 
+### Samples の二重管理ルール
+- `Packages/com.hidano.facialcontrol/Samples~/` が UPM 配布用の canonical なサンプル置き場。`package.json` の `samples` 配列に登録されたもののみが Package Manager から Import 可能
+- `Assets/Samples/` は dev プロジェクト専用の動作確認サンプル（HatsuneMiku 等のモデル依存物を scene にベイクした状態で保持）
+- **同名のサンプル（例: `MultiSourceBlendDemoHUD.cs`, `multi_source_blend_demo.json`）は `Samples~/` と `Assets/Samples/` の両方に二重管理する**: Samples~ は `~` suffix で Unity のコンパイル対象外のため、dev 時には Assets/Samples 側を使って scene 結線する。UPM 経由で配布されるのは Samples~ 側
+- どちらかを編集したら **必ず対応する方もコピー**して同期する。drift すると Package Manager 経由で import したユーザーと dev の挙動が乖離する
+- 二重管理が辛くなったら将来的に「dev project 側でも `Import Sample` ボタン経由で Samples~ を取り込み、Assets/Samples/com.hidano.facialcontrol/.../ を scene 参照先にする」形にリファクタする選択肢あり（preview.2 以降検討）
+
 ### バージョン管理
 - 短縮系命令形コミットメッセージ（日本語可）
 - 例: "表情プロファイルのJSON読み込み機能を追加"

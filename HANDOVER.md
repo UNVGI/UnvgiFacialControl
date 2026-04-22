@@ -73,20 +73,33 @@
 ## 関連ファイル
 
 今回触った / 生成したファイル:
+
+### Runtime コア (package 側)
 - `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Application/UseCases/LayerUseCase.cs` (`BlendedOutputSpan` / `TryGetExpressionTriggerSourceById` / `_layerHasAdditionalSources` + フィルタ修正)
 - `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Adapters/Playable/FacialController.cs` (`LateUpdate` を Aggregator 経路に差替 + `TryGetExpressionTriggerSourceById` facade)
 - `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Services/ExpressionTriggerInputSourceBase.cs` (`ActiveExpressionIds` を `protected` → `public` 昇格)
 - `FacialControl/Packages/com.hidano.facialcontrol/Tests/EditMode/Application/LayerUseCaseTests.cs` (+7 tests)
-- `FacialControl/Assets/Samples/MultiSourceBlendDemoHUD.cs` (新規、OnGUI HUD)
+
+### UPM Sample (package 側、shippable)
+- `FacialControl/Packages/com.hidano.facialcontrol/Samples~/MultiSourceBlendDemo/MultiSourceBlendDemoHUD.cs` (新規)
+- `FacialControl/Packages/com.hidano.facialcontrol/Samples~/MultiSourceBlendDemo/multi_source_blend_demo.json` (新規)
+- `FacialControl/Packages/com.hidano.facialcontrol/Samples~/MultiSourceBlendDemo/README.md` (新規、セットアップ手順)
+- `FacialControl/Packages/com.hidano.facialcontrol/package.json` (`samples` 配列に Multi Source Blend Demo を登録)
+
+### Dev 用 (Assets/ 側、二重管理)
+- `FacialControl/Assets/Samples/MultiSourceBlendDemoHUD.cs` (新規、Samples~ と同内容)
 - `FacialControl/Assets/Samples/SampleScene.unity` (HUD GameObject 追加)
 - `FacialControl/Assets/Samples/SampleFacialProfileSO.asset` (JsonFilePath を multi_source_blend_demo.json に)
-- `FacialControl/Assets/StreamingAssets/FacialControl/multi_source_blend_demo.json` (新規)
+- `FacialControl/Assets/StreamingAssets/FacialControl/multi_source_blend_demo.json` (新規、Samples~ と同内容)
 - `FacialControl/Assets/StreamingAssets/FacialControl/default_profile.json` (neutral に復帰)
 - `FacialControl/Assets/StreamingAssets/FacialControl/sample_profile.json` (test fixture 状態に復帰、demo 書き換えから巻き戻し)
 - `FacialControl/Assets/Editor/AttachMultiSourceBlendDemoHUD.cs` (新規、scene 結線)
 - `FacialControl/Assets/Editor/DumpMikuBlendShapes.cs` (新規、BS 名抽出)
 - `FacialControl/Assets/Editor/VerifyDemoProfileBlendShapes.cs` (新規、BS 名整合検証)
 - `FacialControl/Assets/Editor/DiagMultiSourceBlend.cs` (新規、runtime 診断メニュー)
+
+### ドキュメント
+- `CLAUDE.md` に「Samples の二重管理ルール」セクション追加 (`Samples~/` と `Assets/Samples/` の同期ルール明文化)
 
 参照のみ:
 - `FacialControl/Packages/com.hidano.facialcontrol/package.json`(version は据置)
