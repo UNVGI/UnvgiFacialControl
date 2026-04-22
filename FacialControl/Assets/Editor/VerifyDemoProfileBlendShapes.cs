@@ -46,7 +46,7 @@ namespace Hidano.FacialControl.Samples.EditorTools
             }
 
             // default_profile.json を読み込みパース
-            string jsonPath = Path.Combine(Application.streamingAssetsPath, "FacialControl", "default_profile.json");
+            string jsonPath = Path.Combine(UnityEngine.Application.streamingAssetsPath, "FacialControl", "default_profile.json");
             if (!File.Exists(jsonPath))
             {
                 Debug.LogError($"[VerifyDemoProfileBlendShapes] profile not found: {jsonPath}");
