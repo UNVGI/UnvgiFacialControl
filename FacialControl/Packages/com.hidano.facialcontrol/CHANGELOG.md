@@ -46,7 +46,7 @@
 - `InputSystemAdapter` — InputAction Asset との連携（Button / Value 両対応）
 - `InputBindingProfileSO`（ScriptableObject）— InputActionAsset・ActionMap 名・バインディングペア（Action ⟷ ExpressionId）を永続化するアセット
 - `FacialInputBinder`（MonoBehaviour）— `InputBindingProfileSO` を読み込み、`InputSystemAdapter` 経由で Action と Expression をバインドするシーン配置用コンポーネント
-- デフォルト InputAction Asset
+- `Runtime/Adapters/Input/FacialControlDefaultActions.inputactions` — デフォルト InputAction Asset（Xbox コントローラの LT/RT バインディング含む）
 
 #### Editor 拡張
 - `FacialControllerEditor` — FacialController の Inspector カスタマイズ
@@ -63,14 +63,10 @@
 - `InputBindingProfileSOEditor` — UI Toolkit ベースの Inspector。ActionMap / Action / Expression ドロップダウンの自動列挙とバインディング行の追加・削除をサポート
 
 #### サンプル
-- `Assets/Samples/SampleFacialProfileSO.asset` — サンプル専用の最小 `FacialProfileSO`
-- `Assets/StreamingAssets/FacialControl/sample_profile.json` — まばたき Expression（固定 GUID）を含む最小 JSON
-- `Assets/Samples/SampleInputBinding.asset` — `Trigger1` をまばたき Expression にバインドする `InputBindingProfileSO`
+- `Samples~/MultiSourceBlendDemo` — 同一レイヤーに `controller-expr` + `keyboard-expr` を並置し、ウェイトブレンドの挙動を OnGUI HUD で目視確認する PlayMode サンプル（JSON プロファイル + HUD スクリプト + README 同梱。モデルはユーザー持ち込み）
 
 #### テンプレート
-- `default_profile.json` — デフォルト 3 レイヤー + 基本 Expression（default, blink, gaze_follow, gaze_camera）
-- `default_config.json` — VRChat プリセットの OSC 設定
-- デフォルト InputAction Asset（Xbox コントローラの LT/RT バインディング含む）
+- `Templates/default_profile.json` — デフォルト 3 レイヤー + 基本 Expression（default, blink, gaze_follow, gaze_camera）
 
 #### ドキュメント
 - 全公開 API の XML コメント
