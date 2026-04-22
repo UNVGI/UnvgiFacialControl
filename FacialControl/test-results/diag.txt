@@ -1,4 +1,4 @@
-﻿[Diag] playing=True
+﻿[Diag] playing=True frame=6150 time=21.756
 [Diag] fc=HatsuneMiku IsInitialized=True
 [Diag] layers=2 expressions=5
   layer[0] name=emotion excl=LastWins
@@ -11,19 +11,19 @@
 [Diag] controller-expr found=True
   active=[smile]
 [Diag] keyboard-expr found=True
-  active=[]
+  active=[angry]
 [Diag] snapshot entries=4
-  snap layer=0 id=input w=1.00 valid=True sat=False
-  snap layer=0 id=controller-expr w=0.50 valid=False sat=False
-  snap layer=0 id=keyboard-expr w=0.50 valid=False sat=False
+  snap layer=0 id=input w=1.00 valid=True sat=True
+  snap layer=0 id=controller-expr w=0.50 valid=True sat=True
+  snap layer=0 id=keyboard-expr w=0.50 valid=True sat=True
   snap layer=1 id=input w=1.00 valid=True sat=False
   BS[20] ▲=0.00
-  BS[28] 口角上げ=0.00
+  BS[28] 口角上げ=30.00
   BS[29] 口角下げ=0.00
-  BS[37] 笑い=0.00
+  BS[37] 笑い=50.00
   BS[40] まばたき=0.00
   BS[48] びっくり=0.00
   BS[61] 困る=0.00
-  BS[63] 怒り=0.00
-  BS[64] 左眉下げ=0.00
-  BS[65] 右眉下げ=0.00
+  BS[63] 怒り=50.00
+  BS[64] 左眉下げ=25.00
+  BS[65] 右眉下げ=25.00
