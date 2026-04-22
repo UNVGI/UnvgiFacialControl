@@ -17,7 +17,7 @@ namespace Hidano.FacialControl.Samples.EditorTools
         public static void Dump()
         {
             var sb = new StringBuilder();
-            sb.AppendLine($"[Diag] playing={UnityEngine.Application.isPlaying}");
+            sb.AppendLine($"[Diag] playing={UnityEngine.Application.isPlaying} frame={Time.frameCount} time={Time.time:0.000}");
 
             var fc = Object.FindFirstObjectByType<FacialController>(FindObjectsInactive.Include);
             if (fc == null)
