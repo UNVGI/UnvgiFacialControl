@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7457aa44055671b4cabdfaf775927bef, type: 3}
   m_Name: SampleFacialProfileSO
   m_EditorClassIdentifier: Hidano.FacialControl.Adapters::Hidano.FacialControl.Adapters.ScriptableObject.FacialProfileSO
-  _jsonFilePath: FacialControl/sample_profile.json
+  _jsonFilePath: FacialControl/multi_source_blend_demo.json
   _schemaVersion: 1.0
   _layerCount: 1
   _expressionCount: 1
