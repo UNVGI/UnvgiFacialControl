@@ -52,6 +52,10 @@ namespace Hidano.FacialControl.Samples
 
         private void Start()
         {
+            // Game View が非 focus でも Aggregator が tick し続けるように
+            // runInBackground を強制する (demo を見ながら Inspector を操作するユースケース対応)。
+            Application.runInBackground = true;
+
             if (_facialController != null && _facialController.IsInitialized)
             {
                 ApplyInitialWeights();
