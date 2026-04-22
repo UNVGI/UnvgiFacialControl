@@ -29,6 +29,11 @@ namespace Hidano.FacialControl.Application.UseCases
         private float[] _layerInterWeights;
         private LayerBlender.LayerInput[] _layerInputScratch;
         private LayerBlender.LayerInput[] _filteredLayerInputs;
+        // プロファイルで inputSources を宣言したレイヤーは、そのレイヤー自体を
+        // 恒常的に blend 対象とみなす (legacy HasBeenActive フィルタを補完する)。
+        // 宣言したソースが未トリガ状態でも intra-layer aggregator 出力はゼロに保たれるため
+        // blend 結果を損ねない一方、trigger が入った瞬間に最終出力へ反映される。
+        private bool[] _layerHasAdditionalSources;
         private float[] _finalOutput;
         private bool _disposed;
 
@@ -140,7 +145,15 @@ namespace Hidano.FacialControl.Application.UseCases
             int activeCount = 0;
             for (int l = 0; l < layerSpan.Length; l++)
             {
-                if (_layerSources[l].HasBeenActive)
+                // LayerExpressionSource (sourceIdx=0) の HasBeenActive に加え、
+                // プロファイル由来の追加 IInputSource を持つレイヤーも blend 対象に含める。
+                // これがないと profile.inputSources だけで駆動するレイヤー
+                // (controller-expr / keyboard-expr のみが intra-layer に居る場合など)
+                // が LayerBlender から除外され、実機上で反映されない。
+                bool hasAdditional = _layerHasAdditionalSources != null
+                    && l < _layerHasAdditionalSources.Length
+                    && _layerHasAdditionalSources[l];
+                if (_layerSources[l].HasBeenActive || hasAdditional)
                 {
                     _filteredLayerInputs[activeCount++] = _layerInputScratch[l];
                 }
@@ -319,6 +332,7 @@ namespace Hidano.FacialControl.Application.UseCases
             _layerSources = layerCount == 0 ? Array.Empty<LayerExpressionSource>() : new LayerExpressionSource[layerCount];
             _layerInputScratch = layerCount == 0 ? Array.Empty<LayerBlender.LayerInput>() : new LayerBlender.LayerInput[layerCount];
             _filteredLayerInputs = layerCount == 0 ? Array.Empty<LayerBlender.LayerInput>() : new LayerBlender.LayerInput[layerCount];
+            _layerHasAdditionalSources = layerCount == 0 ? Array.Empty<bool>() : new bool[layerCount];
 
             var bindings = new List<(int layerIdx, int sourceIdx, IInputSource source)>(layerCount);
             var layerSpan = _profile.Layers.Span;
@@ -351,6 +365,7 @@ namespace Hidano.FacialControl.Application.UseCases
                     int sourceIdx = nextSourceIdx[entry.layerIdx]++;
                     bindings.Add((entry.layerIdx, sourceIdx, entry.source));
                     additionalWeights.Add((entry.layerIdx, sourceIdx, entry.weight));
+                    _layerHasAdditionalSources[entry.layerIdx] = true;
                 }
             }
 

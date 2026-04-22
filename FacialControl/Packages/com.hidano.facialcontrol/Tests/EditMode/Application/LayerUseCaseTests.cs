@@ -644,5 +644,46 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
 
             public override bool TryWriteValues(Span<float> output) => false;
         }
+
+        // --- additional IInputSource だけで駆動するレイヤーが blend に含まれる契約 ---
+
+        /// <summary>
+        /// Profile で additional IInputSource を宣言したレイヤーは、LayerExpressionSource
+        /// (sourceIdx=0) が一度も activate されていなくても blend 対象となり、
+        /// sourceIdx=1+ のソースが TriggerOn した値が最終 BlendShape 出力に届くこと。
+        /// </summary>
+        [Test]
+        public void UpdateWeights_AdditionalSourceOnly_TriggersReachFinalOutput()
+        {
+            var layers = new[] { new LayerDefinition("emotion", 0, ExclusionMode.LastWins) };
+            var expressionBs = new[] { new BlendShapeMapping("bs_smile", 1.0f) };
+            var smileExpr = new Expression(
+                "smile", "smile", "emotion", 0f, TransitionCurve.Linear, expressionBs);
+            var profile = new FacialProfile("1.0", layers, new[] { smileExpr });
+            var expressionUseCase = new ExpressionUseCase(profile);
+            var blendShapeNames = new[] { "bs_smile", "bs_sad", "bs_blink" };
+
+            var controller = new Adapters.InputSources.ControllerExpressionInputSource(
+                blendShapeCount: blendShapeNames.Length,
+                maxStackDepth: 4,
+                exclusionMode: ExclusionMode.LastWins,
+                blendShapeNames: blendShapeNames,
+                profile: profile);
+            var additional = new List<(int layerIdx, IInputSource source, float weight)>
+            {
+                (0, controller, 1.0f),
+            };
+
+            using var useCase = new LayerUseCase(
+                profile, expressionUseCase, blendShapeNames, additional);
+
+            // ExpressionUseCase.Activate は呼ばない。sourceIdx=1 (controller-expr) だけで駆動する。
+            controller.TriggerOn("smile");
+            useCase.UpdateWeights(0.001f);
+
+            var output = useCase.GetBlendedOutput();
+            Assert.AreEqual(1.0f, output[0], 1e-4f,
+                "additional source のみで triggered した bs_smile が最終出力に反映されること");
+        }
     }
 }
