@@ -1,106 +1,64 @@
-# HANDOVER (2026-04-22 #2)
+# HANDOVER (2026-04-22 #3)
 
 ## 今回やったこと
 
-- **multi-source blending の runtime 配線欠落を発見・修復**: `LayerUseCase.UpdateWeights` がランタイムで一度も呼ばれず、IInputSource パイプラインが死コードだった。前回 HANDOVER で「preview.1 finalize」と書いたが、実際は intra-layer contract が自動テストで通るだけで、実機では BlendShape まで届いていなかった
-- **Phase 1 runtime wiring 完成** (3 gap 埋め):
-  1. `LayerUseCase.BlendedOutputSpan` (zero-alloc アクセサ) 追加
-  2. `FacialController.LateUpdate` を mixer 読取から `_layerUseCase.UpdateWeights` + `BlendedOutputSpan` 読取に差替
-  3. `FacialController.TryGetExpressionTriggerSourceById` 追加 (Samples デモから source を直接 TriggerOn/Off するため)
-- **LayerUseCase blend フィルタのバグ修正**: `_layerSources[l].HasBeenActive` のみで blend 対象を絞っていたため、additional IInputSource だけのレイヤー (profile.inputSources 宣言のみ) が常に除外されていた。`_layerHasAdditionalSources[]` を追加し「profile で宣言した layer は無条件で blend 対象」に拡張
-- **SampleScene に Samples 専用デモを結線**:
-  - `MultiSourceBlendDemoHUD.cs` (OnGUI: weight スライダー + 各ソース trigger ボタン + snapshot)
-  - `Assets/Editor/AttachMultiSourceBlendDemoHUD.cs` で scene に GameObject を自動配置
-  - `Assets/Editor/DumpMikuBlendShapes.cs` で Miku の BlendShape 名 (85 個) を抽出
-  - `Assets/Editor/VerifyDemoProfileBlendShapes.cs` で demo プロファイルと mesh の BlendShape 名一致検証 (10/10 マッチ)
-  - `Assets/Editor/DiagMultiSourceBlend.cs` で runtime 状態を console + file にダンプする診断メニュー
-- **demo data を Samples に隔離**:
-  - `StreamingAssets/FacialControl/multi_source_blend_demo.json` 新設 (smile/angry/surprise/troubled + blink、Miku BlendShape 直接参照)
-  - `default_profile.json` は neutral 状態に復帰
-  - `sample_profile.json` は test fixture 用に復帰 (blink id は UUID 維持)
-  - `SampleFacialProfileSO.asset._jsonFilePath` を `multi_source_blend_demo.json` に更新
-- **目視検証クリア**: UnityMCP 経由で controller-expr smile + keyboard-expr angry を同時トリガ → 笑い=50 / 怒り=50 / 口角上げ=30 / 左眉下げ=25 / 右眉下げ=25 (すべて期待通り)
-- **テスト回帰**: EditMode **1054/1054 Passed**, PlayMode **261/261 Passed** (新規 +7: BlendedOutputSpan×3 / TryGet×4 / AdditionalSourceOnly×1、前回比 +7)
+- `Assets/Samples/` の孤児アセット棚卸し（`NewFacialProfile.asset` が scene 未参照）→ ユーザー削除
+- `Assets/Editor/` 配下 4 スクリプト（Attach/Diag/Dump/Verify）の使用状況調査（scene/CI/package 本体から参照なし）→ ユーザー削除
+- `Assets/StreamingAssets/FacialControl/` の 3 JSON 棚卸し（`multi_source_blend_demo.json` のみ dev scene 参照、他 2 つは孤児）→ ユーザー削除
+- `Packages/com.hidano.facialcontrol/Templates/` 棚卸し＆不要削除:
+  - `default_profile.json` → README L64 から参照あり、残す
+  - `default_inputactions.inputactions` → Runtime 側 `FacialControlDefaultActions.inputactions` と実質重複、削除
+  - `default_config.json` → README/docs から参照経路なし、削除
+- CHANGELOG.md 整合更新:
+  - Adapters 節 L49：「デフォルト InputAction Asset」→ `Runtime/Adapters/Input/FacialControlDefaultActions.inputactions` をファイル実体付きで明記
+  - サンプル節：旧 3 項目 → `Samples~/MultiSourceBlendDemo` 1 項目に集約
+  - テンプレート節：3 項目 → `Templates/default_profile.json` のみに縮小
 
 ## 決定事項
 
-- **preview.1 のステータスを "runtime 統合含め動作確認済" に正式格上げ**。前回 HANDOVER の finalize 宣言は誤り (runtime 統合未完だった)
-- **新 API 追加は許容**: publish 前なので `BlendedOutputSpan` / `TryGetExpressionTriggerSourceById` を preview.1 に加える
-- **demo data は Samples に隔離**: `default_profile.json` / `sample_profile.json` は触らず、demo 専用 JSON を新設。「出所不明の Miku 依存 Expression が default に混入」を避ける
-- **Phase 2/3 (物理入力 → IInputSource dispatch refactor) は後回し**: scope が大きく既存テスト大量更新が必要。HUD ボタンで代替できるため demo 目的には不要
-- **キーボード 1 = blink バインディングの修復不要**: HUD でデバッグ可能なため (ユーザー判断)
+- FacialControl 仕様として必要な SO は 2 種：`FacialProfileSO`（FacialController）と `InputBindingProfileSO`（FacialInputBinder）
+- `InputActionAsset` は Unity 標準 SO。Runtime 同梱の `FacialControlDefaultActions.inputactions` をデフォルトとするためユーザー自作不要
+- `StreamingAssets/FacialControl/multi_source_blend_demo.json` は Samples~ 側にコピーがあっても **dev scene 動作に必須**のため削除不可（CLAUDE.md dual maintenance ルール）
+- CHANGELOG の InputAction Asset 記述は Adapters 節に一本化（Templates 節から重複排除）
 
 ## 捨てた選択肢と理由
 
-- **(1) API 追加せず**: 初期提案したが preview.1 finalize 直後で筋が悪いと指摘された → 一度は「既存 API 完結」に切替えたが実装ギャップに気付き「publish 前なら新 API OK」で再反転
-- **(2) Samples 専用の独立 MonoBehaviour で自前 Aggregator を組む**: 採用せず。FacialController 本体に手を入れた方が preview.1 として正しい
-- **default_profile.json を書き換えて demo データを載せる**: ユーザーから「出所不明の authoring 混入」と指摘され、Samples 専用 JSON に隔離する方針へ変更
+- **StreamingAssets を Samples~ 配下に移す** → 不採用。UPM import 時は `Assets/Samples/com.hidano.facialcontrol/x.y.z/` 配下に展開され StreamingAssets 扱いにならない。`FacialProfileSO._jsonFilePath` が StreamingAssets 相対パス前提である以上、README での手動コピー案内が現実解
+- **`Assets/Editor/` の `Diag*`/`Verify*` を残す案** → 全削除を選択。必要になれば git 履歴から復活可能
+- **`default_config.json` を README で案内して活かす案 (a)** → 削除 (b) を選択
+- **CHANGELOG の InputAction Asset を「その他」節新設 (c)** → 不採用。Adapters 節 L49 に既存行があったのでそちらをエンリッチして一本化
 
 ## ハマりどころ
 
-- **`LayerUseCase.UpdateWeights` がランタイムで呼ばれていなかった**: 自動テストだけ green で runtime dark の状態が preview.1 finalize 後も残っていた。`FacialController.LateUpdate` が PlayableGraph mixer を読むだけで Aggregator 出力を無視する設計だった
-- **`Hidano.FacialControl.Samples.EditorTools` namespace 内で `Application.xxx` が `Hidano.FacialControl.Application` を掴む**: UnityEngine.Application を明示修飾しないとコンパイル失敗。3 回引っかかった
-- **SampleScene の FacialController は `SampleFacialProfileSO.asset` (guid `d7e9a2c4...`) を参照しており、`NewFacialProfile.asset` (guid `2faa955c...`) ではなかった**: `default_profile.json` を書き換えても scene には届かず。demo 用 JSON を書き換える時は asset 側の参照を追跡して正しいファイルに書く必要あり
-- **`inputSources: []` (空配列) は JSON parser が preview.1 破壊的変更で拒否** (`FormatException` → `CreateDefaultProfile` fallback)。非空必須。layer ごとに最低 1 source を宣言するか、layer 自体を削除
-- **Unity Editor の Game View が非 focus だと Play mode でも tick しない**: MCP から `EnterPlaymode` しても `Time.frameCount=2` で止まる。`Application.runInBackground = true` で解決 (今回 HUD.Start で立てた)
-- **UnityMCP の `Unity_RunCommand` は Unity が compile 中だと受け付けない**: Play 中にスクリプトを追加・編集すると再コンパイルがトリガされ、途中で詰まることがある。stop→edit→enter の順が安全
-- **UnityMCP が別プロジェクトの Unity に接続**: 途中で `RealtimeAvatarController` に繋がっていた。複数 Unity 起動時は MCP がどちらに接続しているか要確認 (`Unity_RunCommand` で `Directory.GetCurrentDirectory()` を出して確認)
-- **UnityMCP compile environment が package asmdef を参照しない**: `Hidano.FacialControl.*` 型は直接使えず reflection 経由。さらに `out` 引数 reflection で MCP 自身が NRE を起こすことがあるため、Editor menu 経由で呼ぶのが確実
-- **TestRunner 結果は Console に出ない**: TestRunnerApi の callback を登録してファイルに書き出すか、batchmode で xml を取るしかない
+- `Templates/default_inputactions.inputactions` と `Runtime/Adapters/Input/FacialControlDefaultActions.inputactions` が 387 行同サイズで紛らわしい。GUID は別物で scene 参照は Runtime 側（guid `a3b4c5d6e7f8091a2b3c4d5e6f708192`）
+- CHANGELOG Adapters 節 L49 に既に「デフォルト InputAction Asset」行があり、Templates 節との重複を見落としかけた
 
 ## 学び
 
-- **preview.X を finalize する前に「実機 Play でどれか 1 ソース以上が BlendShape まで届く」ことを 1 回は目視せよ**: 自動テストで契約が通っていても runtime 配線が抜けていれば使い物にならない
-- **UnityMCP の tool 群は開発中調査に有用**: `ManageEditor.Play/Stop/GetState` + `ManageMenuItem.Execute` + `ReadConsole` + `RunCommand` の組合せで Editor 状態を遠隔操作できる。特に "diag + trigger" メニュー 2 つを `Assets/Editor/` に置いておくと、MCP から呼べて反復デバッグが速い
-- **`GC.GetTotalMemory(false)` ベースの alloc テストは環境ゆらぎを起こす**: `OscControllerBlendingIntegrationTests.Pipeline_AggregateAndBlendLoop_AllocatesZeroManagedMemory` が TestRunner で 1 回だけ 16KB 計測 → 再実行で pass。flaky 扱い。再現性のある alloc バグが混入したわけではない
-- **Layer blend の lerp(weight=1) は全 BlendShape index を上書きする**: 高 priority layer が weight=1 のままだと下位 layer の出力を wipe する。同時 trigger での「emotion smile + eye blink」が期待通りブレンドしない (pre-existing design issue、今回スコープ外)
+- UPM の `Samples~/` は import 時に `Assets/Samples/{package}/{version}/` 配下にコピーされるため、StreamingAssets や ProjectSettings 等 Unity 特殊フォルダへの配置は自動化できない
+- `FacialControlConfig` の JSON Parse/Serialize API は Runtime 実装済みだが、ユーザー向けサンプル/ドキュメントのエントリポイントが無いと実質死に機能
+- Templates フォルダは「ユーザーが手動コピーする雛形」の性質上、README からのリンクが無いと参照経路が消える
 
 ## 次にやること
 
-優先度高:
-- **`feature/hidano/generate-prototype` → `main` の PR 作成**: 今回の追加内容も含めて preview.1 として PR。変更要約に「runtime wiring 完成 + 新 API 2 点 (`BlendedOutputSpan` / `TryGetExpressionTriggerSourceById`) + demo 隔離」を明記
-- **main merge 後に `v0.1.0-preview.1` タグ付与 + push**
+**優先度：高**
+- 特になし（preview.1 タグ切り前のクリーンアップは一通り完了）
 
-優先度中:
-- **Phase 2/3 (物理入力 → IInputSource dispatch refactor)**: `FacialInputBinder` / `InputSystemAdapter` が category に応じて `controller-expr` / `keyboard-expr` を直接 TriggerOn/Off する経路へ。既存 `InputSystemAdapterTests` / `FacialInputBinderTests` の大量更新を伴う。preview.2 候補
-- **LayerBlender lerp 問題の見直し**: 高 priority layer の weight=1 が下位 layer 全 BS を wipe する挙動。multi-layer 目視検証中に発覚。preview.2 以降の設計検討
-- **HUD 自動テスト**: Samples コンポーネント自体の回帰テスト (現状は目視のみ)
+**優先度：中**
+- `Samples~/MultiSourceBlendDemo/MultiSourceBlendDemoHUD.cs` と `Assets/Samples/MultiSourceBlendDemoHUD.cs` の doc コメント差分が残存（機能差はない）。次回 edit 時に揃える
+- StreamingAssets 手動コピー問題の自動化案：Editor 拡張での import 後コピー or `FacialProfileSO` に TextAsset 直参照モード追加（preview 段階の破壊的変更で検討）
 
-優先度低:
-- 旧 `FacialControl/FacialControl/test-results/editmode-P03-T02.xml` など test-results/ のゴミ整理
-- PlayableGraph / FacialControlMixer が現在出力に使われていないので preview.2 で撤去検討
+**優先度：低**
+- `Runtime/Adapters/Json/JsonSchemaDefinition.cs:317` の `SampleConfigJson` const と旧 `default_config.json` の役割が重複している可能性。preview.2 以降で棚卸し
 
 ## 関連ファイル
 
-今回触った / 生成したファイル:
-
-### Runtime コア (package 側)
-- `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Application/UseCases/LayerUseCase.cs` (`BlendedOutputSpan` / `TryGetExpressionTriggerSourceById` / `_layerHasAdditionalSources` + フィルタ修正)
-- `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Adapters/Playable/FacialController.cs` (`LateUpdate` を Aggregator 経路に差替 + `TryGetExpressionTriggerSourceById` facade)
-- `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Services/ExpressionTriggerInputSourceBase.cs` (`ActiveExpressionIds` を `protected` → `public` 昇格)
-- `FacialControl/Packages/com.hidano.facialcontrol/Tests/EditMode/Application/LayerUseCaseTests.cs` (+7 tests)
-
-### UPM Sample (package 側、shippable)
-- `FacialControl/Packages/com.hidano.facialcontrol/Samples~/MultiSourceBlendDemo/MultiSourceBlendDemoHUD.cs` (新規)
-- `FacialControl/Packages/com.hidano.facialcontrol/Samples~/MultiSourceBlendDemo/multi_source_blend_demo.json` (新規)
-- `FacialControl/Packages/com.hidano.facialcontrol/Samples~/MultiSourceBlendDemo/README.md` (新規、セットアップ手順)
-- `FacialControl/Packages/com.hidano.facialcontrol/package.json` (`samples` 配列に Multi Source Blend Demo を登録)
-
-### Dev 用 (Assets/ 側、二重管理)
-- `FacialControl/Assets/Samples/MultiSourceBlendDemoHUD.cs` (新規、Samples~ と同内容)
-- `FacialControl/Assets/Samples/SampleScene.unity` (HUD GameObject 追加)
-- `FacialControl/Assets/Samples/SampleFacialProfileSO.asset` (JsonFilePath を multi_source_blend_demo.json に)
-- `FacialControl/Assets/StreamingAssets/FacialControl/multi_source_blend_demo.json` (新規、Samples~ と同内容)
-- `FacialControl/Assets/StreamingAssets/FacialControl/default_profile.json` (neutral に復帰)
-- `FacialControl/Assets/StreamingAssets/FacialControl/sample_profile.json` (test fixture 状態に復帰、demo 書き換えから巻き戻し)
-- `FacialControl/Assets/Editor/AttachMultiSourceBlendDemoHUD.cs` (新規、scene 結線)
-- `FacialControl/Assets/Editor/DumpMikuBlendShapes.cs` (新規、BS 名抽出)
-- `FacialControl/Assets/Editor/VerifyDemoProfileBlendShapes.cs` (新規、BS 名整合検証)
-- `FacialControl/Assets/Editor/DiagMultiSourceBlend.cs` (新規、runtime 診断メニュー)
-
-### ドキュメント
-- `CLAUDE.md` に「Samples の二重管理ルール」セクション追加 (`Samples~/` と `Assets/Samples/` の同期ルール明文化)
-
-参照のみ:
-- `FacialControl/Packages/com.hidano.facialcontrol/package.json`(version は据置)
-- `FacialControl/Packages/com.hidano.facialcontrol/CHANGELOG.md`
+- `FacialControl/Packages/com.hidano.facialcontrol/CHANGELOG.md`（編集）
+- `FacialControl/Packages/com.hidano.facialcontrol/Templates/default_profile.json`（残存）
+- `FacialControl/Packages/com.hidano.facialcontrol/Templates/default_config.json`（削除）
+- `FacialControl/Packages/com.hidano.facialcontrol/Templates/default_inputactions.inputactions`（削除）
+- `FacialControl/Packages/com.hidano.facialcontrol/package.json`（参照のみ）
+- `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Adapters/Input/FacialControlDefaultActions.inputactions`（canonical、参照のみ）
+- `FacialControl/Packages/com.hidano.facialcontrol/Samples~/MultiSourceBlendDemo/`（参照のみ）
+- `FacialControl/Assets/Samples/SampleFacialProfileSO.asset` / `SampleInputBinding.asset` / `SampleScene.unity`（scene 配線確認）
+- `FacialControl/Assets/StreamingAssets/FacialControl/multi_source_blend_demo.json`（dev scene 必須）
