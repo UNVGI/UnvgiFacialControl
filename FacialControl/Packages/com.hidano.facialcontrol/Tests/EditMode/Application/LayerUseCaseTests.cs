@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using NUnit.Framework;
+using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
 using Hidano.FacialControl.Application.UseCases;
 
 namespace Hidano.FacialControl.Tests.EditMode.Application
@@ -344,6 +347,53 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
             Assert.AreNotSame(output1, output2);
         }
 
+        // --- BlendedOutputSpan (zero-alloc accessor) ---
+
+        [Test]
+        public void BlendedOutputSpan_NoActiveExpressions_AllZero()
+        {
+            var span = _useCase.BlendedOutputSpan;
+
+            Assert.AreEqual(3, span.Length);
+            Assert.AreEqual(0f, span[0]);
+            Assert.AreEqual(0f, span[1]);
+            Assert.AreEqual(0f, span[2]);
+        }
+
+        [Test]
+        public void BlendedOutputSpan_AfterUpdateWeights_MatchesGetBlendedOutput()
+        {
+            var blendShapes = new[]
+            {
+                new BlendShapeMapping("bs_smile", 0.8f),
+                new BlendShapeMapping("bs_sad", 0.2f),
+                new BlendShapeMapping("bs_blink", 0.0f)
+            };
+            var expr = CreateExpression(
+                blendShapeValues: blendShapes,
+                transitionDuration: 0f);
+
+            _expressionUseCase.Activate(expr);
+            _useCase.UpdateWeights(0.001f);
+
+            var span = _useCase.BlendedOutputSpan;
+            var copy = _useCase.GetBlendedOutput();
+
+            Assert.AreEqual(copy.Length, span.Length);
+            for (int i = 0; i < copy.Length; i++)
+            {
+                Assert.AreEqual(copy[i], span[i], 1e-6f,
+                    $"index {i}: BlendedOutputSpan と GetBlendedOutput が一致すべき");
+            }
+        }
+
+        [Test]
+        public void BlendedOutputSpan_Length_MatchesBlendShapeCount()
+        {
+            var span = _useCase.BlendedOutputSpan;
+            Assert.AreEqual(3, span.Length);
+        }
+
         // --- 遷移割込 ---
 
         [Test]
@@ -517,6 +567,82 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
 
             var output = _useCase.GetBlendedOutput();
             Assert.AreEqual(1.0f, output[0], 0.001f);
+        }
+
+        // --- TryGetExpressionTriggerSourceById ---
+
+        private sealed class FakeExpressionTriggerSource : ExpressionTriggerInputSourceBase
+        {
+            public FakeExpressionTriggerSource(string id, int blendShapeCount, FacialProfile profile)
+                : base(InputSourceId.Parse(id), blendShapeCount, 4, ExclusionMode.LastWins,
+                       Array.Empty<string>(), profile)
+            {
+            }
+        }
+
+        [Test]
+        public void TryGetExpressionTriggerSourceById_RegisteredId_ReturnsTrue()
+        {
+            var fake = new FakeExpressionTriggerSource("controller-expr", 3, _profile);
+            var additional = new List<(int layerIdx, IInputSource source, float weight)>
+            {
+                (0, fake, 1.0f),
+            };
+            using var useCase = new LayerUseCase(
+                _profile, _expressionUseCase, CreateBlendShapeNames(), additional);
+
+            bool found = useCase.TryGetExpressionTriggerSourceById(
+                "controller-expr", out var source);
+
+            Assert.IsTrue(found);
+            Assert.AreSame(fake, source);
+        }
+
+        [Test]
+        public void TryGetExpressionTriggerSourceById_UnregisteredId_ReturnsFalse()
+        {
+            bool found = _useCase.TryGetExpressionTriggerSourceById(
+                "controller-expr", out var source);
+
+            Assert.IsFalse(found);
+            Assert.IsNull(source);
+        }
+
+        [Test]
+        public void TryGetExpressionTriggerSourceById_NullOrEmptyId_ReturnsFalse()
+        {
+            Assert.IsFalse(_useCase.TryGetExpressionTriggerSourceById(null, out var s1));
+            Assert.IsNull(s1);
+            Assert.IsFalse(_useCase.TryGetExpressionTriggerSourceById("", out var s2));
+            Assert.IsNull(s2);
+        }
+
+        [Test]
+        public void TryGetExpressionTriggerSourceById_NonExpressionTriggerSource_NotReturned()
+        {
+            // ValueProvider 型のソースは ExpressionTrigger lookup には該当しない。
+            var valueProvider = new FakeValueProviderSource("osc", 3);
+            var additional = new List<(int layerIdx, IInputSource source, float weight)>
+            {
+                (0, valueProvider, 1.0f),
+            };
+            using var useCase = new LayerUseCase(
+                _profile, _expressionUseCase, CreateBlendShapeNames(), additional);
+
+            bool found = useCase.TryGetExpressionTriggerSourceById("osc", out var source);
+
+            Assert.IsFalse(found);
+            Assert.IsNull(source);
+        }
+
+        private sealed class FakeValueProviderSource : ValueProviderInputSourceBase
+        {
+            public FakeValueProviderSource(string id, int blendShapeCount)
+                : base(InputSourceId.Parse(id), blendShapeCount)
+            {
+            }
+
+            public override bool TryWriteValues(Span<float> output) => false;
         }
     }
 }

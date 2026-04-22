@@ -173,6 +173,16 @@ namespace Hidano.FacialControl.Application.UseCases
         }
 
         /// <summary>
+        /// 直近 <see cref="UpdateWeights"/> の結果を zero-alloc で参照する Span アクセサ。
+        /// 毎フレーム呼ばれる <see cref="Adapters.Playable.FacialController"/> の LateUpdate から
+        /// BlendShape 出力を読み取る用途を想定する（GC スパイク回避）。
+        /// 返される Span の内容は次回 <see cref="UpdateWeights"/> / <see cref="SetProfile"/>
+        /// / <see cref="Dispose"/> 呼出で無効化されるため、フレームをまたいで保持しないこと。
+        /// </summary>
+        public ReadOnlySpan<float> BlendedOutputSpan
+            => _finalOutput == null ? ReadOnlySpan<float>.Empty : new ReadOnlySpan<float>(_finalOutput);
+
+        /// <summary>
         /// (layer, source) スロットの入力源ウェイトをランタイムで書込む (8.3)。
         /// 任意スレッドから呼出可能で、書込は次回 <see cref="UpdateWeights"/>
         /// (内部の <c>Aggregator.Aggregate</c> 入口の <c>SwapIfDirty</c>) 以降に観測される。
@@ -218,6 +228,38 @@ namespace Hidano.FacialControl.Application.UseCases
                 return Array.Empty<LayerSourceWeightEntry>();
             }
             return _aggregator.GetSnapshot();
+        }
+
+        /// <summary>
+        /// プロファイルの <c>inputSources</c> 宣言から生成された Expression トリガー型
+        /// 入力源を id で検索する。ランタイム UI（<see cref="Adapters.Playable.FacialController"/>
+        /// 経由のデモ HUD / Editor ツール）から特定アダプタを掴んで <c>TriggerOn</c> /
+        /// <c>TriggerOff</c> を直接呼びたい場合に利用する。
+        /// </summary>
+        /// <param name="id">検索する <see cref="IInputSource.Id"/>。null / 空文字は false。</param>
+        /// <param name="source">見つかった <see cref="ExpressionTriggerInputSourceBase"/>
+        /// インスタンス、見つからない場合は null。</param>
+        /// <returns>id が一致し、かつ <see cref="InputSourceType.ExpressionTrigger"/> 型の
+        /// 追加ソースとして登録されていれば true。ValueProvider 型および未登録 id では false。</returns>
+        public bool TryGetExpressionTriggerSourceById(string id, out ExpressionTriggerInputSourceBase source)
+        {
+            source = null;
+            if (string.IsNullOrEmpty(id) || _additionalInputSources == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < _additionalInputSources.Count; i++)
+            {
+                var entry = _additionalInputSources[i];
+                if (entry.source is ExpressionTriggerInputSourceBase triggerSource
+                    && triggerSource.Id == id)
+                {
+                    source = triggerSource;
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>

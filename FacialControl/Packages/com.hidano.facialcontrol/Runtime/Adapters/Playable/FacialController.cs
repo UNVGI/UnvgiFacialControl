@@ -151,11 +151,18 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         private void LateUpdate()
         {
-            if (!_isInitialized || _graphBuildResult == null || _blendShapeTargets == null)
+            if (!_isInitialized || _blendShapeTargets == null || _layerUseCase == null)
                 return;
 
-            var mixer = _graphBuildResult.Mixer.GetBehaviour();
-            var output = mixer.OutputWeights;
+            // Aggregator パイプラインを 1 フレーム分進める。
+            // sourceIdx=0 の LayerExpressionSource は ExpressionUseCase.GetActiveExpressions から駆動、
+            // sourceIdx=1+ の IInputSource (controller-expr / keyboard-expr / osc 等) は
+            // 各アダプタの TriggerOn/Off または WriteTick 経由で駆動される。
+            _layerUseCase.UpdateWeights(Time.deltaTime);
+
+            // Aggregator 出力を BlendShape に転写。PlayableGraph の出力はバイパスする
+            // （PlayableGraph は preview.2 以降で撤去検討）。
+            var output = _layerUseCase.BlendedOutputSpan;
 
             int count = Math.Min(output.Length, _blendShapeTargets.Length);
             for (int i = 0; i < count; i++)
@@ -447,6 +454,26 @@ namespace Hidano.FacialControl.Adapters.Playable
                 return Array.Empty<LayerSourceWeightEntry>();
             }
             return _layerUseCase.GetInputSourceWeightsSnapshot();
+        }
+
+        /// <summary>
+        /// プロファイルの <c>inputSources</c> 宣言から生成された Expression トリガー型
+        /// 入力源 (<c>controller-expr</c> / <c>keyboard-expr</c> など) を id で検索する。
+        /// Samples のデモ HUD や Editor ツールから特定アダプタを掴んで
+        /// <see cref="ExpressionTriggerInputSourceBase.TriggerOn"/> /
+        /// <see cref="ExpressionTriggerInputSourceBase.TriggerOff"/> を直接呼びたい場合に利用する。
+        /// </summary>
+        /// <param name="id">検索対象の入力源 id。</param>
+        /// <param name="source">見つかったアダプタ、見つからない場合は null。</param>
+        /// <returns>id が一致する Expression トリガー型ソースが登録されていれば true。</returns>
+        public bool TryGetExpressionTriggerSourceById(string id, out ExpressionTriggerInputSourceBase source)
+        {
+            source = null;
+            if (!_isInitialized || _layerUseCase == null)
+            {
+                return false;
+            }
+            return _layerUseCase.TryGetExpressionTriggerSourceById(id, out source);
         }
 
         /// <summary>

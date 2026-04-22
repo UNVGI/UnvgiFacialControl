@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="4" result="Passed" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-04-22 04:24:44Z" end-time="2026-04-22 04:24:44Z" duration="0.0645302">
+  <test-suite type="TestSuite" id="1000" name="FacialControl" fullname="FacialControl" runstate="Runnable" testcasecount="1053" result="Passed" start-time="2026-04-22 04:24:44Z" end-time="2026-04-22 04:24:44Z" duration="0.064530" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="2114" name="Hidano.FacialControl.Tests.EditMode.dll" fullname="D:/Personal/Repositries/FacialControl/FacialControl/Library/ScriptAssemblies/Hidano.FacialControl.Tests.EditMode.dll" runstate="Runnable" testcasecount="1053" result="Passed" start-time="2026-04-22 04:24:44Z" end-time="2026-04-22 04:24:44Z" duration="0.055189" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="76316" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="2115" name="Hidano" fullname="Hidano" runstate="Runnable" testcasecount="1053" result="Passed" start-time="2026-04-22 04:24:44Z" end-time="2026-04-22 04:24:44Z" duration="0.050494" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="2116" name="FacialControl" fullname="Hidano.FacialControl" runstate="Runnable" testcasecount="1053" result="Passed" start-time="2026-04-22 04:24:44Z" end-time="2026-04-22 04:24:44Z" duration="0.046067" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="2117" name="Tests" fullname="Hidano.FacialControl.Tests" runstate="Runnable" testcasecount="1053" result="Passed" start-time="2026-04-22 04:24:44Z" end-time="2026-04-22 04:24:44Z" duration="0.041598" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="2118" name="EditMode" fullname="Hidano.FacialControl.Tests.EditMode" runstate="Runnable" testcasecount="1053" result="Passed" start-time="2026-04-22 04:24:44Z" end-time="2026-04-22 04:24:44Z" duration="0.037133" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestSuite" id="2122" name="Application" fullname="Hidano.FacialControl.Tests.EditMode.Application" runstate="Runnable" testcasecount="109" result="Passed" start-time="2026-04-22 04:24:44Z" end-time="2026-04-22 04:24:44Z" duration="0.028157" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-suite type="TestFixture" id="1608" name="LayerUseCaseTests" fullname="Hidano.FacialControl.Tests.EditMode.Application.LayerUseCaseTests" classname="Hidano.FacialControl.Tests.EditMode.Application.LayerUseCaseTests" runstate="Runnable" testcasecount="33" result="Passed" start-time="2026-04-22 04:24:44Z" end-time="2026-04-22 04:24:44Z" duration="0.026096" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="1641" name="TryGetExpressionTriggerSourceById_NonExpressionTriggerSource_NotReturned" fullname="Hidano.FacialControl.Tests.EditMode.Application.LayerUseCaseTests.TryGetExpressionTriggerSourceById_NonExpressionTriggerSource_NotReturned" methodname="TryGetExpressionTriggerSourceById_NonExpressionTriggerSource_NotReturned" classname="Hidano.FacialControl.Tests.EditMode.Application.LayerUseCaseTests" runstate="Runnable" seed="560158234" result="Passed" start-time="2026-04-22 04:24:44Z" end-time="2026-04-22 04:24:44Z" duration="0.013062" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1640" name="TryGetExpressionTriggerSourceById_NullOrEmptyId_ReturnsFalse" fullname="Hidano.FacialControl.Tests.EditMode.Application.LayerUseCaseTests.TryGetExpressionTriggerSourceById_NullOrEmptyId_ReturnsFalse" methodname="TryGetExpressionTriggerSourceById_NullOrEmptyId_ReturnsFalse" classname="Hidano.FacialControl.Tests.EditMode.Application.LayerUseCaseTests" runstate="Runnable" seed="878706408" result="Passed" start-time="2026-04-22 04:24:44Z" end-time="2026-04-22 04:24:44Z" duration="0.000230" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1638" name="TryGetExpressionTriggerSourceById_RegisteredId_ReturnsTrue" fullname="Hidano.FacialControl.Tests.EditMode.Application.LayerUseCaseTests.TryGetExpressionTriggerSourceById_RegisteredId_ReturnsTrue" methodname="TryGetExpressionTriggerSourceById_RegisteredId_ReturnsTrue" classname="Hidano.FacialControl.Tests.EditMode.Application.LayerUseCaseTests" runstate="Runnable" seed="53192770" result="Passed" start-time="2026-04-22 04:24:44Z" end-time="2026-04-22 04:24:44Z" duration="0.000722" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1639" name="TryGetExpressionTriggerSourceById_UnregisteredId_ReturnsFalse" fullname="Hidano.FacialControl.Tests.EditMode.Application.LayerUseCaseTests.TryGetExpressionTriggerSourceById_UnregisteredId_ReturnsFalse" methodname="TryGetExpressionTriggerSourceById_UnregisteredId_ReturnsFalse" classname="Hidano.FacialControl.Tests.EditMode.Application.LayerUseCaseTests" runstate="Runnable" seed="286899040" result="Passed" start-time="2026-04-22 04:24:44Z" end-time="2026-04-22 04:24:44Z" duration="0.000177" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[Saving results to: C:/Users/Hidano/AppData/LocalLow/DefaultCompany/FacialControl\TestResults.xml
+]]></output>
+                  </test-case>
+                </test-suite>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

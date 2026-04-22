@@ -1,4 +1,4 @@
-﻿{
+{
     "schemaVersion": "1.0",
     "layers": [
         {
@@ -6,80 +6,82 @@
             "priority": 0,
             "exclusionMode": "lastWins",
             "inputSources": [
-                {"id": "controller-expr", "weight": 0.5},
-                {"id": "osc", "weight": 0.5, "options": {"stalenessSeconds": 1.0}}
+                {"id": "controller-expr", "weight": 0.5, "options": {"maxStackDepth": 4}},
+                {"id": "keyboard-expr", "weight": 0.5, "options": {"maxStackDepth": 4}}
             ]
         },
         {
             "name": "lipsync",
             "priority": 1,
             "exclusionMode": "blend",
-            "inputSources": [
-                {"id": "lipsync", "weight": 1.0}
-            ]
+            "inputSources": []
         },
         {
             "name": "eye",
             "priority": 2,
             "exclusionMode": "lastWins",
-            "inputSources": [
-                {"id": "keyboard-expr", "weight": 1.0, "options": {"maxStackDepth": 4}}
-            ]
+            "inputSources": []
         }
     ],
     "expressions": [
         {
-            "id": "00000000-0000-0000-0000-000000000001",
-            "name": "default",
+            "id": "smile",
+            "name": "smile",
             "layer": "emotion",
             "transitionDuration": 0.25,
-            "transitionCurve": {
-                "type": "linear",
-                "keys": []
-            },
-            "blendShapeValues": [],
-            "layerSlots": []
-        },
-        {
-            "id": "00000000-0000-0000-0000-000000000002",
-            "name": "blink",
-            "layer": "eye",
-            "transitionDuration": 0.07999999821186066,
-            "transitionCurve": {
-                "type": "linear",
-                "keys": []
-            },
+            "transitionCurve": {"type": "linear", "keys": []},
             "blendShapeValues": [
-                {
-                    "name": "まばたき",
-                    "value": 1.0,
-                    "renderer": ""
-                }
+                {"name": "笑い", "value": 1.0, "renderer": ""},
+                {"name": "口角上げ", "value": 0.6, "renderer": ""}
             ],
             "layerSlots": []
         },
         {
-            "id": "00000000-0000-0000-0000-000000000003",
-            "name": "gaze_follow",
-            "layer": "eye",
+            "id": "angry",
+            "name": "angry",
+            "layer": "emotion",
             "transitionDuration": 0.25,
-            "transitionCurve": {
-                "type": "linear",
-                "keys": []
-            },
-            "blendShapeValues": [],
+            "transitionCurve": {"type": "linear", "keys": []},
+            "blendShapeValues": [
+                {"name": "怒り", "value": 1.0, "renderer": ""},
+                {"name": "左眉下げ", "value": 0.5, "renderer": ""},
+                {"name": "右眉下げ", "value": 0.5, "renderer": ""}
+            ],
             "layerSlots": []
         },
         {
-            "id": "00000000-0000-0000-0000-000000000004",
-            "name": "gaze_camera",
-            "layer": "eye",
+            "id": "surprise",
+            "name": "surprise",
+            "layer": "emotion",
+            "transitionDuration": 0.2,
+            "transitionCurve": {"type": "linear", "keys": []},
+            "blendShapeValues": [
+                {"name": "びっくり", "value": 1.0, "renderer": ""},
+                {"name": "▲", "value": 0.8, "renderer": ""}
+            ],
+            "layerSlots": []
+        },
+        {
+            "id": "troubled",
+            "name": "troubled",
+            "layer": "emotion",
             "transitionDuration": 0.25,
-            "transitionCurve": {
-                "type": "linear",
-                "keys": []
-            },
-            "blendShapeValues": [],
+            "transitionCurve": {"type": "linear", "keys": []},
+            "blendShapeValues": [
+                {"name": "困る", "value": 0.8, "renderer": ""},
+                {"name": "口角下げ", "value": 0.4, "renderer": ""}
+            ],
+            "layerSlots": []
+        },
+        {
+            "id": "blink",
+            "name": "blink",
+            "layer": "eye",
+            "transitionDuration": 0.08,
+            "transitionCurve": {"type": "linear", "keys": []},
+            "blendShapeValues": [
+                {"name": "まばたき", "value": 1.0, "renderer": ""}
+            ],
             "layerSlots": []
         }
     ],

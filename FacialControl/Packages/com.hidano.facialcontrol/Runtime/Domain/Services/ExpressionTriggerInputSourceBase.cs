@@ -64,10 +64,12 @@ namespace Hidano.FacialControl.Domain.Services
         private bool _hasWarnedStackDepthExceeded;
 
         /// <summary>
-        /// 現在アクティブな Expression の ID リストを読取専用で公開する (診断/テスト用)。
+        /// 現在アクティブな Expression の ID リストを読取専用で公開する (診断/HUD/テスト用)。
         /// スタックの末尾が最新 Trigger (LIFO における top)。
+        /// Samples デモ HUD や Editor Inspector から「どの Expression が積まれているか」を
+        /// 可視化するために public 公開する。
         /// </summary>
-        protected IReadOnlyList<string> ActiveExpressionIds => _activeExpressionIds;
+        public IReadOnlyList<string> ActiveExpressionIds => _activeExpressionIds;
 
         /// <summary>
         /// 現在の補間済み BlendShape 値 (長さ <see cref="BlendShapeCount"/>)。診断/テスト用。
