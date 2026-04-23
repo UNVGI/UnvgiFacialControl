@@ -165,7 +165,6 @@ namespace Hidano.FacialControl.Editor.Inspector
         private void OnPlayModeStateChanged(PlayModeStateChange change)
         {
             _cachedController = null;
-            RefreshCategoryWarning();
             RefreshSnapshot(forceRecheck: true);
         }
 
