@@ -22,8 +22,6 @@
 
 ## インストール
 
-### npm レジストリ経由（推奨）
-
 `Packages/manifest.json` に以下を追加する（必要なサブパッケージのみ追加 OK）。
 
 ```json
@@ -45,19 +43,7 @@
 }
 ```
 
-### ローカルインストール
-
-リポジトリをクローンして `Packages/` ディレクトリに配置する場合:
-
-```json
-{
-    "dependencies": {
-        "com.hidano.facialcontrol": "file:com.hidano.facialcontrol",
-        "com.hidano.facialcontrol.osc": "file:com.hidano.facialcontrol.osc",
-        "com.hidano.facialcontrol.inputsystem": "file:com.hidano.facialcontrol.inputsystem"
-    }
-}
-```
+本リポジトリをクローンして利用する場合、各パッケージは `FacialControl/Packages/` 配下に配置済みで embedded package として自動認識されるため、`manifest.json` への追記は不要（リポジトリ直下の `FacialControl/` を Unity Hub からプロジェクトとして開けば動作する）。
 
 ## クイックスタート
 
