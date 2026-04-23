@@ -319,6 +319,20 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
         // GC ゼロ契約: パイプライン全体が per-frame 0-alloc であること
         // ------------------------------------------------------------------
 
+        // Unity Mono ヒープは 32〜64 KB 単位のページで確保されるため、EditMode で
+        // GC.GetTotalMemory(false) を before/after 比較すると、測定対象ホットパス自体が
+        // 0-alloc でも Editor / NUnit 内部活動が 1 ページ分ぶんだけ差分として観測され得る
+        // (Mono 実装詳細: 本リポジトリでの実測で 1 ページ ≒ 32KB〜40KB)。
+        // GC.GetAllocatedBytesForCurrentThread は Unity の Mono では未実装 (常に 0)、
+        // Profiler.GetTotalAllocatedMemoryLong は managed を返さず native のみのため EditMode では
+        // 該当ホットパスの per-method 精度で managed alloc を計測する手段が存在しない。
+        // そこで (1) ループを十分大きくして実アロケーションが発生した場合の累積が
+        // ページサイズを大きく上回るようにし、(2) 許容しきい値 = 1 ページ分ぶんの
+        // ノイズに設定する。実回帰 (e.g. 32 byte/iter) の場合でも 50,000 iter で 1.6MB となり、
+        // しきい値 (= ManagedPageNoiseToleranceBytes) をはるかに超えるため検出可能。
+        private const long ManagedPageNoiseToleranceBytes = 64 * 1024;
+        private const int ZeroAllocMeasureIterations = 50_000;
+
         [Test]
         public void Pipeline_AggregateAndBlendLoop_AllocatesZeroManagedMemory()
         {
@@ -349,7 +363,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
             GC.Collect();
             long before = GC.GetTotalMemory(false);
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < ZeroAllocMeasureIterations; i++)
             {
                 h.Aggregator.AggregateAndBlend(
                     deltaTime: 0.016f,
@@ -361,8 +375,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
             long after = GC.GetTotalMemory(false);
             long allocated = after - before;
 
-            Assert.LessOrEqual(allocated, 0,
-                $"AggregateAndBlend 1000 回ループで GC アロケーションが発生しないこと " +
+            Assert.LessOrEqual(allocated, ManagedPageNoiseToleranceBytes,
+                $"AggregateAndBlend {ZeroAllocMeasureIterations} 回ループで GC アロケーションが" +
+                $"Mono ヒープページノイズ許容 ({ManagedPageNoiseToleranceBytes} bytes) を超えないこと " +
                 $"(差分: {allocated} bytes)");
         }
     }

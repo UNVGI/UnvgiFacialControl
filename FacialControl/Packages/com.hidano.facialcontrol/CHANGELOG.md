@@ -2,7 +2,7 @@
 
 すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
 
-## [0.1.0-preview.1] - 2026-04-21
+## [0.1.0-preview.1] - Unreleased
 
 初回プレリリース。
 
@@ -61,6 +61,10 @@
 - `PreviewRenderUtility` ラッパー（カメラ / ライティング / RenderTexture 管理）
 - `ARKitDetectorWindow` — ARKit / PerfectSync 自動検出 Editor UI
 - `InputBindingProfileSOEditor` — UI Toolkit ベースの Inspector。ActionMap / Action / Expression ドロップダウンの自動列挙とバインディング行の追加・削除をサポート
+- MenuItem `FacialControl/新規プロファイル作成` — `ProfileCreationDialog` を開き GUI だけで `FacialProfileSO` + JSON を生成（JSON 手書き不要の GUI ファースト導線）
+- `ProfileCreationData.NamingConvention`（VRM / ARKit / None）と `BuildSampleExpressions()` — 選択した命名規則に合わせて `smile` / `angry` / `blink` の雛形 Expression を自動生成
+- `Editor/Common/BlendShapeNameProvider.cs` — 参照モデル（`GameObject` / `FacialProfileSO`）から BlendShape 名を収集する Editor 共通ユーティリティ
+- `ARKitEditorService.MergeIntoExistingProfile()` — ARKit / PerfectSync 検出結果を既存 `FacialProfileSO` にマージ（`ARKitDetectorWindow` の UI から呼び出し可能）
 
 #### サンプル
 - `Samples~/MultiSourceBlendDemo` — 同一レイヤーに `controller-expr` + `keyboard-expr` を並置し、ウェイトブレンドの挙動を OnGUI HUD で目視確認する PlayMode サンプル（JSON プロファイル + HUD スクリプト + README 同梱。モデルはユーザー持ち込み）
@@ -72,6 +76,7 @@
 - 全公開 API の XML コメント
 - クイックスタートガイド（`Documentation~/quickstart.md`）
 - JSON スキーマリファレンス（`Documentation~/json-schema.md`）
+- `README.md` に「既知の制限とロードマップ」節を新設（Addressables 対応方針 / preview.2 以降の `IProfileJsonLoader` 抽象化計画）
 
 ### Changed
 
@@ -87,9 +92,15 @@
 - 使用モデルに Hierarchy 上の GameObject をアタッチ可能に変更
 - ARKit 検出ツールの JSON 保存後に `AssetDatabase.Refresh` を実行するよう修正
 - JSON インポートで JsonFilePath 未設定時もファイル選択ダイアログを表示するよう改善
+- `FacialProfileSOEditor` / `ExpressionCreatorWindow` の BlendShape 名入力を TextField から検索付きドロップダウン（`BlendShapeNameProvider` 連携）に変更してタイポ耐性を向上
+- `ARKitDetectorWindow` に既存 `FacialProfileSO` へのマージ UI を追加（`MergeIntoExistingProfile()` 連携）
 
 #### Domain 層
 - `ARKitDetector` の検出仕様を見直し、完全一致判定を修正
+
+#### ドキュメント
+- `Documentation~/quickstart.md` を GUI ファースト手順に全面刷新（プロファイル作成ダイアログ → 使用モデル指定 → キーコンフィグ設定の順序）
+- `README.md` のクイックスタート節を 4 ステップに刷新（GUI ファースト導線へ）
 
 ### Breaking Changes
 
