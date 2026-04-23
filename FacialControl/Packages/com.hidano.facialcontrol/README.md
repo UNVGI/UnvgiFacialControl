@@ -61,18 +61,19 @@ FacialControl は、VTuber 配信用フェイシャルキャプチャ連動や G
 
 ## クイックスタート
 
-1. `StreamingAssets/FacialControl/` にプロファイル JSON を配置（テンプレート: `Templates/default_profile.json`）
-2. Unity Editor で **Create** → **FacialControl** → **Facial Profile** から FacialProfileSO を作成し、JSON パスを設定
-3. キャラクターの GameObject に **FacialController** コンポーネントを追加
-4. Inspector で FacialProfileSO を割り当て
+1. メニュー **FacialControl** → **新規プロファイル作成** からダイアログを開き、命名規則プリセット（VRM / ARKit）を選んで作成
+   - `FacialProfileSO` アセットとプロファイル JSON が自動生成され、`smile` / `angry` / `blink` の雛形 Expression も含まれます
+2. キャラクターの GameObject に **FacialController** を追加し、生成された `FacialProfileSO` を割り当て
+3. `InputBindingProfileSO` を作成して `FacialInputBinder` に割り当て（キー `1`/`2`/`3` で発動）
+4. Play して動作確認。BlendShape 名の微調整は `FacialProfileSO` Inspector か **Expression 作成** ウィンドウから（ドロップダウン候補あり）
 
 ```csharp
-// スクリプトから Expression を切り替え
+// スクリプトから Expression を切り替える場合
 _facialController.Activate(expression);
 _facialController.Deactivate(expression);
 ```
 
-詳細は [クイックスタートガイド](Documentation~/quickstart.md) を参照してください。
+詳細は [クイックスタートガイド](Documentation~/quickstart.md) を参照してください。JSON の直接編集など高度な運用も同ガイドでカバーしています。
 
 ## アーキテクチャ
 
