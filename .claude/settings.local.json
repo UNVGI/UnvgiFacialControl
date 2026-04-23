@@ -69,7 +69,8 @@
       "mcp__unity-mcp__Unity_ManageEditor",
       "mcp__unity-mcp__Unity_RunCommand",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:999)",
-      "Bash(break)"
+      "Bash(break)",
+      "PowerShell(Get-NetTCPConnection *)"
     ]
   }
 }

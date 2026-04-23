@@ -34,7 +34,7 @@ InputRegistration.Register(factory, blendShapeNames, ExclusionMode.LastWins);
 
 ## サンプル
 
-`Multi Source Blend Demo` — 同一レイヤーに `controller-expr` と `keyboard-expr` を並置し、OnGUI 経由で加重和ブレンドを目視確認するサンプル。Package Manager から Import 可能。
+`Multi Source Blend Demo` — 同一レイヤーに `controller-expr` と `keyboard-expr` を並置し、OnGUI 経由で加重和ブレンドを目視確認するサンプル。Package Manager から Import 可能。Scene / FacialProfileSO / InputBindingProfileSO / HUD / JSON を同梱し、ユーザーはモデルを Scene の Character の子に配置するだけで動作する。
 
 ## ライセンス
 

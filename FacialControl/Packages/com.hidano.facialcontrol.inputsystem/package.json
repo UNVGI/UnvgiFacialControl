@@ -15,7 +15,7 @@
     "samples": [
         {
             "displayName": "Multi Source Blend Demo",
-            "description": "同一レイヤーに controller-expr と keyboard-expr を並置し、OnGUI 経由で加重和ブレンドを目視確認するサンプル。",
+            "description": "同一レイヤーに controller-expr と keyboard-expr を並置し、OnGUI 経由で加重和ブレンドを目視確認するサンプル。Scene / FacialProfileSO / InputBindingProfileSO / JSON / HUD 一式を同梱し、ユーザーはモデルを Character の子に配置するだけで動作する。",
             "path": "Samples~/MultiSourceBlendDemo"
         }
     ],

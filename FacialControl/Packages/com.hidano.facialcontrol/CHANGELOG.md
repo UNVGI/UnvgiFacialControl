@@ -77,7 +77,7 @@
 - `ARKitEditorService.MergeIntoExistingProfile()` — ARKit / PerfectSync 検出結果を既存 `FacialProfileSO` にマージ（`ARKitDetectorWindow` の UI から呼び出し可能）
 
 #### サンプル
-- `Samples~/MultiSourceBlendDemo` — 同一レイヤーに `controller-expr` + `keyboard-expr` を並置し、ウェイトブレンドの挙動を OnGUI HUD で目視確認する PlayMode サンプル（JSON プロファイル + HUD スクリプト + README 同梱。モデルはユーザー持ち込み）
+- `Samples~/MultiSourceBlendDemo` — 同一レイヤーに `controller-expr` + `keyboard-expr` を並置し、ウェイトブレンドの挙動を OnGUI HUD で目視確認する PlayMode サンプル。Scene (`MultiSourceBlendDemo.unity`) / FacialProfileSO / InputBindingProfileSO / JSON プロファイル / HUD スクリプト / README を同梱し、ユーザーは Scene を開いて Character の子にモデルを配置するだけで動作する（モデルはライセンスの都合で同梱しない）
 
 #### テンプレート
 - `Templates/default_profile.json` — デフォルト 3 レイヤー + 基本 Expression（default, blink, gaze_follow, gaze_camera）

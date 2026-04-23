@@ -1,5 +1,6 @@
 using UnityEngine;
 using Hidano.FacialControl.Adapters.InputSources;
+using Hidano.FacialControl.Adapters.Json;
 using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Domain.Services;
 
@@ -14,13 +15,20 @@ namespace Hidano.FacialControl.Samples
     /// 詳しい使い方は本サンプル同梱の README.md 参照。
     /// 本 HUD は FacialController の既存公開 API (<c>SetInputSourceWeight</c> /
     /// <c>TryGetExpressionTriggerSourceById</c> / <c>GetInputSourceWeightsSnapshot</c>) のみを利用する。
+    /// 加えて、サンプル同梱 JSON (TextAsset) を起動時にパースして
+    /// <c>FacialController.InitializeWithProfile</c> を呼ぶブートストラップ機能を持つ。
     /// </remarks>
+    [DefaultExecutionOrder(-100)]
     [AddComponentMenu("FacialControl/Samples/Multi Source Blend Demo HUD")]
     public class MultiSourceBlendDemoHUD : MonoBehaviour
     {
         [Tooltip("対象の FacialController")]
         [SerializeField]
         private FacialController _facialController;
+
+        [Tooltip("サンプル用に同梱された表情プロファイル JSON (TextAsset)。設定されている場合、Awake 時にパースして FacialController を初期化する。")]
+        [SerializeField]
+        private TextAsset _profileJson;
 
         [Tooltip("HUD を表示するレイヤー index。既定: 0 (emotion)。")]
         [SerializeField]
@@ -40,11 +48,52 @@ namespace Hidano.FacialControl.Samples
         private float _keyboardWeight = 0.5f;
         private Vector2 _scroll;
 
-        private void Start()
+        private void Awake()
         {
             // Game View が非 focus でも Aggregator が tick し続けるように。
             UnityEngine.Application.runInBackground = true;
 
+            TryBootstrapProfile();
+        }
+
+        /// <summary>
+        /// サンプル同梱 JSON を TextAsset 経由でロードし、FacialController を初期化する。
+        /// <list type="bullet">
+        ///   <item>FacialController が未割当、または既に初期化済みの場合は何もしない。</item>
+        ///   <item><c>_profileJson</c> が未割当の場合は何もしない（ユーザーが FacialProfileSO 経由で初期化するケース）。</item>
+        /// </list>
+        /// Awake で呼ぶことで、同一 GameObject 上の FacialInputBinder.OnEnable が
+        /// FacialController.CurrentProfile を参照する前に初期化が完了する。
+        /// </summary>
+        private void TryBootstrapProfile()
+        {
+            if (_facialController == null)
+            {
+                return;
+            }
+            if (_facialController.IsInitialized)
+            {
+                return;
+            }
+            if (_profileJson == null || string.IsNullOrWhiteSpace(_profileJson.text))
+            {
+                return;
+            }
+
+            try
+            {
+                var parser = new SystemTextJsonParser();
+                var profile = parser.ParseProfile(_profileJson.text);
+                _facialController.InitializeWithProfile(profile);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"MultiSourceBlendDemoHUD: サンプル JSON のロードに失敗しました: {ex.Message}");
+            }
+        }
+
+        private void Start()
+        {
             if (_facialController != null && _facialController.IsInitialized)
             {
                 ApplyInitialWeights();
