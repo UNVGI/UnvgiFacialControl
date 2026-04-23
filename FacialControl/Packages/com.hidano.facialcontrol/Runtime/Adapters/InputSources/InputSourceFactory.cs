@@ -21,7 +21,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
     /// <para>
     /// コア標準のビルトイン登録は <c>lipsync</c> のみ（<see cref="LipSyncInputSource"/>）。
     /// <c>osc</c> / <c>controller-expr</c> / <c>keyboard-expr</c> は公式サブパッケージ
-    /// (<c>com.hidano.facialcontrol.osc</c> / <c>com.hidano.facialcontrol.input</c>) が
+    /// (<c>com.hidano.facialcontrol.osc</c> / <c>com.hidano.facialcontrol.inputsystem</c>) が
     /// <see cref="RegisterReserved{TOptions}"/> 経由で追加登録する。
     /// サードパーティ <c>x-*</c> 拡張は <see cref="RegisterExtension{TOptions}"/>
     /// で typed DTO と creator を同時に登録する（Req 1.7, 3.7）。
@@ -87,7 +87,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
         /// <see cref="InputSourceFactory"/> を構築する。
         /// コア標準では <c>lipsync</c> のみビルトイン登録される。
         /// <c>osc</c> / <c>controller-expr</c> / <c>keyboard-expr</c> は対応サブパッケージ
-        /// (<c>com.hidano.facialcontrol.osc</c> / <c>com.hidano.facialcontrol.input</c>) の
+        /// (<c>com.hidano.facialcontrol.osc</c> / <c>com.hidano.facialcontrol.inputsystem</c>) の
         /// <c>Register(...)</c> ヘルパー経由で <see cref="RegisterReserved{TOptions}"/> を呼ぶこと。
         /// </summary>
         /// <param name="lipSyncProvider">
@@ -153,7 +153,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
         /// <summary>
         /// 公式サブパッケージ（<c>com.hidano.facialcontrol.osc</c> /
-        /// <c>com.hidano.facialcontrol.input</c> 等）から予約 id 含む任意 id でアダプタを登録する。
+        /// <c>com.hidano.facialcontrol.inputsystem</c> 等）から予約 id 含む任意 id でアダプタを登録する。
         /// 第三者拡張は <see cref="RegisterExtension{TOptions}"/>（<c>x-*</c> プレフィックス必須）を使うこと。
         /// </summary>
         /// <typeparam name="TOptions">

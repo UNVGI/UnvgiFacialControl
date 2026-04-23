@@ -1,19 +1,21 @@
 {
-    "name": "Hidano.FacialControl.Input.Tests.PlayMode",
-    "rootNamespace": "Hidano.FacialControl.Input.Tests.PlayMode",
+    "name": "Hidano.FacialControl.InputSystem.Tests.EditMode",
+    "rootNamespace": "Hidano.FacialControl.InputSystem.Tests.EditMode",
     "references": [
         "Hidano.FacialControl.Domain",
         "Hidano.FacialControl.Application",
         "Hidano.FacialControl.Adapters",
-        "Hidano.FacialControl.Input",
+        "Hidano.FacialControl.InputSystem",
+        "Hidano.FacialControl.Osc",
         "Hidano.FacialControl.Tests.Shared",
         "Unity.Collections",
         "Unity.InputSystem",
-        "Unity.InputSystem.TestFramework",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,

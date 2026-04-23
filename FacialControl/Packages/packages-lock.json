@@ -8,8 +8,8 @@
         "com.hidano.scene-view-style-camera-controller": "1.0.0"
       }
     },
-    "com.hidano.facialcontrol.input": {
-      "version": "file:com.hidano.facialcontrol.input",
+    "com.hidano.facialcontrol.inputsystem": {
+      "version": "file:com.hidano.facialcontrol.inputsystem",
       "depth": 0,
       "source": "embedded",
       "dependencies": {

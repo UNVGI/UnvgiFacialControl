@@ -4,7 +4,7 @@ using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Domain.Models;
 
-namespace Hidano.FacialControl.Input
+namespace Hidano.FacialControl.InputSystem
 {
     /// <summary>
     /// FacialControl コアの <see cref="InputSourceFactory"/> に予約 id <c>controller-expr</c>

@@ -15,7 +15,7 @@ FacialControl は、VTuber 配信用フェイシャルキャプチャ連動や G
 - **JSON ファーストの永続化** — 表情設定は JSON で管理。ビルド後も差し替え可能。ScriptableObject は JSON への参照ポインター
 - **リップシンク連携** — 外部プラグイン（uLipSync 等）からの入力を受け付ける `ILipSyncProvider` インターフェース
 - **OSC ネットワーク通信** — 別パッケージ `com.hidano.facialcontrol.osc` で提供。VRChat 互換 OSC（UDP + uOsc）による BlendShape 送受信。受信は `Interlocked.Exchange` ベースの非ブロッキングダブルバッファ
-- **入力デバイス対応** — 別パッケージ `com.hidano.facialcontrol.input` で提供。InputSystem 経由のコントローラ / キーボード入力と `InputBindingProfileSO` + `FacialInputBinder` によるキーコンフィグ永続化
+- **入力デバイス対応** — 別パッケージ `com.hidano.facialcontrol.inputsystem` で提供。InputSystem 経由のコントローラ / キーボード入力と `InputBindingProfileSO` + `FacialInputBinder` によるキーコンフィグ永続化
 
 ## 動作要件
 
@@ -31,7 +31,7 @@ FacialControl は機能別に 3 パッケージで提供されます。コアパ
 |---|---|---|
 | `com.hidano.facialcontrol` | コア（表情遷移・レイヤーブレンド・JSON プロファイル・Editor 拡張・LipSync I/F） | Unity 6000.3+ |
 | `com.hidano.facialcontrol.osc` | OSC 送受信アダプタ（VRChat / ARKit 互換） | コア + `com.hidano.uosc` |
-| `com.hidano.facialcontrol.input` | InputSystem 経由のキーバインド・コントローラ入力 | コア + `com.unity.inputsystem` |
+| `com.hidano.facialcontrol.inputsystem` | InputSystem 経由のキーバインド・コントローラ入力 | コア + `com.unity.inputsystem` |
 
 サブパッケージは同 GameObject 上の `OscFacialControllerExtension` / `InputFacialControllerExtension` MonoBehaviour 経由で `FacialController` に接続されます。
 
@@ -55,7 +55,7 @@ FacialControl は機能別に 3 パッケージで提供されます。コアパ
     "dependencies": {
         "com.hidano.facialcontrol": "0.2.0-preview.2",
         "com.hidano.facialcontrol.osc": "0.1.0-preview.2",
-        "com.hidano.facialcontrol.input": "0.1.0-preview.2"
+        "com.hidano.facialcontrol.inputsystem": "0.1.0-preview.2"
     }
 }
 ```
@@ -69,7 +69,7 @@ FacialControl は機能別に 3 パッケージで提供されます。コアパ
     "dependencies": {
         "com.hidano.facialcontrol": "file:com.hidano.facialcontrol",
         "com.hidano.facialcontrol.osc": "file:com.hidano.facialcontrol.osc",
-        "com.hidano.facialcontrol.input": "file:com.hidano.facialcontrol.input"
+        "com.hidano.facialcontrol.inputsystem": "file:com.hidano.facialcontrol.inputsystem"
     }
 }
 ```
@@ -79,7 +79,7 @@ FacialControl は機能別に 3 パッケージで提供されます。コアパ
 1. メニュー **FacialControl** → **新規プロファイル作成** からダイアログを開き、命名規則プリセット（VRM / ARKit）を選んで作成
    - `FacialProfileSO` アセットとプロファイル JSON が自動生成され、`smile` / `angry` / `blink` の雛形 Expression も含まれます
 2. キャラクターの GameObject に **FacialController** を追加し、生成された `FacialProfileSO` を割り当て
-3. **キーボード／コントローラ入力を使う場合**: `com.hidano.facialcontrol.input` を導入し、同 GameObject に **Input Facial Extension** を追加。`InputBindingProfileSO` を作成して `FacialInputBinder` に割り当て（キー `1`/`2`/`3` で発動）
+3. **キーボード／コントローラ入力を使う場合**: `com.hidano.facialcontrol.inputsystem` を導入し、同 GameObject に **Input Facial Extension** を追加。`InputBindingProfileSO` を作成して `FacialInputBinder` に割り当て（キー `1`/`2`/`3` で発動）
 4. **OSC を使う場合**: `com.hidano.facialcontrol.osc` を導入し、同 GameObject に **OSC Facial Extension** + `OscReceiver` / `OscSender` を追加
 5. Play して動作確認。BlendShape 名の微調整は `FacialProfileSO` Inspector か **Expression 作成** ウィンドウから（ドロップダウン候補あり）
 

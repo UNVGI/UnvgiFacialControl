@@ -8,13 +8,13 @@
 
 - **新パッケージ作成**:
   - `com.hidano.facialcontrol.osc` — OSC 関連実装（`OscReceiver` / `OscSender` / `OscDoubleBuffer` / `OscMappingTable` / `OscReceiverPlayable` / `OscInputSource` / `OscOptionsDto`）+ `OscRegistration` ヘルパー + `OscFacialControllerExtension` MonoBehaviour
-  - `com.hidano.facialcontrol.input` — InputSystem 関連実装（`InputSystemAdapter` / `FacialInputBinder` / `Controller/Keyboard ExpressionInputSource` / `InputBindingProfileSO` / `ExpressionTriggerOptionsDto` / `InputBinding`）+ `InputRegistration` ヘルパー + `InputFacialControllerExtension` MonoBehaviour
+  - `com.hidano.facialcontrol.inputsystem` — InputSystem 関連実装（`InputSystemAdapter` / `FacialInputBinder` / `Controller/Keyboard ExpressionInputSource` / `InputBindingProfileSO` / `ExpressionTriggerOptionsDto` / `InputBinding`）+ `InputRegistration` ヘルパー + `InputFacialControllerExtension` MonoBehaviour
 - **コア API 改修**:
   - `InputSourceFactory.RegisterReserved<TOptions>(...)` を新設（公式サブパッケージ向け予約 id 登録 API）
   - `InputSourceFactory` コンストラクタを `lipSyncProvider` のみに簡素化（OSC / Controller / Keyboard 直接登録を削除）
   - `IFacialControllerExtension` インターフェース追加 — `FacialController` 初期化時に同 GameObject 上の拡張へ `ConfigureFactory` で `InputSourceFactory` 登録機会を渡す
   - `FacialController` から `_oscSendPort` / `_oscReceivePort` SerializeField を削除（OSC ポート設定は `OscReceiver` / `OscSender` 側に移管）
-- **ファイル移動**: 25+ ファイルを `git mv` で移動（履歴保存）。テスト 12 ファイルもサブパッケージへ移動。`MultiSourceBlendDemo` サンプルは `com.hidano.facialcontrol.input/Samples~/` へ
+- **ファイル移動**: 25+ ファイルを `git mv` で移動（履歴保存）。テスト 12 ファイルもサブパッケージへ移動。`MultiSourceBlendDemo` サンプルは `com.hidano.facialcontrol.inputsystem/Samples~/` へ
 - **コア依存削除**:
   - `Runtime/Adapters/Hidano.FacialControl.Adapters.asmdef` から `Unity.InputSystem` / `uOSC.Runtime` 参照を削除
   - `Editor/Hidano.FacialControl.Editor.asmdef` から `Unity.InputSystem` 参照を削除
@@ -27,7 +27,7 @@
 
 - `Packages/com.hidano.facialcontrol/README.md` — 「クリーンアーキテクチャ」→「レイヤード設計」、「GC アロケーションゼロ」→「定常状態でゼロを目標」、「ロックフリー」→「`Interlocked.Exchange` ベースの非ブロッキング」、`MultiCharacterPerformanceTests` で 10 キャラ動作検証済みを明記。サブパッケージ章追加
 - `Packages/com.hidano.facialcontrol.osc/README.md` — 新規作成
-- `Packages/com.hidano.facialcontrol.input/README.md` — 新規作成
+- `Packages/com.hidano.facialcontrol.inputsystem/README.md` — 新規作成
 - `Packages/com.hidano.facialcontrol/CHANGELOG.md` — `[0.2.0-preview.2]` セクション追加（Added / Changed / Removed / Migration Guide）
 
 ## 決定事項
@@ -49,17 +49,17 @@
 
 ## 残課題（要 Editor 再起動）
 
-**Unity Editor の MonoScript バインディング更新**: `InputBindingProfileSO` を `com.hidano.facialcontrol` から `com.hidano.facialcontrol.input` へ asmdef 移動した結果、Unity の MonoScript-to-class マッピングがランタイムキャッシュで古い参照を保持しており、`ScriptableObject.CreateInstance<InputBindingProfileSO>()` が "Instance couldn't be created. The script class needs to derive from ScriptableObject" を吐く。15 件のテスト失敗は全てこの原因。
+**Unity Editor の MonoScript バインディング更新**: `InputBindingProfileSO` を `com.hidano.facialcontrol` から `com.hidano.facialcontrol.inputsystem` へ asmdef 移動した結果、Unity の MonoScript-to-class マッピングがランタイムキャッシュで古い参照を保持しており、`ScriptableObject.CreateInstance<InputBindingProfileSO>()` が "Instance couldn't be created. The script class needs to derive from ScriptableObject" を吐く。15 件のテスト失敗は全てこの原因。
 
 **対応**: Unity Editor を一度終了 → 再起動すれば解消。または `Library/ScriptAssemblies/` と `Library/Bee/` を削除して再ビルド。
 
-確認済み: `InputBindingProfileSO.cs` の class 定義は正しく `: UnityEngine.ScriptableObject` を継承、コンパイル成功、DLL も `Library/ScriptAssemblies/Hidano.FacialControl.Input.dll` に生成済み。
+確認済み: `InputBindingProfileSO.cs` の class 定義は正しく `: UnityEngine.ScriptableObject` を継承、コンパイル成功、DLL も `Library/ScriptAssemblies/Hidano.FacialControl.InputSystem.dll` に生成済み。
 
 ## ハマりどころ
 
 - **`git mv` できないファイル**: `Samples~/` 配下は `.gitignore` の `*~` パターンで untracked のため `git mv` がエラーで失敗。プレーン `mv` で対応
 - **Unity MCP `Unity_RunCommand` の namespace 自動ラップ**: my code が `Unity.AI.Assistant.Agent.Dynamic.Extension.Editor` 名前空間にラップされ、`UnityEditor.Compilation.CompilationPipeline` を `Unity.CompilationPipeline` と誤解釈する。fully-qualified name (`UnityEditor.Compilation.CompilationPipeline`) を明示する必要あり
-- **Unity AppDomain.GetAssemblies()**: MCP RunCommand 実行コンテキストでは Editor の主 AppDomain と異なる可能性があり、`Hidano.FacialControl.Input` 等の loaded アセンブリ一覧から欠落。テスト実行時の実 AppDomain では正しく load されている
+- **Unity AppDomain.GetAssemblies()**: MCP RunCommand 実行コンテキストでは Editor の主 AppDomain と異なる可能性があり、`Hidano.FacialControl.InputSystem` 等の loaded アセンブリ一覧から欠落。テスト実行時の実 AppDomain では正しく load されている
 
 ## 学び
 

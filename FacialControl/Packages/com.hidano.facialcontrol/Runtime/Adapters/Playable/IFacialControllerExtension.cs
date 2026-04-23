@@ -7,7 +7,7 @@ namespace Hidano.FacialControl.Adapters.Playable
     /// <summary>
     /// FacialController の初期化時にサブパッケージから入力源を追加登録するための拡張点。
     /// 公式サブパッケージ（<c>com.hidano.facialcontrol.osc</c> /
-    /// <c>com.hidano.facialcontrol.input</c> 等）が MonoBehaviour として実装し、
+    /// <c>com.hidano.facialcontrol.inputsystem</c> 等）が MonoBehaviour として実装し、
     /// <see cref="FacialController"/> と同じ GameObject に配置することで自動検出される。
     /// </summary>
     /// <remarks>

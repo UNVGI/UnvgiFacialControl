@@ -7,7 +7,7 @@ using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Adapters.OSC;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
-using Hidano.FacialControl.Input;
+using Hidano.FacialControl.InputSystem;
 using Hidano.FacialControl.Osc;
 using Hidano.FacialControl.Tests.Shared;
 

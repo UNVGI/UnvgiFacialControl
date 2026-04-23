@@ -1,6 +1,6 @@
-# FacialControl Input
+# FacialControl InputSystem
 
-`com.hidano.facialcontrol` の InputSystem 連携アダプタ。
+`com.hidano.facialcontrol` の Unity InputSystem 連携アダプタ。
 
 ## 概要
 

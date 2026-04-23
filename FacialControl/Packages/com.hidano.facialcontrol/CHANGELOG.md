@@ -11,12 +11,12 @@
 #### Added
 
 - 新パッケージ **`com.hidano.facialcontrol.osc`** — OSC 関連実装（`OscReceiver` / `OscSender` / `OscDoubleBuffer` / `OscMappingTable` / `OscReceiverPlayable` / `OscInputSource` / `OscOptionsDto`）
-- 新パッケージ **`com.hidano.facialcontrol.input`** — InputSystem 関連実装（`InputSystemAdapter` / `FacialInputBinder` / `ControllerExpressionInputSource` / `KeyboardExpressionInputSource` / `InputBindingProfileSO` / `ExpressionTriggerOptionsDto` / `InputBinding`）
+- 新パッケージ **`com.hidano.facialcontrol.inputsystem`** — InputSystem 関連実装（`InputSystemAdapter` / `FacialInputBinder` / `ControllerExpressionInputSource` / `KeyboardExpressionInputSource` / `InputBindingProfileSO` / `ExpressionTriggerOptionsDto` / `InputBinding`）
 - `IFacialControllerExtension` (`Hidano.FacialControl.Adapters.Playable`) — `FacialController` 初期化時に同 GameObject の拡張から `InputSourceFactory` に追加登録するための I/F
 - `OscFacialControllerExtension` (`Hidano.FacialControl.Osc`) — OSC を `FacialController` に接続する MonoBehaviour
-- `InputFacialControllerExtension` (`Hidano.FacialControl.Input`) — Controller / Keyboard 入力を `FacialController` に接続する MonoBehaviour
+- `InputFacialControllerExtension` (`Hidano.FacialControl.InputSystem`) — Controller / Keyboard 入力を `FacialController` に接続する MonoBehaviour
 - `OscRegistration.Register(...)` (`Hidano.FacialControl.Osc`) — OSC 入力源を InputSourceFactory に登録するヘルパー
-- `InputRegistration.Register(...)` (`Hidano.FacialControl.Input`) — Controller / Keyboard 入力源を登録するヘルパー
+- `InputRegistration.Register(...)` (`Hidano.FacialControl.InputSystem`) — Controller / Keyboard 入力源を登録するヘルパー
 - `InputSourceFactory.RegisterReserved<TOptions>(...)` — 予約 id を含む任意 id の登録 API（公式サブパッケージ向け）
 
 #### Changed
@@ -30,13 +30,13 @@
 #### Removed
 
 - 旧 `Runtime/Adapters/OSC/`, `Runtime/Adapters/Input/`, `Runtime/Adapters/InputSources/Controller*.cs`, `Runtime/Adapters/InputSources/Keyboard*.cs`, `Runtime/Adapters/ScriptableObject/InputBindingProfileSO.cs`, `Runtime/Adapters/Json/Dto/OscOptionsDto.cs`, `Runtime/Adapters/Json/Dto/ExpressionTriggerOptionsDto.cs`, `Runtime/Adapters/Playable/OscReceiverPlayable.cs`, `Runtime/Domain/Models/InputBinding.cs` — それぞれ対応サブパッケージへ移動
-- `MultiSourceBlendDemo` Sample — `com.hidano.facialcontrol.input/Samples~/` へ移動
+- `MultiSourceBlendDemo` Sample — `com.hidano.facialcontrol.inputsystem/Samples~/` へ移動
 
 #### Migration Guide (preview.1 → preview.2)
 
 1. `Packages/manifest.json` の `com.hidano.facialcontrol` を `0.2.0-preview.2` に更新
 2. OSC を使う場合は `com.hidano.facialcontrol.osc` を追加
-3. InputSystem を使う場合は `com.hidano.facialcontrol.input` を追加
+3. InputSystem を使う場合は `com.hidano.facialcontrol.inputsystem` を追加
 4. `FacialController` を持つ GameObject に該当する `OscFacialControllerExtension` / `InputFacialControllerExtension` を追加
 5. 旧 `FacialController._oscSendPort` / `_oscReceivePort` を参照していたコードは `OscReceiver` / `OscSender` の同名プロパティに置換
 

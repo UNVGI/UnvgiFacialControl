@@ -5,7 +5,7 @@ using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Domain.Models;
 
-namespace Hidano.FacialControl.Input
+namespace Hidano.FacialControl.InputSystem
 {
     /// <summary>
     /// FacialController と同じ GameObject に配置することで、コントローラ・キーボードからの

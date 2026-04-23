@@ -26,7 +26,7 @@ FacialControl は機能別に 3 パッケージで提供されます。コアパ
 |---|---|---|
 | `com.hidano.facialcontrol` | コア（表情遷移・JSON プロファイル・Editor 拡張） | Unity 6000.3+ |
 | `com.hidano.facialcontrol.osc` | OSC 送受信アダプタ（VRChat / ARKit 互換） | コア + `com.hidano.uosc` |
-| `com.hidano.facialcontrol.input` | InputSystem 経由のキーバインド・コントローラ入力 | コア + `com.unity.inputsystem` |
+| `com.hidano.facialcontrol.inputsystem` | InputSystem 経由のキーバインド・コントローラ入力 | コア + `com.unity.inputsystem` |
 
 ### npm レジストリ経由（推奨）
 
@@ -46,7 +46,7 @@ FacialControl は機能別に 3 パッケージで提供されます。コアパ
     "dependencies": {
         "com.hidano.facialcontrol": "0.2.0-preview.2",
         "com.hidano.facialcontrol.osc": "0.1.0-preview.2",
-        "com.hidano.facialcontrol.input": "0.1.0-preview.2"
+        "com.hidano.facialcontrol.inputsystem": "0.1.0-preview.2"
     }
 }
 ```
