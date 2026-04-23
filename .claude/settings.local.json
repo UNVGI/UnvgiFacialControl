@@ -66,7 +66,8 @@
       "Read(//c/Users/Hidano/.claude/skills/**)",
       "Read(//c/Users/Hidano/.claude/plugins/**)",
       "mcp__unity-mcp__Unity_ReadConsole",
-      "mcp__unity-mcp__Unity_ManageEditor"
+      "mcp__unity-mcp__Unity_ManageEditor",
+      "mcp__unity-mcp__Unity_RunCommand"
     ]
   }
 }
