@@ -60,15 +60,16 @@ namespace Hidano.FacialControl.Editor.Windows
 
         /// <summary>
         /// 雛形 Expression（smile / angry / blink）を生成するかどうか。
-        /// デフォルト true。
+        /// デフォルト false。雛形を含めたい場合は明示的に true を設定する
+        /// （ダイアログ UI 側で true + <see cref="NamingConvention.VRM"/> を初期値として提示する）。
         /// </summary>
-        public bool IncludeSampleExpressions { get; set; } = true;
+        public bool IncludeSampleExpressions { get; set; } = false;
 
         /// <summary>
         /// 雛形 Expression 生成時に使用する BlendShape 命名規則。
-        /// デフォルト <see cref="NamingConvention.VRM"/>。
+        /// デフォルト <see cref="NamingConvention.None"/>（雛形なし）。
         /// </summary>
-        public NamingConvention Naming { get; set; } = NamingConvention.VRM;
+        public NamingConvention Naming { get; set; } = NamingConvention.None;
 
         /// <summary>
         /// JSON ファイル名（プロファイル名 + .json）
@@ -231,3 +232,4 @@ namespace Hidano.FacialControl.Editor.Windows
         }
     }
 }
+// recompile trigger

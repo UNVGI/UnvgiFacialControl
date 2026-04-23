@@ -1,0 +1,17 @@
+STARTED
+ALL Total=1054 Passed=1051 Failed=3 Skipped=0
+Q1 Total=0 Passed=0 Failed=0
+FAIL: Hidano.FacialControl.Tests.EditMode.Editor.ProfileCreationTests.BuildProfile_HasEmptyExpressionList
+  MSG:   Expected: 0
+  But was:  3
+
+FAIL: Hidano.FacialControl.Tests.EditMode.Editor.ProfileCreationTests.BuildProfile_SerializeAndParse_EmptyExpressionsRoundTrips
+  MSG:   Expected: 0
+  But was:  3
+
+FAIL: Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests.Pipeline_AggregateAndBlendLoop_AllocatesZeroManagedMemory
+  MSG:   AggregateAndBlend 1000 回ループで GC アロケーションが発生しないこと (差分: 32768 bytes)
+  Expected: less than or equal to 0
+  But was:  32768
+
+DONE
