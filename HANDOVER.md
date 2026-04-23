@@ -2,91 +2,78 @@
 
 ## 今回やったこと
 
-- README レビュー中に出た Q1/Q2/Q3 に回答
-  - Q1: プロファイル JSON 役割とテンプレート位置付け → GUI ファースト化方針決定
-  - Q2: FacialProfileSO = JSON への参照ポインター（現状で OK、アクションなし）
-  - Q3: Addressables 対応パターン A〜E 比較 → preview.1 は A 継続、preview.2 以降で E（`IProfileJsonLoader` 抽象化）
-- Q1 実装 10 タスク完了（計画ファイル: `~/.claude/plans/a-e-q1-twinkly-raven.md`）
-  - `ProfileCreationDialog` に MenuItem `FacialControl/新規プロファイル作成` 追加
-  - `ProfileCreationData` に `NamingConvention` enum（VRM / ARKit / None）と `BuildSampleExpressions()` 追加
-  - ダイアログ UI に命名規則プリセット + 雛形 Expression チェックボックス
-  - `Editor/Common/BlendShapeNameProvider.cs` 新規作成（参照モデルから BlendShape 名収集）
-  - `FacialProfileSOEditor` / `ExpressionCreatorWindow` を BlendShape ドロップダウン化
-  - `ARKitDetectorWindow` + `ARKitEditorService.MergeIntoExistingProfile()` で既存 SO マージ機能追加
-  - 新規テスト 27 件（`SampleExpressionsTests.cs` + `BlendShapeNameProviderTests.cs`）全 pass
-  - `Documentation~/quickstart.md` を GUI ファースト順序に全面刷新
-  - `README.md` のクイックスタート 4 ステップ刷新 + 「既知の制限とロードマップ」節新設
-- テスト結果: 1081 総数、1080 pass、1 flaky（`Pipeline_AggregateAndBlendLoop_AllocatesZeroManagedMemory`）
+- CHANGELOG.md へ Q1 変更を追記
+  - 日付を `2026-04-21` → `Unreleased` に戻す（P22-07 ルール準拠）
+  - Added（Editor 拡張）: MenuItem `FacialControl/新規プロファイル作成`、`ProfileCreationData.NamingConvention`、`BlendShapeNameProvider`、`ARKitEditorService.MergeIntoExistingProfile()`
+  - Changed（Editor 拡張）: BlendShape 名入力の TextField → ドロップダウン化、ARKit マージ UI
+  - ドキュメント（新節）: README の「既知の制限とロードマップ」、quickstart.md の GUI ファースト刷新
+- `Pipeline_AggregateAndBlendLoop_AllocatesZeroManagedMemory` の flaky 対応
+  - ホットパス静的解析: `AggregateAndBlend` の全経路が事前確保バッファで動作し割当なしを確認
+  - Unity MCP 経由で Mono ヒープページサイズを実測（probe で `string[1000]` alloc = 40960 byte = 1 ページ）
+  - 修正: ループ 1,000 → 50,000 iter、許容しきい値 `ManagedPageNoiseToleranceBytes = 64 * 1024`（ページ 2 枚分）
+  - 修正後 TestRunnerApi 経由で 5 連続 pass 確認（flaky 再現せず）
 
 ## 決定事項
 
-- **Q1 対応スコープ**: MenuItem 結線 + 雛形 Expression + BlendShape ドロップダウン化（2 Editor）+ ARKit マージ のフルスコープを preview.1 に含める
-- **雛形 Expression の初期値ポリシー**: `ProfileCreationData` のデフォルトは `IncludeSampleExpressions = false` / `Naming = None`。ダイアログ UI 側でのみ VRM + true を初期値として提示。→ `CreateDefault()` を使う既存テストの互換性を維持
-- **命名規則プリセット**: VRM（`Fcl_ALL_Joy`）/ ARKit（`mouthSmile_L` 等）/ None の 3 択固定
-- **Addressables 対応ロードマップ**: preview.2 以降で `IProfileJsonLoader` I/F を導入し、StreamingAssets / TextAsset / Addressables の 3 実装を opt-in 可能にする。既存 StreamingAssets 経路はデフォルトとして維持
-- **並列 Agent 運用ルール**: 完了直後に必ず `Unity_ReadConsole` でコンパイルエラー 0 を確認する。Agent の `[Tool result missing due to internal error]` は失敗として扱い再実行
+- **CHANGELOG の日付ポリシー**: npm 公開 / タグ作成前は `Unreleased` を維持。P22-07 タスクで実リリース日に置換
+- **EditMode GCAlloc テストの測定方針**: 精密な per-method counter は存在しないため、「ループ回数 × 最小想定割当 >> ページノイズ許容」の条件を満たすループサイズ + ページ許容の組合せで検証
+- **許容しきい値 = 64KB**: Mono ページ実測値（32〜40KB）の 2 倍。32 byte/iter の実回帰でも 50,000 iter で 1.6MB になるため 25 倍のマージンで検出可能
 
 ## 捨てた選択肢と理由
 
-- **Q3 パターン C（SO に JSON 文字列埋め込み）**: 不採用。「JSON ファーストの永続化」ポリシーと真逆で、外部エディタ編集や単独配布・Git diff 性が崩れる
-- **Q3 パターン D 単独採用（Addressables 強制）**: 不採用。ミニマル利用者に Addressables 依存を強制したくない。E の I/F 抽象化で opt-in 提供する
-- **ProfileCreationDialog で「空プロファイル作成」のみ案**: 不採用。雛形 3 件（smile/angry/blink）自動生成で「作成 → Play して即試す」導線を作る方が GUI ファースト価値が高い
-- **Q1 スコープを「MenuItem 結線 + README 並べ替え」のみに限定する案**: 不採用。タイポ耐性 UI 改善（BlendShape ドロップダウン）を合わせて入れないと GUI ファースト化の効果が半減する
-- **batchmode でテスト実行**: Unity Editor 起動中は競合で失敗。`TestRunnerApi` + ファイルポーリング経路に切り替え
-- **`ExpressionCreatorWindow` の TextField → PopupField 置換**: 対象 TextField が存在しなかった（元 UI は slider 方式）。「参照モデル自動解決 + 候補プロバイダフック」という別実装に変更
+- **`GC.GetAllocatedBytesForCurrentThread()` への置換**: Unity Mono では未実装で常に 0 を返すため使えない（probe で確認済）
+- **`Profiler.GetTotalAllocatedMemoryLong()` を使用**: managed 差分を返さず native のみ（probe で `string[1000]` alloc の Profiler diff = 0 を確認）
+- **`Recorder.Get("GC.Alloc")` の `sampleBlockCount`**: EditMode では Profiler の frame sampling が機能せず、`Profiler.enabled = true` でも sampleBlockCount が常に 0（probe で確認済）
+- **tolerance を緩めるだけで対応**: 感度が落ちるので NG。ループ増量と組み合わせて実割当を magnify する方針を採用
+- **PlayMode への移設**: テスト目的（Domain + Adapters の統合パイプライン検証）は EditMode の枠内で完結するため移設不要。`SetWeightZeroAllocationTests` 等の PlayMode 側は既に存在
 
 ## ハマりどころ
 
-- **一晩放置の原因**: 並列 Agent 3 本が ~4 分で完了したが、完了直後に Unity コンパイル検証を行わず、Agent C が混入させた `Application.streamingAssetsPath` 名前空間 shadow バグ（`using Hidano.FacialControl.Application.UseCases;` による）を翌朝まで検知できなかった
-- **Unity の DLL キャッシュ**: ソース編集後 `RequestScriptCompilation(CleanBuildCache)` + `EditorUtility.RequestScriptReload()` でも in-memory の型は古いまま。最終的に Unity 再起動でしか確実に反映できなかった
-- **Test assembly 単体では再コンパイルが走らない**: 新規 `.cs` ファイルを追加しても Test DLL の mtime が更新されず、Total 件数が変わらなかった。Unity 再起動で解消
-- **NUnit `Assert.Contains`**: 第 2 引数が非ジェネリック `ICollection` 要求のため `HashSet<string>` 非対応。`Assert.IsTrue(set.Contains(...))` または `CollectionAssert.Contains(IEnumerable, object)` で代替
-- **Unity MCP `Unity_RunCommand` の namespace 解決**: 生成スクリプトが `Unity.AI.Assistant.Agent.Dynamic.Extension.Editor` 名前空間に包まれるため、`UnityEngine.Application` / `UnityEditor.Compilation.CompilationPipeline` 等は完全修飾しないと shadow される
-- **Unity MCP で domain reload ダイアログが出る操作は不可**: DLL 削除や「Restart Required」系は `UNEXPECTED_ERROR: User interactions are not supported` で拒否される
-- **Bash の `until ... sleep ... done` パターンがセッション設定で denied**: `Monitor` ツール経由で使う必要あり
+- **Unity MCP `Unity_RunCommand` の namespace 自動ラップ**: nested `private` class が namespace レベルに hoist されて `CS1527` エラー。top-level `internal sealed class` として分離して回避
+- **`Application.dataPath` のパス**: Unity project root の `/Assets` を返す。`Path.Combine(..., "..")` で行くのは Unity project root（= `FacialControl/FacialControl/`）であって、**リポジトリ root（= `FacialControl/`）ではない**。test-results ファイルを探すパスを間違えて「ファイルなし」と誤認した
+- **TestRunnerApi 経由の Full EditMode run**: `Filter { testMode = TestMode.EditMode }` だけで実行すると MCP が "User interactions are not supported" を返す。単一テスト名指定やフィルタ付きは動く。回避策未解明（Performance Testing の Prebuild/PostBuild hook が悪さしている可能性）
+- **ICallbacks の GC**: `TestRunnerApi.RegisterCallbacks` は弱参照的挙動のため、コマンド script exit 後にコールバックが GC される。`static` フィールドで参照を保持すれば解決
 
 ## 学び
 
-- 並列 Agent の成功 report はファイル変更の正当性を保証しない。Unity のようなコンパイル依存環境では、Agent 完了 → `Unity_ReadConsole` → 型チェックの 3 段ループが必須
-- Unity の `using Namespace;` は `UnityEngine.{Common}` を shadow しうる。`Application` / `Debug` / `Object` / `Random` / `Time` など衝突しやすい名前はエージェントに事前警告しておく
-- Unity 6 の MCP 経由では、単体 Asset の ImportAsset + ForceUpdate ではなく、ソースファイルの mtime 更新 + 再起動が最も確実な recompile トリガー
-- `CreateDefault()` のようなファクトリメソッドは「古い契約」を保つために property defaults を維持する価値がある。新機能のデフォルトを既存 API に波及させると、既存テスト全体を書き換える必要が出る
+- Unity EditMode で managed alloc を per-method 精度で測る公式手段は事実上存在しない（3 種の API すべて機能不全を確認）
+- 代替パターン: 「ループ回数を桁違いに増やして実割当を magnify + ページサイズを固定 tolerance として吸収」が現実解
+- Mono ヒープは 32〜40KB ページで伸びる。`GC.Collect()` 直後の `GetTotalMemory(false)` は heap minimum を返すが、以降の微小活動で次ページ確保が起きると丸ごと差分に乗る
+- Unity MCP のコード生成は regex ベースの namespace ラップのため、C# の class nesting / アクセス修飾子の組合せに制約がある。top-level に classes を並べる書き方が安定
 
 ## 次にやること
 
 **優先度：高**
 
-- CHANGELOG.md に今回の Q1 変更を追記（MenuItem、雛形 Expression、BlendShape ドロップダウン、ARKit マージ、README ロードマップ節、quickstart.md 刷新）
-- クイックスタート手順を実機で上から実行して詰まる箇所がないか検証（GUI ファースト化したので過去の検証は無効）
+- クイックスタート手順を実機で上から実行して詰まる箇所がないか検証（GUI ファースト化後の初検証）
+- preview.1 リリースステップ: `package.json` バリデーション → uOsc / FacialControl を npmjs.com 公開 → `v0.1.0-preview.1` タグ作成
 
 **優先度：中**
 
-- `Pipeline_AggregateAndBlendLoop_AllocatesZeroManagedMemory` の切り分け（flaky か real regression か）。失敗時の差分は 24576〜32768 byte
-- preview.1 リリースステップ: `package.json` バリデーション → uOsc / FacialControl を npmjs.com 公開 → `v0.1.0-preview.1` タグ作成
 - `Samples~/MultiSourceBlendDemo/MultiSourceBlendDemoHUD.cs` と `Assets/Samples/MultiSourceBlendDemoHUD.cs` の doc コメント差分解消
+- `TryWriteSnapshot_SteadyStateCalls_DoNotAllocate`（`LayerInputSourceAggregatorTests.cs:1107`）も同パターン（`GC.GetTotalMemory` + `<= 0`）だが現状 flaky 報告なし。将来 flaky 化したら同じ修正を展開
 
 **優先度：低（preview.2 以降）**
 
-- `IProfileJsonLoader` I/F 設計 + StreamingAssets / TextAsset / Addressables の 3 実装（Q3 ロードマップ）
+- `IProfileJsonLoader` I/F 設計 + StreamingAssets / TextAsset / Addressables の 3 実装
 - `JsonSchemaDefinition.SampleConfigJson` と旧 `default_config.json` の役割重複棚卸し
 
 ## 関連ファイル
 
-### 新規作成
-- `FacialControl/Packages/com.hidano.facialcontrol/Editor/Common/BlendShapeNameProvider.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Tests/EditMode/Editor/SampleExpressionsTests.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Tests/EditMode/Editor/BlendShapeNameProviderTests.cs`
-
 ### 修正
-- `FacialControl/Packages/com.hidano.facialcontrol/Editor/Windows/ProfileCreationDialog.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Editor/Windows/ProfileCreationData.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Editor/Tools/ExpressionCreatorWindow.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Editor/Inspector/FacialProfileSOEditor.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Editor/Windows/ARKitDetectorWindow.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Editor/Tools/ARKitEditorService.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Documentation~/quickstart.md`
-- `FacialControl/Packages/com.hidano.facialcontrol/README.md`
+- `FacialControl/Packages/com.hidano.facialcontrol/CHANGELOG.md`
+- `FacialControl/Packages/com.hidano.facialcontrol/Tests/EditMode/Integration/OscControllerBlendingIntegrationTests.cs`
 
-### 計画・参照
-- `~/.claude/plans/a-e-q1-twinkly-raven.md`（Q1 実装プラン）
-- `docs/work-procedure.md`（preview.1 チェックリスト L1757-1782）
+### 静的解析で参照（変更なし）
+- `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Services/LayerInputSourceAggregator.cs`
+- `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Services/LayerInputSourceWeightBuffer.cs`
+- `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Services/LayerBlender.cs`
+- `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Adapters/InputSources/OscInputSource.cs`
+- `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Services/ExpressionTriggerInputSourceBase.cs`
+
+### 参考テスト（PlayMode 側の類似実装）
+- `FacialControl/Packages/com.hidano.facialcontrol/Tests/PlayMode/Performance/SetWeightZeroAllocationTests.cs` — managed diff は `<= 0`、Profiler diff は `<= 1024` のハイブリッド
+
+### 一時出力
+- `FacialControl/test-results/pipeline-alloc-test.txt` — 単発検証結果
+- `FacialControl/test-results/pipeline-alloc-multi.txt` — 5 連続実行結果（全 pass）
