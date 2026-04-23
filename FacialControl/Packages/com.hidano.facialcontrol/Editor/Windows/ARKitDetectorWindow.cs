@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
+using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Application.UseCases;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
@@ -41,8 +42,28 @@ namespace Hidano.FacialControl.Editor.Windows
         private Button _generateOscButton;
         private Label _statusLabel;
 
+        // 出力先選択 UI
+        private EnumField _outputModeField;
+        private ObjectField _mergeTargetField;
+
+        // 出力先選択状態
+        private OutputMode _outputMode = OutputMode.NewJson;
+        private FacialProfileSO _mergeTargetProfile;
+
         // 依存
         private ARKitEditorService _editorService;
+
+        /// <summary>
+        /// 生成結果の出力先モード
+        /// </summary>
+        private enum OutputMode
+        {
+            /// <summary>新規 JSON として保存（既定）</summary>
+            NewJson,
+
+            /// <summary>既存 FacialProfileSO の JSON に追記</summary>
+            MergeIntoExisting
+        }
 
         [MenuItem("FacialControl/ARKit 検出ツール", false, 30)]
         public static void ShowWindow()
@@ -122,6 +143,37 @@ namespace Hidano.FacialControl.Editor.Windows
             _resultListView.style.paddingLeft = 4;
             _resultListView.style.paddingRight = 4;
             root.Add(_resultListView);
+
+            // ========================================
+            // 出力先選択セクション
+            // ========================================
+            var outputSection = new VisualElement();
+            outputSection.style.flexShrink = 0;
+            outputSection.style.paddingLeft = 4;
+            outputSection.style.paddingRight = 4;
+            outputSection.style.marginTop = 4;
+            outputSection.style.marginBottom = 2;
+
+            var outputHeader = new Label("出力先");
+            outputHeader.style.unityFontStyleAndWeight = FontStyle.Bold;
+            outputHeader.style.marginBottom = 2;
+            outputSection.Add(outputHeader);
+
+            _outputModeField = new EnumField("保存モード", _outputMode);
+            _outputModeField.RegisterValueChangedCallback(OnOutputModeChanged);
+            outputSection.Add(_outputModeField);
+
+            _mergeTargetField = new ObjectField("マージ先プロファイル")
+            {
+                objectType = typeof(FacialProfileSO),
+                allowSceneObjects = false,
+                tooltip = "追記先の FacialProfileSO（参照する JSON に新規 Expression / OSC マッピングが追記されます）"
+            };
+            _mergeTargetField.RegisterValueChangedCallback(OnMergeTargetChanged);
+            _mergeTargetField.style.display = DisplayStyle.None;
+            outputSection.Add(_mergeTargetField);
+
+            root.Add(outputSection);
 
             // ========================================
             // 生成ボタンセクション
@@ -352,8 +404,34 @@ namespace Hidano.FacialControl.Editor.Windows
         }
 
         /// <summary>
+        /// 出力モード（新規 JSON / 既存 SO マージ）変更時の処理。
+        /// </summary>
+        private void OnOutputModeChanged(ChangeEvent<Enum> evt)
+        {
+            if (evt.newValue is OutputMode mode)
+            {
+                _outputMode = mode;
+            }
+
+            if (_mergeTargetField != null)
+            {
+                _mergeTargetField.style.display = _outputMode == OutputMode.MergeIntoExisting
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+            }
+        }
+
+        /// <summary>
+        /// マージ先 FacialProfileSO 変更時の処理。
+        /// </summary>
+        private void OnMergeTargetChanged(ChangeEvent<UnityEngine.Object> evt)
+        {
+            _mergeTargetProfile = evt.newValue as FacialProfileSO;
+        }
+
+        /// <summary>
         /// Expression 生成ボタン押下時の処理。
-        /// 確認ダイアログを表示後、JSON ファイルとして保存する。
+        /// 出力モードに応じて、新規 JSON 保存または既存 SO への JSON マージを実行する。
         /// </summary>
         private void OnGenerateExpressionsClicked()
         {
@@ -364,6 +442,22 @@ namespace Hidano.FacialControl.Editor.Windows
             }
 
             var expressions = _detectResult.GeneratedExpressions;
+
+            if (_outputMode == OutputMode.MergeIntoExisting)
+            {
+                GenerateExpressionsMergeMode(expressions);
+            }
+            else
+            {
+                GenerateExpressionsNewJsonMode(expressions);
+            }
+        }
+
+        /// <summary>
+        /// 新規 JSON として Expression を保存するモードの処理（既存動作を維持）。
+        /// </summary>
+        private void GenerateExpressionsNewJsonMode(Expression[] expressions)
+        {
             string message =
                 $"{expressions.Length} 個の Expression を生成します:\n\n";
 
@@ -401,8 +495,48 @@ namespace Hidano.FacialControl.Editor.Windows
         }
 
         /// <summary>
+        /// 既存 FacialProfileSO の JSON に Expression を追記するマージモードの処理。
+        /// </summary>
+        private void GenerateExpressionsMergeMode(Expression[] expressions)
+        {
+            if (_mergeTargetProfile == null)
+            {
+                ShowStatus("マージ先の FacialProfileSO を指定してください。", isError: true);
+                return;
+            }
+
+            string message =
+                $"{expressions.Length} 個の Expression をマージします:\n\n";
+
+            for (int i = 0; i < expressions.Length; i++)
+            {
+                message += $"  - {expressions[i].Name} (レイヤー: {expressions[i].Layer}, " +
+                           $"BlendShape: {expressions[i].BlendShapeValues.Length})\n";
+            }
+
+            message += $"\nマージ先: {_mergeTargetProfile.name} ({_mergeTargetProfile.JsonFilePath})\n";
+            message += "ID / 名前が衝突する場合は自動的にリネームされます。続行しますか？";
+
+            if (!EditorUtility.DisplayDialog("Expression 追記マージ", message, "マージ", "キャンセル"))
+                return;
+
+            try
+            {
+                _editorService.MergeIntoExistingProfile(_mergeTargetProfile, expressions);
+                ShowStatus(
+                    $"Expression を {_mergeTargetProfile.name} にマージしました。",
+                    isError: false);
+            }
+            catch (Exception ex)
+            {
+                ShowStatus($"マージエラー: {ex.Message}", isError: true);
+                Debug.LogError($"[ARKitDetectorWindow] Expression マージエラー: {ex}");
+            }
+        }
+
+        /// <summary>
         /// OSC マッピング生成ボタン押下時の処理。
-        /// 確認ダイアログを表示後、config.json として保存する。
+        /// 出力モードに応じて、新規 config.json 保存または既存 SO 参照 JSON 隣接 config.json へのマージを実行する。
         /// </summary>
         private void OnGenerateOscClicked()
         {
@@ -412,6 +546,21 @@ namespace Hidano.FacialControl.Editor.Windows
                 return;
             }
 
+            if (_outputMode == OutputMode.MergeIntoExisting)
+            {
+                GenerateOscMergeMode();
+            }
+            else
+            {
+                GenerateOscNewJsonMode();
+            }
+        }
+
+        /// <summary>
+        /// 新規 config.json として OSC マッピングを保存するモードの処理（既存動作を維持）。
+        /// </summary>
+        private void GenerateOscNewJsonMode()
+        {
             string message =
                 $"{_oscMappings.Length} 個の OSC マッピングを生成します:\n\n";
 
@@ -450,6 +599,55 @@ namespace Hidano.FacialControl.Editor.Windows
             {
                 ShowStatus($"保存エラー: {ex.Message}", isError: true);
                 Debug.LogError($"[ARKitDetectorWindow] OSC マッピング保存エラー: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// マージ先 FacialProfileSO の JSON と隣接する config.json に OSC マッピングを追記するモードの処理。
+        /// </summary>
+        private void GenerateOscMergeMode()
+        {
+            if (_mergeTargetProfile == null)
+            {
+                ShowStatus("マージ先の FacialProfileSO を指定してください。", isError: true);
+                return;
+            }
+
+            string message =
+                $"{_oscMappings.Length} 個の OSC マッピングをマージします:\n\n";
+
+            int previewCount = Math.Min(_oscMappings.Length, 5);
+            for (int i = 0; i < previewCount; i++)
+            {
+                message += $"  {_oscMappings[i].OscAddress} → {_oscMappings[i].BlendShapeName}\n";
+            }
+
+            if (_oscMappings.Length > previewCount)
+            {
+                message += $"  ... 他 {_oscMappings.Length - previewCount} 件\n";
+            }
+
+            message += $"\nマージ先: {_mergeTargetProfile.name} ({_mergeTargetProfile.JsonFilePath})\n";
+            message += "OSC アドレスが既存と重複する場合はスキップされます。続行しますか？";
+
+            if (!EditorUtility.DisplayDialog("OSC マッピング追記マージ", message, "マージ", "キャンセル"))
+                return;
+
+            try
+            {
+                // Expression はマージ済み、または追記不要のケースのため空配列で呼び出し
+                _editorService.MergeIntoExistingProfile(
+                    _mergeTargetProfile,
+                    Array.Empty<Expression>(),
+                    _oscMappings);
+                ShowStatus(
+                    $"OSC マッピングを {_mergeTargetProfile.name} にマージしました。",
+                    isError: false);
+            }
+            catch (Exception ex)
+            {
+                ShowStatus($"マージエラー: {ex.Message}", isError: true);
+                Debug.LogError($"[ARKitDetectorWindow] OSC マッピングマージエラー: {ex}");
             }
         }
 

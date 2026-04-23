@@ -171,6 +171,12 @@ namespace Hidano.FacialControl.Editor.Inspector
             });
             refModelFoldout.Add(refModelField);
 
+            // 参照モデル設定時の補足説明（BlendShape ドロップダウン案内）
+            var refModelHelpBox = new HelpBox(
+                "参照モデルを設定すると、Expression 追加時に BlendShape 名をドロップダウンで選択できます。",
+                HelpBoxMessageType.Info);
+            refModelFoldout.Add(refModelHelpBox);
+
             var detectButton = new Button(OnDetectRendererPathsClicked) { text = "RendererPaths 自動検出" };
             detectButton.AddToClassList(FacialControlStyles.ActionButton);
             refModelFoldout.Add(detectButton);
@@ -1649,36 +1655,16 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         /// <summary>
         /// 使用モデルの全 SkinnedMeshRenderer から BlendShape 名を収集する（重複排除、ソート済み）。
-        /// 使用モデルが null の場合は null を返す。
+        /// 使用モデルが null または BlendShape が 1 件も存在しない場合は null を返す。
+        /// 内部的には <see cref="BlendShapeNameProvider.GetBlendShapeNames(GameObject)"/> を利用する。
         /// </summary>
         private static List<string> CollectBlendShapeNames(GameObject referenceModel)
         {
-            if (referenceModel == null)
+            var names = BlendShapeNameProvider.GetBlendShapeNames(referenceModel);
+            if (names == null || names.Length == 0)
                 return null;
 
-            var renderers = referenceModel.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-            if (renderers.Length == 0)
-                return null;
-
-            var nameSet = new HashSet<string>();
-            foreach (var smr in renderers)
-            {
-                if (smr.sharedMesh == null)
-                    continue;
-
-                var mesh = smr.sharedMesh;
-                for (int i = 0; i < mesh.blendShapeCount; i++)
-                {
-                    nameSet.Add(mesh.GetBlendShapeName(i));
-                }
-            }
-
-            if (nameSet.Count == 0)
-                return null;
-
-            var sorted = new List<string>(nameSet);
-            sorted.Sort(StringComparer.Ordinal);
-            return sorted;
+            return new List<string>(names);
         }
 
         /// <summary>

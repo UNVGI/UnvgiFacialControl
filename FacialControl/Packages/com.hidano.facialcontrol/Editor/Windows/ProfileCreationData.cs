@@ -11,6 +11,27 @@ namespace Hidano.FacialControl.Editor.Windows
     public sealed class ProfileCreationData
     {
         /// <summary>
+        /// 雛形 Expression 生成に使用する BlendShape 命名規則プリセット。
+        /// </summary>
+        public enum NamingConvention
+        {
+            /// <summary>
+            /// VRM 0.x / 1.0 の標準 BlendShape 名（例: Fcl_ALL_Joy）
+            /// </summary>
+            VRM,
+
+            /// <summary>
+            /// ARKit 52 の BlendShape 名（例: mouthSmile_L）
+            /// </summary>
+            ARKit,
+
+            /// <summary>
+            /// 雛形を生成しない（ユーザーが個別に定義する）
+            /// </summary>
+            None
+        }
+
+        /// <summary>
         /// レイヤー定義エントリ（UI 入力用）
         /// </summary>
         public sealed class LayerEntry
@@ -36,6 +57,18 @@ namespace Hidano.FacialControl.Editor.Windows
         /// レイヤー定義リスト
         /// </summary>
         public LayerEntry[] Layers { get; }
+
+        /// <summary>
+        /// 雛形 Expression（smile / angry / blink）を生成するかどうか。
+        /// デフォルト true。
+        /// </summary>
+        public bool IncludeSampleExpressions { get; set; } = true;
+
+        /// <summary>
+        /// 雛形 Expression 生成時に使用する BlendShape 命名規則。
+        /// デフォルト <see cref="NamingConvention.VRM"/>。
+        /// </summary>
+        public NamingConvention Naming { get; set; } = NamingConvention.VRM;
 
         /// <summary>
         /// JSON ファイル名（プロファイル名 + .json）
@@ -89,8 +122,95 @@ namespace Hidano.FacialControl.Editor.Windows
         }
 
         /// <summary>
+        /// 命名規則に対応した雛形 Expression 配列を構築する。
+        /// smile / angry（emotion レイヤー）と blink（eye レイヤー）を含む。
+        /// <see cref="NamingConvention.None"/> の場合は空配列を返す。
+        /// </summary>
+        /// <param name="convention">BlendShape 命名規則プリセット</param>
+        /// <returns>雛形 Expression 配列</returns>
+        public static Expression[] BuildSampleExpressions(NamingConvention convention)
+        {
+            if (convention == NamingConvention.None)
+                return Array.Empty<Expression>();
+
+            var easeInOut = new TransitionCurve(TransitionCurveType.EaseInOut);
+            var linear = new TransitionCurve(TransitionCurveType.Linear);
+
+            // 命名規則毎の BlendShape 値をまとめて解決
+            BlendShapeMapping[] smileShapes;
+            BlendShapeMapping[] angryShapes;
+            BlendShapeMapping[] blinkShapes;
+
+            switch (convention)
+            {
+                case NamingConvention.VRM:
+                    smileShapes = new[]
+                    {
+                        new BlendShapeMapping("Fcl_ALL_Joy", 1.0f)
+                    };
+                    angryShapes = new[]
+                    {
+                        new BlendShapeMapping("Fcl_ALL_Angry", 1.0f)
+                    };
+                    blinkShapes = new[]
+                    {
+                        new BlendShapeMapping("Fcl_ALL_Close", 1.0f)
+                    };
+                    break;
+
+                case NamingConvention.ARKit:
+                    smileShapes = new[]
+                    {
+                        new BlendShapeMapping("mouthSmile_L", 1.0f),
+                        new BlendShapeMapping("mouthSmile_R", 1.0f)
+                    };
+                    angryShapes = new[]
+                    {
+                        new BlendShapeMapping("browDown_L", 1.0f),
+                        new BlendShapeMapping("browDown_R", 1.0f)
+                    };
+                    blinkShapes = new[]
+                    {
+                        new BlendShapeMapping("eyeBlink_L", 1.0f),
+                        new BlendShapeMapping("eyeBlink_R", 1.0f)
+                    };
+                    break;
+
+                default:
+                    return Array.Empty<Expression>();
+            }
+
+            return new[]
+            {
+                new Expression(
+                    Guid.NewGuid().ToString(),
+                    "smile",
+                    "emotion",
+                    0.25f,
+                    easeInOut,
+                    smileShapes),
+                new Expression(
+                    Guid.NewGuid().ToString(),
+                    "angry",
+                    "emotion",
+                    0.25f,
+                    easeInOut,
+                    angryShapes),
+                new Expression(
+                    Guid.NewGuid().ToString(),
+                    "blink",
+                    "eye",
+                    0.08f,
+                    linear,
+                    blinkShapes)
+            };
+        }
+
+        /// <summary>
         /// FacialProfile ドメインモデルを構築する。
-        /// スキーマバージョンは "1.0"、Expression リストは空。
+        /// スキーマバージョンは "1.0"。
+        /// <see cref="IncludeSampleExpressions"/> が true かつ <see cref="Naming"/> が
+        /// <see cref="NamingConvention.None"/> でない場合、雛形 Expression を含める。
         /// </summary>
         public FacialProfile BuildProfile()
         {
@@ -103,7 +223,11 @@ namespace Hidano.FacialControl.Editor.Windows
                     Layers[i].ExclusionMode);
             }
 
-            return new FacialProfile("1.0", layerDefinitions, Array.Empty<Expression>());
+            var expressions = IncludeSampleExpressions
+                ? BuildSampleExpressions(Naming)
+                : Array.Empty<Expression>();
+
+            return new FacialProfile("1.0", layerDefinitions, expressions);
         }
     }
 }

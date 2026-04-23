@@ -6,6 +6,7 @@ using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Hidano.FacialControl.Adapters.Json;
+using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Adapters.FileSystem;
 using Hidano.FacialControl.Domain.Interfaces;
@@ -28,6 +29,9 @@ namespace Hidano.FacialControl.Editor.Tools
         // モデル参照
         private GameObject _targetObject;
         private SkinnedMeshRenderer[] _skinnedMeshRenderers;
+        private ObjectField _modelField;
+        private string[] _availableBlendShapeNames = Array.Empty<string>();
+        private HelpBox _blendShapeHelpBox;
 
         // プレビュー
         private PreviewRenderWrapper _previewWrapper;
@@ -106,13 +110,21 @@ namespace Hidano.FacialControl.Editor.Tools
             mainContainer.Add(leftPanel);
 
             // モデル選択
-            var modelField = new ObjectField("モデル")
+            _modelField = new ObjectField("モデル")
             {
                 objectType = typeof(GameObject),
-                allowSceneObjects = true
+                allowSceneObjects = true,
+                tooltip = "BlendShape 名候補の取得元モデル。プロファイル SO の参照モデル未設定時やシーンに FacialController が無い時の手動選択用。"
             };
-            modelField.RegisterValueChangedCallback(OnModelChanged);
-            leftPanel.Add(modelField);
+            _modelField.RegisterValueChangedCallback(OnModelChanged);
+            leftPanel.Add(_modelField);
+
+            // BlendShape 名ドロップダウン候補案内（モデル未設定時）
+            _blendShapeHelpBox = new HelpBox(
+                "モデルを設定するか、参照モデル付きのプロファイル SO を選択すると、BlendShape 名がドロップダウンで選択できるようになります。",
+                HelpBoxMessageType.Info);
+            _blendShapeHelpBox.style.marginTop = 4;
+            leftPanel.Add(_blendShapeHelpBox);
 
             // プレビュー領域（IMGUI で PreviewRenderUtility を描画）
             _previewContainer = new IMGUIContainer(OnPreviewGUI);
@@ -222,9 +234,33 @@ namespace Hidano.FacialControl.Editor.Tools
         {
             _targetObject = evt.newValue as GameObject;
             CollectBlendShapes();
+            RefreshBlendShapeNameChoices();
             RebuildBlendShapeList();
             SetupPreview();
         }
+
+        /// <summary>
+        /// 現在の <see cref="_targetObject"/> から BlendShape 名候補配列を再構築する。
+        /// <see cref="BlendShapeNameProvider"/> を経由して重複排除・ソート済みの配列を取得する。
+        /// 取得結果が空であれば BlendShape 名の選択案内 HelpBox を表示する。
+        /// </summary>
+        private void RefreshBlendShapeNameChoices()
+        {
+            _availableBlendShapeNames = BlendShapeNameProvider.GetBlendShapeNames(_targetObject);
+
+            if (_blendShapeHelpBox != null)
+            {
+                _blendShapeHelpBox.style.display = _availableBlendShapeNames.Length == 0
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+            }
+        }
+
+        /// <summary>
+        /// 現在利用可能な BlendShape 名候補。モデル未設定時は空配列。
+        /// BlendShape 検索フィルタやタイポ検出の補助として参照する。
+        /// </summary>
+        private string[] AvailableBlendShapeNames => _availableBlendShapeNames ?? Array.Empty<string>();
 
         /// <summary>
         /// 対象モデルから全 SkinnedMeshRenderer の BlendShape を収集する
@@ -285,7 +321,10 @@ namespace Hidano.FacialControl.Editor.Tools
 
             if (_blendShapeEntries.Count == 0)
             {
-                var emptyLabel = new Label("モデルを選択してください。");
+                var message = AvailableBlendShapeNames.Length == 0
+                    ? "モデルを選択してください。"
+                    : "選択中のモデルに BlendShape が見つかりませんでした。";
+                var emptyLabel = new Label(message);
                 emptyLabel.AddToClassList(FacialControlStyles.InfoLabel);
                 emptyLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
                 emptyLabel.style.marginTop = 20;
@@ -502,6 +541,48 @@ namespace Hidano.FacialControl.Editor.Tools
         {
             _profileSO = evt.newValue as FacialProfileSO;
             LoadProfile();
+            TryAutoResolveReferenceModel();
+        }
+
+        /// <summary>
+        /// モデル未選択時に、参照モデルを自動解決してモデルフィールドへ反映する。
+        /// 優先順位:
+        /// 1. 選択中 FacialProfileSO の ReferenceModel
+        /// 2. シーン上の FacialController の GameObject
+        /// どちらも取得できない場合は何もしない（ユーザーが手動で選ぶ既存動線を維持）。
+        /// </summary>
+        private void TryAutoResolveReferenceModel()
+        {
+            if (_modelField == null)
+                return;
+
+            // 既にユーザーがモデルを手動で設定している場合は上書きしない
+            if (_targetObject != null)
+                return;
+
+            GameObject resolved = null;
+
+#if UNITY_EDITOR
+            if (_profileSO != null && _profileSO.ReferenceModel != null)
+            {
+                resolved = _profileSO.ReferenceModel;
+            }
+#endif
+
+            if (resolved == null)
+            {
+                var controller = UnityEngine.Object.FindObjectOfType<FacialController>();
+                if (controller != null)
+                {
+                    resolved = controller.gameObject;
+                }
+            }
+
+            if (resolved != null)
+            {
+                // ChangeEvent<Object> を通して OnModelChanged が呼ばれ、BlendShape 収集が行われる
+                _modelField.value = resolved;
+            }
         }
 
         /// <summary>

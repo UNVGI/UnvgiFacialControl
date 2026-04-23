@@ -64,7 +64,9 @@
       "WebFetch(domain:docs.unity3d.com)",
       "Skill(dig:dig)",
       "Read(//c/Users/Hidano/.claude/skills/**)",
-      "Read(//c/Users/Hidano/.claude/plugins/**)"
+      "Read(//c/Users/Hidano/.claude/plugins/**)",
+      "mcp__unity-mcp__Unity_ReadConsole",
+      "mcp__unity-mcp__Unity_ManageEditor"
     ]
   }
 }

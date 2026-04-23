@@ -30,11 +30,22 @@ namespace Hidano.FacialControl.Editor.Windows
         private Button _addLayerButton;
         private Button _createButton;
         private Label _statusLabel;
+        private EnumField _namingConventionField;
+        private Toggle _includeSampleExpressionsToggle;
 
         private List<ProfileCreationData.LayerEntry> _layers;
         private List<VisualElement> _layerElements;
 
         private IJsonParser _parser;
+
+        /// <summary>
+        /// メニューからダイアログを起動する
+        /// </summary>
+        [MenuItem("FacialControl/新規プロファイル作成", false, 10)]
+        public static void OpenFromMenu()
+        {
+            ShowDialog();
+        }
 
         /// <summary>
         /// ダイアログを表示する
@@ -105,6 +116,38 @@ namespace Hidano.FacialControl.Editor.Windows
             root.Add(_layerListView);
 
             RebuildLayerList();
+
+            // ========================================
+            // 雛形 Expression 設定セクション
+            // ========================================
+            var sampleHeader = new Label("雛形 Expression");
+            sampleHeader.style.marginTop = 8;
+            sampleHeader.style.marginBottom = 4;
+            root.Add(sampleHeader);
+
+            _namingConventionField = new EnumField(
+                "命名規則プリセット",
+                ProfileCreationData.NamingConvention.VRM);
+            _namingConventionField.tooltip =
+                "雛形 Expression の BlendShape 名に使用する命名規則を選択します。None を選ぶと雛形を生成しません。";
+            root.Add(_namingConventionField);
+
+            _includeSampleExpressionsToggle = new Toggle("雛形 Expression を追加")
+            {
+                value = true
+            };
+            _includeSampleExpressionsToggle.tooltip =
+                "smile / angry / blink の 3 つの雛形 Expression をプロファイルに追加します。";
+            root.Add(_includeSampleExpressionsToggle);
+
+            var sampleHelpLabel = new Label(
+                "BlendShape 名はモデル依存のため、必要に応じて Expression 作成ウィンドウで調整してください");
+            sampleHelpLabel.style.whiteSpace = WhiteSpace.Normal;
+            sampleHelpLabel.style.marginTop = 2;
+            sampleHelpLabel.style.marginBottom = 4;
+            sampleHelpLabel.style.color = new Color(0.7f, 0.7f, 0.7f, 1f);
+            sampleHelpLabel.style.fontSize = 11;
+            root.Add(sampleHelpLabel);
 
             // ========================================
             // ボタンセクション
@@ -277,9 +320,43 @@ namespace Hidano.FacialControl.Editor.Windows
                 }
             }
 
+            // 雛形設定の解決（UI 未初期化時のフォールバックあり）
+            var naming = _namingConventionField != null
+                ? (ProfileCreationData.NamingConvention)_namingConventionField.value
+                : ProfileCreationData.NamingConvention.VRM;
+            var includeSamples = _includeSampleExpressionsToggle != null
+                ? _includeSampleExpressionsToggle.value
+                : true;
+
+            // 雛形は emotion / eye レイヤーを参照するため、欠落している場合は警告のみ表示し続行
+            if (includeSamples && naming != ProfileCreationData.NamingConvention.None)
+            {
+                bool hasEmotion = false;
+                bool hasEye = false;
+                for (int i = 0; i < _layers.Count; i++)
+                {
+                    if (_layers[i].Name == "emotion") hasEmotion = true;
+                    if (_layers[i].Name == "eye") hasEye = true;
+                }
+
+                if (!hasEmotion || !hasEye)
+                {
+                    var missing = new List<string>();
+                    if (!hasEmotion) missing.Add("emotion");
+                    if (!hasEye) missing.Add("eye");
+                    Debug.LogWarning(
+                        $"[ProfileCreationDialog] 雛形 Expression が参照するレイヤーが不足しています: {string.Join(", ", missing)}。"
+                        + " 該当レイヤーを追加するか、Expression のレイヤーを調整してください。");
+                }
+            }
+
             try
             {
-                var data = new ProfileCreationData(profileName, _layers.ToArray());
+                var data = new ProfileCreationData(profileName, _layers.ToArray())
+                {
+                    IncludeSampleExpressions = includeSamples,
+                    Naming = naming
+                };
                 var profile = data.BuildProfile();
 
                 // JSON を StreamingAssets に保存
