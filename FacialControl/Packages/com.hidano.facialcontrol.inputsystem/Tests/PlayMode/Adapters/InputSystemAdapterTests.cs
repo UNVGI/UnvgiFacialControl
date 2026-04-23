@@ -5,8 +5,6 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 using UnityEngine.TestTools;
-// 名前空間 Hidano.FacialControl.InputSystem との衝突回避のため UnityEngine.InputSystem.InputSystem static class をエイリアス化
-using InputSystem = UnityEngine.InputSystem.InputSystem;
 using Hidano.FacialControl.Adapters.Input;
 using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Adapters.ScriptableObject;
@@ -29,8 +27,9 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters
         public override void Setup()
         {
             base.Setup();
-            _keyboard = InputSystem.AddDevice<Keyboard>();
-            _gamepad = InputSystem.AddDevice<Gamepad>();
+            // namespace 衝突回避のため UnityEngine.InputSystem.InputSystem を完全修飾
+            _keyboard = UnityEngine.InputSystem.InputSystem.AddDevice<Keyboard>();
+            _gamepad = UnityEngine.InputSystem.InputSystem.AddDevice<Gamepad>();
         }
 
         public override void TearDown()
