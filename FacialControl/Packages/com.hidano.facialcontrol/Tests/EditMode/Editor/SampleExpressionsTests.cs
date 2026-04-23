@@ -34,9 +34,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
             for (int i = 0; i < samples.Length; i++)
                 names.Add(samples[i].Name);
 
-            Assert.Contains("smile", names);
-            Assert.Contains("angry", names);
-            Assert.Contains("blink", names);
+            Assert.IsTrue(names.Contains("smile"));
+            Assert.IsTrue(names.Contains("angry"));
+            Assert.IsTrue(names.Contains("blink"));
         }
 
         [Test]
@@ -118,8 +118,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
             Assert.AreEqual(2, bsArray.Length);
 
             var names = new HashSet<string> { bsArray[0].Name, bsArray[1].Name };
-            Assert.Contains("mouthSmile_L", names);
-            Assert.Contains("mouthSmile_R", names);
+            Assert.IsTrue(names.Contains("mouthSmile_L"));
+            Assert.IsTrue(names.Contains("mouthSmile_R"));
         }
 
         [Test]
@@ -133,8 +133,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
             Assert.AreEqual(2, bsArray.Length);
 
             var names = new HashSet<string> { bsArray[0].Name, bsArray[1].Name };
-            Assert.Contains("eyeBlink_L", names);
-            Assert.Contains("eyeBlink_R", names);
+            Assert.IsTrue(names.Contains("eyeBlink_L"));
+            Assert.IsTrue(names.Contains("eyeBlink_R"));
         }
 
         // --- BuildSampleExpressions: None プリセット ---
