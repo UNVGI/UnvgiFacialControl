@@ -13,7 +13,7 @@
       "depth": 0,
       "source": "embedded",
       "dependencies": {
-        "com.hidano.facialcontrol": "0.2.0-preview.2",
+        "com.hidano.facialcontrol": "0.1.0-preview.1",
         "com.unity.inputsystem": "1.17.0"
       }
     },
@@ -22,7 +22,7 @@
       "depth": 0,
       "source": "embedded",
       "dependencies": {
-        "com.hidano.facialcontrol": "0.2.0-preview.2",
+        "com.hidano.facialcontrol": "0.1.0-preview.1",
         "com.hidano.uosc": "1.0.0"
       }
     },

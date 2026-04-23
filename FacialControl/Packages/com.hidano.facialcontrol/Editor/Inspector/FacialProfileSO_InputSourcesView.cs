@@ -23,9 +23,8 @@ namespace Hidano.FacialControl.Editor.Inspector
     /// 大規模シーンでも <c>FindObjectOfType</c> が毎回走るのを防ぐ。
     /// </para>
     /// <para>
-    /// 旧 preview.1 まで Editor 拡張で実施していた InputBindingProfileSO 由来の
-    /// Category=Controller × Keyboard-only バインド検出は、
-    /// <c>com.hidano.facialcontrol.inputsystem</c> サブパッケージに移管済み（preview.2）。
+    /// InputBindingProfileSO 由来の Category=Controller × Keyboard-only バインド検出は
+    /// <c>com.hidano.facialcontrol.inputsystem</c> サブパッケージ側に配置する想定（コア Editor からは依存切離）。
     /// </para>
     /// </remarks>
     internal sealed class FacialProfileSO_InputSourcesView : IDisposable

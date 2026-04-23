@@ -1,6 +1,6 @@
 {
     "name": "com.hidano.facialcontrol",
-    "version": "0.2.0-preview.2",
+    "version": "0.1.0-preview.1",
     "displayName": "FacialControl",
     "description": "3D キャラクターの表情をリアルタイムに制御する Unity 向けライブラリ。OSC 配信は com.hidano.facialcontrol.osc、InputSystem 連携は com.hidano.facialcontrol.inputsystem を別途追加して使う。",
     "unity": "6000.3",

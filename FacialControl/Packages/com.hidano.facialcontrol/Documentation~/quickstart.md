@@ -44,9 +44,9 @@ FacialControl は機能別に 3 パッケージで提供されます。コアパ
         }
     ],
     "dependencies": {
-        "com.hidano.facialcontrol": "0.2.0-preview.2",
-        "com.hidano.facialcontrol.osc": "0.1.0-preview.2",
-        "com.hidano.facialcontrol.inputsystem": "0.1.0-preview.2"
+        "com.hidano.facialcontrol": "0.1.0-preview.1",
+        "com.hidano.facialcontrol.osc": "0.1.0-preview.1",
+        "com.hidano.facialcontrol.inputsystem": "0.1.0-preview.1"
     }
 }
 ```

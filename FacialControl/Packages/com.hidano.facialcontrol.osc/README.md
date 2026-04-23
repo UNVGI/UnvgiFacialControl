@@ -15,7 +15,7 @@
 
 | パッケージ | バージョン | 用途 |
 |---|---|---|
-| `com.hidano.facialcontrol` | 0.2.0-preview.2 以降 | コア機能 |
+| `com.hidano.facialcontrol` | 0.1.0-preview.1 以降 | コア機能 |
 | `com.hidano.uosc` | 1.0.0 | OSC（UDP）通信 |
 
 ## 使い方

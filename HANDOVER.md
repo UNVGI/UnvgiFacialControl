@@ -2,7 +2,7 @@
 
 ## 今回やったこと
 
-### サブパッケージ分離（preview.1 → preview.2 破壊的変更）
+### サブパッケージ分離（preview.1 内で実施）
 
 コアパッケージ `com.hidano.facialcontrol` が `com.unity.inputsystem` と `com.hidano.uosc` に hard-required している現状を解消し、3 パッケージ構成に再編。
 
@@ -19,7 +19,7 @@
   - `Runtime/Adapters/Hidano.FacialControl.Adapters.asmdef` から `Unity.InputSystem` / `uOSC.Runtime` 参照を削除
   - `Editor/Hidano.FacialControl.Editor.asmdef` から `Unity.InputSystem` 参照を削除
   - `package.json` の `dependencies` から `com.unity.inputsystem` / `com.hidano.uosc` を削除（`com.hidano.scene-view-style-camera-controller` のみ残る）
-  - バージョン: `0.1.0-preview.1` → `0.2.0-preview.2`
+  - バージョン: `0.1.0-preview.1` を維持（未 publish のためバンプなし）
 - **manifest.json 更新**: `com.hidano.facialcontrol.osc` / `.input` を file: 参照で追加
 - **テスト互換維持**: コア `Tests.EditMode` / `Tests.PlayMode` asmdef にサブパッケージ `Hidano.FacialControl.Osc` / `.Input` への参照を追加。`InputSourceFactoryTests.CreateFactory` ヘルパーで `OscRegistration.Register` + `InputRegistration.Register` を呼ぶよう更新
 
@@ -28,7 +28,7 @@
 - `Packages/com.hidano.facialcontrol/README.md` — 「クリーンアーキテクチャ」→「レイヤード設計」、「GC アロケーションゼロ」→「定常状態でゼロを目標」、「ロックフリー」→「`Interlocked.Exchange` ベースの非ブロッキング」、`MultiCharacterPerformanceTests` で 10 キャラ動作検証済みを明記。サブパッケージ章追加
 - `Packages/com.hidano.facialcontrol.osc/README.md` — 新規作成
 - `Packages/com.hidano.facialcontrol.inputsystem/README.md` — 新規作成
-- `Packages/com.hidano.facialcontrol/CHANGELOG.md` — `[0.2.0-preview.2]` セクション追加（Added / Changed / Removed / Migration Guide）
+- `Packages/com.hidano.facialcontrol/CHANGELOG.md` — `[0.1.0-preview.1]` 内に「サブパッケージ構成」サブセクション追加
 
 ## 決定事項
 
@@ -73,4 +73,4 @@
 2. PlayMode テストもフル実行（`Hidano.FacialControl.Tests.PlayMode` + `Osc.Tests.PlayMode` + `Input.Tests.PlayMode`）
 3. Documentation~/quickstart.md 更新（Registration 呼び出し手順追記） — Phase 5 の残タスク
 4. dev プロジェクトで `MultiSourceBlendDemo` シーンを開いて動作確認
-5. preview.2 タグ前に `docs/work-procedure.md` のサブパッケージ化タスクを反映
+5. preview.1 publish 前に `docs/work-procedure.md` のサブパッケージ化タスクを反映

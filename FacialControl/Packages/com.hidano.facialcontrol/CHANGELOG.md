@@ -2,49 +2,19 @@
 
 すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
 
-## [0.2.0-preview.2] - Unreleased
-
-### サブパッケージ分離（破壊的変更）
-
-コアパッケージから OSC / InputSystem 依存を分離し、3 パッケージ構成に再編。コア単体導入時に `com.hidano.uosc` / `com.unity.inputsystem` への依存を強制しなくなった。
-
-#### Added
-
-- 新パッケージ **`com.hidano.facialcontrol.osc`** — OSC 関連実装（`OscReceiver` / `OscSender` / `OscDoubleBuffer` / `OscMappingTable` / `OscReceiverPlayable` / `OscInputSource` / `OscOptionsDto`）
-- 新パッケージ **`com.hidano.facialcontrol.inputsystem`** — InputSystem 関連実装（`InputSystemAdapter` / `FacialInputBinder` / `ControllerExpressionInputSource` / `KeyboardExpressionInputSource` / `InputBindingProfileSO` / `ExpressionTriggerOptionsDto` / `InputBinding`）
-- `IFacialControllerExtension` (`Hidano.FacialControl.Adapters.Playable`) — `FacialController` 初期化時に同 GameObject の拡張から `InputSourceFactory` に追加登録するための I/F
-- `OscFacialControllerExtension` (`Hidano.FacialControl.Osc`) — OSC を `FacialController` に接続する MonoBehaviour
-- `InputFacialControllerExtension` (`Hidano.FacialControl.InputSystem`) — Controller / Keyboard 入力を `FacialController` に接続する MonoBehaviour
-- `OscRegistration.Register(...)` (`Hidano.FacialControl.Osc`) — OSC 入力源を InputSourceFactory に登録するヘルパー
-- `InputRegistration.Register(...)` (`Hidano.FacialControl.InputSystem`) — Controller / Keyboard 入力源を登録するヘルパー
-- `InputSourceFactory.RegisterReserved<TOptions>(...)` — 予約 id を含む任意 id の登録 API（公式サブパッケージ向け）
-
-#### Changed
-
-- `InputSourceFactory` コンストラクタを簡素化: `oscBuffer` / `timeProvider` / `blendShapeNames` / `defaultExclusionMode` パラメータを削除し、`lipSyncProvider` のみを残す。OSC / Controller / Keyboard はサブパッケージのヘルパー経由で登録する
-- `FacialController` から `_oscSendPort` / `_oscReceivePort` SerializeField を削除（OSC ポート設定は `OscReceiver` / `OscSender` に移管）
-- コア `package.json`: `com.unity.inputsystem` / `com.hidano.uosc` 依存を削除
-- コア `Adapters` asmdef: `Unity.InputSystem` / `uOSC.Runtime` 参照を削除
-- バージョン: 0.1.0-preview.1 → 0.2.0-preview.2
-
-#### Removed
-
-- 旧 `Runtime/Adapters/OSC/`, `Runtime/Adapters/Input/`, `Runtime/Adapters/InputSources/Controller*.cs`, `Runtime/Adapters/InputSources/Keyboard*.cs`, `Runtime/Adapters/ScriptableObject/InputBindingProfileSO.cs`, `Runtime/Adapters/Json/Dto/OscOptionsDto.cs`, `Runtime/Adapters/Json/Dto/ExpressionTriggerOptionsDto.cs`, `Runtime/Adapters/Playable/OscReceiverPlayable.cs`, `Runtime/Domain/Models/InputBinding.cs` — それぞれ対応サブパッケージへ移動
-- `MultiSourceBlendDemo` Sample — `com.hidano.facialcontrol.inputsystem/Samples~/` へ移動
-
-#### Migration Guide (preview.1 → preview.2)
-
-1. `Packages/manifest.json` の `com.hidano.facialcontrol` を `0.2.0-preview.2` に更新
-2. OSC を使う場合は `com.hidano.facialcontrol.osc` を追加
-3. InputSystem を使う場合は `com.hidano.facialcontrol.inputsystem` を追加
-4. `FacialController` を持つ GameObject に該当する `OscFacialControllerExtension` / `InputFacialControllerExtension` を追加
-5. 旧 `FacialController._oscSendPort` / `_oscReceivePort` を参照していたコードは `OscReceiver` / `OscSender` の同名プロパティに置換
-
----
-
 ## [0.1.0-preview.1] - Unreleased
 
-初回プレリリース。
+初回プレリリース。3 パッケージ構成（コア + `com.hidano.facialcontrol.osc` + `com.hidano.facialcontrol.inputsystem`）で提供。
+
+### サブパッケージ構成
+
+- 新パッケージ **`com.hidano.facialcontrol.osc`** — OSC 関連実装（`OscReceiver` / `OscSender` / `OscDoubleBuffer` / `OscMappingTable` / `OscReceiverPlayable` / `OscInputSource` / `OscOptionsDto`）+ `OscRegistration` ヘルパー + `OscFacialControllerExtension` MonoBehaviour
+- 新パッケージ **`com.hidano.facialcontrol.inputsystem`** — InputSystem 関連実装（`InputSystemAdapter` / `FacialInputBinder` / `ControllerExpressionInputSource` / `KeyboardExpressionInputSource` / `InputBindingProfileSO` / `ExpressionTriggerOptionsDto` / `InputBinding`）+ `InputRegistration` ヘルパー + `InputFacialControllerExtension` MonoBehaviour
+- コア `Hidano.FacialControl.Adapters` は `Unity.InputSystem` / `uOSC.Runtime` 非参照。表情切替を API から呼ぶだけのユーザーは uOSC・InputSystem インストール不要
+- `IFacialControllerExtension` (`Hidano.FacialControl.Adapters.Playable`) — `FacialController` 初期化時に同 GameObject の拡張から `InputSourceFactory` に追加登録するための I/F
+- `InputSourceFactory.RegisterReserved<TOptions>(...)` — 予約 id を含む任意 id の登録 API（公式サブパッケージ向け）
+
+
 
 ### Added
 

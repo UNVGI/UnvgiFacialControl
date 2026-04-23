@@ -1,6 +1,6 @@
 {
     "name": "com.hidano.facialcontrol.osc",
-    "version": "0.1.0-preview.2",
+    "version": "0.1.0-preview.1",
     "displayName": "FacialControl OSC",
     "description": "FacialControl の OSC 配信アダプタ。VRChat / ARKit 互換 OSC で BlendShape を送受信し、`OscFacialControllerExtension` を介して FacialController に入力源として接続する。",
     "unity": "6000.3",
@@ -9,7 +9,7 @@
         "name": "Hidano"
     },
     "dependencies": {
-        "com.hidano.facialcontrol": "0.2.0-preview.2",
+        "com.hidano.facialcontrol": "0.1.0-preview.1",
         "com.hidano.uosc": "1.0.0"
     },
     "keywords": [
