@@ -228,8 +228,6 @@ GameObject:
   - component: {fileID: 345471963}
   - component: {fileID: 345471962}
   - component: {fileID: 345471961}
-  - component: {fileID: 345471960}
-  - component: {fileID: 345471959}
   m_Layer: 0
   m_Name: Character
   m_TagString: Untagged
@@ -237,17 +235,81 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!1 &512341001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 512341002}
+  - component: {fileID: 345471960}
+  m_Layer: 0
+  m_Name: Facial Input Binder
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &512341002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 512341001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &823412001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 823412002}
+  - component: {fileID: 345471959}
+  m_Layer: 0
+  m_Name: Multi Source Blend Demo HUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &823412002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 823412001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &345471959
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 345471958}
+  m_GameObject: {fileID: 823412001}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 87665ebea9129824b90cb4ca6819c07c, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::Hidano.FacialControl.Samples.MultiSourceBlendDemoHUD
   _facialController: {fileID: 345471962}
   _profileJson: {fileID: 4900000, guid: 4ae8518b46747f341bda0656660f70ab, type: 3}
@@ -260,11 +322,11 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 345471958}
+  m_GameObject: {fileID: 512341001}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4b2f1d8e7a4c4c8ba7c14bf8a3e29a12, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Hidano.FacialControl.InputSystem::Hidano.FacialControl.Adapters.Input.FacialInputBinder
   _facialController: {fileID: 345471962}
   _bindingProfile: {fileID: 11400000, guid: 0053dab565d04cb4abd2e5890f6355e1, type: 2}
@@ -431,3 +493,5 @@ SceneRoots:
   - {fileID: 2031058189}
   - {fileID: 28788804}
   - {fileID: 345471964}
+  - {fileID: 512341002}
+  - {fileID: 823412002}

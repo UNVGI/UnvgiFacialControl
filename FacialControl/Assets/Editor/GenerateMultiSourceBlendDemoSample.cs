@@ -160,6 +160,9 @@ namespace Hidano.FacialControl.Samples.EditorTools
             var scene = EditorSceneManager.NewScene(
                 NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
+            // Character: Animator + FacialController + Extension (Extension は
+            // [RequireComponent(typeof(FacialController))] + FacialController が同一 GO の
+            // GetComponents<IFacialControllerExtension>() で収集するため同居必須)。
             var character = new GameObject("Character");
             Undo.RegisterCreatedObjectUndo(character, "Create Character");
 
@@ -170,8 +173,13 @@ namespace Hidano.FacialControl.Samples.EditorTools
             controller.ProfileSO = null; // HUD ブートストラップで初期化するため明示的に未設定
 
             character.AddComponent<InputFacialControllerExtension>();
+            character.transform.position = Vector3.zero;
 
-            var binder = character.AddComponent<FacialInputBinder>();
+            // Facial Input Binder: InputBindingProfileSO を読み込んでキーボード入力を
+            // FacialController に配線する。役割を示すため個別 GO に配置。
+            var binderGO = new GameObject("Facial Input Binder");
+            Undo.RegisterCreatedObjectUndo(binderGO, "Create Facial Input Binder");
+            var binder = binderGO.AddComponent<FacialInputBinder>();
             {
                 var so = new SerializedObject(binder);
                 so.FindProperty("_facialController").objectReferenceValue = controller;
@@ -179,7 +187,11 @@ namespace Hidano.FacialControl.Samples.EditorTools
                 so.ApplyModifiedPropertiesWithoutUndo();
             }
 
-            var hud = character.AddComponent<MultiSourceBlendDemoHUD>();
+            // Multi Source Blend Demo HUD: TextAsset 経由の profile bootstrap と
+            // OnGUI ウィジェット。役割を示すため個別 GO に配置。
+            var hudGO = new GameObject("Multi Source Blend Demo HUD");
+            Undo.RegisterCreatedObjectUndo(hudGO, "Create HUD");
+            var hud = hudGO.AddComponent<MultiSourceBlendDemoHUD>();
             {
                 var so = new SerializedObject(hud);
                 so.FindProperty("_facialController").objectReferenceValue = controller;
@@ -187,8 +199,6 @@ namespace Hidano.FacialControl.Samples.EditorTools
                 so.FindProperty("_profileJson").objectReferenceValue = jsonAsset;
                 so.ApplyModifiedPropertiesWithoutUndo();
             }
-
-            character.transform.position = Vector3.zero;
 
             // Main Camera を少し引く
             var camera = GameObject.Find("Main Camera");

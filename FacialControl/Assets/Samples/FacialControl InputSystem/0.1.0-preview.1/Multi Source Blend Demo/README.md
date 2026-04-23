@@ -23,15 +23,19 @@ Package Manager で本サンプルを Import すると
 `Assets/Samples/FacialControl InputSystem/<version>/Multi Source Blend Demo/MultiSourceBlendDemo.unity`
 に配置されます。これをダブルクリックで開いてください。
 
-Scene には既に以下の GameObject が存在します。
+Scene には既に以下の GameObject が存在します（役割ごとに個別 GO に分割済み）。
 
-- **Character** — ルート GameObject（以下のコンポーネント付与済み）
+- **Character** — モデルを配置するルート GameObject
   - `Animator`（FacialController の `RequireComponent`）
   - `FacialController`（`Profile SO` は未設定。HUD が JSON を TextAsset 経由で初期化）
   - `InputFacialControllerExtension`（`controller-expr` / `keyboard-expr` アダプタ登録）
-  - `FacialInputBinder`（キーボード入力 → Expression）
-  - `MultiSourceBlendDemoHUD`（JSON TextAsset とウィジェット HUD）
+- **Facial Input Binder** — キーボード入力 → Expression を配線する GO
+  - `FacialInputBinder`（`_facialController` は Character の FacialController を参照）
+- **Multi Source Blend Demo HUD** — OnGUI ウィジェットとプロファイルブートストラップを担う GO
+  - `MultiSourceBlendDemoHUD`（`_profileJson` に同梱 JSON TextAsset、`_facialController` は Character の FacialController を参照）
 - Main Camera / Directional Light
+
+> `InputFacialControllerExtension` は `[RequireComponent(typeof(FacialController))]` かつ `FacialController` 側が同一 GameObject 上の `GetComponents<IFacialControllerExtension>()` で拡張を収集するため、Character に同居させる必要があります。
 
 ### 2. モデルを Character の子に配置
 
