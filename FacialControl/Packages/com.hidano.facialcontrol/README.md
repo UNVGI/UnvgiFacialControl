@@ -115,6 +115,27 @@ Editor/             # Editor 拡張（UI Toolkit）
 | FBX | 対応 |
 | VRM | 今後対応予定 |
 
+## 既知の制限とロードマップ
+
+### Addressables（AssetBundle）対応
+
+現状 preview.1 では、プロファイル JSON は `StreamingAssets/FacialControl/` 配下のファイルシステムから直接読み込む設計です。これにより以下の制約があります。
+
+- **キャラクター Prefab と表情プロファイルを 1 セットで Addressables 配信しにくい**
+  - `FacialController` / `FacialProfileSO` 自体は Addressables 対応可能ですが、SO が指す JSON が StreamingAssets 前提のため、キャラクター配信とセットにできません
+- **プラットフォーム別の読み込み経路差**
+  - Windows PC を主ターゲットとしています。Android / WebGL 等では StreamingAssets アクセスに専用 API が必要で、現状未対応です
+
+### preview.2 以降の予定
+
+**`IProfileJsonLoader` 抽象化の導入**: プロファイル JSON のロード経路を差し替え可能なインターフェースで抽象化し、以下をサポート予定です。
+
+- StreamingAssets（現状、デフォルト）
+- TextAsset 参照（Addressables グループに同梱可能）
+- Addressables アドレス直接指定（リモート配信・追加表情パック）
+
+既存のデフォルト経路（StreamingAssets）は維持するため、現在の設定から破壊的変更は発生しません。
+
 ## ライセンス
 
 [MIT License](LICENSE.md)
