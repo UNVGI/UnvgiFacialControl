@@ -1,0 +1,29 @@
+{
+    "name": "com.hidano.facialcontrol.input",
+    "version": "0.1.0-preview.2",
+    "displayName": "FacialControl Input",
+    "description": "FacialControl の InputSystem 連携アダプタ。コントローラ／キーボードからの Expression トリガー入力と、`InputBindingProfileSO` によるキーバインド永続化を提供する。",
+    "unity": "6000.3",
+    "license": "MIT",
+    "author": {
+        "name": "Hidano"
+    },
+    "dependencies": {
+        "com.hidano.facialcontrol": "0.2.0-preview.2",
+        "com.unity.inputsystem": "1.17.0"
+    },
+    "samples": [
+        {
+            "displayName": "Multi Source Blend Demo",
+            "description": "同一レイヤーに controller-expr と keyboard-expr を並置し、OnGUI 経由で加重和ブレンドを目視確認するサンプル。",
+            "path": "Samples~/MultiSourceBlendDemo"
+        }
+    ],
+    "keywords": [
+        "facial",
+        "blendshape",
+        "expression",
+        "vtuber",
+        "input"
+    ]
+}

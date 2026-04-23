@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Hidano.FacialControl.Adapters.Json.Dto;
-using Hidano.FacialControl.Adapters.OSC;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using UnityEngine;
@@ -20,14 +19,11 @@ namespace Hidano.FacialControl.Adapters.InputSources
     /// 警告ログを出して当該エントリを skip する (Req 3.3)。
     /// </para>
     /// <para>
-    /// 予約 id と DTO 型 / creator の対応:
-    /// <list type="bullet">
-    ///   <item><c>osc</c> → <see cref="OscOptionsDto"/> → <see cref="OscInputSource"/></item>
-    ///   <item><c>lipsync</c> → <see cref="LipSyncOptionsDto"/> → <see cref="LipSyncInputSource"/></item>
-    ///   <item><c>controller-expr</c> → <see cref="ExpressionTriggerOptionsDto"/> → <see cref="ControllerExpressionInputSource"/></item>
-    ///   <item><c>keyboard-expr</c> → <see cref="ExpressionTriggerOptionsDto"/> → <see cref="KeyboardExpressionInputSource"/></item>
-    /// </list>
-    /// サードパーティ <c>x-*</c> 拡張は <see cref="InputSourceFactory.RegisterExtension{TOptions}"/>
+    /// コア標準のビルトイン登録は <c>lipsync</c> のみ（<see cref="LipSyncInputSource"/>）。
+    /// <c>osc</c> / <c>controller-expr</c> / <c>keyboard-expr</c> は公式サブパッケージ
+    /// (<c>com.hidano.facialcontrol.osc</c> / <c>com.hidano.facialcontrol.input</c>) が
+    /// <see cref="RegisterReserved{TOptions}"/> 経由で追加登録する。
+    /// サードパーティ <c>x-*</c> 拡張は <see cref="RegisterExtension{TOptions}"/>
     /// で typed DTO と creator を同時に登録する（Req 1.7, 3.7）。
     /// </para>
     /// </remarks>
@@ -84,66 +80,31 @@ namespace Hidano.FacialControl.Adapters.InputSources
         /// </summary>
         public const int DefaultMaxStackDepth = 8;
 
-        private readonly OscDoubleBuffer _oscBuffer;
-        private readonly ITimeProvider _timeProvider;
         private readonly ILipSyncProvider _lipSyncProvider;
-        private readonly IReadOnlyList<string> _blendShapeNames;
-        private readonly ExclusionMode _defaultExclusionMode;
         private readonly Dictionary<string, Entry> _entries;
 
         /// <summary>
         /// <see cref="InputSourceFactory"/> を構築する。
+        /// コア標準では <c>lipsync</c> のみビルトイン登録される。
+        /// <c>osc</c> / <c>controller-expr</c> / <c>keyboard-expr</c> は対応サブパッケージ
+        /// (<c>com.hidano.facialcontrol.osc</c> / <c>com.hidano.facialcontrol.input</c>) の
+        /// <c>Register(...)</c> ヘルパー経由で <see cref="RegisterReserved{TOptions}"/> を呼ぶこと。
         /// </summary>
-        /// <param name="oscBuffer">OSC 受信ダブルバッファ。<c>null</c> の場合 <c>osc</c> アダプタは生成できない。</param>
-        /// <param name="timeProvider">現在時刻供給元。<c>null</c> の場合 <c>osc</c> アダプタは生成できない。</param>
-        /// <param name="lipSyncProvider">リップシンク値供給元。<c>null</c> の場合 <c>lipsync</c> アダプタは生成できない。</param>
-        /// <param name="blendShapeNames">
-        /// Expression トリガー型アダプタが参照する BlendShape 名の列。
-        /// <c>null</c> の場合は空配列として扱う。
+        /// <param name="lipSyncProvider">
+        /// リップシンク値供給元。<c>null</c> の場合 <c>lipsync</c> アダプタの <see cref="TryCreate"/>
+        /// は <c>null</c> を返す。
         /// </param>
-        /// <param name="defaultExclusionMode">
-        /// Expression トリガー型アダプタに与える既定の排他モード（D-12）。
-        /// </param>
-        public InputSourceFactory(
-            OscDoubleBuffer oscBuffer = null,
-            ITimeProvider timeProvider = null,
-            ILipSyncProvider lipSyncProvider = null,
-            IReadOnlyList<string> blendShapeNames = null,
-            ExclusionMode defaultExclusionMode = ExclusionMode.LastWins)
+        public InputSourceFactory(ILipSyncProvider lipSyncProvider = null)
         {
-            _oscBuffer = oscBuffer;
-            _timeProvider = timeProvider;
             _lipSyncProvider = lipSyncProvider;
-            _blendShapeNames = blendShapeNames ?? Array.Empty<string>();
-            _defaultExclusionMode = defaultExclusionMode;
 
             _entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
-
-            Register(
-                OscInputSource.ReservedId,
-                typeof(OscOptionsDto),
-                () => new OscOptionsDto(),
-                (options, blendShapeCount, profile) => CreateOsc(options));
 
             Register(
                 LipSyncInputSource.ReservedId,
                 typeof(LipSyncOptionsDto),
                 () => new LipSyncOptionsDto(),
                 (options, blendShapeCount, profile) => CreateLipSync(blendShapeCount));
-
-            Register(
-                ControllerExpressionInputSource.ReservedId,
-                typeof(ExpressionTriggerOptionsDto),
-                () => new ExpressionTriggerOptionsDto(),
-                (options, blendShapeCount, profile) =>
-                    CreateController((ExpressionTriggerOptionsDto)options, blendShapeCount, profile));
-
-            Register(
-                KeyboardExpressionInputSource.ReservedId,
-                typeof(ExpressionTriggerOptionsDto),
-                () => new ExpressionTriggerOptionsDto(),
-                (options, blendShapeCount, profile) =>
-                    CreateKeyboard((ExpressionTriggerOptionsDto)options, blendShapeCount, profile));
         }
 
         /// <inheritdoc />
@@ -188,6 +149,55 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
             var effectiveOptions = options ?? entry.DefaultFactory();
             return entry.Creator(effectiveOptions, blendShapeCount, profile);
+        }
+
+        /// <summary>
+        /// 公式サブパッケージ（<c>com.hidano.facialcontrol.osc</c> /
+        /// <c>com.hidano.facialcontrol.input</c> 等）から予約 id 含む任意 id でアダプタを登録する。
+        /// 第三者拡張は <see cref="RegisterExtension{TOptions}"/>（<c>x-*</c> プレフィックス必須）を使うこと。
+        /// </summary>
+        /// <typeparam name="TOptions">
+        /// アダプタが用いる options DTO 型。<see cref="InputSourceOptionsDto"/> 派生で、
+        /// JsonUtility でデシリアライズ可能な public 無引数コンストラクタを持つ必要がある。
+        /// </typeparam>
+        /// <param name="id">登録対象の識別子。予約 id も含む任意 id。</param>
+        /// <param name="creator">
+        /// 型付き options・BlendShape 個数・<see cref="FacialProfile"/> から
+        /// <see cref="IInputSource"/> を生成する関数。必須依存が未注入の場合は <c>null</c> 返却で skip される契約。
+        /// </param>
+        /// <exception cref="ArgumentException">
+        /// <paramref name="id"/> が未初期化（<c>default</c>）の場合。
+        /// </exception>
+        /// <exception cref="ArgumentNullException"><paramref name="creator"/> が <c>null</c> の場合。</exception>
+        /// <remarks>
+        /// 同 id の再登録は後勝ち（警告なし）。サブパッケージ側で予約 id を登録 / 上書きするための公式 API。
+        /// </remarks>
+        public void RegisterReserved<TOptions>(
+            InputSourceId id,
+            Func<TOptions, int, FacialProfile, IInputSource> creator)
+            where TOptions : InputSourceOptionsDto, new()
+        {
+            if (string.IsNullOrEmpty(id.Value))
+            {
+                throw new ArgumentException(
+                    "RegisterReserved requires a valid InputSourceId (Value must not be null or empty).",
+                    nameof(id));
+            }
+
+            if (creator == null)
+            {
+                throw new ArgumentNullException(nameof(creator));
+            }
+
+            Register(
+                id.Value,
+                typeof(TOptions),
+                () => new TOptions(),
+                (options, blendShapeCount, profile) =>
+                {
+                    var typedOptions = options as TOptions ?? new TOptions();
+                    return creator(typedOptions, blendShapeCount, profile);
+                });
         }
 
         /// <summary>
@@ -261,17 +271,6 @@ namespace Hidano.FacialControl.Adapters.InputSources
             _entries[id] = new Entry(optionsType, defaultFactory, creator);
         }
 
-        private IInputSource CreateOsc(InputSourceOptionsDto options)
-        {
-            if (_oscBuffer == null || _timeProvider == null)
-            {
-                return null;
-            }
-
-            var oscOptions = (OscOptionsDto)options;
-            return new OscInputSource(_oscBuffer, oscOptions.stalenessSeconds, _timeProvider);
-        }
-
         private IInputSource CreateLipSync(int blendShapeCount)
         {
             if (_lipSyncProvider == null)
@@ -280,34 +279,6 @@ namespace Hidano.FacialControl.Adapters.InputSources
             }
 
             return new LipSyncInputSource(_lipSyncProvider, blendShapeCount);
-        }
-
-        private IInputSource CreateController(
-            ExpressionTriggerOptionsDto options,
-            int blendShapeCount,
-            FacialProfile profile)
-        {
-            int depth = options.maxStackDepth > 0 ? options.maxStackDepth : DefaultMaxStackDepth;
-            return new ControllerExpressionInputSource(
-                blendShapeCount,
-                depth,
-                _defaultExclusionMode,
-                _blendShapeNames,
-                profile);
-        }
-
-        private IInputSource CreateKeyboard(
-            ExpressionTriggerOptionsDto options,
-            int blendShapeCount,
-            FacialProfile profile)
-        {
-            int depth = options.maxStackDepth > 0 ? options.maxStackDepth : DefaultMaxStackDepth;
-            return new KeyboardExpressionInputSource(
-                blendShapeCount,
-                depth,
-                _defaultExclusionMode,
-                _blendShapeNames,
-                profile);
         }
 
         private readonly struct Entry

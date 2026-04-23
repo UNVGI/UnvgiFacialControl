@@ -6,6 +6,8 @@
         "Hidano.FacialControl.Application",
         "Hidano.FacialControl.Adapters",
         "Hidano.FacialControl.Editor",
+        "Hidano.FacialControl.Osc",
+        "Hidano.FacialControl.Input",
         "Hidano.FacialControl.Tests.Shared",
         "Unity.Collections",
         "Unity.InputSystem",

@@ -1,16 +1,14 @@
 {
     "name": "com.hidano.facialcontrol",
-    "version": "0.1.0-preview.1",
+    "version": "0.2.0-preview.2",
     "displayName": "FacialControl",
-    "description": "3D キャラクターの表情をリアルタイムに制御する Unity 向けライブラリ",
+    "description": "3D キャラクターの表情をリアルタイムに制御する Unity 向けライブラリ。OSC 配信は com.hidano.facialcontrol.osc、InputSystem 連携は com.hidano.facialcontrol.input を別途追加して使う。",
     "unity": "6000.3",
     "license": "MIT",
     "author": {
         "name": "Hidano"
     },
     "dependencies": {
-        "com.unity.inputsystem": "1.17.0",
-        "com.hidano.uosc": "1.0.0",
         "com.hidano.scene-view-style-camera-controller": "1.0.0"
     },
     "keywords": [
@@ -20,11 +18,5 @@
         "vtuber",
         "osc"
     ],
-    "samples": [
-        {
-            "displayName": "Multi Source Blend Demo",
-            "description": "同一レイヤーに controller-expr と keyboard-expr を並置し、OnGUI 経由で加重和ブレンドを目視確認するサンプル。セットアップ手順は同梱 README.md 参照 (モデルは同梱せずユーザーが用意)。",
-            "path": "Samples~/MultiSourceBlendDemo"
-        }
-    ]
+    "samples": []
 }

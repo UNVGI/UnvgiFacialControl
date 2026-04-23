@@ -10,6 +10,8 @@
   ],
   "dependencies": {
     "com.hidano.facialcontrol": "file:com.hidano.facialcontrol",
+    "com.hidano.facialcontrol.osc": "file:com.hidano.facialcontrol.osc",
+    "com.hidano.facialcontrol.input": "file:com.hidano.facialcontrol.input",
     "com.hidano.scene-view-style-camera-controller": "1.0.0",
     "com.hidano.unity-mcp-custom-tools": "git+ssh://git@github-personal/NHidano/UnityMCPCustomTools.git?path=UnityMCPCustomTools/Packages/UnityMCPCustomTools",
     "com.mikunote.hatsunemiku-sample": "git+ssh://git@github.com/NHidano/Mikunote_Models.git?path=/Mikunote_Models/Assets/HatsuneMiku_Sample",

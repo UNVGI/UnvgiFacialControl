@@ -7,6 +7,8 @@ using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Adapters.OSC;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Input;
+using Hidano.FacialControl.Osc;
 using Hidano.FacialControl.Tests.Shared;
 
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
@@ -67,11 +69,17 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
             ITimeProvider timeProvider = null,
             ILipSyncProvider lipSyncProvider = null)
         {
-            return new InputSourceFactory(
-                oscBuffer: oscBuffer,
-                timeProvider: timeProvider,
-                lipSyncProvider: lipSyncProvider,
-                blendShapeNames: BlendShapeNames);
+            // コアの InputSourceFactory は lipsync のビルトイン登録のみを持つ。
+            // OSC / Controller / Keyboard はサブパッケージ側のヘルパー経由で登録する。
+            // 既存テスト互換のため、引数未指定時は stub を用いて全予約 id を登録しておく。
+            var factory = new InputSourceFactory(lipSyncProvider: lipSyncProvider);
+
+            var effectiveBuffer = oscBuffer ?? new OscDoubleBuffer(BlendShapeNames.Length);
+            var effectiveTime = timeProvider ?? new ManualTimeProvider();
+            OscRegistration.Register(factory, effectiveBuffer, effectiveTime);
+            InputRegistration.Register(factory, BlendShapeNames);
+
+            return factory;
         }
 
         [Test]

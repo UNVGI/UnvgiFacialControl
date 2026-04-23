@@ -11,14 +11,14 @@ namespace Hidano.FacialControl.Editor.Inspector
     /// <summary>
     /// FacialController のカスタム Inspector。
     /// UI Toolkit で実装し、プロファイル参照、SkinnedMeshRenderer リスト、
-    /// OSC ポート設定、プロファイル概要を表示する。
+    /// プロファイル概要を表示する。OSC 設定はサブパッケージ
+    /// <c>com.hidano.facialcontrol.osc</c> の専用 MonoBehaviour 側に移管されている。
     /// </summary>
     [CustomEditor(typeof(FacialController))]
     public class FacialControllerEditor : UnityEditor.Editor
     {
         private const string ProfileSectionLabel = "プロファイル";
         private const string RenderersSectionLabel = "SkinnedMeshRenderer";
-        private const string OscSectionLabel = "OSC 設定";
         private const string ProfileInfoSectionLabel = "プロファイル情報";
 
         private Label _layerCountLabel;
@@ -50,19 +50,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             renderersField.tooltip = "空の場合は子オブジェクトから自動検索されます";
             renderersFoldout.Add(renderersField);
             root.Add(renderersFoldout);
-
-            // ========================================
-            // OSC 設定セクション
-            // ========================================
-            var oscFoldout = new Foldout { text = OscSectionLabel, value = true };
-
-            var sendPortField = new PropertyField(serializedObject.FindProperty("_oscSendPort"), "送信ポート");
-            oscFoldout.Add(sendPortField);
-
-            var receivePortField = new PropertyField(serializedObject.FindProperty("_oscReceivePort"), "受信ポート");
-            oscFoldout.Add(receivePortField);
-
-            root.Add(oscFoldout);
 
             // ========================================
             // プロファイル情報セクション（読み取り専用）

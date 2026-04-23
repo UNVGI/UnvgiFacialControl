@@ -2,78 +2,75 @@
 
 ## 今回やったこと
 
-- CHANGELOG.md へ Q1 変更を追記
-  - 日付を `2026-04-21` → `Unreleased` に戻す（P22-07 ルール準拠）
-  - Added（Editor 拡張）: MenuItem `FacialControl/新規プロファイル作成`、`ProfileCreationData.NamingConvention`、`BlendShapeNameProvider`、`ARKitEditorService.MergeIntoExistingProfile()`
-  - Changed（Editor 拡張）: BlendShape 名入力の TextField → ドロップダウン化、ARKit マージ UI
-  - ドキュメント（新節）: README の「既知の制限とロードマップ」、quickstart.md の GUI ファースト刷新
-- `Pipeline_AggregateAndBlendLoop_AllocatesZeroManagedMemory` の flaky 対応
-  - ホットパス静的解析: `AggregateAndBlend` の全経路が事前確保バッファで動作し割当なしを確認
-  - Unity MCP 経由で Mono ヒープページサイズを実測（probe で `string[1000]` alloc = 40960 byte = 1 ページ）
-  - 修正: ループ 1,000 → 50,000 iter、許容しきい値 `ManagedPageNoiseToleranceBytes = 64 * 1024`（ページ 2 枚分）
-  - 修正後 TestRunnerApi 経由で 5 連続 pass 確認（flaky 再現せず）
+### サブパッケージ分離（preview.1 → preview.2 破壊的変更）
+
+コアパッケージ `com.hidano.facialcontrol` が `com.unity.inputsystem` と `com.hidano.uosc` に hard-required している現状を解消し、3 パッケージ構成に再編。
+
+- **新パッケージ作成**:
+  - `com.hidano.facialcontrol.osc` — OSC 関連実装（`OscReceiver` / `OscSender` / `OscDoubleBuffer` / `OscMappingTable` / `OscReceiverPlayable` / `OscInputSource` / `OscOptionsDto`）+ `OscRegistration` ヘルパー + `OscFacialControllerExtension` MonoBehaviour
+  - `com.hidano.facialcontrol.input` — InputSystem 関連実装（`InputSystemAdapter` / `FacialInputBinder` / `Controller/Keyboard ExpressionInputSource` / `InputBindingProfileSO` / `ExpressionTriggerOptionsDto` / `InputBinding`）+ `InputRegistration` ヘルパー + `InputFacialControllerExtension` MonoBehaviour
+- **コア API 改修**:
+  - `InputSourceFactory.RegisterReserved<TOptions>(...)` を新設（公式サブパッケージ向け予約 id 登録 API）
+  - `InputSourceFactory` コンストラクタを `lipSyncProvider` のみに簡素化（OSC / Controller / Keyboard 直接登録を削除）
+  - `IFacialControllerExtension` インターフェース追加 — `FacialController` 初期化時に同 GameObject 上の拡張へ `ConfigureFactory` で `InputSourceFactory` 登録機会を渡す
+  - `FacialController` から `_oscSendPort` / `_oscReceivePort` SerializeField を削除（OSC ポート設定は `OscReceiver` / `OscSender` 側に移管）
+- **ファイル移動**: 25+ ファイルを `git mv` で移動（履歴保存）。テスト 12 ファイルもサブパッケージへ移動。`MultiSourceBlendDemo` サンプルは `com.hidano.facialcontrol.input/Samples~/` へ
+- **コア依存削除**:
+  - `Runtime/Adapters/Hidano.FacialControl.Adapters.asmdef` から `Unity.InputSystem` / `uOSC.Runtime` 参照を削除
+  - `Editor/Hidano.FacialControl.Editor.asmdef` から `Unity.InputSystem` 参照を削除
+  - `package.json` の `dependencies` から `com.unity.inputsystem` / `com.hidano.uosc` を削除（`com.hidano.scene-view-style-camera-controller` のみ残る）
+  - バージョン: `0.1.0-preview.1` → `0.2.0-preview.2`
+- **manifest.json 更新**: `com.hidano.facialcontrol.osc` / `.input` を file: 参照で追加
+- **テスト互換維持**: コア `Tests.EditMode` / `Tests.PlayMode` asmdef にサブパッケージ `Hidano.FacialControl.Osc` / `.Input` への参照を追加。`InputSourceFactoryTests.CreateFactory` ヘルパーで `OscRegistration.Register` + `InputRegistration.Register` を呼ぶよう更新
+
+### README / CHANGELOG / 新パッケージ README 更新
+
+- `Packages/com.hidano.facialcontrol/README.md` — 「クリーンアーキテクチャ」→「レイヤード設計」、「GC アロケーションゼロ」→「定常状態でゼロを目標」、「ロックフリー」→「`Interlocked.Exchange` ベースの非ブロッキング」、`MultiCharacterPerformanceTests` で 10 キャラ動作検証済みを明記。サブパッケージ章追加
+- `Packages/com.hidano.facialcontrol.osc/README.md` — 新規作成
+- `Packages/com.hidano.facialcontrol.input/README.md` — 新規作成
+- `Packages/com.hidano.facialcontrol/CHANGELOG.md` — `[0.2.0-preview.2]` セクション追加（Added / Changed / Removed / Migration Guide）
 
 ## 決定事項
 
-- **CHANGELOG の日付ポリシー**: npm 公開 / タグ作成前は `Unreleased` を維持。P22-07 タスクで実リリース日に置換
-- **EditMode GCAlloc テストの測定方針**: 精密な per-method counter は存在しないため、「ループ回数 × 最小想定割当 >> ページノイズ許容」の条件を満たすループサイズ + ページ許容の組合せで検証
-- **許容しきい値 = 64KB**: Mono ページ実測値（32〜40KB）の 2 倍。32 byte/iter の実回帰でも 50,000 iter で 1.6MB になるため 25 倍のマージンで検出可能
+- **サブパッケージの境界** (Plan: `~/.claude/plans/groovy-plotting-wolf.md`):
+  - Domain の値オブジェクト (`OscMapping` / `OscConfiguration` / `InputSourceType` / `InputSourceId` / `InputSourceDeclaration`) はコアに残置（純データ・uOSC/InputSystem 非依存）
+  - `IInputSource` / `ExpressionTriggerInputSourceBase` / `ValueProviderInputSourceBase` などの汎用抽象もコアに残置
+  - `LipSyncInputSource` はコアに残置（外部ライブラリ依存ゼロのため）
+  - `InputBinding` 値オブジェクト → input サブパッケージへ移動（`InputBindingProfileSO`/`FacialInputBinder` 専用と確認）
+- **`InputSourceFactory.RegisterReserved` は public API**: 予約 id を含む任意 id を登録可能。将来サブパッケージ追加（`.lipsync.full` / `.midi` 等）時も同 API を使う
+- **`OscControllerBlendingIntegrationTests` は input サブパッケージ側**: input asmdef が osc を参照する形で実装
+- **拡張接続パターン**: `IFacialControllerExtension` MonoBehaviour を同 GameObject に配置 → `FacialController` が `GetComponents<IFacialControllerExtension>()` で検出 → `ConfigureFactory(factory, profile, blendShapeNames)` で各 extension が `RegisterReserved` を呼ぶ
 
-## 捨てた選択肢と理由
+## 検証状況
 
-- **`GC.GetAllocatedBytesForCurrentThread()` への置換**: Unity Mono では未実装で常に 0 を返すため使えない（probe で確認済）
-- **`Profiler.GetTotalAllocatedMemoryLong()` を使用**: managed 差分を返さず native のみ（probe で `string[1000]` alloc の Profiler diff = 0 を確認）
-- **`Recorder.Get("GC.Alloc")` の `sampleBlockCount`**: EditMode では Profiler の frame sampling が機能せず、`Profiler.enabled = true` でも sampleBlockCount が常に 0（probe で確認済）
-- **tolerance を緩めるだけで対応**: 感度が落ちるので NG。ループ増量と組み合わせて実割当を magnify する方針を採用
-- **PlayMode への移設**: テスト目的（Domain + Adapters の統合パイプライン検証）は EditMode の枠内で完結するため移設不要。`SetWeightZeroAllocationTests` 等の PlayMode 側は既に存在
+- **コンパイル**: 全 15 アセンブリがクリーンにコンパイル成功（CS エラー 0）
+- **アセンブリ依存**: コア `Hidano.FacialControl.Adapters` の参照は `[Domain, Application, Unity.Collections]` のみ — **InputSystem/uOSC 非参照を確認**
+- **テスト全体**: EditMode テスト 1066 pass / 15 fail（fail はすべて `InputBindingProfileSOTests` のもの。下記注意点）
+
+## 残課題（要 Editor 再起動）
+
+**Unity Editor の MonoScript バインディング更新**: `InputBindingProfileSO` を `com.hidano.facialcontrol` から `com.hidano.facialcontrol.input` へ asmdef 移動した結果、Unity の MonoScript-to-class マッピングがランタイムキャッシュで古い参照を保持しており、`ScriptableObject.CreateInstance<InputBindingProfileSO>()` が "Instance couldn't be created. The script class needs to derive from ScriptableObject" を吐く。15 件のテスト失敗は全てこの原因。
+
+**対応**: Unity Editor を一度終了 → 再起動すれば解消。または `Library/ScriptAssemblies/` と `Library/Bee/` を削除して再ビルド。
+
+確認済み: `InputBindingProfileSO.cs` の class 定義は正しく `: UnityEngine.ScriptableObject` を継承、コンパイル成功、DLL も `Library/ScriptAssemblies/Hidano.FacialControl.Input.dll` に生成済み。
 
 ## ハマりどころ
 
-- **Unity MCP `Unity_RunCommand` の namespace 自動ラップ**: nested `private` class が namespace レベルに hoist されて `CS1527` エラー。top-level `internal sealed class` として分離して回避
-- **`Application.dataPath` のパス**: Unity project root の `/Assets` を返す。`Path.Combine(..., "..")` で行くのは Unity project root（= `FacialControl/FacialControl/`）であって、**リポジトリ root（= `FacialControl/`）ではない**。test-results ファイルを探すパスを間違えて「ファイルなし」と誤認した
-- **TestRunnerApi 経由の Full EditMode run**: `Filter { testMode = TestMode.EditMode }` だけで実行すると MCP が "User interactions are not supported" を返す。単一テスト名指定やフィルタ付きは動く。回避策未解明（Performance Testing の Prebuild/PostBuild hook が悪さしている可能性）
-- **ICallbacks の GC**: `TestRunnerApi.RegisterCallbacks` は弱参照的挙動のため、コマンド script exit 後にコールバックが GC される。`static` フィールドで参照を保持すれば解決
+- **`git mv` できないファイル**: `Samples~/` 配下は `.gitignore` の `*~` パターンで untracked のため `git mv` がエラーで失敗。プレーン `mv` で対応
+- **Unity MCP `Unity_RunCommand` の namespace 自動ラップ**: my code が `Unity.AI.Assistant.Agent.Dynamic.Extension.Editor` 名前空間にラップされ、`UnityEditor.Compilation.CompilationPipeline` を `Unity.CompilationPipeline` と誤解釈する。fully-qualified name (`UnityEditor.Compilation.CompilationPipeline`) を明示する必要あり
+- **Unity AppDomain.GetAssemblies()**: MCP RunCommand 実行コンテキストでは Editor の主 AppDomain と異なる可能性があり、`Hidano.FacialControl.Input` 等の loaded アセンブリ一覧から欠落。テスト実行時の実 AppDomain では正しく load されている
 
 ## 学び
 
-- Unity EditMode で managed alloc を per-method 精度で測る公式手段は事実上存在しない（3 種の API すべて機能不全を確認）
-- 代替パターン: 「ループ回数を桁違いに増やして実割当を magnify + ページサイズを固定 tolerance として吸収」が現実解
-- Mono ヒープは 32〜40KB ページで伸びる。`GC.Collect()` 直後の `GetTotalMemory(false)` は heap minimum を返すが、以降の微小活動で次ページ確保が起きると丸ごと差分に乗る
-- Unity MCP のコード生成は regex ベースの namespace ラップのため、C# の class nesting / アクセス修飾子の組合せに制約がある。top-level に classes を並べる書き方が安定
+- Unity の `git mv` は asmdef + .meta GUID を保持するが、asset DB の MonoScript-class binding キャッシュは domain reload まで stale が残る場合がある
+- サブパッケージ分離時に「拡張点」(`IFacialControllerExtension` 等) を core 側に置けば、サブパッケージは中立な API で接続できる
+- `[RequireComponent(typeof(FacialController))]` を extension MonoBehaviour に付けると Inspector でも分かりやすい
 
 ## 次にやること
 
-**優先度：高**
-
-- クイックスタート手順を実機で上から実行して詰まる箇所がないか検証（GUI ファースト化後の初検証）
-- preview.1 リリースステップ: `package.json` バリデーション → uOsc / FacialControl を npmjs.com 公開 → `v0.1.0-preview.1` タグ作成
-
-**優先度：中**
-
-- `Samples~/MultiSourceBlendDemo/MultiSourceBlendDemoHUD.cs` と `Assets/Samples/MultiSourceBlendDemoHUD.cs` の doc コメント差分解消
-- `TryWriteSnapshot_SteadyStateCalls_DoNotAllocate`（`LayerInputSourceAggregatorTests.cs:1107`）も同パターン（`GC.GetTotalMemory` + `<= 0`）だが現状 flaky 報告なし。将来 flaky 化したら同じ修正を展開
-
-**優先度：低（preview.2 以降）**
-
-- `IProfileJsonLoader` I/F 設計 + StreamingAssets / TextAsset / Addressables の 3 実装
-- `JsonSchemaDefinition.SampleConfigJson` と旧 `default_config.json` の役割重複棚卸し
-
-## 関連ファイル
-
-### 修正
-- `FacialControl/Packages/com.hidano.facialcontrol/CHANGELOG.md`
-- `FacialControl/Packages/com.hidano.facialcontrol/Tests/EditMode/Integration/OscControllerBlendingIntegrationTests.cs`
-
-### 静的解析で参照（変更なし）
-- `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Services/LayerInputSourceAggregator.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Services/LayerInputSourceWeightBuffer.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Services/LayerBlender.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Adapters/InputSources/OscInputSource.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Services/ExpressionTriggerInputSourceBase.cs`
-
-### 参考テスト（PlayMode 側の類似実装）
-- `FacialControl/Packages/com.hidano.facialcontrol/Tests/PlayMode/Performance/SetWeightZeroAllocationTests.cs` — managed diff は `<= 0`、Profiler diff は `<= 1024` のハイブリッド
-
-### 一時出力
-- `FacialControl/test-results/pipeline-alloc-test.txt` — 単発検証結果
-- `FacialControl/test-results/pipeline-alloc-multi.txt` — 5 連続実行結果（全 pass）
+1. **Unity Editor を再起動** → テスト全 pass 確認
+2. PlayMode テストもフル実行（`Hidano.FacialControl.Tests.PlayMode` + `Osc.Tests.PlayMode` + `Input.Tests.PlayMode`）
+3. Documentation~/quickstart.md 更新（Registration 呼び出し手順追記） — Phase 5 の残タスク
+4. dev プロジェクトで `MultiSourceBlendDemo` シーンを開いて動作確認
+5. preview.2 タグ前に `docs/work-procedure.md` のサブパッケージ化タスクを反映

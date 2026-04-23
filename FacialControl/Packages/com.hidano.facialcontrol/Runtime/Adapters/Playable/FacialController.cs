@@ -40,20 +40,6 @@ namespace Hidano.FacialControl.Adapters.Playable
         [SerializeField]
         private SkinnedMeshRenderer[] _skinnedMeshRenderers;
 
-        /// <summary>
-        /// OSC 送信ポート番号
-        /// </summary>
-        [Tooltip("OSC 送信ポート番号")]
-        [SerializeField]
-        private int _oscSendPort = Domain.Models.OscConfiguration.DefaultSendPort;
-
-        /// <summary>
-        /// OSC 受信ポート番号
-        /// </summary>
-        [Tooltip("OSC 受信ポート番号")]
-        [SerializeField]
-        private int _oscReceivePort = Domain.Models.OscConfiguration.DefaultReceivePort;
-
         private Animator _animator;
         private PlayableGraphBuilder.BuildResult _graphBuildResult;
         private ExpressionUseCase _expressionUseCase;
@@ -62,10 +48,6 @@ namespace Hidano.FacialControl.Adapters.Playable
         private FacialProfile? _currentProfile;
         private string[] _blendShapeNames;
         private bool _isInitialized;
-
-        // プロセス内で 1 インスタンスだけ保持する時刻源 (8.2)。
-        // 初期化経路 (InputSourceFactory / LayerInputSourceAggregator) で共有する。
-        private static ITimeProvider s_sharedTimeProvider;
 
         // BlendShape 出力インデックス → (Renderer, Renderer 上の BS index) のマッピング
         private BlendShapeTarget[][] _blendShapeTargets;
@@ -111,24 +93,6 @@ namespace Hidano.FacialControl.Adapters.Playable
         {
             get => _skinnedMeshRenderers;
             set => _skinnedMeshRenderers = value;
-        }
-
-        /// <summary>
-        /// OSC 送信ポート番号
-        /// </summary>
-        public int OscSendPort
-        {
-            get => _oscSendPort;
-            set => _oscSendPort = value;
-        }
-
-        /// <summary>
-        /// OSC 受信ポート番号
-        /// </summary>
-        public int OscReceivePort
-        {
-            get => _oscReceivePort;
-            set => _oscReceivePort = value;
         }
 
         // ================================================================
@@ -248,22 +212,16 @@ namespace Hidano.FacialControl.Adapters.Playable
             _currentProfile = profile;
             _expressionUseCase = new ExpressionUseCase(profile);
 
-            // UnityTimeProvider はプロセス内単一インスタンスを再利用する (8.2)
-            if (s_sharedTimeProvider == null)
-            {
-                s_sharedTimeProvider = new UnityTimeProvider();
-            }
-
-            // InputSourceFactory をプロファイルごとに構築する
-            // (blendShapeNames などプロファイル由来の依存を持つため)。
-            // OSC / LipSync は後続タスクで配線する想定で今は null を渡す
-            // (osc / lipsync 宣言は TryCreate が null を返して呼出側で skip される契約)。
+            // InputSourceFactory をプロファイルごとに構築する。
+            // コアは lipsync のビルトイン登録のみ持つ。
+            // OSC / Controller / Keyboard 等は同 GameObject 上の IFacialControllerExtension が
+            // ConfigureFactory 経由で RegisterReserved を呼んで配線する。
+            // 未配線の id は TryCreate が null を返して呼出側で skip される契約。
             var blendShapeNames = _blendShapeNames ?? Array.Empty<string>();
-            _inputSourceFactory = new InputSourceFactory(
-                oscBuffer: null,
-                timeProvider: s_sharedTimeProvider,
-                lipSyncProvider: null,
-                blendShapeNames: blendShapeNames);
+            _inputSourceFactory = new InputSourceFactory(lipSyncProvider: null);
+
+            // 同 GameObject 上の拡張 (OSC / Input サブパッケージ等) に追加登録の機会を与える。
+            ApplyExtensions(profile, blendShapeNames);
 
             // profile.LayerInputSources を Factory 経由で IInputSource 列に変換する。
             var additionalSources = BuildAdditionalInputSources(profile, _inputSourceFactory, blendShapeNames.Length);
@@ -278,6 +236,24 @@ namespace Hidano.FacialControl.Adapters.Playable
 
             _graphBuildResult.Graph.Play();
             _isInitialized = true;
+        }
+
+        private void ApplyExtensions(FacialProfile profile, string[] blendShapeNames)
+        {
+            var extensions = GetComponents<IFacialControllerExtension>();
+            for (int i = 0; i < extensions.Length; i++)
+            {
+                var ext = extensions[i];
+                try
+                {
+                    ext.ConfigureFactory(_inputSourceFactory, profile, blendShapeNames);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError(
+                        $"FacialController: extension '{ext.GetType().Name}' の ConfigureFactory が失敗しました: {ex}");
+                }
+            }
         }
 
         private static List<(int layerIdx, IInputSource source, float weight)> BuildAdditionalInputSources(

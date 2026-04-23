@@ -5,9 +5,25 @@
       "depth": 0,
       "source": "embedded",
       "dependencies": {
-        "com.unity.inputsystem": "1.17.0",
-        "com.hidano.uosc": "1.0.0",
         "com.hidano.scene-view-style-camera-controller": "1.0.0"
+      }
+    },
+    "com.hidano.facialcontrol.input": {
+      "version": "file:com.hidano.facialcontrol.input",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.hidano.facialcontrol": "0.2.0-preview.2",
+        "com.unity.inputsystem": "1.17.0"
+      }
+    },
+    "com.hidano.facialcontrol.osc": {
+      "version": "file:com.hidano.facialcontrol.osc",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.hidano.facialcontrol": "0.2.0-preview.2",
+        "com.hidano.uosc": "1.0.0"
       }
     },
     "com.hidano.scene-view-style-camera-controller": {
