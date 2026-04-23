@@ -23,9 +23,9 @@ namespace Hidano.FacialControl.Editor.Inspector
     /// 大規模シーンでも <c>FindObjectOfType</c> が毎回走るのを防ぐ。
     /// </para>
     /// <para>
-    /// 加えて、<c>Category=Controller</c> のまま Keyboard デバイスのみを参照している
-    /// <see cref="InputBindingProfileSO"/> が Project 内に存在する場合、
-    /// 注意喚起の <see cref="HelpBox"/> を表示する (best-effort)。
+    /// 旧 preview.1 まで Editor 拡張で実施していた InputBindingProfileSO 由来の
+    /// Category=Controller × Keyboard-only バインド検出は、
+    /// <c>com.hidano.facialcontrol.input</c> サブパッケージに移管済み（preview.2）。
     /// </para>
     /// </remarks>
     internal sealed class FacialProfileSO_InputSourcesView : IDisposable
@@ -36,7 +36,6 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         private readonly VisualElement _root;
         private readonly Label _placeholderLabel;
-        private readonly HelpBox _categoryWarningBox;
         private readonly ListView _listView;
 
         private readonly List<LayerSourceWeightEntry> _entries = new List<LayerSourceWeightEntry>();
@@ -58,12 +57,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             _placeholderLabel.style.marginBottom = 2;
             _root.Add(_placeholderLabel);
 
-            _categoryWarningBox = new HelpBox(
-                string.Empty,
-                HelpBoxMessageType.Warning);
-            _categoryWarningBox.style.display = DisplayStyle.None;
-            _root.Add(_categoryWarningBox);
-
             _listView = new ListView
             {
                 fixedItemHeight = 18f,
@@ -81,7 +74,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             EditorApplication.update += OnEditorUpdate;
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
 
-            RefreshCategoryWarning();
             RefreshSnapshot(forceRecheck: true);
         }
 
@@ -255,79 +247,5 @@ namespace Hidano.FacialControl.Editor.Inspector
             return null;
         }
 
-        private void RefreshCategoryWarning()
-        {
-            int problematicCount = CountProblematicControllerCategoryBindings();
-            if (problematicCount > 0)
-            {
-                _categoryWarningBox.text =
-                    $"Category=Controller のまま Keyboard デバイスのみにバインドされている InputBindingProfileSO が " +
-                    $"{problematicCount} 件あります。意図した設定か確認してください (詳細はコンソールの警告を参照)。";
-                _categoryWarningBox.style.display = DisplayStyle.Flex;
-            }
-            else
-            {
-                _categoryWarningBox.style.display = DisplayStyle.None;
-            }
-        }
-
-        private static int CountProblematicControllerCategoryBindings()
-        {
-            int count = 0;
-            var guids = AssetDatabase.FindAssets($"t:{nameof(InputBindingProfileSO)}");
-            for (int i = 0; i < guids.Length; i++)
-            {
-                var path = AssetDatabase.GUIDToAssetPath(guids[i]);
-                var profile = AssetDatabase.LoadAssetAtPath<InputBindingProfileSO>(path);
-                if (profile == null)
-                    continue;
-
-                if (profile.InputSourceCategory != InputSourceCategory.Controller)
-                    continue;
-
-                if (IsKeyboardOnly(profile))
-                {
-                    count++;
-                }
-            }
-            return count;
-        }
-
-        private static bool IsKeyboardOnly(InputBindingProfileSO profile)
-        {
-            var asset = profile.ActionAsset;
-            if (asset == null)
-                return false;
-
-            var mapName = profile.ActionMapName;
-            if (string.IsNullOrEmpty(mapName))
-                return false;
-
-            var map = asset.FindActionMap(mapName);
-            if (map == null)
-                return false;
-
-            int leafCount = 0;
-            int keyboardCount = 0;
-            foreach (var binding in map.bindings)
-            {
-                if (binding.isComposite)
-                    continue;
-
-                string path = binding.effectivePath;
-                if (string.IsNullOrEmpty(path))
-                    path = binding.path;
-                if (string.IsNullOrEmpty(path))
-                    continue;
-
-                leafCount++;
-                if (path.StartsWith("<Keyboard>", StringComparison.OrdinalIgnoreCase))
-                {
-                    keyboardCount++;
-                }
-            }
-
-            return leafCount > 0 && leafCount == keyboardCount;
-        }
     }
 }
