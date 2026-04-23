@@ -196,7 +196,7 @@ Tests/
 - 機能単位リリース: preview.1 → preview.2 → ... → 1.0.0
 - 2026 年 2 月末までにプレリリース目標
 - プレリリーススコープ: コア + Editor 拡張 + OSC 通信 + ARKit/PerfectSync 完全対応
-- プレリリースにはドキュメントのみ同梱（サンプルシーンなし）
+- プレリリース同梱物: ドキュメント + `com.hidano.facialcontrol.inputsystem` の `Multi Source Blend Demo` サンプル（Scene / FacialProfileSO / InputBindingProfileSO / JSON / HUD 一式。モデルはユーザー持ち込み）
 
 ## Claude Code 実行ルール
 

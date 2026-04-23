@@ -540,7 +540,7 @@ JSON (FacialProfile)
 | OSC 通信 | 含む |
 | ARKit / PerfectSync 完全対応 | 含む |
 | パッケージドキュメント（README / Documentation~ の Markdown） | 含む |
-| サンプルシーン | 含まない（別リポジトリまたは後のリリースで提供） |
+| サンプルシーン | `com.hidano.facialcontrol.inputsystem` の `Multi Source Blend Demo` を同梱（Scene + FacialProfileSO + InputBindingProfileSO + JSON + HUD 一式、モデルはユーザー持ち込み） |
 | OSC マッピング Editor UI | 含まない（JSON 直接編集のみ） |
 
 ### 7.3 実装順序

@@ -144,4 +144,4 @@
 - プロファイル情報のレイヤー数・Expression 数の冗長な表示
 - JSON 読み込みボタン（Inspector 表示時の自動読み込みで代替）
 - クローン作成ボタン（Unity 標準のアセット複製で代替）
-- `Assets/Samples/TestExpressionToggle.cs`（`FacialInputBinder` + `SampleInputBinding.asset` への移行により不要）
+- `Assets/Samples/TestExpressionToggle.cs`（`FacialInputBinder` + `com.hidano.facialcontrol.inputsystem/Samples~/MultiSourceBlendDemo/MultiSourceBlendDemoInputBinding.asset` への移行により不要）

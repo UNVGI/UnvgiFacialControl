@@ -695,8 +695,8 @@
 
 | 項目 | 決定内容 |
 |------|----------|
-| プレリリース同梱物 | API ドキュメントのみ。サンプルシーンは同梱しない |
-| サンプルシーン | 別リポジトリまたは後のリリースで提供 |
+| プレリリース同梱物 | API ドキュメント + `com.hidano.facialcontrol.inputsystem` の `Multi Source Blend Demo` サンプル |
+| サンプルシーン | `com.hidano.facialcontrol.inputsystem/Samples~/MultiSourceBlendDemo` に Scene + FacialProfileSO + InputBindingProfileSO + JSON + HUD を同梱。モデルはライセンスの都合で含めず、ユーザーが Character GameObject の子に配置する設計 |
 
 ---
 

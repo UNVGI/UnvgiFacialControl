@@ -1,5 +1,46 @@
 # HANDOVER (2026-04-23)
 
+## 追記 (同日・サンプル完成度向上セッション)
+
+### やったこと
+
+- `com.hidano.facialcontrol.inputsystem/Samples~/MultiSourceBlendDemo/` に以下を新規同梱
+  - `MultiSourceBlendDemo.unity` — モデル以外結線済み Scene
+  - `MultiSourceBlendDemoProfile.asset` — `FacialProfileSO`（パターン呈示用）
+  - `MultiSourceBlendDemoInputBinding.asset` — `InputBindingProfileSO`（Keyboard Trigger1-4 → smile/angry/surprise/troubled）
+  - `MultiSourceBlendDemoHUD.cs` — `[DefaultExecutionOrder(-100)]` + `TextAsset _profileJson` フィールドで Awake 時に `SystemTextJsonParser.ParseProfile` → `FacialController.InitializeWithProfile` を呼ぶブートストラップ機能追加
+  - `multi_source_blend_demo.json` — emotion レイヤー + 4 Expression に簡素化
+  - `README.md` — モデル配置〜Play の 3 ステップ手順
+- Scene ヒエラルキーを 3 GameObject に役割分割
+  - `Character`: Animator + FacialController + InputFacialControllerExtension（Extension は `[RequireComponent]` + `GetComponents<IFacialControllerExtension>()` 同 GO 制約のため同居必須）
+  - `Facial Input Binder`: `FacialInputBinder`（Character の FacialController を参照）
+  - `Multi Source Blend Demo HUD`: HUD（JSON TextAsset + Character の FacialController を参照）
+- `Assets/Samples/FacialControl InputSystem/0.1.0-preview.1/Multi Source Blend Demo/` に dev ミラーを同期（CLAUDE.md 二重管理ルール準拠、.meta GUID 共有）
+- `Assets/Editor/GenerateMultiSourceBlendDemoSample.cs` を追加 — `Tools/FacialControl/Generate Multi Source Blend Demo Sample` メニュー + `[InitializeOnLoadMethod]` で sentinel 付き auto-run。Scene が無い場合のみ regenerate
+- ドキュメント更新
+  - `CLAUDE.md` の「プレリリース同梱物」から「サンプルシーンなし」記述を撤回
+  - `docs/requirements.md` / `docs/requirements-qa.md` の同梱ポリシーを最新化
+  - `docs/work-procedure.md` の P23-05 を MultiSourceBlendDemo ベースに書き直し
+  - `Documentation~/quickstart.md` 冒頭にサンプル導線を追加
+  - `com.hidano.facialcontrol/CHANGELOG.md` および `com.hidano.facialcontrol.inputsystem/README.md` / `package.json` のサンプル記述を更新
+
+### 決定事項
+
+- **HUD TextAsset bootstrap を採用**: `FacialProfileSO.JsonFilePath` は `StreamingAssets` 前提のため、サンプルだけは HUD が TextAsset 経由で直接 JSON をパースし `InitializeWithProfile` を呼ぶ設計。FacialController のコア設計は変更せず、Scene 上では `_profileSO = null`（自動初期化無効化） + HUD が Awake で手動初期化
+- **Scene YAML は手動編集**: Unity MCP が別プロジェクト (`RealtimeAvatarController`) に接続されているため、`Assets/Editor/GenerateMultiSourceBlendDemoSample.cs` を auto-run させて FacialControl 側 Unity 実体で Scene 生成。`_bindingProfile` 参照が null になる bug に対し `AssetDatabase.SaveAssets()` を SO 生成と Scene 生成の間に挿入することで修正
+- **3 GO 分割**: ユーザー要望「役割が分かりやすいように個別の GameObject に配置」に従い、Binder と HUD を分離。Extension は RequireComponent + 同 GO 限定の GetComponents 収集のため Character に残置
+
+### ハマりどころ
+
+- **`ApplyModifiedPropertiesWithoutUndo` + `objectReferenceValue` は CreateAsset 後に SaveAssets が必要**: `bindingSO` を新規作成直後に Scene 上の SerializedObject に `objectReferenceValue = bindingSO` でセットしても、SaveAssets を挟まないと Scene YAML に `{fileID: 0}` がシリアライズされる
+- **Unity MCP はプロセス単位で唯一の接続先を保持**: 複数 Unity Editor を起動していても MCP が他プロジェクトにバインドしていると、FacialControl 側 Unity に直接コマンドを送れない。`Assets/Editor/` の `[InitializeOnLoadMethod]` で auto-run させる間接アプローチが唯一の自動化手段
+
+### 次にやること
+
+- 既存 HANDOVER の P1 項目「MultiSourceBlendDemo シーン動作確認」は **Scene/SO 作成までは完了**。実モデル配置での Play 動作確認は引き続き未実施（ユーザー持ち込みのモデルで手動検証が必要）
+
+---
+
 ## 今回やったこと
 
 ### README 正直化修正

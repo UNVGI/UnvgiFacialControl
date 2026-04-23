@@ -2,6 +2,8 @@
 
 FacialControl を使って 3D キャラクターの表情をリアルタイム制御するまでの手順を解説します。本ガイドは GUI ベースの導線を優先しており、上から順に読み進めれば JSON を手書きせずに動作確認まで完遂できます。
 
+> **最速動作確認**: `com.hidano.facialcontrol.inputsystem` をインストール後、Package Manager から `Multi Source Blend Demo` サンプルを Import し、開いた Scene の `Character` GameObject にモデル（FBX / VRM）を子として配置すれば、本ガイドの手順をスキップして即座にキーボード/HUD 操作で表情遷移を確認できます。詳細は `Samples~/MultiSourceBlendDemo/README.md` 参照。
+
 ## 動作要件
 
 - Unity 6000.3 以降
