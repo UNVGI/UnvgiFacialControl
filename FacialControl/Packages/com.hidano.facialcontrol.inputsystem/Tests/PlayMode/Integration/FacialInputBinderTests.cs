@@ -6,6 +6,8 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.TestTools;
+// 名前空間 Hidano.FacialControl.InputSystem との衝突回避のため UnityEngine.InputSystem.InputSystem static class をエイリアス化
+using InputSystem = UnityEngine.InputSystem.InputSystem;
 using Hidano.FacialControl.Adapters.Input;
 using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Adapters.ScriptableObject;
