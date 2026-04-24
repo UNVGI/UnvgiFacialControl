@@ -1,9 +1,0 @@
-STARTED
-ALL Total=1081 Passed=1080 Failed=1 Skipped=0
-Q1 Total=27 Passed=27 Failed=0
-FAIL: Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests.Pipeline_AggregateAndBlendLoop_AllocatesZeroManagedMemory
-  MSG:   AggregateAndBlend 1000 回ループで GC アロケーションが発生しないこと (差分: 24576 bytes)
-  Expected: less than or equal to 0
-  But was:  24576
-
-DONE

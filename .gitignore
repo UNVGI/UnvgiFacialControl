@@ -238,8 +238,9 @@ coverage.xml
 #Msbuild binary log output
 output.binlog
 
-# Unity test runner log output
-test-results/unity-log-*.txt
+# Unity test runner output (logs, XML, diagnostic artifacts — regenerated locally & in CI)
+/test-results/
+FacialControl/test-results/
 
 # KDiff3
 *_BACKUP_*
