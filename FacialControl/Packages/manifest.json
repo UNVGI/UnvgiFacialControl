@@ -1,31 +1,20 @@
 {
   "scopedRegistries": [
     {
-      "name": "npmjs",
-      "url": "https://registry.npmjs.org",
+      "name": "UNVGI Inc.",
+      "url": "https://npm.unvgi.com",
       "scopes": [
-        "com.hidano"
+        "jp.co.unvgi"
       ]
     }
   ],
   "dependencies": {
-    "com.hidano.facialcontrol": "file:com.hidano.facialcontrol",
-    "com.hidano.facialcontrol.osc": "file:com.hidano.facialcontrol.osc",
-    "com.hidano.facialcontrol.inputsystem": "file:com.hidano.facialcontrol.inputsystem",
-    "com.hidano.scene-view-style-camera-controller": "1.0.0",
-    "com.hidano.unity-mcp-custom-tools": "git+ssh://git@github-personal/NHidano/UnityMCPCustomTools.git?path=UnityMCPCustomTools/Packages/UnityMCPCustomTools",
-    "com.mikunote.hatsunemiku-sample": "git+ssh://git@github.com/NHidano/Mikunote_Models.git?path=/Mikunote_Models/Assets/HatsuneMiku_Sample",
-    "com.mikunote.magica-cloth-2": "git+ssh://git@github.com/NHidano/Mikunote_Models.git?path=/Mikunote_Models/Assets/MagicaCloth2",
     "com.unity.ai.assistant": "2.6.0-pre.1",
     "com.unity.ide.rider": "3.0.38",
-    "com.unity.ide.visualstudio": "2.0.25",
-    "com.unity.inputsystem": "1.17.0",
     "com.unity.render-pipelines.universal": "17.3.0",
     "com.unity.test-framework": "1.6.0",
     "com.unity.timeline": "1.8.9",
     "com.unity.ugui": "2.0.0",
-    "jp.lilxyzw.liltoon": "git+ssh://git@github.com/NHidano/Mikunote_Models.git?path=/Mikunote_Models/Packages/jp.lilxyzw.liltoon",
-    "jp.shiranui-isuzu.unity-mcp": "https://github.com/isuzu-shiranui/UnityMCP.git?path=jp.shiranui-isuzu.unity-mcp",
     "com.unity.modules.accessibility": "1.0.0",
     "com.unity.modules.adaptiveperformance": "1.0.0",
     "com.unity.modules.ai": "1.0.0",
