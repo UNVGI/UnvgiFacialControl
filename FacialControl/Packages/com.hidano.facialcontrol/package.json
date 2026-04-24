@@ -1,15 +1,15 @@
 {
-    "name": "com.hidano.facialcontrol",
+    "name": "jp.co.unvgi.facialcontrol",
     "version": "0.1.0-preview.1",
     "displayName": "FacialControl",
-    "description": "3D キャラクターの表情をリアルタイムに制御する Unity 向けライブラリ。OSC 配信は com.hidano.facialcontrol.osc、InputSystem 連携は com.hidano.facialcontrol.inputsystem を別途追加して使う。",
+    "description": "3D キャラクターの表情をリアルタイムに制御する Unity 向けライブラリ。OSC 配信は jp.co.unvgi.facialcontrol.osc、InputSystem 連携は jp.co.unvgi.facialcontrol.inputsystem を別途追加して使う。",
     "unity": "6000.3",
     "license": "MIT",
     "author": {
-        "name": "Hidano"
+        "name": "UNVGI Inc."
     },
     "dependencies": {
-        "com.hidano.scene-view-style-camera-controller": "1.0.0"
+        "jp.co.unvgi.scene-view-style-camera-controller": "1.0.0"
     },
     "keywords": [
         "facial",
