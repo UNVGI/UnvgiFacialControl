@@ -254,3 +254,6 @@ WiX.Toolset.DummyFile.txt
 GitHubVS.sln.DotSettings
 */UserSettings
 FacialControl/Assets/Samples/ARKitModel
+
+# Session handover notes (local-only, not tracked)
+HANDOVER.md
