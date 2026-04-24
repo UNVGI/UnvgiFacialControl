@@ -238,6 +238,9 @@ coverage.xml
 #Msbuild binary log output
 output.binlog
 
+# Unity test runner log output
+test-results/unity-log-*.txt
+
 # KDiff3
 *_BACKUP_*
 *_BASE_*
@@ -250,3 +253,7 @@ NuGetBuild
 WiX.Toolset.DummyFile.txt
 GitHubVS.sln.DotSettings
 */UserSettings
+FacialControl/Assets/Samples/ARKitModel
+
+# Session handover notes (local-only, not tracked)
+HANDOVER.md

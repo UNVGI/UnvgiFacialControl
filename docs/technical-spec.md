@@ -18,7 +18,7 @@
 | ARKit 52 / PerfectSync | 手動トリガーによる BlendShape スキャン + Expression 自動生成 |
 | Editor 拡張 | Inspector カスタマイズ、プロファイル管理ウィンドウ、Expression 作成支援、JSON インポート / エクスポート |
 | 複数 Renderer 対応 | 1 つの FacialController が複数の SkinnedMeshRenderer を制御 |
-| ドキュメント | API リファレンス（DocFX 自動生成）、クイックスタートガイド、JSON スキーマドキュメント |
+| ドキュメント | パッケージ README、クイックスタートガイド、JSON スキーマドキュメント（`Documentation~/` 配下の Markdown） |
 
 ### preview.2 以降に延期
 
@@ -774,8 +774,7 @@ com.hidano.facialcontrol/
 │   ├── Tools/                     # Expression 作成支援、ARKit 検出
 │   └── Common/                    # 共通ユーティリティ、スタイル、PreviewRenderUtility
 ├── Templates/                     # デフォルトプロファイル JSON テンプレート
-├── Documentation~/                # ドキュメント（DocFX 自動生成）
-│   ├── api-reference.md
+├── Documentation~/                # ドキュメント（Unity Package Manager 表示用 Markdown）
 │   ├── quickstart.md
 │   └── json-schema.md
 └── Tests/
@@ -828,9 +827,11 @@ com.hidano.facialcontrol/
 
 | ドキュメント | 内容 |
 |------------|------|
-| API リファレンス | XML コメントから DocFX で自動生成。CI 統合 |
-| クイックスタート | 基本的なセットアップ手順、最初のプロファイル作成 |
-| JSON スキーマ | プロファイル JSON の全フィールド定義と例 |
+| パッケージ README | インストール手順、主な機能、アーキテクチャ概要、API 利用例（`Packages/com.hidano.facialcontrol/README.md`） |
+| クイックスタート | 基本的なセットアップ手順、最初のプロファイル作成（`Documentation~/quickstart.md`） |
+| JSON スキーマ | プロファイル JSON の全フィールド定義と例（`Documentation~/json-schema.md`） |
+
+> **補足**: 自動生成 API リファレンス（DocFX）は preview.1 スコープから外し、XML コメントは IDE の IntelliSense 用途に限定する。Unity UPM パッケージの一般的な慣習（README + `Documentation~/` の Markdown）に揃える方針。
 
 ---
 
@@ -860,7 +861,7 @@ com.hidano.facialcontrol/
 | 18 | サムネイル | 手動ボタンで生成 | 対象モデル指定が必要 |
 | 19 | Curve シリアライズ | キーフレーム配列そのまま JSON 化 | Keyframe 全フィールド保持 |
 | 20 | 検索 | 名前検索のみ | レイヤーフィルターは将来 |
-| 21 | uOsc 同梱 | package.json 依存定義 | OpenUPM 登録確認要 |
+| 21 | uOsc 同梱 | package.json 依存定義 | npmjs.com 公開確認要 |
 | 22 | コントローラー | キャラクターごとにコンポーネント | グローバルマネージャーは別途 |
 | 23 | UDP ポート | デフォルト VRChat 標準 + ユーザー設定可 | Inspector / JSON で変更 |
 | 24 | PlayableGraph 構成 | 1 Graph / キャラクター + レイヤー分ノード | AnimationLayerMixerPlayable |
@@ -946,7 +947,7 @@ com.hidano.facialcontrol/
 | 94 | Renderer 検索 | 全子階層再帰 | GetComponentsInChildren |
 | 95 | layerSlots | オーバーライド値で完全置換 | 排他モード無視 |
 | 96 | Animator | 既存 Animator を共有 | ボディアニメと共存 |
-| 97 | API ドキュメント | DocFX 自動生成 | CI 統合 |
+| 97 | パッケージドキュメント | README + `Documentation~/` Markdown | Unity UPM 慣習準拠。DocFX 自動生成は preview.1 では採用しない |
 | 98 | uOsc フォーク | ポート再利用設定のみ変更 | SO_REUSEADDR 相当 |
 | 99 | 実装順序 | Domain → Adapters → Editor | ボトムアップ / TDD |
 | 100 | プレビュー更新 | 値変更毎に即座更新 | リアルタイム |

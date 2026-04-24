@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="6" result="Passed" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-04-21 07:31:17Z" end-time="2026-04-21 07:31:18Z" duration="0.3906085">
+  <test-suite type="TestSuite" id="1000" name="FacialControl" fullname="FacialControl" runstate="Runnable" testcasecount="1022" result="Passed" start-time="2026-04-21 07:31:17Z" end-time="2026-04-21 07:31:18Z" duration="0.390609" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="2080" name="Hidano.FacialControl.Tests.EditMode.dll" fullname="D:/Personal/Repositries/FacialControl/FacialControl/Library/ScriptAssemblies/Hidano.FacialControl.Tests.EditMode.dll" runstate="Runnable" testcasecount="1022" result="Passed" start-time="2026-04-21 07:31:17Z" end-time="2026-04-21 07:31:18Z" duration="0.366997" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="5284" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="2081" name="Hidano" fullname="Hidano" runstate="Runnable" testcasecount="1022" result="Passed" start-time="2026-04-21 07:31:17Z" end-time="2026-04-21 07:31:18Z" duration="0.348164" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="2082" name="FacialControl" fullname="Hidano.FacialControl" runstate="Runnable" testcasecount="1022" result="Passed" start-time="2026-04-21 07:31:17Z" end-time="2026-04-21 07:31:18Z" duration="0.329374" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="2083" name="Tests" fullname="Hidano.FacialControl.Tests" runstate="Runnable" testcasecount="1022" result="Passed" start-time="2026-04-21 07:31:17Z" end-time="2026-04-21 07:31:18Z" duration="0.310931" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="2084" name="EditMode" fullname="Hidano.FacialControl.Tests.EditMode" runstate="Runnable" testcasecount="1022" result="Passed" start-time="2026-04-21 07:31:17Z" end-time="2026-04-21 07:31:18Z" duration="0.292620" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestSuite" id="2085" name="Integration" fullname="Hidano.FacialControl.Tests.EditMode.Integration" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-04-21 07:31:17Z" end-time="2026-04-21 07:31:18Z" duration="0.273365" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-suite type="TestFixture" id="1001" name="OscControllerBlendingIntegrationTests" fullname="Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests" classname="Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-04-21 07:31:17Z" end-time="2026-04-21 07:31:18Z" duration="0.272267" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="1007" name="Pipeline_AggregateAndBlendLoop_AllocatesZeroManagedMemory" fullname="Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests.Pipeline_AggregateAndBlendLoop_AllocatesZeroManagedMemory" methodname="Pipeline_AggregateAndBlendLoop_AllocatesZeroManagedMemory" classname="Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests" runstate="Runnable" seed="1950264879" result="Passed" start-time="2026-04-21 07:31:17Z" end-time="2026-04-21 07:31:18Z" duration="0.258079" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1004" name="UC1_SituationSwitch_ControllerToOsc_AtRuntime_ChangesBlendedOutput" fullname="Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests.UC1_SituationSwitch_ControllerToOsc_AtRuntime_ChangesBlendedOutput" methodname="UC1_SituationSwitch_ControllerToOsc_AtRuntime_ChangesBlendedOutput" classname="Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests" runstate="Runnable" seed="441807516" result="Passed" start-time="2026-04-21 07:31:18Z" end-time="2026-04-21 07:31:18Z" duration="0.002788" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1002" name="UC2_WeightedBlend_ControllerAndOsc_FiftyFifty_BlendsAtValueLevel" fullname="Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests.UC2_WeightedBlend_ControllerAndOsc_FiftyFifty_BlendsAtValueLevel" methodname="UC2_WeightedBlend_ControllerAndOsc_FiftyFifty_BlendsAtValueLevel" classname="Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests" runstate="Runnable" seed="1968853434" result="Passed" start-time="2026-04-21 07:31:18Z" end-time="2026-04-21 07:31:18Z" duration="0.000378" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1003" name="UC2_WeightedBlend_SumExceedsOne_IsClampedToOne" fullname="Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests.UC2_WeightedBlend_SumExceedsOne_IsClampedToOne" methodname="UC2_WeightedBlend_SumExceedsOne_IsClampedToOne" classname="Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests" runstate="Runnable" seed="1022001721" result="Passed" start-time="2026-04-21 07:31:18Z" end-time="2026-04-21 07:31:18Z" duration="0.000386" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1006" name="UC3_FixedSingleSource_ControllerOnly_OscWeightZero_ControllerValueIsExactOutput" fullname="Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests.UC3_FixedSingleSource_ControllerOnly_OscWeightZero_ControllerValueIsExactOutput" methodname="UC3_FixedSingleSource_ControllerOnly_OscWeightZero_ControllerValueIsExactOutput" classname="Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests" runstate="Runnable" seed="280648886" result="Passed" start-time="2026-04-21 07:31:18Z" end-time="2026-04-21 07:31:18Z" duration="0.000294" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1005" name="UC3_FixedSingleSource_OscOnly_ControllerWeightZero_OscValueIsExactOutput" fullname="Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests.UC3_FixedSingleSource_OscOnly_ControllerWeightZero_OscValueIsExactOutput" methodname="UC3_FixedSingleSource_OscOnly_ControllerWeightZero_OscValueIsExactOutput" classname="Hidano.FacialControl.Tests.EditMode.Integration.OscControllerBlendingIntegrationTests" runstate="Runnable" seed="138146597" result="Passed" start-time="2026-04-21 07:31:18Z" end-time="2026-04-21 07:31:18Z" duration="0.000359" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[Saving results to: C:/Users/Hidano/AppData/LocalLow/DefaultCompany/FacialControl\TestResults.xml
+]]></output>
+                  </test-case>
+                </test-suite>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>
