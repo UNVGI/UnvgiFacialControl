@@ -9,7 +9,7 @@
         "name": "UNVGI Inc."
     },
     "dependencies": {
-        "jp.co.unvgi.scene-view-style-camera-controller": "1.0.0"
+        "jp.co.unvgi.scene-view-style-camera-controller": "1.0.1"
     },
     "keywords": [
         "facial",
