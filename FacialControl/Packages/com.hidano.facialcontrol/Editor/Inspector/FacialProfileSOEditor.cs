@@ -28,6 +28,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         private const string InputSourcesSectionLabel = "入力源ウェイト (読取専用)";
 
         private FacialProfileSO_InputSourcesView _inputSourcesView;
+        private FacialProfileSO_BonePoseView _bonePoseView;
 
         private Label _schemaVersionLabel;
         private Label _statusLabel;
@@ -102,6 +103,8 @@ namespace Hidano.FacialControl.Editor.Inspector
             Undo.undoRedoPerformed -= OnUndoRedoPerformed;
             _inputSourcesView?.Dispose();
             _inputSourcesView = null;
+            _bonePoseView?.Dispose();
+            _bonePoseView = null;
         }
 
         public override VisualElement CreateInspectorGUI()
@@ -274,6 +277,16 @@ namespace Hidano.FacialControl.Editor.Inspector
                 inputSourcesFoldout.Add(_inputSourcesView.RootElement);
             }
             root.Add(inputSourcesFoldout);
+
+            // ========================================
+            // BonePose 一覧ビュー（編集可能、Req 9.1 / 9.6 / タスク 9.6）
+            // ========================================
+            _bonePoseView?.Dispose();
+            _bonePoseView = so2 != null ? new FacialProfileSO_BonePoseView(so2) : null;
+            if (_bonePoseView != null)
+            {
+                root.Add(_bonePoseView.RootElement);
+            }
 
             // ========================================
             // JSON に保存ボタン
