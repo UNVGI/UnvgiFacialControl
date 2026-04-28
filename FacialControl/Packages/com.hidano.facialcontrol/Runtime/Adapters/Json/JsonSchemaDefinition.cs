@@ -32,6 +32,36 @@ namespace Hidano.FacialControl.Adapters.Json
             public const string RendererPaths = "rendererPaths";
 
             /// <summary>
+            /// bonePoses フィールド名（Req 7.1, 7.2）。
+            /// 後方互換のため optional フィールド：欠落 / null / 空配列はすべて空 BonePoses 扱い（Req 7.3, 10.2）。
+            /// </summary>
+            public const string BonePoses = "bonePoses";
+
+            /// <summary>
+            /// BonePose のフィールド名（Req 7.1, 7.2）。
+            /// </summary>
+            public static class BonePose
+            {
+                /// <summary>プロファイル内識別子（preview.1 では参照キー未使用、空文字許容）</summary>
+                public const string Id = "id";
+
+                /// <summary>姿勢オーバーライドエントリの配列</summary>
+                public const string Entries = "entries";
+            }
+
+            /// <summary>
+            /// BonePoseEntry のフィールド名（Req 7.1, 7.2）。
+            /// </summary>
+            public static class BonePoseEntry
+            {
+                /// <summary>対象ボーン名（多バイト文字を含む任意の文字列、Req 2.2）</summary>
+                public const string BoneName = "boneName";
+
+                /// <summary>X/Y/Z 軸オイラー角（度、Z-X-Y Tait-Bryan 順、Req 4.2-4.4）</summary>
+                public const string EulerXYZ = "eulerXYZ";
+            }
+
+            /// <summary>
             /// レイヤー定義のフィールド名
             /// </summary>
             public static class Layer
