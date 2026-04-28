@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
+using Hidano.FacialControl.Adapters.Bone;
 using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Editor.Common;
 
@@ -28,6 +29,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         private readonly VisualElement _root;
         private readonly Foldout _foldout;
         private readonly ListView _listView;
+        private readonly Button _autoAssignButton;
         private readonly List<BonePoseSerializable> _items = new List<BonePoseSerializable>();
 
         public VisualElement RootElement => _root;
@@ -61,6 +63,15 @@ namespace Hidano.FacialControl.Editor.Inspector
             var addButton = new Button(AddBonePose) { text = "BonePose 追加" };
             addButton.style.marginTop = 4;
             _foldout.Add(addButton);
+
+            _autoAssignButton = new Button(AutoAssignHumanoidEyes)
+            {
+                name = "humanoidAutoAssign",
+                text = "Humanoid 自動アサイン",
+            };
+            _autoAssignButton.style.marginTop = 2;
+            _foldout.Add(_autoAssignButton);
+            UpdateAutoAssignButtonState();
 
             RefreshItems();
         }
@@ -152,6 +163,54 @@ namespace Hidano.FacialControl.Editor.Inspector
             EditorUtility.SetDirty(_target);
         }
 
+        /// <summary>
+        /// 参照モデルが Humanoid の場合に LeftEye / RightEye の bone 名を取得し、
+        /// それぞれを 1 entry 持つ BonePose として <c>_bonePoses</c> 末尾に追加する (Req 3.3 / 9.3)。
+        /// 非 Humanoid または Animator 不在のときは Warning ログ + no-op。
+        /// </summary>
+        internal void AutoAssignHumanoidEyes()
+        {
+            if (_target == null)
+                return;
+
+            var animator = ResolveAnimator();
+            if (animator == null)
+            {
+                Debug.LogWarning("[FacialProfileSO_BonePoseView] Humanoid 自動アサイン: 参照モデルに Animator が存在しません。");
+                return;
+            }
+
+            var eyes = HumanoidBoneAutoAssigner.ResolveEyeBoneNames(animator);
+            bool hasLeft = !string.IsNullOrEmpty(eyes.LeftEye);
+            bool hasRight = !string.IsNullOrEmpty(eyes.RightEye);
+            if (!hasLeft && !hasRight)
+            {
+                // 警告は HumanoidBoneAutoAssigner 側で出力済み
+                return;
+            }
+
+            int addCount = (hasLeft ? 1 : 0) + (hasRight ? 1 : 0);
+            var existing = _target.BonePoses ?? Array.Empty<BonePoseSerializable>();
+            var newArray = new BonePoseSerializable[existing.Length + addCount];
+            Array.Copy(existing, newArray, existing.Length);
+
+            int dest = existing.Length;
+            if (hasLeft)
+            {
+                newArray[dest++] = CreateSinglePoseFor(eyes.LeftEye);
+            }
+            if (hasRight)
+            {
+                newArray[dest++] = CreateSinglePoseFor(eyes.RightEye);
+            }
+
+            Undo.RecordObject(_target, "Humanoid 自動アサイン");
+            _target.BonePoses = newArray;
+            EditorUtility.SetDirty(_target);
+
+            RefreshItems();
+        }
+
         internal void UpdateEntryBoneName(int bonePoseIndex, int entryIndex, string newBoneName)
         {
             if (_target == null)
@@ -192,6 +251,47 @@ namespace Hidano.FacialControl.Editor.Inspector
                 }
             }
             _listView.Rebuild();
+            UpdateAutoAssignButtonState();
+        }
+
+        private static BonePoseSerializable CreateSinglePoseFor(string boneName)
+        {
+            return new BonePoseSerializable
+            {
+                id = boneName ?? string.Empty,
+                entries = new[]
+                {
+                    new BonePoseEntrySerializable
+                    {
+                        boneName = boneName ?? string.Empty,
+                        eulerXYZ = Vector3.zero,
+                    },
+                },
+            };
+        }
+
+        private Animator ResolveAnimator()
+        {
+            if (_target == null || _target.ReferenceModel == null)
+                return null;
+
+            var animator = _target.ReferenceModel.GetComponent<Animator>();
+            if (animator == null)
+                animator = _target.ReferenceModel.GetComponentInChildren<Animator>(includeInactive: true);
+            return animator;
+        }
+
+        private void UpdateAutoAssignButtonState()
+        {
+            if (_autoAssignButton == null)
+                return;
+
+            var animator = ResolveAnimator();
+            bool isHumanoid =
+                animator != null
+                && animator.avatar != null
+                && animator.avatar.isHuman;
+            _autoAssignButton.SetEnabled(isHumanoid);
         }
 
         private VisualElement MakeItem()
