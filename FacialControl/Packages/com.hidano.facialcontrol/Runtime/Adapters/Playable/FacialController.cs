@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.Playables;
+using Hidano.FacialControl.Adapters.Bone;
 using Hidano.FacialControl.Adapters.FileSystem;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.Json;
@@ -23,7 +24,7 @@ namespace Hidano.FacialControl.Adapters.Playable
     /// </summary>
     [RequireComponent(typeof(Animator))]
     [AddComponentMenu("FacialControl/Facial Controller")]
-    public class FacialController : MonoBehaviour
+    public class FacialController : MonoBehaviour, IBonePoseProvider, IBonePoseSource
     {
         /// <summary>
         /// 表情プロファイルの ScriptableObject 参照
@@ -450,6 +451,31 @@ namespace Hidano.FacialControl.Adapters.Playable
                 return false;
             }
             return _layerUseCase.TryGetExpressionTriggerSourceById(id, out source);
+        }
+
+        /// <summary>
+        /// 外部 (analog-input-binding 等) から現在 active な <see cref="BonePose"/> を差替える
+        /// (Req 11.1, 11.2, 11.3, 11.4, 11.5)。次フレームの <see cref="BoneWriter.Apply"/> から有効。
+        /// </summary>
+        /// <remarks>
+        /// 実装はタスク 8.2（Green）。本タスク 8.1（Red）ではスタブ。
+        /// </remarks>
+        public void SetActiveBonePose(in BonePose pose)
+        {
+            throw new NotImplementedException(
+                "FacialController.SetActiveBonePose は task 8.2 で実装される (現状 task 8.1 Red)。");
+        }
+
+        /// <summary>
+        /// 現在 active な <see cref="BonePose"/> を返す (Req 5.6, 11.1)。
+        /// </summary>
+        /// <remarks>
+        /// 実装はタスク 8.2（Green）。本タスク 8.1（Red）ではスタブ。
+        /// </remarks>
+        public BonePose GetActiveBonePose()
+        {
+            throw new NotImplementedException(
+                "FacialController.GetActiveBonePose は task 8.2 で実装される (現状 task 8.1 Red)。");
         }
 
         /// <summary>
