@@ -155,6 +155,8 @@ ClientBin/
 [Ss]tyle[Cc]op.*
 ~$*
 *~
+!Samples~/
+!Samples~/**
 *.dbmdl
 *.dbproj.schemaview
 *.pfx
