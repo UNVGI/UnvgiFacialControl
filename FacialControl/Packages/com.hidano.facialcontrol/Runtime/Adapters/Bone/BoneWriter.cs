@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
@@ -19,6 +20,7 @@ namespace Hidano.FacialControl.Adapters.Bone
         private readonly BoneTransformResolver _resolver;
         private readonly Animator _animator;
         private readonly BonePoseSnapshot _snapshot = new BonePoseSnapshot();
+        private readonly Dictionary<string, Quaternion> _initialSnapshot = new Dictionary<string, Quaternion>();
 
         private BonePose _activePose;
         private BonePose _pendingPose;
@@ -128,6 +130,13 @@ namespace Hidano.FacialControl.Adapters.Bone
                     continue;
                 }
 
+                // 遅延スナップショット (MAJOR-1): 初回書込み直前の localRotation を first-write-only で記録。
+                // 既に key が存在する場合は ContainsKey のみで早期 return し、hot path で alloc しない。
+                if (!_initialSnapshot.ContainsKey(entry.BoneName))
+                {
+                    _initialSnapshot[entry.BoneName] = target.localRotation;
+                }
+
                 BonePoseComposer.Compose(
                     basisRot.x, basisRot.y, basisRot.z, basisRot.w,
                     entry.EulerX, entry.EulerY, entry.EulerZ,
@@ -146,7 +155,24 @@ namespace Hidano.FacialControl.Adapters.Bone
         /// </remarks>
         public void RestoreInitialRotations()
         {
-            throw new NotImplementedException("BoneWriter.RestoreInitialRotations はタスク 7.6 で実装する。");
+            // snapshot 空（Apply 未実行 / 全エントリ解決失敗）→ 何もしない（no-op）。
+            if (_initialSnapshot.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var kvp in _initialSnapshot)
+            {
+                var target = _resolver.Resolve(kvp.Key);
+                if (target == null)
+                {
+                    // Initialize 〜 Apply 〜 Restore の間にヒエラルキーが消失したケース。
+                    // warning は resolver 側で dedupe 済みのため skip のみ。
+                    continue;
+                }
+
+                target.localRotation = kvp.Value;
+            }
         }
 
         /// <inheritdoc />
@@ -156,6 +182,7 @@ namespace Hidano.FacialControl.Adapters.Bone
             _basisBone = null;
             _pendingPose = default;
             _hasPending = false;
+            _initialSnapshot.Clear();
         }
     }
 }
