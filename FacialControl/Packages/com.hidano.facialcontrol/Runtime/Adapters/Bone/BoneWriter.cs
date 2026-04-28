@@ -1,5 +1,7 @@
 using System;
+using UnityEngine;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
 
 namespace Hidano.FacialControl.Adapters.Bone
 {
@@ -11,10 +13,24 @@ namespace Hidano.FacialControl.Adapters.Bone
     /// preview.1: メインスレッド限定、hot path で alloc しない。
     /// MAJOR-1 反映: <see cref="RestoreInitialRotations"/> は遅延スナップショット方式 (タスク 7.5 / 7.6)。
     /// MINOR-1 反映: <see cref="Initialize"/> で basis をキャッシュ、<see cref="Apply"/> は引数なし (タスク 6.2 で API 形状確定)。
-    /// 本クラスのメソッド本体はタスク 7.2 / 7.4 / 7.6 で実装する (Red はタスク 7.1 / 7.3 / 7.5)。
     /// </remarks>
     public sealed class BoneWriter : IBonePoseSource, IBonePoseProvider, IDisposable
     {
+        private readonly BoneTransformResolver _resolver;
+        private readonly Animator _animator;
+        private readonly BonePoseSnapshot _snapshot = new BonePoseSnapshot();
+
+        private BonePose _activePose;
+        private string _basisBoneName;
+        private Transform _basisBone;
+        private bool _initialized;
+
+        public BoneWriter(BoneTransformResolver resolver, Animator animator)
+        {
+            _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
+            _animator = animator;
+        }
+
         /// <summary>
         /// 初期 BonePose と basis bone 名で BoneWriter を初期化する。
         /// </summary>
@@ -22,7 +38,28 @@ namespace Hidano.FacialControl.Adapters.Bone
         /// <param name="basisBoneName">顔相対軸の基準ボーン名（典型: "Head"）。Initialize 時に basis Transform を解決してキャッシュする</param>
         public void Initialize(in BonePose initialPose, string basisBoneName)
         {
-            throw new NotImplementedException("BoneWriter.Initialize はタスク 7.2 で実装する。");
+            _activePose = initialPose;
+            _basisBoneName = basisBoneName ?? string.Empty;
+
+            if (string.IsNullOrEmpty(_basisBoneName))
+            {
+                Debug.LogWarning("[BoneWriter] basisBoneName が空のため basis bone を解決できません。Apply は frame ごと skip されます。");
+                _basisBone = null;
+            }
+            else
+            {
+                _basisBone = _resolver.Resolve(_basisBoneName);
+                // 解決失敗時の警告は BoneTransformResolver 側で 1 回だけ出る（dedupe 済み）。
+            }
+
+            var entries = initialPose.Entries.Span;
+            for (int i = 0; i < entries.Length; i++)
+            {
+                _ = _resolver.Resolve(entries[i].BoneName);
+            }
+
+            _snapshot.EnsureCapacity(entries.Length);
+            _initialized = true;
         }
 
         /// <inheritdoc />
@@ -46,7 +83,42 @@ namespace Hidano.FacialControl.Adapters.Bone
         /// </remarks>
         public void Apply()
         {
-            throw new NotImplementedException("BoneWriter.Apply はタスク 7.2 で実装する。");
+            if (!_initialized)
+            {
+                return;
+            }
+
+            var entries = _activePose.Entries.Span;
+            if (entries.Length == 0)
+            {
+                return;
+            }
+
+            if (_basisBone == null)
+            {
+                // basis 未解決時は world 軸フォールバックしない（Req 4.6）。warning は Initialize で出力済み。
+                return;
+            }
+
+            var basisRot = _basisBone.localRotation;
+
+            for (int i = 0; i < entries.Length; i++)
+            {
+                var entry = entries[i];
+                var target = _resolver.Resolve(entry.BoneName);
+                if (target == null)
+                {
+                    // bone 名未解決は warning + skip + 続行（Req 2.4）。warning は resolver 側で dedupe 済み。
+                    continue;
+                }
+
+                BonePoseComposer.Compose(
+                    basisRot.x, basisRot.y, basisRot.z, basisRot.w,
+                    entry.EulerX, entry.EulerY, entry.EulerZ,
+                    out float qx, out float qy, out float qz, out float qw);
+
+                target.localRotation = new Quaternion(qx, qy, qz, qw);
+            }
         }
 
         /// <summary>
@@ -64,7 +136,8 @@ namespace Hidano.FacialControl.Adapters.Bone
         /// <inheritdoc />
         public void Dispose()
         {
-            throw new NotImplementedException("BoneWriter.Dispose はタスク 7.2 で実装する。");
+            _initialized = false;
+            _basisBone = null;
         }
     }
 }
