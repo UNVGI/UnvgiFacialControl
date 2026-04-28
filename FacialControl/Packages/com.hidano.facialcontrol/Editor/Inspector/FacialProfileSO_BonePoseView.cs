@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Hidano.FacialControl.Adapters.Bone;
+using Hidano.FacialControl.Adapters.Json;
 using Hidano.FacialControl.Adapters.ScriptableObject;
+using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.Common;
 
 namespace Hidano.FacialControl.Editor.Inspector
@@ -72,6 +76,29 @@ namespace Hidano.FacialControl.Editor.Inspector
             _autoAssignButton.style.marginTop = 2;
             _foldout.Add(_autoAssignButton);
             UpdateAutoAssignButtonState();
+
+            var importExportContainer = new VisualElement();
+            importExportContainer.style.flexDirection = FlexDirection.Row;
+            importExportContainer.style.marginTop = 4;
+
+            var importButton = new Button(ImportBonePosesFromJson)
+            {
+                name = "bonePoseJsonImport",
+                text = "JSON Import",
+            };
+            importButton.style.flexGrow = 1;
+            importExportContainer.Add(importButton);
+
+            var exportButton = new Button(ExportBonePosesToJson)
+            {
+                name = "bonePoseJsonExport",
+                text = "JSON Export",
+            };
+            exportButton.style.flexGrow = 1;
+            exportButton.style.marginLeft = 4;
+            importExportContainer.Add(exportButton);
+
+            _foldout.Add(importExportContainer);
 
             RefreshItems();
         }
@@ -209,6 +236,68 @@ namespace Hidano.FacialControl.Editor.Inspector
             EditorUtility.SetDirty(_target);
 
             RefreshItems();
+        }
+
+        /// <summary>
+        /// 外部 JSON ファイルを選択してパースし、<c>bonePoses</c> ブロックの内容で
+        /// SO の <c>_bonePoses</c> を上書きする (Req 9.5)。
+        /// </summary>
+        internal void ImportBonePosesFromJson()
+        {
+            if (_target == null)
+                return;
+
+            var importPath = EditorUtility.OpenFilePanel("BonePose JSON のインポート", string.Empty, "json");
+            if (string.IsNullOrEmpty(importPath))
+                return;
+
+            try
+            {
+                var json = File.ReadAllText(importPath, Encoding.UTF8);
+                var parser = new SystemTextJsonParser();
+                var profile = parser.ParseProfile(json);
+                var serializable = FacialProfileMapper.ToSerializableBonePoses(profile.BonePoses);
+
+                Undo.RecordObject(_target, "BonePose JSON インポート");
+                _target.BonePoses = serializable;
+                EditorUtility.SetDirty(_target);
+
+                RefreshItems();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[FacialProfileSO_BonePoseView] BonePose JSON インポートエラー: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// 現在の <c>_bonePoses</c> を Domain の <see cref="BonePose"/> 配列に変換し、
+        /// JSON 文字列化して外部ファイルに保存する (Req 9.5)。
+        /// </summary>
+        internal void ExportBonePosesToJson()
+        {
+            if (_target == null)
+                return;
+
+            var exportPath = EditorUtility.SaveFilePanel("BonePose JSON のエクスポート", string.Empty, "boneposes.json", "json");
+            if (string.IsNullOrEmpty(exportPath))
+                return;
+
+            try
+            {
+                var domainBonePoses = FacialProfileMapper.ToDomainBonePoses(_target.BonePoses);
+                var profile = new FacialProfile(
+                    schemaVersion: "1.0",
+                    bonePoses: domainBonePoses);
+
+                var parser = new SystemTextJsonParser();
+                var json = parser.SerializeProfile(profile);
+                File.WriteAllText(exportPath, json, Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[FacialProfileSO_BonePoseView] BonePose JSON エクスポートエラー: {ex}");
+            }
         }
 
         internal void UpdateEntryBoneName(int bonePoseIndex, int entryIndex, string newBoneName)
