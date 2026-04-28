@@ -1,7 +1,29 @@
+using System;
 using UnityEngine;
 
 namespace Hidano.FacialControl.Adapters.ScriptableObject
 {
+    /// <summary>
+    /// BonePose 1 件分の Serializable 表現（id + entries[]）。
+    /// JsonUtility / SerializedObject 連携のため [Serializable] 付き。
+    /// </summary>
+    [Serializable]
+    public sealed class BonePoseSerializable
+    {
+        public string id;
+        public BonePoseEntrySerializable[] entries;
+    }
+
+    /// <summary>
+    /// BonePose のエントリ 1 件分の Serializable 表現（boneName + eulerXYZ degrees）。
+    /// </summary>
+    [Serializable]
+    public sealed class BonePoseEntrySerializable
+    {
+        public string boneName;
+        public Vector3 eulerXYZ;
+    }
+
     /// <summary>
     /// 表情プロファイルの ScriptableObject。
     /// JSON ファイルへの参照ポインターとして機能し、Inspector でのプロファイル指定に使用する。
@@ -55,6 +77,14 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject
         [HideInInspector]
         [SerializeField]
         private string _undoJsonSnapshot;
+
+        /// <summary>
+        /// BonePose 配列。Editor での編集対象。
+        /// 既定では空配列で初期化される（Req 8.4 / 10.1）。
+        /// </summary>
+        [Tooltip("BonePose 配列（顔相対 Euler 制御）")]
+        [SerializeField]
+        private BonePoseSerializable[] _bonePoses = Array.Empty<BonePoseSerializable>();
 
 #if UNITY_EDITOR
         /// <summary>
@@ -118,6 +148,15 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject
         {
             get => _undoJsonSnapshot;
             set => _undoJsonSnapshot = value;
+        }
+
+        /// <summary>
+        /// BonePose 配列（顔相対 Euler 制御）。
+        /// </summary>
+        public BonePoseSerializable[] BonePoses
+        {
+            get => _bonePoses;
+            set => _bonePoses = value;
         }
 
 #if UNITY_EDITOR
