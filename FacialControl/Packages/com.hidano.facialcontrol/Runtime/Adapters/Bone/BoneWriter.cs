@@ -21,6 +21,8 @@ namespace Hidano.FacialControl.Adapters.Bone
         private readonly BonePoseSnapshot _snapshot = new BonePoseSnapshot();
 
         private BonePose _activePose;
+        private BonePose _pendingPose;
+        private bool _hasPending;
         private string _basisBoneName;
         private Transform _basisBone;
         private bool _initialized;
@@ -63,15 +65,22 @@ namespace Hidano.FacialControl.Adapters.Bone
         }
 
         /// <inheritdoc />
+        /// <remarks>
+        /// next-frame セマンティクス (Req 11.2): 呼出時点では <c>_pendingPose</c> に格納するのみで、
+        /// 次回 <see cref="Apply"/> 開始時に <c>_activePose</c> へ swap する。
+        /// 同一フレームで複数回呼ばれた場合は latest-wins（pending は queue ではなく最新値保持）。
+        /// メインスレッド限定契約（preview.1）。
+        /// </remarks>
         public void SetActiveBonePose(in BonePose pose)
         {
-            throw new NotImplementedException("BoneWriter.SetActiveBonePose はタスク 7.4 で実装する。");
+            _pendingPose = pose;
+            _hasPending = true;
         }
 
         /// <inheritdoc />
         public BonePose GetActiveBonePose()
         {
-            throw new NotImplementedException("BoneWriter.GetActiveBonePose はタスク 7.4 で実装する。");
+            return _activePose;
         }
 
         /// <summary>
@@ -86,6 +95,13 @@ namespace Hidano.FacialControl.Adapters.Bone
             if (!_initialized)
             {
                 return;
+            }
+
+            if (_hasPending)
+            {
+                _activePose = _pendingPose;
+                _pendingPose = default;
+                _hasPending = false;
             }
 
             var entries = _activePose.Entries.Span;
@@ -138,6 +154,8 @@ namespace Hidano.FacialControl.Adapters.Bone
         {
             _initialized = false;
             _basisBone = null;
+            _pendingPose = default;
+            _hasPending = false;
         }
     }
 }
