@@ -49,6 +49,7 @@ namespace Hidano.FacialControl.Adapters.Playable
         private FacialProfile? _currentProfile;
         private string[] _blendShapeNames;
         private bool _isInitialized;
+        private BoneWriter _boneWriter;
 
         // BlendShape 出力インデックス → (Renderer, Renderer 上の BS index) のマッピング
         private BlendShapeTarget[][] _blendShapeTargets;
@@ -143,6 +144,9 @@ namespace Hidano.FacialControl.Adapters.Playable
                         targets[t].RendererBlendShapeIndex, weight);
                 }
             }
+
+            // BoneWriter は LateUpdate 末尾で適用する（Animator → BlendShape → BoneWriter の順、Req 5.3）。
+            _boneWriter?.Apply();
         }
 
         /// <summary>
@@ -236,7 +240,43 @@ namespace Hidano.FacialControl.Adapters.Playable
                 _animator, profile, blendShapeNames);
 
             _graphBuildResult.Graph.Play();
+
+            // BoneWriter を生成・初期化（Req 5.3, 5.6, 11.1〜11.4）。
+            SetupBoneWriter(profile);
+
             _isInitialized = true;
+        }
+
+        private void SetupBoneWriter(FacialProfile profile)
+        {
+            if (_animator == null)
+            {
+                return;
+            }
+
+            var resolver = new BoneTransformResolver(_animator.transform);
+            _boneWriter = new BoneWriter(resolver, _animator);
+
+            // basisBoneName は Humanoid Avatar から解決し、未設定 / 非 Humanoid は "Head" をデフォルトとする。
+            string basisBoneName = "Head";
+            if (_animator.avatar != null && _animator.avatar.isHuman)
+            {
+                var resolved = HumanoidBoneAutoAssigner.ResolveBasisBoneName(_animator);
+                if (!string.IsNullOrEmpty(resolved))
+                {
+                    basisBoneName = resolved;
+                }
+            }
+
+            // 初期 BonePose は profile.BonePoses[0]（存在しなければ default = 空）。
+            BonePose initialPose = default;
+            var bonePosesSpan = profile.BonePoses.Span;
+            if (bonePosesSpan.Length > 0)
+            {
+                initialPose = bonePosesSpan[0];
+            }
+
+            _boneWriter.Initialize(in initialPose, basisBoneName);
         }
 
         private void ApplyExtensions(FacialProfile profile, string[] blendShapeNames)
@@ -457,25 +497,28 @@ namespace Hidano.FacialControl.Adapters.Playable
         /// 外部 (analog-input-binding 等) から現在 active な <see cref="BonePose"/> を差替える
         /// (Req 11.1, 11.2, 11.3, 11.4, 11.5)。次フレームの <see cref="BoneWriter.Apply"/> から有効。
         /// </summary>
-        /// <remarks>
-        /// 実装はタスク 8.2（Green）。本タスク 8.1（Red）ではスタブ。
-        /// </remarks>
         public void SetActiveBonePose(in BonePose pose)
         {
-            throw new NotImplementedException(
-                "FacialController.SetActiveBonePose は task 8.2 で実装される (現状 task 8.1 Red)。");
+            if (_boneWriter == null)
+            {
+                Debug.LogWarning("FacialController が初期化されていません。SetActiveBonePose は無視されます。");
+                return;
+            }
+
+            _boneWriter.SetActiveBonePose(in pose);
         }
 
         /// <summary>
         /// 現在 active な <see cref="BonePose"/> を返す (Req 5.6, 11.1)。
         /// </summary>
-        /// <remarks>
-        /// 実装はタスク 8.2（Green）。本タスク 8.1（Red）ではスタブ。
-        /// </remarks>
         public BonePose GetActiveBonePose()
         {
-            throw new NotImplementedException(
-                "FacialController.GetActiveBonePose は task 8.2 で実装される (現状 task 8.1 Red)。");
+            if (_boneWriter == null)
+            {
+                return default;
+            }
+
+            return _boneWriter.GetActiveBonePose();
         }
 
         /// <summary>
@@ -661,6 +704,14 @@ namespace Hidano.FacialControl.Adapters.Playable
             {
                 _layerUseCase.Dispose();
                 _layerUseCase = null;
+            }
+
+            // BoneWriter は書込中だった bone の localRotation を初回書込み直前の値に戻してから Dispose する。
+            if (_boneWriter != null)
+            {
+                _boneWriter.RestoreInitialRotations();
+                _boneWriter.Dispose();
+                _boneWriter = null;
             }
 
             _inputSourceFactory = null;
