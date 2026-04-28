@@ -1,6 +1,7 @@
 using System;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using UnityEngine;
 
 namespace Hidano.FacialControl.Adapters.ScriptableObject
 {
@@ -52,6 +53,98 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject
             so.LayerCount = profile.Layers.Length;
             so.ExpressionCount = profile.Expressions.Length;
             so.RendererPaths = profile.RendererPaths.ToArray();
+            so.BonePoses = ToSerializableBonePoses(profile.BonePoses);
+        }
+
+        /// <summary>
+        /// Domain BonePose 配列を Serializable 形式に変換する。
+        /// 空配列の場合は空配列を返す（null は返さない、Req 10.1）。
+        /// </summary>
+        /// <param name="domain">Domain BonePose 配列</param>
+        /// <returns>Serializable BonePose 配列（null 不返却）</returns>
+        public static BonePoseSerializable[] ToSerializableBonePoses(ReadOnlyMemory<BonePose> domain)
+        {
+            if (domain.IsEmpty)
+                return Array.Empty<BonePoseSerializable>();
+
+            var span = domain.Span;
+            var result = new BonePoseSerializable[span.Length];
+            for (int i = 0; i < span.Length; i++)
+            {
+                var pose = span[i];
+                var entriesSpan = pose.Entries.Span;
+                var serialEntries = new BonePoseEntrySerializable[entriesSpan.Length];
+                for (int j = 0; j < entriesSpan.Length; j++)
+                {
+                    var entry = entriesSpan[j];
+                    serialEntries[j] = new BonePoseEntrySerializable
+                    {
+                        boneName = entry.BoneName,
+                        eulerXYZ = new Vector3(entry.EulerX, entry.EulerY, entry.EulerZ),
+                    };
+                }
+
+                result[i] = new BonePoseSerializable
+                {
+                    id = pose.Id,
+                    entries = serialEntries,
+                };
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Serializable BonePose 配列を Domain BonePose 配列に変換する。
+        /// null / 空配列の場合は空配列を返す（Req 10.1）。
+        /// </summary>
+        /// <param name="serializable">Serializable BonePose 配列（null 許容）</param>
+        /// <returns>Domain BonePose 配列（null 不返却）</returns>
+        public static BonePose[] ToDomainBonePoses(BonePoseSerializable[] serializable)
+        {
+            if (serializable == null || serializable.Length == 0)
+                return Array.Empty<BonePose>();
+
+            var result = new BonePose[serializable.Length];
+            for (int i = 0; i < serializable.Length; i++)
+            {
+                var serial = serializable[i];
+                if (serial == null)
+                {
+                    result[i] = new BonePose(string.Empty, Array.Empty<BonePoseEntry>());
+                    continue;
+                }
+
+                BonePoseEntry[] domainEntries;
+                if (serial.entries == null || serial.entries.Length == 0)
+                {
+                    domainEntries = Array.Empty<BonePoseEntry>();
+                }
+                else
+                {
+                    domainEntries = new BonePoseEntry[serial.entries.Length];
+                    for (int j = 0; j < serial.entries.Length; j++)
+                    {
+                        var serialEntry = serial.entries[j];
+                        if (serialEntry == null)
+                        {
+                            domainEntries[j] = new BonePoseEntry(string.Empty, 0f, 0f, 0f);
+                        }
+                        else
+                        {
+                            domainEntries[j] = new BonePoseEntry(
+                                serialEntry.boneName,
+                                serialEntry.eulerXYZ.x,
+                                serialEntry.eulerXYZ.y,
+                                serialEntry.eulerXYZ.z);
+                        }
+                    }
+                }
+
+                result[i] = new BonePose(serial.id, domainEntries);
+            }
+
+            return result;
         }
 
         /// <summary>
