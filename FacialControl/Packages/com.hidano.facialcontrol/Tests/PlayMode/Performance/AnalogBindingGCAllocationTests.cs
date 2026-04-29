@@ -341,6 +341,8 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
         {
             // OscFloatAnalogSource の受信 → メインスレッド転写経路を Volatile.Read/Write +
             // Interlocked.Increment で再現する。これらの API が boxing なしで動作することを確認する。
+            // ProfilerRecorder の GC.Alloc を主指標とすることでテストランナー由来の
+            // mono ヒープチャンク確保ノイズを排除する (Req 8.6, D-7)。
             float pendingValue = 0f;
             int writeTick = 0;
             int lastObservedTick = 0;
@@ -359,30 +361,30 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
                 }
             }
 
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-
-            long managedBefore = GC.GetTotalMemory(forceFullCollection: false);
-
-            for (int i = 0; i < 10000; i++)
+            var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "GC.Alloc");
+            try
             {
-                Volatile.Write(ref pendingValue, i * 0.0001f);
-                Interlocked.Increment(ref writeTick);
-                int t = Volatile.Read(ref writeTick);
-                if (t != lastObservedTick)
+                for (int i = 0; i < 10000; i++)
                 {
-                    lastObservedTick = t;
-                    cachedValue = Volatile.Read(ref pendingValue);
+                    Volatile.Write(ref pendingValue, i * 0.0001f);
+                    Interlocked.Increment(ref writeTick);
+                    int t = Volatile.Read(ref writeTick);
+                    if (t != lastObservedTick)
+                    {
+                        lastObservedTick = t;
+                        cachedValue = Volatile.Read(ref pendingValue);
+                    }
                 }
+                Assert.IsTrue(!float.IsNaN(cachedValue));
+
+                long gcAlloc = recorder.LastValue;
+                Assert.AreEqual(0, gcAlloc,
+                    $"OSC Volatile.Read/Write 経路で GC.Alloc が検出: {gcAlloc} bytes (Req 8.6, D-7)。");
             }
-            Assert.IsTrue(!float.IsNaN(cachedValue));
-
-            long managedAfter = GC.GetTotalMemory(forceFullCollection: false);
-            long managedDiff = managedAfter - managedBefore;
-
-            Assert.LessOrEqual(managedDiff, 0,
-                $"OSC Volatile.Read/Write 経路で managed alloc が発生: diff={managedDiff} bytes (Req 8.6, D-7)。");
+            finally
+            {
+                recorder.Dispose();
+            }
         }
 
         // ============================================================

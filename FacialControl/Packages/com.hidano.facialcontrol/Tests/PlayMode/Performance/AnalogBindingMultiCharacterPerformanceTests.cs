@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using NUnit.Framework;
+using Unity.Profiling;
 using UnityEngine.Profiling;
 using Hidano.FacialControl.Adapters.Bone;
 using Hidano.FacialControl.Adapters.InputSources;
@@ -137,26 +138,28 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
                     }
                 }
 
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                GC.Collect();
-
-                long managedBefore = GC.GetTotalMemory(forceFullCollection: false);
-
-                for (int frame = 0; frame < 100; frame++)
+                // ProfilerRecorder の GC.Alloc を主指標とする (Req 8.4)。
+                // ProfilerRecorder は user code 由来の GC.Alloc 呼出のみを測るため、
+                // テストランナー由来の mono ヒープチャンク確保は計上されない。
+                var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "GC.Alloc");
+                try
                 {
-                    for (int c = 0; c < rigs.Length; c++)
+                    for (int frame = 0; frame < 100; frame++)
                     {
-                        rigs[c].Tick(frame);
+                        for (int c = 0; c < rigs.Length; c++)
+                        {
+                            rigs[c].Tick(frame);
+                        }
                     }
+
+                    long gcAlloc = recorder.LastValue;
+                    Assert.AreEqual(0, gcAlloc,
+                        $"10 体同時更新 100 frame で GC.Alloc が検出: {gcAlloc} bytes (Req 8.4)。");
                 }
-
-                long managedAfter = GC.GetTotalMemory(forceFullCollection: false);
-                long managedDiff = managedAfter - managedBefore;
-
-                Assert.LessOrEqual(managedDiff, 0,
-                    $"10 体同時更新 100 frame で managed alloc が発生: " +
-                    $"diff={managedDiff} bytes (Req 8.4)。");
+                finally
+                {
+                    recorder.Dispose();
+                }
 
                 int totalCalls = 0;
                 for (int c = 0; c < rigs.Length; c++)
