@@ -205,6 +205,11 @@ namespace Hidano.FacialControl.Adapters.Input
                     Debug.LogWarning(
                         $"FacialAnalogInputBinder: ActionMap '{_actionMapName}' が InputActionAsset に存在しません。");
                 }
+                else
+                {
+                    // shape 判定で controls[0] を参照するため、source 生成前に Enable して bindings を解決する。
+                    _runtimeActionMap.Enable();
+                }
             }
 
             _ownedSources = new List<IAnalogInputSource>();
@@ -267,6 +272,11 @@ namespace Hidano.FacialControl.Adapters.Input
                 {
                     shape = AnalogInputShape.Vector2;
                 }
+                else if (action.controls.Count > 0 &&
+                         action.controls[0] is global::UnityEngine.InputSystem.InputControl<UnityEngine.Vector2>)
+                {
+                    shape = AnalogInputShape.Vector2;
+                }
 
                 if (!InputSourceId.TryParse(kv.Key, out var srcId))
                 {
@@ -279,8 +289,6 @@ namespace Hidano.FacialControl.Adapters.Input
                 _ownedSources.Add(inputActionSource);
                 _activeSources[kv.Key] = inputActionSource;
             }
-
-            _runtimeActionMap?.Enable();
 
             // BlendShape 側 binding を AnalogBlendShapeRegistration に注入する。
             // FacialController が分離初期化済みであっても、profile.LayerInputSources で
