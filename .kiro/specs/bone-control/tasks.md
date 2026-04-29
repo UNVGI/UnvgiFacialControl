@@ -15,8 +15,8 @@
 
 ---
 
-- [ ] 1. Foundation: Domain 値型と契約の確立
-- [ ] 1.1 BonePoseEntry の失敗テストを書く（Red）
+- [x] 1. Foundation: Domain 値型と契約の確立
+- [x] 1.1 BonePoseEntry の失敗テストを書く（Red）
   - 単一ボーンの (boneName, EulerX, EulerY, EulerZ) を保持する readonly struct の振る舞いを検証
   - boneName が null / 空白文字列 / 全空白の場合に `ArgumentException` が投げられることをアサート
   - Euler degrees の round-trip（コンストラクタに渡した値が getter から同値で返る）をアサート
@@ -25,7 +25,7 @@
   - _Requirements: 1.2, 1.6, 4.1_
   - _Boundary: Domain.Models.BonePoseEntry_
 
-- [ ] 1.2 BonePoseEntry を実装（Green）
+- [x] 1.2 BonePoseEntry を実装（Green）
   - readonly struct として `BoneName` / `EulerX` / `EulerY` / `EulerZ` を公開
   - コンストラクタで boneName の null/whitespace バリデーション → `ArgumentException`
   - Domain 層配置のため `UnityEngine.*` を一切参照しない
@@ -33,7 +33,7 @@
   - _Requirements: 1.2, 1.3, 1.6, 4.1_
   - _Boundary: Domain.Models.BonePoseEntry_
 
-- [ ] 1.3 BonePose の失敗テストを書く（Red）
+- [x] 1.3 BonePose の失敗テストを書く（Red）
   - 0 個以上のエントリを `ReadOnlyMemory<BonePoseEntry>` として保持することをアサート
   - 同一 boneName の重複エントリで構築すると `ArgumentException` が投げられることをアサート（Req 1.7）
   - 防御的コピー（外部配列を後から書き換えても BonePose 内部値が変わらない）をアサート
@@ -43,7 +43,7 @@
   - _Requirements: 1.1, 1.2, 1.7_
   - _Boundary: Domain.Models.BonePose_
 
-- [ ] 1.4 BonePose を実装（Green）
+- [x] 1.4 BonePose を実装（Green）
   - readonly struct + `ReadOnlyMemory<BonePoseEntry> Entries`、`string Id`
   - コンストラクタで防御的コピーと boneName 重複チェック
   - Domain 層配置（`UnityEngine.*` 不参照）
@@ -51,8 +51,8 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.7_
   - _Boundary: Domain.Models.BonePose_
 
-- [ ] 2. Domain Service: 顔相対 Euler 合成の数学
-- [ ] 2.1 BonePoseComposer の Unity 突合テストを書く（Red、PlayMode）
+- [x] 2. Domain Service: 顔相対 Euler 合成の数学
+- [x] 2.1 BonePoseComposer の Unity 突合テストを書く（Red、PlayMode）
   - PlayMode 配置の理由: Unity の `Quaternion.Euler(x, y, z)` と数値突合するため Engine 参照が必要
   - X/Y/Z 各軸 -180°〜180° の grid（10° 刻み）で `EulerToQuaternion(x, y, z)` の出力 (qx, qy, qz, qw) が `UnityEngine.Quaternion.Euler(x, y, z)` と誤差 ≤ 1e-5 で一致することをアサート
   - `Compose(basisQ, eulerXYZ)` が `basisQ * Quaternion.Euler(eulerXYZ)` と数値等価であることをアサート（Hamilton 積）
@@ -61,7 +61,7 @@
   - _Requirements: 4.2, 4.3, 4.4, 4.5_
   - _Boundary: Domain.Services.BonePoseComposer_
 
-- [ ] 2.2 BonePoseComposer を実装（Green）
+- [x] 2.2 BonePoseComposer を実装（Green）
   - `EulerToQuaternion(x, y, z, out qx, out qy, out qz, out qw)`: Unity 互換の **Z-X-Y Tait-Bryan 順** で half-angle quaternion を合成（intrinsic, Z-first）
   - `Compose(basisX..W, eulerX..Z, out outX..W)`: basis × EulerToQuaternion の Hamilton 積
   - Domain 層配置のため float 4 タプル (qx, qy, qz, qw) のみで完結し `UnityEngine.Quaternion` 不参照
@@ -70,8 +70,8 @@
   - _Requirements: 1.3, 4.2, 4.3, 4.4, 4.5_
   - _Boundary: Domain.Services.BonePoseComposer_
 
-- [ ] 3. FacialProfile への BonePoses optional 追加
-- [ ] 3.1 (P) FacialProfile 後方互換テストを書く（Red）
+- [x] 3. FacialProfile への BonePoses optional 追加
+- [x] 3.1 (P) FacialProfile 後方互換テストを書く（Red）
   - 既存コンストラクタ呼出（BonePoses 引数なし）が warning なく通り、`BonePoses` プロパティが空配列を返すことをアサート
   - BonePoses を渡したコンストラクタで防御的コピーが行われることをアサート
   - 既存 `FacialProfileTests` が無修正で全件パスし続けることをアサート（Req 10.1 / 10.3 の構造的保証）
@@ -80,7 +80,7 @@
   - _Boundary: Domain.Models.FacialProfile_
   - _Depends: 1.4_
 
-- [ ] 3.2 (P) FacialProfile に BonePoses プロパティを追加（Green、最小破壊）
+- [x] 3.2 (P) FacialProfile に BonePoses プロパティを追加（Green、最小破壊）
   - `ReadOnlyMemory<BonePose> BonePoses { get; }` を追加（default 空）
   - 既存コンストラクタを温存しつつ BonePoses を受け取るオーバーロードを追加
   - `Expression` には一切手を入れない（Req 1.4）
@@ -89,8 +89,8 @@
   - _Boundary: Domain.Models.FacialProfile_
   - _Depends: 1.4_
 
-- [ ] 4. Adapters/Json: BonePose の JSON DTO とパーサ拡張
-- [ ] 4.1 (P) BonePoseDto / BonePoseEntryDto の round-trip テストを書く（Red、EditMode）
+- [x] 4. Adapters/Json: BonePose の JSON DTO とパーサ拡張
+- [x] 4.1 (P) BonePoseDto / BonePoseEntryDto の round-trip テストを書く（Red、EditMode）
   - サンプル JSON（`bonePoses[].id`, `bonePoses[].entries[].boneName`, `bonePoses[].entries[].eulerXYZ.{x,y,z}`）→ DTO → Domain BonePose → DTO の名前/値が同値であることをアサート
   - `eulerXYZ` の degree 値が float round-trip で保持されることをアサート（Req 8.5）
   - 多バイト boneName（例: 「頭」「左目_あ」）が壊れずに round-trip することをアサート（Req 2.2）
@@ -99,7 +99,7 @@
   - _Boundary: Adapters.Json.Dto.BonePoseDto, BonePoseEntryDto_
   - _Depends: 1.4_
 
-- [ ] 4.2 (P) BonePoseDto / BonePoseEntryDto を実装（Green）
+- [x] 4.2 (P) BonePoseDto / BonePoseEntryDto を実装（Green）
   - `JsonUtility` 互換の `[Serializable]` クラスとして DTO を定義
   - `BonePoseDto`: `string id` + `List<BonePoseEntryDto> entries`
   - `BonePoseEntryDto`: `string boneName` + `Vector3 eulerXYZ`（degrees）
@@ -109,7 +109,7 @@
   - _Boundary: Adapters.Json.Dto.BonePoseDto, BonePoseEntryDto_
   - _Depends: 1.4_
 
-- [ ] 4.3 SystemTextJsonParser に bonePoses ブロック処理を追加するテストを書く（Red、EditMode）
+- [x] 4.3 SystemTextJsonParser に bonePoses ブロック処理を追加するテストを書く（Red、EditMode）
   - `bonePoses` ブロック付き JSON が `FacialProfile.BonePoses` に正しく Domain として乗ることをアサート（Req 7.1, 7.2）
   - `boneName` 欠落 / null / 空のエントリが Warning + skip され、続行することをアサート（Req 7.4）
   - `eulerXYZ` 不在 / 欠損のエントリが Warning + skip されることをアサート（Req 7.4）
@@ -119,7 +119,7 @@
   - _Boundary: Adapters.Json.SystemTextJsonParser, JsonSchemaDefinition_
   - _Depends: 3.2, 4.2_
 
-- [ ] 4.4 SystemTextJsonParser を拡張（Green）
+- [x] 4.4 SystemTextJsonParser を拡張（Green）
   - `ProfileDto` に `public List<BonePoseDto> bonePoses;` を追加
   - `ConvertToProfile` で BonePoseDto[] → BonePose[] 変換（Domain ctor のバリデーション通過）
   - 不正エントリは `Debug.LogWarning` + skip + 続行（**例外を throw しない**）
@@ -129,7 +129,7 @@
   - _Boundary: Adapters.Json.SystemTextJsonParser, JsonSchemaDefinition_
   - _Depends: 3.2, 4.2_
 
-- [ ] 4.5 後方互換テスト: bonePoses 欠落 JSON の読込（Red → Green、EditMode）
+- [x] 4.5 後方互換テスト: bonePoses 欠落 JSON の読込（Red → Green、EditMode）
   - **重要**: このタスクは `inputSources` の D-5 必須化ポリシーを bonePoses に**踏襲しない**ことを保証する
   - bone-control 導入前の既存 JSON（`bonePoses` フィールドが完全に欠落）を読込み、`FacialProfile.BonePoses` が空配列となり、他のフィールド（layers, expressions, inputSources）が破壊なく読込まれることをアサート（Req 7.3, 10.2）
   - `bonePoses: null` / `bonePoses: []` の両方が空配列扱いとなることをアサート
@@ -140,8 +140,8 @@
   - _Boundary: Adapters.Json.SystemTextJsonParser_
   - _Depends: 4.4_
 
-- [ ] 5. Adapters/ScriptableObject: SO 内包と Mapper 双方向変換
-- [ ] 5.1 FacialProfileSO の `_bonePoses` Serializable フィールドを追加するテストを書く（Red、EditMode）
+- [x] 5. Adapters/ScriptableObject: SO 内包と Mapper 双方向変換
+- [x] 5.1 FacialProfileSO の `_bonePoses` Serializable フィールドを追加するテストを書く（Red、EditMode）
   - `BonePoseSerializable` / `BonePoseEntrySerializable`（id, entries[], boneName, Vector3 eulerXYZ）が `[Serializable]` で定義されていることをアサート
   - `FacialProfileSO` の `_bonePoses` フィールドが SerializedProperty として読み取れることをアサート
   - 既存 SO アセット（`_bonePoses` 未設定）が空配列で初期化されることをアサート（Req 8.4 / 10.1）
@@ -149,7 +149,7 @@
   - _Requirements: 8.1, 8.4, 10.1_
   - _Boundary: Adapters.ScriptableObject.FacialProfileSO_
 
-- [ ] 5.2 FacialProfileSO に `_bonePoses` を追加（Green、extend 既存 SO）
+- [x] 5.2 FacialProfileSO に `_bonePoses` を追加（Green、extend 既存 SO）
   - **既存 `FacialProfileSO.cs` を rewrite せず extend する**: 既存フィールドと CreateAssetMenu 属性を保持
   - `[Serializable] public sealed class BonePoseSerializable { public string id; public BonePoseEntrySerializable[] entries; }` を追加
   - `[Serializable] public sealed class BonePoseEntrySerializable { public string boneName; public Vector3 eulerXYZ; }` を追加
@@ -158,7 +158,7 @@
   - _Requirements: 8.1, 8.4, 10.1_
   - _Boundary: Adapters.ScriptableObject.FacialProfileSO_
 
-- [ ] 5.3 FacialProfileMapper の round-trip テストを書く（Red、EditMode）
+- [x] 5.3 FacialProfileMapper の round-trip テストを書く（Red、EditMode）
   - Domain BonePose → BonePoseSerializable → Domain BonePose の名前 / Euler 値が同値であることをアサート（Req 8.1, 8.2, 8.5）
   - SO → JSON 経由 → Domain → SO の経路でも値が保たれることをアサート
   - `_bonePoses` 空配列の SO が Domain で空 BonePoses に変換されることをアサート（Req 10.1）
@@ -167,7 +167,7 @@
   - _Boundary: Adapters.ScriptableObject.FacialProfileMapper_
   - _Depends: 4.4, 5.2_
 
-- [ ] 5.4 FacialProfileMapper を拡張（Green、extend 既存 Mapper）
+- [x] 5.4 FacialProfileMapper を拡張（Green、extend 既存 Mapper）
   - **既存 `FacialProfileMapper.cs` を rewrite せず extend する**: 既存メソッドと変換経路を保持
   - SO → Domain: `_bonePoses` を BonePose[] に変換し、`FacialProfile` ctor へ渡す
   - Domain → SO: BonePose[] を `BonePoseSerializable[]` へ変換し SO へ書込む
@@ -177,8 +177,8 @@
   - _Boundary: Adapters.ScriptableObject.FacialProfileMapper_
   - _Depends: 4.4, 5.2_
 
-- [ ] 6. Adapters/Bone: Resolver / AutoAssigner / BoneWriter
-- [ ] 6.1 Adapters/Bone ディレクトリ構築（Foundation、新規 asmdef なし）
+- [x] 6. Adapters/Bone: Resolver / AutoAssigner / BoneWriter
+- [x] 6.1 Adapters/Bone ディレクトリ構築（Foundation、新規 asmdef なし）
   - `Runtime/Adapters/Bone/` ディレクトリを作成し、`.meta` ペアリングルールに従って配置
   - **新規 asmdef は作らない**: 既存 `Hidano.FacialControl.Adapters.asmdef` の参照配下に新ディレクトリを置く
   - 空のスケルトン（`IBonePoseSource`, `IBonePoseProvider`, `BoneTransformResolver`, `HumanoidBoneAutoAssigner`, `BoneWriter`, `BonePoseSnapshot`）の C# ファイルとそれぞれの `.meta` を配置
@@ -186,7 +186,7 @@
   - _Requirements: 5.1_
   - _Boundary: Adapters.Bone (directory scaffolding)_
 
-- [ ] 6.2 (P) IBonePoseSource / IBonePoseProvider 契約定義
+- [x] 6.2 (P) IBonePoseSource / IBonePoseProvider 契約定義
   - `IBonePoseSource.GetActiveBonePose()` を定義（BoneWriter 自身が実装、内部経路）
   - `IBonePoseProvider.SetActiveBonePose(in BonePose pose)` を定義（外部 = analog-input-binding が消費）
   - `in` 渡しで struct コピーを避け、hot path で alloc しない契約を明文化（Req 11.5）
@@ -196,7 +196,7 @@
   - _Boundary: Adapters.Bone.IBonePoseSource, IBonePoseProvider_
   - _Depends: 1.4, 6.1_
 
-- [ ] 6.3 (P) BoneTransformResolver のテストを書く（Red、PlayMode）
+- [x] 6.3 (P) BoneTransformResolver のテストを書く（Red、PlayMode）
   - PlayMode 配置の理由: 実 Transform 階層を持つ GameObject ツリーが必要
   - 名前から Transform を解決でき、未解決時に `Debug.LogWarning` + null 返却（throw しない）であることをアサート（Req 2.4）
   - 多バイト boneName（「頭」「左目」等）が解決できることをアサート（Req 2.2）
@@ -208,7 +208,7 @@
   - _Boundary: Adapters.Bone.BoneTransformResolver_
   - _Depends: 6.1_
 
-- [ ] 6.4 BoneTransformResolver を実装（Green）
+- [x] 6.4 BoneTransformResolver を実装（Green）
   - ルート Transform から再帰探索で名前一致の最初の Transform を返す
   - `Dictionary<string, Transform>` でキャッシュ、`Initialize` 時に `Prime(boneNames)` で一括解決
   - 解決失敗時は `Debug.LogWarning`（同名連続警告は dedupe）+ null 返却
@@ -217,7 +217,7 @@
   - _Boundary: Adapters.Bone.BoneTransformResolver_
   - _Depends: 6.1_
 
-- [ ] 6.5 (P) HumanoidBoneAutoAssigner のテストを書く（Red、PlayMode）
+- [x] 6.5 (P) HumanoidBoneAutoAssigner のテストを書く（Red、PlayMode）
   - PlayMode 配置の理由: 実 Animator + Humanoid Avatar が必要
   - Humanoid Animator から `HumanBodyBones.LeftEye / RightEye` の bone 名を取得できることをアサート（Req 3.1）
   - `HumanBodyBones.Head` を優先し、Head 不在時に `useNeckFallback=true` で Neck を返すことをアサート（Req 3.2）
@@ -228,7 +228,7 @@
   - _Boundary: Adapters.Bone.HumanoidBoneAutoAssigner_
   - _Depends: 6.1_
 
-- [ ] 6.6 HumanoidBoneAutoAssigner を実装（Green）
+- [x] 6.6 HumanoidBoneAutoAssigner を実装（Green）
   - `ResolveEyeBoneNames(Animator)` → `EyeBoneNames(LeftEye, RightEye)` を返す
   - `ResolveBasisBoneName(Animator, useNeckFallback=true)` → Head 名（不在時 Neck）を返す
   - 非 Humanoid / 未マップは empty + Warning（throw しない）
@@ -238,7 +238,7 @@
   - _Boundary: Adapters.Bone.HumanoidBoneAutoAssigner_
   - _Depends: 6.1_
 
-- [ ] 6.7 BonePoseSnapshot のテストを書く（Red、PlayMode）
+- [x] 6.7 BonePoseSnapshot のテストを書く（Red、PlayMode）
   - 解決済み Transform 配列と中間 quaternion (qx, qy, qz, qw) 配列を事前確保し、BonePose 切替時に容量不足のみ拡張、縮小しないことをアサート（Req 6.2, 6.3）
   - 同一 BonePose 継続中は内部配列を再確保しないことをアサート（Req 6.3）
   - `BoneWriter` の `Apply` ホットパスで参照される配列が `null` でないことをアサート
@@ -247,7 +247,7 @@
   - _Boundary: Adapters.Bone.BonePoseSnapshot_
   - _Depends: 6.1_
 
-- [ ] 6.8 BonePoseSnapshot を実装（Green）
+- [x] 6.8 BonePoseSnapshot を実装（Green）
   - 内部 `Transform[]` と `float[4 * capacity]`（または `(float qx, qy, qz, qw)[]`）を保持
   - `EnsureCapacity(int)` で拡張のみ（縮小なし）
   - 観測可能な完了条件: 6.7 のテストが Green
@@ -255,8 +255,8 @@
   - _Boundary: Adapters.Bone.BonePoseSnapshot_
   - _Depends: 6.1_
 
-- [ ] 7. BoneWriter 本体（適用パイプラインの中核）
-- [ ] 7.1 BoneWriter の Apply 順序・basis 採取テスト（Red、PlayMode）
+- [x] 7. BoneWriter 本体（適用パイプラインの中核）
+- [x] 7.1 BoneWriter の Apply 順序・basis 採取テスト（Red、PlayMode）
   - PlayMode 配置の理由: 実 Animator + Transform 階層 + LateUpdate 順序が必要
   - `Apply()` 開始時に basis bone の `localRotation` を 1 回だけ採取し、entries ループ前にキャッシュすることをアサート（Req 5.5、決定的順序）
   - active BonePose が null / Entries が空のとき、いかなる Transform にも触れないことをアサート（Req 5.4, 10.1）
@@ -268,7 +268,7 @@
   - _Boundary: Adapters.Bone.BoneWriter_
   - _Depends: 2.2, 6.2, 6.4, 6.6, 6.8_
 
-- [ ] 7.2 BoneWriter の Initialize / Apply / Dispose を実装（Green）
+- [x] 7.2 BoneWriter の Initialize / Apply / Dispose を実装（Green）
   - `BoneWriter(BoneTransformResolver resolver, Animator animator)` で構築
   - `Initialize(in BonePose initialPose, string basisBoneName)`: basis Transform を解決して `_basisBone` にキャッシュ（**MINOR-1 反映**）、Resolver に entries の boneName を Prime
   - `Apply()`: 引数なし。`_basisBone.localRotation` を 1 回読み、Composer で各エントリの最終 localRotation を計算、対象 Transform に書込む
@@ -278,7 +278,7 @@
   - _Boundary: Adapters.Bone.BoneWriter_
   - _Depends: 2.2, 6.2, 6.4, 6.6, 6.8_
 
-- [ ] 7.3 SetActiveBonePose / GetActiveBonePose の next-frame セマンティクステスト（Red、PlayMode）
+- [x] 7.3 SetActiveBonePose / GetActiveBonePose の next-frame セマンティクステスト（Red、PlayMode）
   - PlayMode 配置の理由: フレーム同期が必要
   - `SetActiveBonePose(in newPose)` 呼出後、**同一フレーム内の Apply** には反映されず、**次フレームの Apply** から反映されることをアサート（Req 11.2）
   - `GetActiveBonePose()` が現在 active な pose を返すことをアサート（Req 5.6, 11.1）
@@ -288,7 +288,7 @@
   - _Boundary: Adapters.Bone.BoneWriter (IBonePoseProvider)_
   - _Depends: 7.2_
 
-- [ ] 7.4 SetActiveBonePose / GetActiveBonePose を実装（Green）
+- [x] 7.4 SetActiveBonePose / GetActiveBonePose を実装（Green）
   - `_pendingPose` / `_activePose` の簡易 swap を内部で持ち、`SetActiveBonePose` は `_pendingPose` に格納
   - `Apply` 開始時に `_pendingPose != null` なら `_activePose` へ swap してから処理
   - `GetActiveBonePose()` は `_activePose` を返す
@@ -298,7 +298,7 @@
   - _Boundary: Adapters.Bone.BoneWriter (IBonePoseProvider)_
   - _Depends: 7.2_
 
-- [ ] 7.5 RestoreInitialRotations 遅延スナップショットテスト（Red、PlayMode）
+- [x] 7.5 RestoreInitialRotations 遅延スナップショットテスト（Red、PlayMode）
   - PlayMode 配置の理由: 実 Transform への書込みと復元の検証が必要
   - **MAJOR-1 反映**: `Initialize` を空 BonePose で呼び、その後 `SetActiveBonePose` で BonePose を流して `Apply` した場合、各エントリの対象 Transform に「初回書込み直前」の `localRotation` が `_initialSnapshot[boneName]` に記録されることをアサート
   - `Dispose` または BoneWriter を制御する側の `OnDisable` 経路で `RestoreInitialRotations()` を呼ぶと、スナップショットを巡回して全対象 Transform が初期姿勢に戻ることをアサート
@@ -309,7 +309,7 @@
   - _Boundary: Adapters.Bone.BoneWriter (RestoreInitialRotations)_
   - _Depends: 7.2_
 
-- [ ] 7.6 RestoreInitialRotations を実装（Green、遅延スナップショット）
+- [x] 7.6 RestoreInitialRotations を実装（Green、遅延スナップショット）
   - 内部に `Dictionary<string, Quaternion> _initialSnapshot` を保持
   - `Apply()` 内で各エントリの対象 Transform に書込む直前、`_initialSnapshot.ContainsKey(boneName) == false` なら `_initialSnapshot[boneName] = transform.localRotation` を記録（hot path だが key 既存後はチェックのみ、alloc しない）
   - `RestoreInitialRotations()`: スナップショットを巡回し、各 boneName の Transform を `_initialSnapshot[boneName]` に戻す
@@ -319,7 +319,7 @@
   - _Boundary: Adapters.Bone.BoneWriter (RestoreInitialRotations)_
   - _Depends: 7.2_
 
-- [ ] 7.7 BoneWriter の GC ゼロアロケーション検証テスト（Red → Green、PlayMode、Performance）
+- [x] 7.7 BoneWriter の GC ゼロアロケーション検証テスト（Red → Green、PlayMode、Performance）
   - **必須要件**: Req 6.1 / 6.4 / 11.5 の構造的保証として `GCAllocationTests` ファミリに追加
   - 同一 BonePose を複数フレーム継続して `Apply()` した場合に warmup 後の per-frame ヒープ確保が **0 バイト** であることをアサート（`NUnit.Framework.Assert.That(() => writer.Apply(), Is.Not.AllocatingGCMemory())` 相当 / Unity Performance Testing API の `Measure.Method().GC()` 相当）
   - `SetActiveBonePose(in pose)` の呼出経路でも 0 バイトであることをアサート（Req 11.5）
@@ -337,8 +337,8 @@
   - _Boundary: Adapters.Bone.BoneWriter (performance)_
   - _Depends: 7.7_
 
-- [ ] 8. Adapters/Playable: FacialController 統合
-- [ ] 8.1 FacialController に BoneWriter 統合する order テスト（Red、PlayMode）
+- [x] 8. Adapters/Playable: FacialController 統合
+- [x] 8.1 FacialController に BoneWriter 統合する order テスト（Red、PlayMode）
   - PlayMode 配置の理由: 実 Animator + LateUpdate 同期 + 実フレーム必要
   - 同一フレーム内で **Animator → BlendShape 書込 → BoneWriter.Apply** の順で実行されることをアサート（Req 5.3, 10.3）
   - 既存 `FacialControlMixer` 出力（BlendShape weight、layer slots）が BoneWriter 統合後も無変更であることをアサート（Req 10.3）
@@ -349,7 +349,7 @@
   - _Boundary: Adapters.Playable.FacialController (extension only)_
   - _Depends: 5.4, 7.4, 7.6_
 
-- [ ] 8.2 FacialController に BoneWriter を統合（Green、extend 既存 Controller）
+- [x] 8.2 FacialController に BoneWriter を統合（Green、extend 既存 Controller）
   - **既存 `FacialController.cs` を rewrite せず extend する**: 既存 fields / Initialize / LateUpdate を保持
   - `Initialize` 末尾で `_boneWriter = new BoneWriter(resolver, _animator); _boneWriter.Initialize(profile.BonePoses[0] or empty, basisBoneName)` を呼ぶ
   - basisBoneName は SO 設定または `HumanoidBoneAutoAssigner.ResolveBasisBoneName` から決定（未設定時 `"Head"` をデフォルト）
@@ -361,8 +361,8 @@
   - _Boundary: Adapters.Playable.FacialController (extension only)_
   - _Depends: 5.4, 7.4, 7.6_
 
-- [ ] 9. Editor: FacialProfileSO_BonePoseView
-- [ ] 9.1 BoneNameProvider（候補列挙ヘルパ）を追加
+- [x] 9. Editor: FacialProfileSO_BonePoseView
+- [x] 9.1 BoneNameProvider（候補列挙ヘルパ）を追加
   - 参照モデル配下の Animator / SkinnedMeshRenderer から `Transform.name` を再帰列挙し、ソート + 重複除去した string 配列を返す
   - 既存 `Editor/Common/BlendShapeNameProvider.cs` のパターンを踏襲
   - 参照モデル未設定時は空配列を返す
@@ -370,7 +370,7 @@
   - _Requirements: 9.2, 9.3_
   - _Boundary: Editor.Common.BoneNameProvider_
 
-- [ ] 9.2 FacialProfileSO_BonePoseView の UI Toolkit 表示テスト（Red、EditMode）
+- [x] 9.2 FacialProfileSO_BonePoseView の UI Toolkit 表示テスト（Red、EditMode）
   - `Foldout` + `ListView` で BonePose 一覧が表示されることをアサート（Req 9.1）
   - 各エントリ行に boneName 入力（typeahead 候補表示）+ Vector3Field（X, Y, Z degrees）+ 削除ボタンが配置されることをアサート（Req 9.2, 9.4）
   - エントリ追加/削除/編集後に `EditorUtility.SetDirty(target)` が呼ばれ、SO アセットがダーティになることをアサート（Req 9.4）
@@ -380,7 +380,7 @@
   - _Boundary: Editor.Inspector.FacialProfileSO_BonePoseView_
   - _Depends: 5.2, 9.1_
 
-- [ ] 9.3 FacialProfileSO_BonePoseView を実装（Green）
+- [x] 9.3 FacialProfileSO_BonePoseView を実装（Green）
   - UI Toolkit (`UnityEngine.UIElements` / `UnityEditor.UIElements`) で `Foldout` + `ListView` を構築（既存 `FacialProfileSO_InputSourcesView` と同型）
   - 各エントリ行: boneName 用 `DropdownField` + `BoneNameProvider` の候補列挙（Req 9.2、research §7）。候補がない場合は `TextField` フォールバック
   - Vector3Field で X/Y/Z degrees を編集
@@ -390,7 +390,7 @@
   - _Boundary: Editor.Inspector.FacialProfileSO_BonePoseView_
   - _Depends: 5.2, 9.1_
 
-- [ ] 9.4 (P) Humanoid 自動アサインボタンを追加
+- [x] 9.4 (P) Humanoid 自動アサインボタンを追加
   - 「Humanoid 自動アサイン」ボタンを BonePoseView に配置（Req 9.3）
   - クリック時に `HumanoidBoneAutoAssigner.ResolveEyeBoneNames(animator)` で eye bone 名を取得し、LeftEye / RightEye の 2 エントリを既定 Euler (0, 0, 0) で `_bonePoses` に追加
   - 非 Humanoid のときはボタンが Disabled（または押下時に Warning ログ + no-op）
@@ -399,7 +399,7 @@
   - _Boundary: Editor.Inspector.FacialProfileSO_BonePoseView (auto-assign button)_
   - _Depends: 6.6, 9.3_
 
-- [ ] 9.5 (P) JSON Import / Export ボタンを追加
+- [x] 9.5 (P) JSON Import / Export ボタンを追加
   - **判定**: 既存 FacialProfileSO Inspector に JSON I/E のパターンがあるため、同じパターンの転写であり Req 9.5 で必須化されている → optional ではなく必須実装とする
   - 「JSON Import」ボタン: `EditorUtility.OpenFilePanel` で JSON 選択 → `SystemTextJsonParser.ParseProfile` → `FacialProfileMapper` で SO の `_bonePoses` を上書き
   - 「JSON Export」ボタン: 現在の `_bonePoses` を Domain BonePose[] に変換 → JSON 文字列化 → `EditorUtility.SaveFilePanel` で保存
@@ -408,7 +408,7 @@
   - _Boundary: Editor.Inspector.FacialProfileSO_BonePoseView (JSON I/E)_
   - _Depends: 4.4, 5.4, 9.3_
 
-- [ ] 9.6 FacialProfileSOEditor に BonePoseView を組込
+- [x] 9.6 FacialProfileSOEditor に BonePoseView を組込
   - **既存 `FacialProfileSOEditor.cs` を rewrite せず extend する**: `_bonePoseView` フィールドと `CreateInspectorGUI` での `root.Add(_bonePoseView.RootElement)` 1 行追加のみ
   - 既存 InputSourcesView 直下に配置（UX 一貫性）
   - 観測可能な完了条件: FacialProfileSO アセットを Inspector で開くと既存 View に加えて BonePose セクションが表示される
@@ -416,8 +416,8 @@
   - _Boundary: Editor.Inspector.FacialProfileSOEditor (extension only)_
   - _Depends: 9.3_
 
-- [ ] 10. End-to-End 統合検証
-- [ ] 10.1 JSON → SO → Domain → BoneWriter → Transform の E2E テスト（PlayMode）
+- [x] 10. End-to-End 統合検証
+- [x] 10.1 JSON → SO → Domain → BoneWriter → Transform の E2E テスト（PlayMode）
   - JSON ファイル（`bonePoses` ブロック付き）から `FacialProfileSO` をロード → `FacialController.Initialize` → `LateUpdate` で `BoneWriter.Apply` → 対象 Transform に最終 localRotation が書込まれているという全経路をアサート
   - basis bone 採取 → Composer 合成 → Transform 書込みまでのデータフローが値破壊なしであることをアサート（Req 8.5 の round-trip と整合）
   - body tilt 込みのモーション再生中でも、BonePose の Euler 値が basis 相対で正しく適用され、tilt が gaze に漏れないことをアサート（Req 4.5、design §System Flows の主要不変条件）
@@ -426,7 +426,7 @@
   - _Boundary: cross-layer integration_
   - _Depends: 8.2, 9.5_
 
-- [ ] 10.2 (P) IBonePoseProvider 経由の analog-input-binding 互換性検証（PlayMode）
+- [x] 10.2 (P) IBonePoseProvider 経由の analog-input-binding 互換性検証（PlayMode）
   - **このタスクは analog-input-binding spec が消費する API の安定性を保証する**
   - 任意の MonoBehaviour（テスト用 Fake Provider）から `FacialController.SetActiveBonePose(in pose)` を呼び、次フレームから `Apply()` 結果が変わることをアサート（Req 11.2, 11.3, 11.4）
   - 入力源を仮定しない汎用 API であることを Fake Provider のシグネチャレビューで確認（Req 11.4）
@@ -436,7 +436,7 @@
   - _Boundary: Adapters.Bone.IBonePoseProvider (API surface)_
   - _Depends: 8.2_
 
-- [ ] 10.3 (P) 既存 BlendShape パイプラインの非破壊検証（PlayMode）
+- [x] 10.3 (P) 既存 BlendShape パイプラインの非破壊検証（PlayMode）
   - 既存 `FacialControlMixer` / `LayerInputSourceAggregator` の出力（BlendShape weight, layer slots）が BoneWriter 統合後も bit-exact で同一であることをアサート（Req 10.3）
   - 既存 `FacialControllerLifecycleTests` / `SampleJsonParseTests` が **無修正で全件パス**することをアサート
   - 既存 GC alloc テスト（BlendShape 経路）が BoneWriter 追加後も予算内であることをアサート（Req 10.3）
