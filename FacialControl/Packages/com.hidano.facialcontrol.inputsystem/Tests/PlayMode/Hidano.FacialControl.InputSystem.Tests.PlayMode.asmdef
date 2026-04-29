@@ -6,12 +6,14 @@
         "Hidano.FacialControl.Application",
         "Hidano.FacialControl.Adapters",
         "Hidano.FacialControl.InputSystem",
+        "Hidano.FacialControl.Osc",
         "Hidano.FacialControl.Tests.Shared",
         "Unity.Collections",
         "Unity.InputSystem",
         "Unity.InputSystem.TestFramework",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "uOSC.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
