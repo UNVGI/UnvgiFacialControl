@@ -104,13 +104,14 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             _binderObj.SetActive(true);
 
-            // X=0.5 → mapping(deadZone=0, scale=30, min=-180, max=180) で 15deg
-            Set(_gamepad.leftStick, new Vector2(0.5f, 0f));
+            // X=1.0 → mapping(deadZone=0, scale=1, curve=Linear, min=-180, max=180) で 1.0
+            // （TransitionCalculator.Evaluate は内部で clamp01 するため、curve 後の値は [0,1] に収まる）。
+            Set(_gamepad.leftStick, new Vector2(1.0f, 0f));
             yield return null;
             yield return null;
 
-            // 期待値: tilt * Quaternion.Euler(0, 15, 0)（basis 相対）
-            var expected = tilt * Quaternion.Euler(0f, 15f, 0f);
+            // 期待値: tilt * Quaternion.Euler(0, 1, 0)（basis 相対の合成結果）
+            var expected = tilt * Quaternion.Euler(0f, 1f, 0f);
             AssertQuaternionApprox(expected, leftEye.localRotation, 1e-3f,
                 "シナリオ A: 右スティック X → LeftEye Y が basis(tilt) 相対の合成結果");
             AssertQuaternionApprox(expected, rightEye.localRotation, 1e-3f,
@@ -383,8 +384,13 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
         /// <summary>
         /// 右スティック(<c>right_stick</c>) → LeftEye/RightEye の Y 軸 BonePose binding。
-        /// scale=30, min=-180, max=180, deadZone=0, curve=Linear。
+        /// scale=1, min=-180, max=180, deadZone=0, curve=Linear。
         /// </summary>
+        /// <remarks>
+        /// <see cref="Hidano.FacialControl.Domain.Services.AnalogMappingEvaluator"/> は
+        /// curve 評価で <c>clamp01</c> をかけるため、curve 後の値は [0,1] に収まる。
+        /// テストでは入力値 1.0 を与えて output=1.0 となる構成を使う。
+        /// </remarks>
         private static AnalogInputBindingProfileSO CreateRightStickBonePoseProfileSO()
         {
             var so = ScriptableObject.CreateInstance<AnalogInputBindingProfileSO>();
@@ -392,8 +398,8 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
                 "{\n" +
                 "  \"version\": \"1.0.0\",\n" +
                 "  \"bindings\": [\n" +
-                BoneposeBindingJson("right_stick", 0, "LeftEye", "Y", 30f) + ",\n" +
-                BoneposeBindingJson("right_stick", 0, "RightEye", "Y", 30f) +
+                BoneposeBindingJson("right_stick", 0, "LeftEye", "Y", 1f) + ",\n" +
+                BoneposeBindingJson("right_stick", 0, "RightEye", "Y", 1f) +
                 "  ]\n" +
                 "}";
             so.JsonText = json;
