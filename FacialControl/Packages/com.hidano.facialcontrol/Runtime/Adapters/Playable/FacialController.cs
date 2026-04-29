@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.Playables;
+using Hidano.FacialControl.Adapters.Bone;
 using Hidano.FacialControl.Adapters.FileSystem;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.Json;
@@ -23,7 +24,7 @@ namespace Hidano.FacialControl.Adapters.Playable
     /// </summary>
     [RequireComponent(typeof(Animator))]
     [AddComponentMenu("FacialControl/Facial Controller")]
-    public class FacialController : MonoBehaviour
+    public class FacialController : MonoBehaviour, IBonePoseProvider, IBonePoseSource
     {
         /// <summary>
         /// 表情プロファイルの ScriptableObject 参照
@@ -48,6 +49,7 @@ namespace Hidano.FacialControl.Adapters.Playable
         private FacialProfile? _currentProfile;
         private string[] _blendShapeNames;
         private bool _isInitialized;
+        private BoneWriter _boneWriter;
 
         // BlendShape 出力インデックス → (Renderer, Renderer 上の BS index) のマッピング
         private BlendShapeTarget[][] _blendShapeTargets;
@@ -142,6 +144,9 @@ namespace Hidano.FacialControl.Adapters.Playable
                         targets[t].RendererBlendShapeIndex, weight);
                 }
             }
+
+            // BoneWriter は LateUpdate 末尾で適用する（Animator → BlendShape → BoneWriter の順、Req 5.3）。
+            _boneWriter?.Apply();
         }
 
         /// <summary>
@@ -235,7 +240,43 @@ namespace Hidano.FacialControl.Adapters.Playable
                 _animator, profile, blendShapeNames);
 
             _graphBuildResult.Graph.Play();
+
+            // BoneWriter を生成・初期化（Req 5.3, 5.6, 11.1〜11.4）。
+            SetupBoneWriter(profile);
+
             _isInitialized = true;
+        }
+
+        private void SetupBoneWriter(FacialProfile profile)
+        {
+            if (_animator == null)
+            {
+                return;
+            }
+
+            var resolver = new BoneTransformResolver(_animator.transform);
+            _boneWriter = new BoneWriter(resolver, _animator);
+
+            // basisBoneName は Humanoid Avatar から解決し、未設定 / 非 Humanoid は "Head" をデフォルトとする。
+            string basisBoneName = "Head";
+            if (_animator.avatar != null && _animator.avatar.isHuman)
+            {
+                var resolved = HumanoidBoneAutoAssigner.ResolveBasisBoneName(_animator);
+                if (!string.IsNullOrEmpty(resolved))
+                {
+                    basisBoneName = resolved;
+                }
+            }
+
+            // 初期 BonePose は profile.BonePoses[0]（存在しなければ default = 空）。
+            BonePose initialPose = default;
+            var bonePosesSpan = profile.BonePoses.Span;
+            if (bonePosesSpan.Length > 0)
+            {
+                initialPose = bonePosesSpan[0];
+            }
+
+            _boneWriter.Initialize(in initialPose, basisBoneName);
         }
 
         private void ApplyExtensions(FacialProfile profile, string[] blendShapeNames)
@@ -453,6 +494,34 @@ namespace Hidano.FacialControl.Adapters.Playable
         }
 
         /// <summary>
+        /// 外部 (analog-input-binding 等) から現在 active な <see cref="BonePose"/> を差替える
+        /// (Req 11.1, 11.2, 11.3, 11.4, 11.5)。次フレームの <see cref="BoneWriter.Apply"/> から有効。
+        /// </summary>
+        public void SetActiveBonePose(in BonePose pose)
+        {
+            if (_boneWriter == null)
+            {
+                Debug.LogWarning("FacialController が初期化されていません。SetActiveBonePose は無視されます。");
+                return;
+            }
+
+            _boneWriter.SetActiveBonePose(in pose);
+        }
+
+        /// <summary>
+        /// 現在 active な <see cref="BonePose"/> を返す (Req 5.6, 11.1)。
+        /// </summary>
+        public BonePose GetActiveBonePose()
+        {
+            if (_boneWriter == null)
+            {
+                return default;
+            }
+
+            return _boneWriter.GetActiveBonePose();
+        }
+
+        /// <summary>
         /// 現在アクティブな Expression のリストを返す。
         /// </summary>
         /// <returns>アクティブな Expression のリスト</returns>
@@ -635,6 +704,14 @@ namespace Hidano.FacialControl.Adapters.Playable
             {
                 _layerUseCase.Dispose();
                 _layerUseCase = null;
+            }
+
+            // BoneWriter は書込中だった bone の localRotation を初回書込み直前の値に戻してから Dispose する。
+            if (_boneWriter != null)
+            {
+                _boneWriter.RestoreInitialRotations();
+                _boneWriter.Dispose();
+                _boneWriter = null;
             }
 
             _inputSourceFactory = null;

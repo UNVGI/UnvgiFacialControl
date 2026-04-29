@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="4" result="Passed" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-04-29 00:44:20Z" end-time="2026-04-29 00:44:20Z" duration="0.0835052">
+  <test-suite type="TestSuite" id="1417" name="FacialControl" fullname="FacialControl" runstate="Runnable" testcasecount="357" result="Passed" start-time="2026-04-29 00:44:20Z" end-time="2026-04-29 00:44:20Z" duration="0.083505" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1403" name="Hidano.FacialControl.Tests.PlayMode.dll" fullname="D:/Personal/Repositries/FacialControl/FacialControl/Library/ScriptAssemblies/Hidano.FacialControl.Tests.PlayMode.dll" runstate="Runnable" testcasecount="283" result="Passed" start-time="2026-04-29 00:44:20Z" end-time="2026-04-29 00:44:20Z" duration="0.072879" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="34128" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1404" name="Hidano" fullname="Hidano" runstate="Runnable" testcasecount="283" result="Passed" start-time="2026-04-29 00:44:20Z" end-time="2026-04-29 00:44:20Z" duration="0.069026" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1405" name="FacialControl" fullname="Hidano.FacialControl" runstate="Runnable" testcasecount="283" result="Passed" start-time="2026-04-29 00:44:20Z" end-time="2026-04-29 00:44:20Z" duration="0.065069" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1406" name="Tests" fullname="Hidano.FacialControl.Tests" runstate="Runnable" testcasecount="283" result="Passed" start-time="2026-04-29 00:44:20Z" end-time="2026-04-29 00:44:20Z" duration="0.061189" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1407" name="PlayMode" fullname="Hidano.FacialControl.Tests.PlayMode" runstate="Runnable" testcasecount="283" result="Passed" start-time="2026-04-29 00:44:20Z" end-time="2026-04-29 00:44:20Z" duration="0.057456" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestSuite" id="1409" name="Integration" fullname="Hidano.FacialControl.Tests.PlayMode.Integration" runstate="Runnable" testcasecount="60" result="Passed" start-time="2026-04-29 00:44:20Z" end-time="2026-04-29 00:44:20Z" duration="0.052697" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-suite type="TestFixture" id="1130" name="BlendShapeNonRegressionTests" fullname="Hidano.FacialControl.Tests.PlayMode.Integration.BlendShapeNonRegressionTests" classname="Hidano.FacialControl.Tests.PlayMode.Integration.BlendShapeNonRegressionTests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-04-29 00:44:20Z" end-time="2026-04-29 00:44:20Z" duration="0.049844" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="1134" name="FacialController_WithBonePoses_InitAndActivateUnaffected" fullname="Hidano.FacialControl.Tests.PlayMode.Integration.BlendShapeNonRegressionTests.FacialController_WithBonePoses_InitAndActivateUnaffected" methodname="FacialController_WithBonePoses_InitAndActivateUnaffected" classname="Hidano.FacialControl.Tests.PlayMode.Integration.BlendShapeNonRegressionTests" runstate="Runnable" seed="605273913" result="Passed" start-time="2026-04-29 00:44:20Z" end-time="2026-04-29 00:44:20Z" duration="0.028588" asserts="0">
+                    <properties>
+                      <property name="_JOINTYPE" value="UnityCombinatorial" />
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[BoneTransformResolver] bone 'Head' を解決できませんでした。
+[BoneTransformResolver] bone 'LeftEye' を解決できませんでした。
+[BoneTransformResolver] bone 'RightEye' を解決できませんでした。
+]]></output>
+                  </test-case>
+                  <test-case id="1132" name="LayerUseCaseOutput_DuringTransitionInterrupt_BitExactSame" fullname="Hidano.FacialControl.Tests.PlayMode.Integration.BlendShapeNonRegressionTests.LayerUseCaseOutput_DuringTransitionInterrupt_BitExactSame" methodname="LayerUseCaseOutput_DuringTransitionInterrupt_BitExactSame" classname="Hidano.FacialControl.Tests.PlayMode.Integration.BlendShapeNonRegressionTests" runstate="Runnable" seed="376261213" result="Passed" start-time="2026-04-29 00:44:20Z" end-time="2026-04-29 00:44:20Z" duration="0.005909" asserts="0">
+                    <properties>
+                      <property name="_JOINTYPE" value="UnityCombinatorial" />
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1131" name="LayerUseCaseOutput_WithAndWithoutBonePoses_BitExactSame" fullname="Hidano.FacialControl.Tests.PlayMode.Integration.BlendShapeNonRegressionTests.LayerUseCaseOutput_WithAndWithoutBonePoses_BitExactSame" methodname="LayerUseCaseOutput_WithAndWithoutBonePoses_BitExactSame" classname="Hidano.FacialControl.Tests.PlayMode.Integration.BlendShapeNonRegressionTests" runstate="Runnable" seed="1215256273" result="Passed" start-time="2026-04-29 00:44:20Z" end-time="2026-04-29 00:44:20Z" duration="0.003618" asserts="0">
+                    <properties>
+                      <property name="_JOINTYPE" value="UnityCombinatorial" />
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1133" name="UpdateTransition_WithBonePosesProfile_ZeroGCAllocation" fullname="Hidano.FacialControl.Tests.PlayMode.Integration.BlendShapeNonRegressionTests.UpdateTransition_WithBonePosesProfile_ZeroGCAllocation" methodname="UpdateTransition_WithBonePosesProfile_ZeroGCAllocation" classname="Hidano.FacialControl.Tests.PlayMode.Integration.BlendShapeNonRegressionTests" runstate="Runnable" seed="1386109070" result="Passed" start-time="2026-04-29 00:44:20Z" end-time="2026-04-29 00:44:20Z" duration="0.002388" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[Saving results to: C:/Users/Hidano/AppData/LocalLow/DefaultCompany/FacialControl\TestResults.xml
+]]></output>
+                  </test-case>
+                </test-suite>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

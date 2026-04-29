@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="17" result="Failed(Child)" total="17" passed="16" failed="1" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.0823414">
+  <test-suite type="TestSuite" id="1417" name="FacialControl" fullname="FacialControl" runstate="Runnable" testcasecount="357" result="Failed" site="Child" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.082341" total="17" passed="16" failed="1" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <failure>
+      <message><![CDATA[One or more child tests had errors]]></message>
+    </failure>
+    <test-suite type="Assembly" id="1403" name="Hidano.FacialControl.Tests.PlayMode.dll" fullname="D:/Personal/Repositries/FacialControl/FacialControl/Library/ScriptAssemblies/Hidano.FacialControl.Tests.PlayMode.dll" runstate="Runnable" testcasecount="283" result="Failed" site="Child" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.074755" total="17" passed="16" failed="1" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="54480" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <failure>
+        <message><![CDATA[One or more child tests had errors]]></message>
+      </failure>
+      <test-suite type="TestSuite" id="1404" name="Hidano" fullname="Hidano" runstate="Runnable" testcasecount="283" result="Failed" site="Child" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.073245" total="17" passed="16" failed="1" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <failure>
+          <message><![CDATA[One or more child tests had errors]]></message>
+        </failure>
+        <test-suite type="TestSuite" id="1405" name="FacialControl" fullname="Hidano.FacialControl" runstate="Runnable" testcasecount="283" result="Failed" site="Child" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.071979" total="17" passed="16" failed="1" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <failure>
+            <message><![CDATA[One or more child tests had errors]]></message>
+          </failure>
+          <test-suite type="TestSuite" id="1406" name="Tests" fullname="Hidano.FacialControl.Tests" runstate="Runnable" testcasecount="283" result="Failed" site="Child" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.070725" total="17" passed="16" failed="1" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <failure>
+              <message><![CDATA[One or more child tests had errors]]></message>
+            </failure>
+            <test-suite type="TestSuite" id="1407" name="PlayMode" fullname="Hidano.FacialControl.Tests.PlayMode" runstate="Runnable" testcasecount="283" result="Failed" site="Child" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.069554" total="17" passed="16" failed="1" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <failure>
+                <message><![CDATA[One or more child tests had errors]]></message>
+              </failure>
+              <test-suite type="TestSuite" id="1411" name="Adapters" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters" runstate="Runnable" testcasecount="183" result="Failed" site="Child" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.067196" total="17" passed="16" failed="1" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <failure>
+                  <message><![CDATA[One or more child tests had errors]]></message>
+                </failure>
+                <test-suite type="TestFixture" id="1232" name="FacialControllerLifecycleTests" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" testcasecount="17" result="Failed" site="Child" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.064225" total="17" passed="16" failed="1" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <failure>
+                    <message><![CDATA[One or more child tests had errors]]></message>
+                  </failure>
+                  <test-case id="1233" name="AddComponent_FacialController_CanBeAdded" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.AddComponent_FacialController_CanBeAdded" methodname="AddComponent_FacialController_CanBeAdded" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="563457738" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.007636" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1234" name="AddComponent_FacialController_IsNotInitializedWithoutProfile" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.AddComponent_FacialController_IsNotInitializedWithoutProfile" methodname="AddComponent_FacialController_IsNotInitializedWithoutProfile" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="1737833853" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.000559" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1249" name="AddComponent_FacialController_RequiresAnimator" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.AddComponent_FacialController_RequiresAnimator" methodname="AddComponent_FacialController_RequiresAnimator" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="1934792106" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.000541" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1239" name="Initialize_CalledTwice_DoesNotThrow" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.Initialize_CalledTwice_DoesNotThrow" methodname="Initialize_CalledTwice_DoesNotThrow" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="1880647299" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.014897" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[BoneTransformResolver] bone 'Head' を解決できませんでした。
+[BoneTransformResolver] bone 'Head' を解決できませんでした。
+]]></output>
+                  </test-case>
+                  <test-case id="1246" name="Initialize_WithChildSkinnedMeshRenderer_DetectsAutomatically" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.Initialize_WithChildSkinnedMeshRenderer_DetectsAutomatically" methodname="Initialize_WithChildSkinnedMeshRenderer_DetectsAutomatically" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="1476908092" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.000874" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[BoneTransformResolver] bone 'Head' を解決できませんでした。
+]]></output>
+                  </test-case>
+                  <test-case id="1240" name="Initialize_WithJsonFilePath_LoadsProfileFromStreamingAssets" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.Initialize_WithJsonFilePath_LoadsProfileFromStreamingAssets" methodname="Initialize_WithJsonFilePath_LoadsProfileFromStreamingAssets" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="976284524" result="Failed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.010868" asserts="0">
+                    <properties>
+                      <property name="_JOINTYPE" value="UnityCombinatorial" />
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <failure>
+                      <message><![CDATA[  JSON に定義された Expression が検索可能であること
+  Expected: True
+  But was:  False
+]]></message>
+                      <stack-trace><![CDATA[at Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests+<Initialize_WithJsonFilePath_LoadsProfileFromStreamingAssets>d__9.MoveNext () [0x000fb] in .\Packages\com.hidano.facialcontrol\Tests\PlayMode\Adapters\FacialControllerLifecycleTests.cs:151
+at UnityEngine.TestTools.TestEnumerator+<Execute>d__7.MoveNext () [0x0004e] in .\Library\PackageCache\com.unity.test-framework@0b7a23ab2e1d\UnityEngine.TestRunner\NUnitExtensions\Attributes\TestEnumerator.cs:44
+]]></stack-trace>
+                    </failure>
+                    <output><![CDATA[FacialController: プロファイル JSON が見つかりません: D:/Personal/Repositries/FacialControl/FacialControl/Assets/StreamingAssets\FacialControl/sample_profile.json。デフォルトプロファイルで初期化します。
+[BoneTransformResolver] bone 'Head' を解決できませんでした。
+]]></output>
+                  </test-case>
+                  <test-case id="1238" name="Initialize_WithoutProfileSO_DoesNotThrow" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.Initialize_WithoutProfileSO_DoesNotThrow" methodname="Initialize_WithoutProfileSO_DoesNotThrow" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="1718551238" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.000378" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1247" name="Initialize_WithoutSkinnedMeshRenderer_LogsWarningAndDoesNotInitialize" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.Initialize_WithoutSkinnedMeshRenderer_LogsWarningAndDoesNotInitialize" methodname="Initialize_WithoutSkinnedMeshRenderer_LogsWarningAndDoesNotInitialize" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="179491231" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.000620" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[SkinnedMeshRenderer が見つかりません。初期化をスキップします。
+]]></output>
+                  </test-case>
+                  <test-case id="1237" name="Initialize_WithProfileSO_SetsIsInitializedTrue" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.Initialize_WithProfileSO_SetsIsInitializedTrue" methodname="Initialize_WithProfileSO_SetsIsInitializedTrue" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="680149548" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.000758" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[BoneTransformResolver] bone 'Head' を解決できませんでした。
+]]></output>
+                  </test-case>
+                  <test-case id="1243" name="InitializeWithProfile_WithControllerExprDeclaration_InitializesSuccessfully" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.InitializeWithProfile_WithControllerExprDeclaration_InitializesSuccessfully" methodname="InitializeWithProfile_WithControllerExprDeclaration_InitializesSuccessfully" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="965694279" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.002509" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[FacialController: inputSource id 'controller-expr' のアダプタ生成に失敗したため layer 0 でスキップします (未登録 id または必須依存未注入)。
+[BoneTransformResolver] bone 'Head' を解決できませんでした。
+]]></output>
+                  </test-case>
+                  <test-case id="1244" name="InitializeWithProfile_WithUnknownId_SkipsAndInitializes" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.InitializeWithProfile_WithUnknownId_SkipsAndInitializes" methodname="InitializeWithProfile_WithUnknownId_SkipsAndInitializes" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="1348735740" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.002076" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[FacialController: inputSource id 'x-nonexistent' のアダプタ生成に失敗したため layer 0 でスキップします (未登録 id または必須依存未注入)。
+[BoneTransformResolver] bone 'Head' を解決できませんでした。
+]]></output>
+                  </test-case>
+                  <test-case id="1245" name="LoadProfile_AfterInitialize_RebuildsAggregatorPipeline" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.LoadProfile_AfterInitialize_RebuildsAggregatorPipeline" methodname="LoadProfile_AfterInitialize_RebuildsAggregatorPipeline" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="204052461" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.002435" asserts="0">
+                    <properties>
+                      <property name="_JOINTYPE" value="UnityCombinatorial" />
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[FacialController: inputSource id 'controller-expr' のアダプタ生成に失敗したため layer 0 でスキップします (未登録 id または必須依存未注入)。
+[BoneTransformResolver] bone 'Head' を解決できませんでした。
+[BoneTransformResolver] bone 'Head' を解決できませんでした。
+]]></output>
+                  </test-case>
+                  <test-case id="1241" name="OnDisable_DestroysGraphAndResources" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.OnDisable_DestroysGraphAndResources" methodname="OnDisable_DestroysGraphAndResources" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="148901521" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.001898" asserts="0">
+                    <properties>
+                      <property name="_JOINTYPE" value="UnityCombinatorial" />
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[BoneTransformResolver] bone 'Head' を解決できませんでした。
+]]></output>
+                  </test-case>
+                  <test-case id="1242" name="OnDisable_ThenReEnable_CanReinitialize" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.OnDisable_ThenReEnable_CanReinitialize" methodname="OnDisable_ThenReEnable_CanReinitialize" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="1570640786" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.002645" asserts="0">
+                    <properties>
+                      <property name="_JOINTYPE" value="UnityCombinatorial" />
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[BoneTransformResolver] bone 'Head' を解決できませんでした。
+[BoneTransformResolver] bone 'Head' を解決できませんでした。
+[BoneTransformResolver] bone 'Head' を解決できませんでした。
+]]></output>
+                  </test-case>
+                  <test-case id="1236" name="OnEnable_WithoutProfileSO_DoesNotInitialize" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.OnEnable_WithoutProfileSO_DoesNotInitialize" methodname="OnEnable_WithoutProfileSO_DoesNotInitialize" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="1461943141" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.001248" asserts="0">
+                    <properties>
+                      <property name="_JOINTYPE" value="UnityCombinatorial" />
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="1235" name="OnEnable_WithProfileSO_InitializesAutomatically" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.OnEnable_WithProfileSO_InitializesAutomatically" methodname="OnEnable_WithProfileSO_InitializesAutomatically" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="999718116" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.001584" asserts="0">
+                    <properties>
+                      <property name="_JOINTYPE" value="UnityCombinatorial" />
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[BoneTransformResolver] bone 'Head' を解決できませんでした。
+]]></output>
+                  </test-case>
+                  <test-case id="1248" name="SkinnedMeshRenderers_ManualOverride_UsesOverrideList" fullname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests.SkinnedMeshRenderers_ManualOverride_UsesOverrideList" methodname="SkinnedMeshRenderers_ManualOverride_UsesOverrideList" classname="Hidano.FacialControl.Tests.PlayMode.Adapters.FacialControllerLifecycleTests" runstate="Runnable" seed="1119651667" result="Passed" start-time="2026-04-29 00:45:28Z" end-time="2026-04-29 00:45:28Z" duration="0.000871" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[[BoneTransformResolver] bone 'Head' を解決できませんでした。
+Saving results to: C:/Users/Hidano/AppData/LocalLow/DefaultCompany/FacialControl\TestResults.xml
+]]></output>
+                  </test-case>
+                </test-suite>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

@@ -40,6 +40,10 @@ namespace Hidano.FacialControl.Adapters.OSC
         // マッピング情報を保持（レイヤー分配のため）
         private OscMapping[] _mappings;
 
+        // analog-input-binding 用: 任意 OSC アドレスごとの float リスナー (加算的拡張)
+        private readonly object _analogListenersLock = new object();
+        private Dictionary<string, Action<float>> _analogListeners;
+
         /// <summary>
         /// 受信ポート番号。
         /// </summary>
@@ -160,14 +164,107 @@ namespace Hidano.FacialControl.Adapters.OSC
             if (_addressToIndex.TryGetValue(message.address, out int index))
             {
                 _buffer.Write(index, value);
-                return;
+            }
+            else
+            {
+                // アドレスプレフィックスを除去して BlendShape 名で検索
+                string blendShapeName = ExtractBlendShapeName(message.address);
+                if (blendShapeName != null && _blendShapeNameToIndex.TryGetValue(blendShapeName, out index))
+                {
+                    _buffer.Write(index, value);
+                }
             }
 
-            // アドレスプレフィックスを除去して BlendShape 名で検索
-            string blendShapeName = ExtractBlendShapeName(message.address);
-            if (blendShapeName != null && _blendShapeNameToIndex.TryGetValue(blendShapeName, out index))
+            // 加算的拡張: analog-input-binding 用任意アドレスリスナー通知 (Req 5.3〜5.5)
+            NotifyAnalogListeners(message.address, value);
+        }
+
+        /// <summary>
+        /// 任意 OSC アドレスに対する float リスナーを登録する。
+        /// 受信スレッドからコールバックされるため、ハンドラ側でスレッドセーフな書込みを行うこと。
+        /// 同一 (address, listener) を重複登録した場合は multicast 結合される。
+        /// </summary>
+        /// <param name="address">購読する OSC アドレス（完全一致）。</param>
+        /// <param name="listener">受信時に invoke される delegate。</param>
+        /// <exception cref="ArgumentException"><paramref name="address"/> が null/空。</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="listener"/> が null。</exception>
+        public void RegisterAnalogListener(string address, Action<float> listener)
+        {
+            if (string.IsNullOrEmpty(address))
+                throw new ArgumentException("address は null/空にできません。", nameof(address));
+            if (listener == null)
+                throw new ArgumentNullException(nameof(listener));
+
+            lock (_analogListenersLock)
             {
-                _buffer.Write(index, value);
+                if (_analogListeners == null)
+                {
+                    _analogListeners = new Dictionary<string, Action<float>>(StringComparer.Ordinal);
+                }
+
+                if (_analogListeners.TryGetValue(address, out var existing))
+                {
+                    _analogListeners[address] = (Action<float>)Delegate.Combine(existing, listener);
+                }
+                else
+                {
+                    _analogListeners[address] = listener;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 登録済みの analog listener を解除する。
+        /// 未登録または既に解除済みの (address, listener) を渡しても例外にはならない。
+        /// </summary>
+        /// <param name="address">登録時と同じ OSC アドレス。</param>
+        /// <param name="listener">登録時と同じ delegate 参照。</param>
+        public void UnregisterAnalogListener(string address, Action<float> listener)
+        {
+            if (string.IsNullOrEmpty(address) || listener == null)
+                return;
+
+            lock (_analogListenersLock)
+            {
+                if (_analogListeners == null)
+                    return;
+
+                if (_analogListeners.TryGetValue(address, out var existing))
+                {
+                    var updated = (Action<float>)Delegate.Remove(existing, listener);
+                    if (updated == null)
+                    {
+                        _analogListeners.Remove(address);
+                    }
+                    else
+                    {
+                        _analogListeners[address] = updated;
+                    }
+                }
+            }
+        }
+
+        private void NotifyAnalogListeners(string address, float value)
+        {
+            Action<float> listener = null;
+            lock (_analogListenersLock)
+            {
+                if (_analogListeners == null)
+                    return;
+                _analogListeners.TryGetValue(address, out listener);
+            }
+
+            if (listener == null)
+                return;
+
+            try
+            {
+                listener.Invoke(value);
+            }
+            catch (Exception ex)
+            {
+                // 受信スレッドで例外が漏れて uOSC サーバが停止しないよう握り潰してログのみ
+                Debug.LogException(ex);
             }
         }
 

@@ -71,7 +71,10 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:999)",
       "Bash(break)",
       "PowerShell(Get-NetTCPConnection *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(unset CLAUDECODE:*)",
+      "Bash(claude -p:*)",
+      "Bash(echo \"\" | claude -p:*)"
     ]
   }
 }

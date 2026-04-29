@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="35" result="Passed" total="35" passed="35" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.1240954">
+  <test-suite type="TestSuite" id="1000" name="FacialControl" fullname="FacialControl" runstate="Runnable" testcasecount="1198" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.124095" total="35" passed="35" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="2286" name="Hidano.FacialControl.Tests.EditMode.dll" fullname="D:/Personal/Repositries/FacialControl/FacialControl/Library/ScriptAssemblies/Hidano.FacialControl.Tests.EditMode.dll" runstate="Runnable" testcasecount="1069" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.114611" total="35" passed="35" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="45168" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="2287" name="Hidano" fullname="Hidano" runstate="Runnable" testcasecount="1069" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.111305" total="35" passed="35" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="2288" name="FacialControl" fullname="Hidano.FacialControl" runstate="Runnable" testcasecount="1069" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.107939" total="35" passed="35" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="2289" name="Tests" fullname="Hidano.FacialControl.Tests" runstate="Runnable" testcasecount="1069" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.104702" total="35" passed="35" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="2290" name="EditMode" fullname="Hidano.FacialControl.Tests.EditMode" runstate="Runnable" testcasecount="1069" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.099270" total="35" passed="35" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestSuite" id="2295" name="Adapters" fullname="Hidano.FacialControl.Tests.EditMode.Adapters" runstate="Runnable" testcasecount="367" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.070750" total="35" passed="35" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-suite type="TestFixture" id="2036" name="SampleJsonParseTests" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" testcasecount="35" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.062310" total="35" passed="35" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-case id="2064" name="ParseConfig_SampleJson_CacheCorrect" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseConfig_SampleJson_CacheCorrect" methodname="ParseConfig_SampleJson_CacheCorrect" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="392059192" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.011805" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2063" name="ParseConfig_SampleJson_OscMappingCorrect" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseConfig_SampleJson_OscMappingCorrect" methodname="ParseConfig_SampleJson_OscMappingCorrect" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1249817004" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.001308" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2061" name="ParseConfig_SampleJson_OscPortsCorrect" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseConfig_SampleJson_OscPortsCorrect" methodname="ParseConfig_SampleJson_OscPortsCorrect" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1347537560" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000312" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2062" name="ParseConfig_SampleJson_OscPresetCorrect" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseConfig_SampleJson_OscPresetCorrect" methodname="ParseConfig_SampleJson_OscPresetCorrect" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="909704901" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000232" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2060" name="ParseConfig_SampleJson_ReturnsValidConfig" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseConfig_SampleJson_ReturnsValidConfig" methodname="ParseConfig_SampleJson_ReturnsValidConfig" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="64579733" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.001712" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2047" name="ParseProfile_SampleJson_AngryBlendShapesCorrect" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_AngryBlendShapesCorrect" methodname="ParseProfile_SampleJson_AngryBlendShapesCorrect" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1685216537" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.008096" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2046" name="ParseProfile_SampleJson_AngryExpressionCorrect" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_AngryExpressionCorrect" methodname="ParseProfile_SampleJson_AngryExpressionCorrect" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="767262542" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.002595" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2048" name="ParseProfile_SampleJson_AngryHasEmptyLayerSlots" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_AngryHasEmptyLayerSlots" methodname="ParseProfile_SampleJson_AngryHasEmptyLayerSlots" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1145345393" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000524" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2050" name="ParseProfile_SampleJson_BlinkBlendShapesCorrect" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_BlinkBlendShapesCorrect" methodname="ParseProfile_SampleJson_BlinkBlendShapesCorrect" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="827076242" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.001499" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2049" name="ParseProfile_SampleJson_BlinkExpressionCorrect" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_BlinkExpressionCorrect" methodname="ParseProfile_SampleJson_BlinkExpressionCorrect" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="209922672" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000734" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2039" name="ParseProfile_SampleJson_EmotionLayerCorrect" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_EmotionLayerCorrect" methodname="ParseProfile_SampleJson_EmotionLayerCorrect" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="272470166" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000794" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2041" name="ParseProfile_SampleJson_EyeLayerCorrect" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_EyeLayerCorrect" methodname="ParseProfile_SampleJson_EyeLayerCorrect" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="277930403" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000377" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2052" name="ParseProfile_SampleJson_FindExpressionById" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_FindExpressionById" methodname="ParseProfile_SampleJson_FindExpressionById" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="907390656" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000699" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2053" name="ParseProfile_SampleJson_GetExpressionsByLayer" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_GetExpressionsByLayer" methodname="ParseProfile_SampleJson_GetExpressionsByLayer" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1903853532" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000782" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2042" name="ParseProfile_SampleJson_HasThreeExpressions" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_HasThreeExpressions" methodname="ParseProfile_SampleJson_HasThreeExpressions" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="233246438" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000311" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2038" name="ParseProfile_SampleJson_HasThreeLayers" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_HasThreeLayers" methodname="ParseProfile_SampleJson_HasThreeLayers" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="154555072" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000329" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2051" name="ParseProfile_SampleJson_LayerReferencesValid" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_LayerReferencesValid" methodname="ParseProfile_SampleJson_LayerReferencesValid" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="877803670" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000614" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2040" name="ParseProfile_SampleJson_LipsyncLayerCorrect" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_LipsyncLayerCorrect" methodname="ParseProfile_SampleJson_LipsyncLayerCorrect" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="90341008" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000349" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2037" name="ParseProfile_SampleJson_ReturnsValidProfile" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_ReturnsValidProfile" methodname="ParseProfile_SampleJson_ReturnsValidProfile" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1112846741" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000321" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2044" name="ParseProfile_SampleJson_SmileBlendShapesCorrect" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_SmileBlendShapesCorrect" methodname="ParseProfile_SampleJson_SmileBlendShapesCorrect" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="767133245" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000560" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2043" name="ParseProfile_SampleJson_SmileExpressionCorrect" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_SmileExpressionCorrect" methodname="ParseProfile_SampleJson_SmileExpressionCorrect" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1498893406" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000373" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2045" name="ParseProfile_SampleJson_SmileLayerSlotsCorrect" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.ParseProfile_SampleJson_SmileLayerSlotsCorrect" methodname="ParseProfile_SampleJson_SmileLayerSlotsCorrect" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1649334125" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000754" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2069" name="SchemaDefinition_ConfigFieldNames_Correct" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.SchemaDefinition_ConfigFieldNames_Correct" methodname="SchemaDefinition_ConfigFieldNames_Correct" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1311267943" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000169" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2067" name="SchemaDefinition_CurrentVersion_MatchesExpected" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.SchemaDefinition_CurrentVersion_MatchesExpected" methodname="SchemaDefinition_CurrentVersion_MatchesExpected" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1942911924" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000137" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2070" name="SchemaDefinition_ExclusionModeValues_Correct" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.SchemaDefinition_ExclusionModeValues_Correct" methodname="SchemaDefinition_ExclusionModeValues_Correct" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="474221028" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000127" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2068" name="SchemaDefinition_ProfileFieldNames_Correct" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.SchemaDefinition_ProfileFieldNames_Correct" methodname="SchemaDefinition_ProfileFieldNames_Correct" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1198291436" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000130" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2071" name="SchemaDefinition_TransitionCurveTypeValues_Correct" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.SchemaDefinition_TransitionCurveTypeValues_Correct" methodname="SchemaDefinition_TransitionCurveTypeValues_Correct" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1720753518" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000134" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2065" name="SerializeConfig_SampleJson_RoundTrip_PreservesData" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.SerializeConfig_SampleJson_RoundTrip_PreservesData" methodname="SerializeConfig_SampleJson_RoundTrip_PreservesData" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="921454181" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000658" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2066" name="SerializeConfig_SampleJson_RoundTrip_PreservesOscMapping" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.SerializeConfig_SampleJson_RoundTrip_PreservesOscMapping" methodname="SerializeConfig_SampleJson_RoundTrip_PreservesOscMapping" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="584360817" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000402" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2057" name="SerializeProfile_SampleJson_RoundTrip_PreservesBlendShapeValues" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.SerializeProfile_SampleJson_RoundTrip_PreservesBlendShapeValues" methodname="SerializeProfile_SampleJson_RoundTrip_PreservesBlendShapeValues" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1240424043" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.002855" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2054" name="SerializeProfile_SampleJson_RoundTrip_PreservesData" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.SerializeProfile_SampleJson_RoundTrip_PreservesData" methodname="SerializeProfile_SampleJson_RoundTrip_PreservesData" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1872050431" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000523" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2056" name="SerializeProfile_SampleJson_RoundTrip_PreservesExpressions" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.SerializeProfile_SampleJson_RoundTrip_PreservesExpressions" methodname="SerializeProfile_SampleJson_RoundTrip_PreservesExpressions" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="34768352" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000678" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2055" name="SerializeProfile_SampleJson_RoundTrip_PreservesLayers" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.SerializeProfile_SampleJson_RoundTrip_PreservesLayers" methodname="SerializeProfile_SampleJson_RoundTrip_PreservesLayers" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="778783917" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000636" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2059" name="SerializeProfile_SampleJson_RoundTrip_PreservesLayerSlots" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.SerializeProfile_SampleJson_RoundTrip_PreservesLayerSlots" methodname="SerializeProfile_SampleJson_RoundTrip_PreservesLayerSlots" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="529175338" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000648" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                  </test-case>
+                  <test-case id="2058" name="SerializeProfile_SampleJson_RoundTrip_PreservesRendererField" fullname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests.SerializeProfile_SampleJson_RoundTrip_PreservesRendererField" methodname="SerializeProfile_SampleJson_RoundTrip_PreservesRendererField" classname="Hidano.FacialControl.Tests.EditMode.Adapters.SampleJsonParseTests" runstate="Runnable" seed="1332356015" result="Passed" start-time="2026-04-29 00:46:48Z" end-time="2026-04-29 00:46:48Z" duration="0.000506" asserts="0">
+                    <properties>
+                      <property name="retryIteration" value="0" />
+                      <property name="repeatIteration" value="0" />
+                    </properties>
+                    <output><![CDATA[Saving results to: C:/Users/Hidano/AppData/LocalLow/DefaultCompany/FacialControl\TestResults.xml
+]]></output>
+                  </test-case>
+                </test-suite>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>
