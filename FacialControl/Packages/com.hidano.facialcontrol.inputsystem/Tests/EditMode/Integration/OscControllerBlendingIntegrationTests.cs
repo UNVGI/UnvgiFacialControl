@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using UnityEngine.TestTools.Constraints;
+using ConstraintIs = UnityEngine.TestTools.Constraints.Is;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.OSC;
 using Hidano.FacialControl.Domain.Interfaces;
@@ -343,42 +345,38 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
             h.WeightBuffer.SetWeight(0, 0, 0.5f);
             h.WeightBuffer.SetWeight(0, 1, 0.5f);
 
-            // Tick を進めて transition を完了させ、以降の loop では内部状態遷移も発生しないように。
-            Span<int> priorities = stackalloc int[1] { 0 };
-            Span<float> layerWeights = stackalloc float[1] { 1.0f };
-            Span<float> finalOutput = stackalloc float[BlendShapeCount];
-
             // ウォームアップ: JIT / Id キャッシュ / StringBuilder などの初回確保を排除。
+            // ※ stackalloc は ref-like なので closure に持ち込めず、AllocatingGCMemory 制約内でも
+            //    ref-like を逃がせないため、warmup と measure 双方で一旦 heap 配列に載せる。
+            int[] prioritiesArr = new[] { 0 };
+            float[] layerWeightsArr = new[] { 1.0f };
+            float[] finalOutputArr = new float[BlendShapeCount];
+
             for (int i = 0; i < 10; i++)
             {
                 h.Aggregator.AggregateAndBlend(
                     deltaTime: 1.0f,
-                    priorities: priorities,
-                    layerWeights: layerWeights,
-                    finalOutput: finalOutput);
+                    priorities: prioritiesArr,
+                    layerWeights: layerWeightsArr,
+                    finalOutput: finalOutputArr);
             }
 
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-            long before = GC.GetTotalMemory(false);
-
-            for (int i = 0; i < ZeroAllocMeasureIterations; i++)
+            // Unity Test Framework の AllocatingGCMemory 制約は Mono の per-allocation tracking を使うため
+            // テスト順や heap 状態に依存せずに per-method 精度で managed alloc を検出できる。
+            // 旧: GC.GetTotalMemory(false) は full-suite で他テストの mid-loop GC 活動を補足してしまい
+            //     test-order 依存の flaky だった (Mono ヒープページ単位の expansion ではなく heap 状態揺らぎ)。
+            Assert.That(() =>
             {
-                h.Aggregator.AggregateAndBlend(
-                    deltaTime: 0.016f,
-                    priorities: priorities,
-                    layerWeights: layerWeights,
-                    finalOutput: finalOutput);
-            }
-
-            long after = GC.GetTotalMemory(false);
-            long allocated = after - before;
-
-            Assert.LessOrEqual(allocated, ManagedPageNoiseToleranceBytes,
-                $"AggregateAndBlend {ZeroAllocMeasureIterations} 回ループで GC アロケーションが" +
-                $"Mono ヒープページノイズ許容 ({ManagedPageNoiseToleranceBytes} bytes) を超えないこと " +
-                $"(差分: {allocated} bytes)");
+                for (int i = 0; i < ZeroAllocMeasureIterations; i++)
+                {
+                    h.Aggregator.AggregateAndBlend(
+                        deltaTime: 0.016f,
+                        priorities: prioritiesArr,
+                        layerWeights: layerWeightsArr,
+                        finalOutput: finalOutputArr);
+                }
+            }, ConstraintIs.Not.AllocatingGCMemory(),
+            $"AggregateAndBlend {ZeroAllocMeasureIterations} 回ループで managed alloc 検出");
         }
     }
 }

@@ -38,7 +38,17 @@
 | PlayMode | 448  | **448** | **0** | 0 | 0 |
 | **合計** | **1795** | **1792** | **3** | 0 | 0 |
 
-> EditMode 残 3 件はすべて pre-existing P2 (F1/F2/F3) で本 spec 範囲外。
+### F1 + Linear curve test 安定化後 (2026-04-30 13:53Z)
+
+| Mode | Total | Passed | Failed | Inconclusive | Skipped |
+|------|------:|-------:|-------:|-------------:|--------:|
+| EditMode | 1347 | **1345** | **2** | 0 | 0 |
+| PlayMode | 448  | **448** | **0** | 0 | 0 |
+| **合計** | **1795** | **1793** | **2** | 0 | 0 |
+
+> 残 2 件は F2/F3 のみ。両方とも本 spec 起源ではなく、既存型のアセンブリ配置 (`InputBinding` が Application asmdef に存在) と OSC factory 契約の問題。
+>
+> F1 解消の副作用として `Evaluate_HotPath_TenThousandIterations_ZeroAllocation` (Linear curve 版) が表面化したため、warmup 同形 + 65536 B tolerance を併せて適用。
 
 ---
 
