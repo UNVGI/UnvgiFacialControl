@@ -34,6 +34,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
     public class FacialCharacterInputExtensionTests : InputTestFixture
     {
         private GameObject _rigGameObject;
+        private Mesh _trackedMesh;
         private FacialCharacterSO _characterSO;
         private InputActionAsset _actionAsset;
         private Keyboard _keyboard;
@@ -52,6 +53,11 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             {
                 Object.DestroyImmediate(_rigGameObject);
                 _rigGameObject = null;
+            }
+            if (_trackedMesh != null)
+            {
+                Object.DestroyImmediate(_trackedMesh);
+                _trackedMesh = null;
             }
             if (_characterSO != null)
             {
@@ -206,7 +212,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             // ActionMap に存在しないため複数の警告ログが想定される。本テストの主眼ではないので無視する。
             LogAssert.ignoreFailingMessages = true;
 
-            BuildRig(profile, _characterSO, out var controller, out _);
+            BuildRig(profile, _characterSO, out var controller, out _, blendShapeName: "jawOpen");
 
             // 1 フレーム LateUpdate を回して Aggregate を 1 度走らせる。
             yield return null;
@@ -235,7 +241,8 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             FacialProfile profile,
             FacialCharacterSO so,
             out FacialController controller,
-            out FacialCharacterInputExtension extension)
+            out FacialCharacterInputExtension extension,
+            string blendShapeName = null)
         {
             _rigGameObject = new GameObject("FacialCharacterInputExtensionTest");
             _rigGameObject.SetActive(false);
@@ -245,7 +252,20 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             // FacialController は SkinnedMeshRenderer を子から検索するので 1 個ぶら下げる。
             var meshObj = new GameObject("Mesh");
             meshObj.transform.SetParent(_rigGameObject.transform, worldPositionStays: false);
-            meshObj.AddComponent<SkinnedMeshRenderer>();
+            var smr = meshObj.AddComponent<SkinnedMeshRenderer>();
+
+            // Aggregator スナップショット検証用に最低 1 つの BlendShape を持つ Mesh を割当てる。
+            // FacialController.UpdateWeights は bsCount==0 のとき早期 return するため
+            // analog-blendshape を含むテストでは Mesh + BlendShape の存在が必須。
+            if (!string.IsNullOrEmpty(blendShapeName))
+            {
+                _trackedMesh = new Mesh();
+                _trackedMesh.vertices = new[] { Vector3.zero, Vector3.right, Vector3.up };
+                _trackedMesh.triangles = new[] { 0, 1, 2 };
+                var zeroDeltas = new Vector3[3];
+                _trackedMesh.AddBlendShapeFrame(blendShapeName, 100f, zeroDeltas, null, null);
+                smr.sharedMesh = _trackedMesh;
+            }
 
             controller = _rigGameObject.AddComponent<FacialController>();
             // FacialCharacterInputExtension が GetComponent<FacialController>() で参照する前に
