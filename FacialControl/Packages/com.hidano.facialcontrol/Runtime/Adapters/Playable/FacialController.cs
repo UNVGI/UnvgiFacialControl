@@ -1,13 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using UnityEngine;
 using UnityEngine.Playables;
 using Hidano.FacialControl.Adapters.Bone;
-using Hidano.FacialControl.Adapters.FileSystem;
 using Hidano.FacialControl.Adapters.InputSources;
-using Hidano.FacialControl.Adapters.Json;
-using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Application.UseCases;
 using Hidano.FacialControl.Domain.Interfaces;
@@ -18,7 +14,7 @@ namespace Hidano.FacialControl.Adapters.Playable
 {
     /// <summary>
     /// FacialControl のメインコンポーネント。
-    /// FacialProfileSO を参照して PlayableGraph を構築し、
+    /// <see cref="FacialCharacterProfileSO"/> を参照して PlayableGraph を構築し、
     /// Expression のアクティブ化・非アクティブ化を制御する。
     /// OnEnable で自動初期化、Initialize() で手動初期化が可能。
     /// OnDisable で PlayableGraph と NativeArray を破棄する。
@@ -28,21 +24,13 @@ namespace Hidano.FacialControl.Adapters.Playable
     public class FacialController : MonoBehaviour, IBonePoseProvider, IBonePoseSource
     {
         /// <summary>
-        /// 統合キャラクター SO 参照 (推奨)。
+        /// 統合キャラクター SO 参照。
         /// 設定されていれば SO 名から StreamingAssets/FacialControl/{name}/profile.json を自動探索し、
         /// 存在すれば JSON、不在なら SO の Inspector データから FacialProfile を構築する。
         /// </summary>
         [Tooltip("キャラクター単位の表情・入力統合 SO。これを 1 個 D&D するだけで動作する。")]
         [SerializeField]
         private FacialCharacterProfileSO _characterSO;
-
-        /// <summary>
-        /// 表情プロファイルの ScriptableObject 参照 (旧形式、Task 8 で削除予定)。
-        /// 後方互換のため残置。<see cref="_characterSO"/> が未設定の場合のみ使用される。
-        /// </summary>
-        [Tooltip("[Deprecated] 旧形式の FacialProfileSO。新規プロジェクトでは Character SO を使うこと。")]
-        [SerializeField]
-        private FacialProfileSO _profileSO;
 
         /// <summary>
         /// SkinnedMeshRenderer の手動オーバーライドリスト。
@@ -91,21 +79,12 @@ namespace Hidano.FacialControl.Adapters.Playable
         public FacialProfile? CurrentProfile => _currentProfile;
 
         /// <summary>
-        /// 統合キャラクター SO の参照。新形式の推奨フィールド。
+        /// 統合キャラクター SO の参照。
         /// </summary>
         public FacialCharacterProfileSO CharacterSO
         {
             get => _characterSO;
             set => _characterSO = value;
-        }
-
-        /// <summary>
-        /// FacialProfileSO の参照 (旧形式)。Task 8 で削除予定。
-        /// </summary>
-        public FacialProfileSO ProfileSO
-        {
-            get => _profileSO;
-            set => _profileSO = value;
         }
 
         /// <summary>
@@ -123,8 +102,8 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         private void OnEnable()
         {
-            // 新統合 SO または旧 SO のいずれかが設定されていれば自動初期化を試みる。
-            if (_characterSO != null || _profileSO != null)
+            // 統合 SO が設定されていれば自動初期化を試みる。
+            if (_characterSO != null)
             {
                 Initialize();
             }
@@ -170,12 +149,12 @@ namespace Hidano.FacialControl.Adapters.Playable
         }
 
         /// <summary>
-        /// 手動初期化。CharacterSO (推奨) または旧 ProfileSO からプロファイルを読み込み、
-        /// PlayableGraph を構築する。両方とも未設定の場合は何もしない。
+        /// 手動初期化。<see cref="_characterSO"/> からプロファイルを読み込み、
+        /// PlayableGraph を構築する。SO 未設定の場合は何もしない。
         /// </summary>
         public void Initialize()
         {
-            if (_characterSO == null && _profileSO == null)
+            if (_characterSO == null)
             {
                 return;
             }
@@ -199,10 +178,8 @@ namespace Hidano.FacialControl.Adapters.Playable
             // BlendShape 名を収集
             _blendShapeNames = CollectBlendShapeNames(renderers);
 
-            // プロファイルを構築。新統合 SO が優先、旧 ProfileSO はフォールバック。
-            FacialProfile profile = _characterSO != null
-                ? LoadProfileFromCharacterSO(_characterSO)
-                : LoadProfileFromSO(_profileSO);
+            // 統合 SO からプロファイルを構築。
+            FacialProfile profile = LoadProfileFromCharacterSO(_characterSO);
 
             InitializeInternal(profile);
         }
@@ -406,20 +383,31 @@ namespace Hidano.FacialControl.Adapters.Playable
         }
 
         /// <summary>
-        /// プロファイルを切り替える。PlayableGraph を再構築する。
+        /// 統合キャラクター SO を切り替える。PlayableGraph を再構築する。
         /// </summary>
-        /// <param name="profileSO">新しいプロファイル SO</param>
-        public void LoadProfile(FacialProfileSO profileSO)
+        /// <param name="characterSO">新しい統合キャラクター SO。</param>
+        public void LoadCharacter(FacialCharacterProfileSO characterSO)
         {
-            if (profileSO == null)
+            if (characterSO == null)
             {
-                Debug.LogWarning("ProfileSO が null です。LoadProfile は無視されます。");
+                Debug.LogWarning("CharacterSO が null です。LoadCharacter は無視されます。");
                 return;
             }
 
-            _profileSO = profileSO;
+            _characterSO = characterSO;
 
-            var profile = LoadProfileFromSO(profileSO);
+            // Animator / Renderer を遅延解決する (SO 切替時に Initialize と同じ前段処理を踏む)。
+            _animator = GetComponent<Animator>();
+            if (_animator == null)
+            {
+                Debug.LogWarning("Animator コンポーネントが見つかりません。LoadCharacter は無視されます。");
+                return;
+            }
+
+            var renderers = ResolveSkinnedMeshRenderers();
+            _blendShapeNames = CollectBlendShapeNames(renderers);
+
+            var profile = LoadProfileFromCharacterSO(characterSO);
             InitializeInternal(profile);
         }
 
@@ -760,34 +748,6 @@ namespace Hidano.FacialControl.Adapters.Playable
             {
                 Debug.LogWarning(
                     $"FacialController: Character SO '{so.name}' からのプロファイル構築に失敗しました: {ex.Message}。デフォルトプロファイルで初期化します。");
-                return CreateDefaultProfile();
-            }
-        }
-
-        private static FacialProfile LoadProfileFromSO(FacialProfileSO so)
-        {
-            if (so == null || string.IsNullOrWhiteSpace(so.JsonFilePath))
-            {
-                return CreateDefaultProfile();
-            }
-
-            var fullPath = Path.Combine(UnityEngine.Application.streamingAssetsPath, so.JsonFilePath);
-            if (!File.Exists(fullPath))
-            {
-                Debug.LogWarning(
-                    $"FacialController: プロファイル JSON が見つかりません: {fullPath}。デフォルトプロファイルで初期化します。");
-                return CreateDefaultProfile();
-            }
-
-            try
-            {
-                var repository = new FileProfileRepository(new SystemTextJsonParser());
-                return repository.LoadProfile(fullPath);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning(
-                    $"FacialController: プロファイル JSON の読み込みに失敗しました: {ex.Message}。デフォルトプロファイルで初期化します。");
                 return CreateDefaultProfile();
             }
         }

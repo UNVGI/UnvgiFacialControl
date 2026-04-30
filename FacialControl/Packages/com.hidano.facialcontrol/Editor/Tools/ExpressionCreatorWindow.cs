@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using Hidano.FacialControl.Adapters.Json;
 using Hidano.FacialControl.Adapters.Playable;
-using Hidano.FacialControl.Adapters.ScriptableObject;
+using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Adapters.FileSystem;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
@@ -50,7 +50,7 @@ namespace Hidano.FacialControl.Editor.Tools
         private DropdownField _curveTypeDropdown;
 
         // プロファイル
-        private FacialProfileSO _profileSO;
+        private FacialCharacterProfileSO _profileSO;
         private FacialProfile _currentProfile;
         private string _currentJsonPath;
 
@@ -60,7 +60,6 @@ namespace Hidano.FacialControl.Editor.Tools
         // 依存
         private IJsonParser _parser;
         private IProfileRepository _repository;
-        private FacialProfileMapper _mapper;
 
         [MenuItem("FacialControl/Expression 作成", false, 20)]
         public static void ShowWindow()
@@ -74,7 +73,6 @@ namespace Hidano.FacialControl.Editor.Tools
         {
             _parser = new SystemTextJsonParser();
             _repository = new FileProfileRepository(_parser);
-            _mapper = new FacialProfileMapper(_repository);
             _previewWrapper = new PreviewRenderWrapper();
         }
 
@@ -159,7 +157,7 @@ namespace Hidano.FacialControl.Editor.Tools
             // プロファイル SO 選択
             var profileField = new ObjectField("プロファイル SO")
             {
-                objectType = typeof(FacialProfileSO),
+                objectType = typeof(FacialCharacterProfileSO),
                 allowSceneObjects = false
             };
             profileField.RegisterValueChangedCallback(OnProfileSOChanged);
@@ -539,7 +537,7 @@ namespace Hidano.FacialControl.Editor.Tools
 
         private void OnProfileSOChanged(ChangeEvent<UnityEngine.Object> evt)
         {
-            _profileSO = evt.newValue as FacialProfileSO;
+            _profileSO = evt.newValue as FacialCharacterProfileSO;
             LoadProfile();
             TryAutoResolveReferenceModel();
         }
@@ -586,7 +584,8 @@ namespace Hidano.FacialControl.Editor.Tools
         }
 
         /// <summary>
-        /// プロファイルを JSON から読み込む
+        /// プロファイルを JSON から読み込む。新統合 SO の規約パス
+        /// (<c>StreamingAssets/FacialControl/{SO 名}/profile.json</c>) を解決する。
         /// </summary>
         private void LoadProfile()
         {
@@ -598,22 +597,33 @@ namespace Hidano.FacialControl.Editor.Tools
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(_profileSO.JsonFilePath))
+            var fullPath = FacialCharacterProfileSO.GetStreamingAssetsProfilePath(_profileSO.CharacterAssetName);
+            if (string.IsNullOrEmpty(fullPath))
             {
-                ShowStatus("JSON ファイルパスが設定されていません。", isError: true);
+                ShowStatus("SO のアセット名が解決できません。", isError: true);
                 _currentProfile = default;
                 _currentJsonPath = null;
                 UpdateLayerDropdown();
                 return;
             }
 
-            var fullPath = Path.Combine(UnityEngine.Application.streamingAssetsPath, _profileSO.JsonFilePath);
             if (!File.Exists(fullPath))
             {
-                ShowStatus($"ファイルが見つかりません: {fullPath}", isError: true);
-                _currentProfile = default;
-                _currentJsonPath = null;
-                UpdateLayerDropdown();
+                // JSON が未生成 (Inspector データのみ) の場合は SO のフォールバック構築値で初期化する。
+                try
+                {
+                    _currentProfile = _profileSO.BuildFallbackProfile();
+                    _currentJsonPath = fullPath;
+                    UpdateLayerDropdown();
+                    ShowStatus($"SO のフォールバックデータを使用します (JSON 未生成)。", isError: false);
+                }
+                catch (Exception ex)
+                {
+                    ShowStatus($"フォールバック構築エラー: {ex.Message}", isError: true);
+                    _currentProfile = default;
+                    _currentJsonPath = null;
+                    UpdateLayerDropdown();
+                }
                 return;
             }
 
@@ -733,13 +743,20 @@ namespace Hidano.FacialControl.Editor.Tools
                 expressions.ToArray(),
                 ToArray(_currentProfile.RendererPaths));
 
-            // JSON 保存
+            // JSON 保存。新統合 SO は OnEnable / Inspector 表示時に JSON を読み込み返す設計のため、
+            // ここでは JSON 上書き + SO の Dirty 化に留める (mapper 経路は不要)。
             try
             {
+                var dir = Path.GetDirectoryName(_currentJsonPath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
                 var json = _parser.SerializeProfile(_currentProfile);
                 File.WriteAllText(_currentJsonPath, json, System.Text.Encoding.UTF8);
-                _mapper.UpdateSO(_profileSO, _currentProfile);
                 EditorUtility.SetDirty(_profileSO);
+                AssetDatabase.Refresh();
                 ShowStatus($"Expression を保存しました: {name}", isError: false);
             }
             catch (Exception ex)

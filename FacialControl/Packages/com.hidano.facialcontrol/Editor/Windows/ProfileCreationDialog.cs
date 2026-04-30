@@ -6,7 +6,7 @@ using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Hidano.FacialControl.Adapters.Json;
-using Hidano.FacialControl.Adapters.ScriptableObject;
+using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.Common;
@@ -21,9 +21,9 @@ namespace Hidano.FacialControl.Editor.Windows
     {
         /// <summary>
         /// プロファイル作成完了時に呼び出されるイベント。
-        /// 作成された FacialProfileSO を引数として渡す。
+        /// JSON 出力先のフルパスを引数として渡す。
         /// </summary>
-        public event Action<FacialProfileSO> OnCreated;
+        public event Action<string> OnCreated;
 
         private TextField _profileNameField;
         private ScrollView _layerListView;
@@ -359,13 +359,16 @@ namespace Hidano.FacialControl.Editor.Windows
                 };
                 var profile = data.BuildProfile();
 
-                // JSON を StreamingAssets に保存
+                // 新統合 SO は規約パス
+                // (StreamingAssets/FacialControl/{SO 名}/profile.json) で profile.json を読み込むため、
+                // ダイアログでは JSON テンプレートのみを生成し、SO 自体はユーザーが
+                // Project ウィンドウの Create メニューから手動で作成する設計とする。
                 var streamingAssetsPath = UnityEngine.Application.streamingAssetsPath;
-                var jsonDir = Path.Combine(streamingAssetsPath, "FacialControl");
+                var jsonDir = Path.Combine(streamingAssetsPath, "FacialControl", profileName);
                 if (!Directory.Exists(jsonDir))
                     Directory.CreateDirectory(jsonDir);
 
-                var fullJsonPath = Path.Combine(jsonDir, data.JsonFileName);
+                var fullJsonPath = Path.Combine(jsonDir, FacialCharacterProfileSO.ProfileJsonFileName);
                 if (File.Exists(fullJsonPath))
                 {
                     if (!EditorUtility.DisplayDialog(
@@ -378,26 +381,14 @@ namespace Hidano.FacialControl.Editor.Windows
 
                 var json = _parser.SerializeProfile(profile);
                 File.WriteAllText(fullJsonPath, json, System.Text.Encoding.UTF8);
-
-                // FacialProfileSO を Assets/ に生成
-                var soPath = $"Assets/{profileName}_Profile.asset";
-                if (File.Exists(Path.Combine(UnityEngine.Application.dataPath, "..", soPath)))
-                {
-                    soPath = AssetDatabase.GenerateUniqueAssetPath(soPath);
-                }
-
-                var so = CreateInstance<FacialProfileSO>();
-                so.JsonFilePath = data.JsonRelativePath;
-                so.SchemaVersion = profile.SchemaVersion;
-                so.LayerCount = profile.Layers.Length;
-                so.ExpressionCount = profile.Expressions.Length;
-
-                AssetDatabase.CreateAsset(so, soPath);
-                AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
 
-                OnCreated?.Invoke(so);
-                ShowDialogStatus($"プロファイルを作成しました: {profileName}", isError: false);
+                OnCreated?.Invoke(fullJsonPath);
+                ShowDialogStatus(
+                    $"JSON テンプレートを生成しました: {fullJsonPath}\n"
+                    + "Project ウィンドウから 'FacialControl/Facial Character' を作成し、SO 名を "
+                    + $"\"{profileName}\" にすると自動で読み込まれます。",
+                    isError: false);
 
                 // 少し待ってから閉じる（ステータス表示のため）
                 EditorApplication.delayCall += Close;
