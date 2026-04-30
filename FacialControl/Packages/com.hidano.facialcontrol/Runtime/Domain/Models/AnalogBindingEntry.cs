@@ -13,6 +13,12 @@ namespace Hidano.FacialControl.Domain.Models
     /// <see cref="TargetAxis"/> は <see cref="AnalogBindingTargetKind.BonePose"/> のときのみ意味を持ち、
     /// <see cref="AnalogBindingTargetKind.BlendShape"/> では無視される。
     /// </para>
+    /// <para>
+    /// Phase 3.5 で <c>Mapping</c> field を撤去し、Domain 側は 5 値（SourceId / SourceAxis / TargetKind /
+    /// TargetIdentifier / TargetAxis）のみ保持する（Req 6.3）。dead-zone / scale / offset / curve /
+    /// invert / clamp の値変換は Adapters 側 InputProcessor 経路（<c>InputActionReference</c>）で扱う
+    /// （Decision 4 / Req 13.3）。OSC 互換は別 spec で扱う（design.md 参照）。
+    /// </para>
     /// </remarks>
     public readonly struct AnalogBindingEntry
     {
@@ -31,9 +37,6 @@ namespace Hidano.FacialControl.Domain.Models
         /// <summary>BonePose ターゲットでの Euler 軸（X/Y/Z）。BlendShape ターゲットでは未使用。</summary>
         public AnalogTargetAxis TargetAxis { get; }
 
-        /// <summary>マッピング関数。dead-zone / scale / offset / curve / inversion / clamp を含む。</summary>
-        public AnalogMappingFunction Mapping { get; }
-
         /// <summary>
         /// バインディングエントリを構築する。
         /// </summary>
@@ -42,7 +45,6 @@ namespace Hidano.FacialControl.Domain.Models
         /// <param name="targetKind">ターゲット種別。</param>
         /// <param name="targetIdentifier">ターゲット識別子（BlendShape 名 / bone 名）。</param>
         /// <param name="targetAxis">BonePose ターゲットの Euler 軸（BlendShape では無視）。</param>
-        /// <param name="mapping">マッピング関数。</param>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="sourceAxis"/> が負の場合。</exception>
         /// <exception cref="ArgumentException"><paramref name="targetIdentifier"/> が null / 空 / 全空白の場合。</exception>
         public AnalogBindingEntry(
@@ -50,8 +52,7 @@ namespace Hidano.FacialControl.Domain.Models
             int sourceAxis,
             AnalogBindingTargetKind targetKind,
             string targetIdentifier,
-            AnalogTargetAxis targetAxis,
-            AnalogMappingFunction mapping)
+            AnalogTargetAxis targetAxis)
         {
             if (sourceAxis < 0)
             {
@@ -73,7 +74,6 @@ namespace Hidano.FacialControl.Domain.Models
             TargetKind = targetKind;
             TargetIdentifier = targetIdentifier;
             TargetAxis = targetAxis;
-            Mapping = mapping;
         }
     }
 }

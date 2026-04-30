@@ -13,13 +13,14 @@ namespace Hidano.FacialControl.Adapters.Json
     /// <para>
     /// <c>JsonUtility.FromJson&lt;AnalogInputBindingProfileDto&gt;</c> でデシリアライズ後、
     /// 各エントリを <see cref="AnalogBindingEntry"/> へ変換する。
-    /// 不正エントリ（未知の <c>targetKind</c> / 欠損 <c>targetIdentifier</c> / <c>min &gt; max</c> 等）は
+    /// 不正エントリ（未知の <c>targetKind</c> / 欠損 <c>targetIdentifier</c> 等）は
     /// <see cref="Debug.LogWarning"/> + skip + 残余ロード継続（Req 6.5）。
     /// JSON パース自体に失敗した場合も警告ログを出して空プロファイルを返し、例外伝播はしない。
     /// </para>
     /// <para>
-    /// curveType / targetKind / targetAxis の文字列値は大小無視で解釈する（既存
-    /// <c>SystemTextJsonParser.ParseTransitionCurveType</c> の規約に整合）。
+    /// targetKind / targetAxis の文字列値は大小無視で解釈する。
+    /// Phase 3.5 で <c>mapping</c> field を撤去したため、dead-zone / scale / offset / curve / invert / clamp の
+    /// 値変換は Adapters 側 InputProcessor 経路で扱う（Decision 4 / Req 13.3）。
     /// </para>
     /// </remarks>
     public static class AnalogInputBindingJsonLoader
@@ -133,11 +134,6 @@ namespace Hidano.FacialControl.Adapters.Json
                 return false;
             }
 
-            if (!TryConvertMapping(dto.mapping, index, out var mapping))
-            {
-                return false;
-            }
-
             try
             {
                 entry = new AnalogBindingEntry(
@@ -145,8 +141,7 @@ namespace Hidano.FacialControl.Adapters.Json
                     sourceAxis: dto.sourceAxis,
                     targetKind: targetKind,
                     targetIdentifier: dto.targetIdentifier,
-                    targetAxis: targetAxis,
-                    mapping: mapping);
+                    targetAxis: targetAxis);
                 return true;
             }
             catch (Exception ex)
@@ -155,86 +150,6 @@ namespace Hidano.FacialControl.Adapters.Json
                     $"AnalogInputBindingJsonLoader: bindings[{index}] の構築に失敗したため skip します: {ex.Message}");
                 return false;
             }
-        }
-
-        private static bool TryConvertMapping(AnalogMappingDto dto, int index, out AnalogMappingFunction mapping)
-        {
-            if (dto == null)
-            {
-                mapping = AnalogMappingFunction.Identity;
-                return true;
-            }
-
-            if (!IsFinite(dto.deadZone) || !IsFinite(dto.scale) || !IsFinite(dto.offset)
-                || !IsFinite(dto.min) || !IsFinite(dto.max))
-            {
-                Debug.LogWarning(
-                    $"AnalogInputBindingJsonLoader: bindings[{index}].mapping に NaN/Inf が含まれるため skip します。");
-                mapping = default;
-                return false;
-            }
-
-            if (dto.min > dto.max)
-            {
-                Debug.LogWarning(
-                    $"AnalogInputBindingJsonLoader: bindings[{index}].mapping の min ({dto.min}) > max ({dto.max}) のため skip します。");
-                mapping = default;
-                return false;
-            }
-
-            if (!TryParseCurveType(dto.curveType, out var curveType))
-            {
-                Debug.LogWarning(
-                    $"AnalogInputBindingJsonLoader: bindings[{index}].mapping の curveType '{dto.curveType}' が未知のため skip します。");
-                mapping = default;
-                return false;
-            }
-
-            var keys = ConvertCurveKeyFrames(dto.curveKeyFrames);
-            var curve = new TransitionCurve(curveType, keys);
-
-            try
-            {
-                mapping = new AnalogMappingFunction(
-                    deadZone: dto.deadZone,
-                    scale: dto.scale,
-                    offset: dto.offset,
-                    curve: curve,
-                    invert: dto.invert,
-                    min: dto.min,
-                    max: dto.max);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning(
-                    $"AnalogInputBindingJsonLoader: bindings[{index}].mapping の構築に失敗したため skip します: {ex.Message}");
-                mapping = default;
-                return false;
-            }
-        }
-
-        private static CurveKeyFrame[] ConvertCurveKeyFrames(List<CurveKeyFrameDto> dtos)
-        {
-            if (dtos == null || dtos.Count == 0)
-            {
-                return Array.Empty<CurveKeyFrame>();
-            }
-
-            var keys = new CurveKeyFrame[dtos.Count];
-            for (int i = 0; i < dtos.Count; i++)
-            {
-                var d = dtos[i] ?? new CurveKeyFrameDto();
-                keys[i] = new CurveKeyFrame(
-                    time: d.time,
-                    value: d.value,
-                    inTangent: d.inTangent,
-                    outTangent: d.outTangent,
-                    inWeight: d.inWeight,
-                    outWeight: d.outWeight,
-                    weightedMode: d.weightedMode);
-            }
-            return keys;
         }
 
         private static bool TryParseTargetKind(string value, out AnalogBindingTargetKind result)
@@ -285,42 +200,6 @@ namespace Hidano.FacialControl.Adapters.Json
             }
         }
 
-        private static bool TryParseCurveType(string value, out TransitionCurveType result)
-        {
-            if (string.IsNullOrEmpty(value))
-            {
-                result = TransitionCurveType.Linear;
-                return true;
-            }
-
-            switch (value.ToLowerInvariant())
-            {
-                case "linear":
-                    result = TransitionCurveType.Linear;
-                    return true;
-                case "easein":
-                    result = TransitionCurveType.EaseIn;
-                    return true;
-                case "easeout":
-                    result = TransitionCurveType.EaseOut;
-                    return true;
-                case "easeinout":
-                    result = TransitionCurveType.EaseInOut;
-                    return true;
-                case "custom":
-                    result = TransitionCurveType.Custom;
-                    return true;
-                default:
-                    result = default;
-                    return false;
-            }
-        }
-
-        private static bool IsFinite(float v)
-        {
-            return !float.IsNaN(v) && !float.IsInfinity(v);
-        }
-
         private static AnalogBindingEntryDto ConvertEntryToDto(in AnalogBindingEntry entry)
         {
             return new AnalogBindingEntryDto
@@ -329,41 +208,8 @@ namespace Hidano.FacialControl.Adapters.Json
                 sourceAxis = entry.SourceAxis,
                 targetKind = SerializeTargetKind(entry.TargetKind),
                 targetIdentifier = entry.TargetIdentifier,
-                targetAxis = SerializeTargetAxis(entry.TargetAxis),
-                mapping = ConvertMappingToDto(entry.Mapping)
+                targetAxis = SerializeTargetAxis(entry.TargetAxis)
             };
-        }
-
-        private static AnalogMappingDto ConvertMappingToDto(in AnalogMappingFunction mapping)
-        {
-            var dto = new AnalogMappingDto
-            {
-                deadZone = mapping.DeadZone,
-                scale = mapping.Scale,
-                offset = mapping.Offset,
-                curveType = SerializeCurveType(mapping.Curve.Type),
-                curveKeyFrames = new List<CurveKeyFrameDto>(),
-                invert = mapping.Invert,
-                min = mapping.Min,
-                max = mapping.Max
-            };
-
-            var keys = mapping.Curve.Keys.Span;
-            for (int i = 0; i < keys.Length; i++)
-            {
-                dto.curveKeyFrames.Add(new CurveKeyFrameDto
-                {
-                    time = keys[i].Time,
-                    value = keys[i].Value,
-                    inTangent = keys[i].InTangent,
-                    outTangent = keys[i].OutTangent,
-                    inWeight = keys[i].InWeight,
-                    outWeight = keys[i].OutWeight,
-                    weightedMode = keys[i].WeightedMode
-                });
-            }
-
-            return dto;
         }
 
         private static string SerializeTargetKind(AnalogBindingTargetKind kind)
@@ -384,19 +230,6 @@ namespace Hidano.FacialControl.Adapters.Json
                 AnalogTargetAxis.Y => "Y",
                 AnalogTargetAxis.Z => "Z",
                 _ => "X"
-            };
-        }
-
-        private static string SerializeCurveType(TransitionCurveType type)
-        {
-            return type switch
-            {
-                TransitionCurveType.Linear => "linear",
-                TransitionCurveType.EaseIn => "easeIn",
-                TransitionCurveType.EaseOut => "easeOut",
-                TransitionCurveType.EaseInOut => "easeInOut",
-                TransitionCurveType.Custom => "custom",
-                _ => "linear"
             };
         }
     }

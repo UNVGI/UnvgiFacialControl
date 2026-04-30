@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
-using Hidano.FacialControl.Domain.Services;
 using UnityEngine;
 
 namespace Hidano.FacialControl.Adapters.InputSources
@@ -14,8 +13,9 @@ namespace Hidano.FacialControl.Adapters.InputSources
     /// <remarks>
     /// <para>
     /// 1 つ以上の <see cref="IAnalogInputSource"/> から軸値を読出し、
-    /// <see cref="AnalogMappingEvaluator.Evaluate(in AnalogMappingFunction, float)"/> 経由でマッピング適用後、
     /// binding が指定する BlendShape index に**加算**する（Req 3.3、二重 clamp なし）。
+    /// dead-zone / scale / offset / curve / invert / clamp の値変換は Adapters 側 InputProcessor 経路で
+    /// 上流処理されるため、本アダプタは生値をそのまま反映する（Phase 3.5 / Decision 4 / Req 13.3）。
     /// </para>
     /// <para>
     /// 構築時に bindings の <see cref="AnalogBindingEntry.TargetIdentifier"/> を BlendShape index に逆引きキャッシュする
@@ -111,7 +111,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
                     continue;
                 }
 
-                resolvedList.Add(new ResolvedBinding(source, entry.SourceAxis, bsIndex, entry.Mapping));
+                resolvedList.Add(new ResolvedBinding(source, entry.SourceAxis, bsIndex));
             }
 
             _resolvedBindings = resolvedList.Count == 0
@@ -153,8 +153,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
                 }
 
                 anyValid = true;
-                float mapped = AnalogMappingEvaluator.Evaluate(rb.Mapping, raw);
-                cache[rb.BlendShapeIndex] += mapped;
+                cache[rb.BlendShapeIndex] += raw;
             }
 
             if (!anyValid)
@@ -216,18 +215,15 @@ namespace Hidano.FacialControl.Adapters.InputSources
             public readonly IAnalogInputSource Source;
             public readonly int SourceAxis;
             public readonly int BlendShapeIndex;
-            public readonly AnalogMappingFunction Mapping;
 
             public ResolvedBinding(
                 IAnalogInputSource source,
                 int sourceAxis,
-                int blendShapeIndex,
-                AnalogMappingFunction mapping)
+                int blendShapeIndex)
             {
                 Source = source;
                 SourceAxis = sourceAxis;
                 BlendShapeIndex = blendShapeIndex;
-                Mapping = mapping;
             }
         }
     }

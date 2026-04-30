@@ -7,8 +7,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain.Models
     /// <summary>
     /// <see cref="AnalogBindingEntry"/> 値型および
     /// <see cref="AnalogBindingTargetKind"/> / <see cref="AnalogTargetAxis"/> enum
-    /// のコントラクトテスト（tasks.md 1.3 / Req 6.2, 6.3, 6.7）。
+    /// のコントラクトテスト（tasks.md 3.5 / Req 6.2, 6.3, 13.1）。
     /// </summary>
+    /// <remarks>
+    /// Phase 3.5 で <c>Mapping</c> field が撤去されたため、Domain は 5 値
+    /// (SourceId / SourceAxis / TargetKind / TargetIdentifier / TargetAxis) のみを保持する。
+    /// </remarks>
     [TestFixture]
     public class AnalogBindingEntryTests
     {
@@ -32,23 +36,18 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain.Models
         [Test]
         public void Constructor_ValidParameters_StoredAsIs()
         {
-            var mapping = AnalogMappingFunction.Identity;
-
             var entry = new AnalogBindingEntry(
                 sourceId: "controller-expr",
                 sourceAxis: 1,
                 targetKind: AnalogBindingTargetKind.BonePose,
                 targetIdentifier: "LeftEye",
-                targetAxis: AnalogTargetAxis.Y,
-                mapping: mapping);
+                targetAxis: AnalogTargetAxis.Y);
 
             Assert.AreEqual("controller-expr", entry.SourceId);
             Assert.AreEqual(1, entry.SourceAxis);
             Assert.AreEqual(AnalogBindingTargetKind.BonePose, entry.TargetKind);
             Assert.AreEqual("LeftEye", entry.TargetIdentifier);
             Assert.AreEqual(AnalogTargetAxis.Y, entry.TargetAxis);
-            Assert.AreEqual(mapping.Scale, entry.Mapping.Scale);
-            Assert.AreEqual(mapping.DeadZone, entry.Mapping.DeadZone);
         }
 
         [Test]
@@ -62,8 +61,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain.Models
                     sourceAxis: 0,
                     targetKind: AnalogBindingTargetKind.BlendShape,
                     targetIdentifier: "jawOpen",
-                    targetAxis: AnalogTargetAxis.X,
-                    mapping: AnalogMappingFunction.Identity);
+                    targetAxis: AnalogTargetAxis.X);
             });
         }
 
@@ -77,8 +75,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain.Models
                     sourceAxis: -1,
                     targetKind: AnalogBindingTargetKind.BlendShape,
                     targetIdentifier: "jawOpen",
-                    targetAxis: AnalogTargetAxis.X,
-                    mapping: AnalogMappingFunction.Identity);
+                    targetAxis: AnalogTargetAxis.X);
             });
         }
 
@@ -95,8 +92,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain.Models
                     sourceAxis: 0,
                     targetKind: AnalogBindingTargetKind.BlendShape,
                     targetIdentifier: targetId,
-                    targetAxis: AnalogTargetAxis.X,
-                    mapping: AnalogMappingFunction.Identity);
+                    targetAxis: AnalogTargetAxis.X);
             });
         }
 
@@ -111,8 +107,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain.Models
                     sourceAxis: 0,
                     targetKind: AnalogBindingTargetKind.BlendShape,
                     targetIdentifier: "jawOpen",
-                    targetAxis: AnalogTargetAxis.X,
-                    mapping: AnalogMappingFunction.Identity);
+                    targetAxis: AnalogTargetAxis.X);
             });
         }
 
@@ -127,9 +122,22 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain.Models
                     sourceAxis: 51,
                     targetKind: AnalogBindingTargetKind.BlendShape,
                     targetIdentifier: "tongueOut",
-                    targetAxis: AnalogTargetAxis.X,
-                    mapping: AnalogMappingFunction.Identity);
+                    targetAxis: AnalogTargetAxis.X);
             });
+        }
+
+        [Test]
+        public void Constructor_NullSourceId_TreatedAsEmptyString()
+        {
+            // null sourceId は呼出側 contract により空文字へ正規化する
+            var entry = new AnalogBindingEntry(
+                sourceId: null,
+                sourceAxis: 0,
+                targetKind: AnalogBindingTargetKind.BlendShape,
+                targetIdentifier: "jawOpen",
+                targetAxis: AnalogTargetAxis.X);
+
+            Assert.AreEqual(string.Empty, entry.SourceId);
         }
     }
 }

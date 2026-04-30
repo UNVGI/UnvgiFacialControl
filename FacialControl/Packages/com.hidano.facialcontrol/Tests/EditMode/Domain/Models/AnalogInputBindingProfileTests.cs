@@ -111,8 +111,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain.Models
                 sourceAxis: sourceAxis,
                 targetKind: kind,
                 targetIdentifier: targetIdentifier,
-                targetAxis: axis,
-                mapping: AnalogMappingFunction.Identity);
+                targetAxis: axis);
         }
     }
 }

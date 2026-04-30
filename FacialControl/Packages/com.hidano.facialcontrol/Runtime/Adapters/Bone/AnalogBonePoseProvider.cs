@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
-using Hidano.FacialControl.Domain.Services;
 using UnityEngine;
 
 namespace Hidano.FacialControl.Adapters.Bone
@@ -85,7 +84,7 @@ namespace Hidano.FacialControl.Adapters.Bone
                 }
 
                 resolvedList.Add(new ResolvedBinding(
-                    source, entry.SourceAxis, slot, entry.TargetAxis, entry.Mapping));
+                    source, entry.SourceAxis, slot, entry.TargetAxis));
             }
 
             _resolvedBindings = resolvedList.Count == 0
@@ -152,18 +151,19 @@ namespace Hidano.FacialControl.Adapters.Bone
                     continue;
                 }
 
-                float mapped = AnalogMappingEvaluator.Evaluate(rb.Mapping, raw);
+                // Phase 3.5: Mapping を撤去（dead-zone / scale / offset / curve / invert / clamp の値変換は
+                // Adapters 側 InputProcessor 経路で扱う。Decision 4 / Req 13.3）。生値をそのまま加算する。
                 ref var slot = ref _slots[rb.SlotIndex];
                 switch (rb.TargetAxis)
                 {
                     case AnalogTargetAxis.X:
-                        slot.EulerX += mapped;
+                        slot.EulerX += raw;
                         break;
                     case AnalogTargetAxis.Y:
-                        slot.EulerY += mapped;
+                        slot.EulerY += raw;
                         break;
                     case AnalogTargetAxis.Z:
-                        slot.EulerZ += mapped;
+                        slot.EulerZ += raw;
                         break;
                 }
             }
@@ -246,20 +246,17 @@ namespace Hidano.FacialControl.Adapters.Bone
             public readonly int SourceAxis;
             public readonly int SlotIndex;
             public readonly AnalogTargetAxis TargetAxis;
-            public readonly AnalogMappingFunction Mapping;
 
             public ResolvedBinding(
                 IAnalogInputSource source,
                 int sourceAxis,
                 int slotIndex,
-                AnalogTargetAxis targetAxis,
-                AnalogMappingFunction mapping)
+                AnalogTargetAxis targetAxis)
             {
                 Source = source;
                 SourceAxis = sourceAxis;
                 SlotIndex = slotIndex;
                 TargetAxis = targetAxis;
-                Mapping = mapping;
             }
         }
     }

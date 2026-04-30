@@ -5,10 +5,14 @@ using UnityEngine;
 namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 {
     /// <summary>
-    /// アナログ入力バインディング 1 件 (旧 analog_binding_demo.json: bindings[])。
+    /// アナログ入力バインディング 1 件 (analog binding profile: bindings[])。
     /// 入力源軸 → BlendShape または BonePose 軸への 1 対 1 マッピングを定義する。
     /// <see cref="Hidano.FacialControl.Domain.Models.AnalogBindingEntry"/> の Unity Serializable 投影。
     /// </summary>
+    /// <remarks>
+    /// Phase 3.5 で <c>mapping</c> field を撤去した（Req 6.2, 6.3）。dead-zone / scale / offset / curve /
+    /// invert / clamp の値変換は Adapters 側 InputProcessor 経路で扱う（Decision 4 / Req 13.3）。
+    /// </remarks>
     [Serializable]
     public sealed class AnalogBindingEntrySerializable
     {
@@ -27,8 +31,5 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 
         [Tooltip("BonePose ターゲット時の Euler 軸 (X/Y/Z)。BlendShape ターゲット時は無視される。")]
         public AnalogTargetAxis targetAxis = AnalogTargetAxis.X;
-
-        [Tooltip("マッピング関数 (dead-zone → scale → offset → curve → invert → clamp)。")]
-        public AnalogMappingFunctionSerializable mapping = new AnalogMappingFunctionSerializable();
     }
 }

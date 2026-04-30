@@ -62,27 +62,17 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
                     continue;
                 }
 
-                AnalogMappingFunction mapping;
-                try
-                {
-                    mapping = ConvertAnalogMapping(src.mapping);
-                }
-                catch (ArgumentException)
-                {
-                    // min > max などのバリデーション失敗エントリはスキップして他を残す。
-                    continue;
-                }
-
                 AnalogBindingEntry entry;
                 try
                 {
+                    // Phase 3.5: Mapping field を撤去（dead-zone / scale / offset / curve / invert / clamp の値変換は
+                    // Adapters 側 InputProcessor 経路で扱う。Decision 4 / Req 13.3）。
                     entry = new AnalogBindingEntry(
                         src.sourceId ?? string.Empty,
                         src.sourceAxis,
                         src.targetKind,
                         src.targetIdentifier,
-                        src.targetAxis,
-                        mapping);
+                        src.targetAxis);
                 }
                 catch (ArgumentOutOfRangeException)
                 {
@@ -311,21 +301,5 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             return result.ToArray();
         }
 
-        private static AnalogMappingFunction ConvertAnalogMapping(AnalogMappingFunctionSerializable mapping)
-        {
-            if (mapping == null)
-            {
-                return AnalogMappingFunction.Identity;
-            }
-            var curve = ConvertTransitionCurve(mapping.curve);
-            return new AnalogMappingFunction(
-                mapping.deadZone,
-                mapping.scale,
-                mapping.offset,
-                in curve,
-                mapping.invert,
-                mapping.min,
-                mapping.max);
-        }
     }
 }
