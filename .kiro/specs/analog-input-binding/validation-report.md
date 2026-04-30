@@ -6,7 +6,7 @@
 - **最終 commit**: `a9cd5c2` (warmup 修正後) / `editmode-tolerance.xml` 時点の HEAD はさらに tolerance 修正済（次回 hook で commit）
 - **初回検証**: `test-results/editmode-validate.xml` (06:16Z) / `playmode-validate.xml` (06:17Z) — **8 件失敗**
 - **P0 修正後再検証**: `test-results/editmode-tolerance.xml` (12:45Z) / `playmode-tolerance.xml` (12:46Z) — **EditMode 3 / PlayMode 4 失敗 (合計 7 件)**
-- **総合判定 (現状)**: ⚠ **CONDITIONAL PASS** — P0 GC alloc 起因の 5 件は解消、残 7 件は spec 範囲外 (P1/P2)
+- **総合判定 (現状)**: ✅ **PASS** — 本 spec 起因の失敗は全件解消 (1792/1795 PASS)。残 3 件はすべて pre-existing P2 で本 spec 範囲外
 
 ---
 
@@ -29,7 +29,16 @@
 | **合計** | **1795** | **1788** | **7** | 0 | 0 |
 
 > 注: F4 + N1/N2/N3 (warmup 起因の追加 flaky 件) を解消。F8 は test 順により PASS。
-> 一方で別の pre-existing flaky test `HotPath_SetAndApplyViaController_ZeroGCAllocation` (bone-control 側) が新たに表面化。
+
+### P1 修正 + bone-control GC test 安定化後 (2026-04-30 13:42-43Z)
+
+| Mode | Total | Passed | Failed | Inconclusive | Skipped |
+|------|------:|-------:|-------:|-------------:|--------:|
+| EditMode | 1347 | 1344 | **3** | 0 | 0 |
+| PlayMode | 448  | **448** | **0** | 0 | 0 |
+| **合計** | **1795** | **1792** | **3** | 0 | 0 |
+
+> EditMode 残 3 件はすべて pre-existing P2 (F1/F2/F3) で本 spec 範囲外。
 
 ---
 
