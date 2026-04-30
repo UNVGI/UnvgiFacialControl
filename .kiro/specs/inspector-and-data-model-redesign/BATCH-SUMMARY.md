@@ -19,3 +19,4 @@ Started: 2026-04-30T19:24:48Z
 | 3.5 | Domain AnalogBindingEntry から Mapping field を撤去し� | ERROR(exit=1) | 445s | run-logs/task-3.5.log |
 | 3.6 | SystemTextJsonParser と FacialCharacterProfileConverter を | ERROR(exit=1) | 374s | run-logs/task-3.6.log |
 | 3.7 | Phase 3 完了レビュー — Domain 全層の破壊書換� | FAIL | 130s | run-logs/task-3.7.log |
+| 4.1 | Analog deadzone / scale / offset / clamp の 4 種 InputProc | FAIL | 285s | run-logs/task-4.1.log |

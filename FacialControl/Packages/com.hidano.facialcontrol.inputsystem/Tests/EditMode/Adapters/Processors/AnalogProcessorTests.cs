@@ -4,8 +4,9 @@ using Hidano.FacialControl.Adapters.Processors;
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.Processors
 {
     /// <summary>
-    /// 4 種 stateless アナログ <c>InputProcessor</c>（DeadZone / Scale / Offset / Clamp）の
-    /// 振る舞いを検証する EditMode テスト（tasks.md 4.1）。
+    /// 6 種 stateless アナログ <c>InputProcessor</c>
+    /// （DeadZone / Scale / Offset / Clamp / Invert / Curve）の振る舞いを検証する EditMode テスト
+    /// （tasks.md 4.1, 4.2）。
     /// </summary>
     /// <remarks>
     /// 観測完了条件:
@@ -14,6 +15,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Processors
     ///   <item>Scale: <c>value * factor</c>。</item>
     ///   <item>Offset: <c>value + offset</c>。</item>
     ///   <item>Clamp: <c>Mathf.Clamp(value, min, max)</c>。</item>
+    ///   <item>Invert: <c>-value</c>。</item>
+    ///   <item>Curve: preset 4 種 (Linear / EaseIn (v*v) / EaseOut (1-(1-v)^2) / EaseInOut (SmoothStep))。</item>
     /// </list>
     /// </remarks>
     [TestFixture]
@@ -139,6 +142,158 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Processors
             float result = processor.Process(0.3f, control: null);
 
             Assert.That(result, Is.EqualTo(0.3f).Within(Tolerance));
+        }
+
+        // --- 4.2 Invert / Curve（preset 4 種） ---
+
+        [Test]
+        public void Invert_Process_PositiveValue_ReturnsNegated()
+        {
+            var processor = new AnalogInvertProcessor();
+
+            float result = processor.Process(0.5f, control: null);
+
+            Assert.That(result, Is.EqualTo(-0.5f).Within(Tolerance));
+        }
+
+        [Test]
+        public void Invert_Process_NegativeValue_ReturnsPositive()
+        {
+            var processor = new AnalogInvertProcessor();
+
+            float result = processor.Process(-0.75f, control: null);
+
+            Assert.That(result, Is.EqualTo(0.75f).Within(Tolerance));
+        }
+
+        [Test]
+        public void Invert_Process_Zero_ReturnsZero()
+        {
+            var processor = new AnalogInvertProcessor();
+
+            float result = processor.Process(0f, control: null);
+
+            Assert.That(result, Is.EqualTo(0f).Within(Tolerance));
+        }
+
+        [Test]
+        public void Curve_Linear_Process_Zero_ReturnsZero()
+        {
+            var processor = new AnalogCurveProcessor { preset = 0 };
+
+            float result = processor.Process(0f, control: null);
+
+            Assert.That(result, Is.EqualTo(0f).Within(Tolerance));
+        }
+
+        [Test]
+        public void Curve_Linear_Process_Half_ReturnsHalf()
+        {
+            var processor = new AnalogCurveProcessor { preset = 0 };
+
+            float result = processor.Process(0.5f, control: null);
+
+            Assert.That(result, Is.EqualTo(0.5f).Within(Tolerance));
+        }
+
+        [Test]
+        public void Curve_Linear_Process_One_ReturnsOne()
+        {
+            var processor = new AnalogCurveProcessor { preset = 0 };
+
+            float result = processor.Process(1f, control: null);
+
+            Assert.That(result, Is.EqualTo(1f).Within(Tolerance));
+        }
+
+        [Test]
+        public void Curve_EaseIn_Process_Zero_ReturnsZero()
+        {
+            var processor = new AnalogCurveProcessor { preset = 1 };
+
+            float result = processor.Process(0f, control: null);
+
+            Assert.That(result, Is.EqualTo(0f).Within(Tolerance));
+        }
+
+        [Test]
+        public void Curve_EaseIn_Process_Half_ReturnsQuarter()
+        {
+            var processor = new AnalogCurveProcessor { preset = 1 };
+
+            float result = processor.Process(0.5f, control: null);
+
+            Assert.That(result, Is.EqualTo(0.25f).Within(Tolerance));
+        }
+
+        [Test]
+        public void Curve_EaseIn_Process_One_ReturnsOne()
+        {
+            var processor = new AnalogCurveProcessor { preset = 1 };
+
+            float result = processor.Process(1f, control: null);
+
+            Assert.That(result, Is.EqualTo(1f).Within(Tolerance));
+        }
+
+        [Test]
+        public void Curve_EaseOut_Process_Zero_ReturnsZero()
+        {
+            var processor = new AnalogCurveProcessor { preset = 2 };
+
+            float result = processor.Process(0f, control: null);
+
+            Assert.That(result, Is.EqualTo(0f).Within(Tolerance));
+        }
+
+        [Test]
+        public void Curve_EaseOut_Process_Half_ReturnsThreeQuarters()
+        {
+            var processor = new AnalogCurveProcessor { preset = 2 };
+
+            float result = processor.Process(0.5f, control: null);
+
+            Assert.That(result, Is.EqualTo(0.75f).Within(Tolerance));
+        }
+
+        [Test]
+        public void Curve_EaseOut_Process_One_ReturnsOne()
+        {
+            var processor = new AnalogCurveProcessor { preset = 2 };
+
+            float result = processor.Process(1f, control: null);
+
+            Assert.That(result, Is.EqualTo(1f).Within(Tolerance));
+        }
+
+        [Test]
+        public void Curve_EaseInOut_Process_Zero_ReturnsZero()
+        {
+            var processor = new AnalogCurveProcessor { preset = 3 };
+
+            float result = processor.Process(0f, control: null);
+
+            Assert.That(result, Is.EqualTo(0f).Within(Tolerance));
+        }
+
+        [Test]
+        public void Curve_EaseInOut_Process_Half_ReturnsHalf()
+        {
+            var processor = new AnalogCurveProcessor { preset = 3 };
+
+            float result = processor.Process(0.5f, control: null);
+
+            Assert.That(result, Is.EqualTo(0.5f).Within(Tolerance));
+        }
+
+        [Test]
+        public void Curve_EaseInOut_Process_One_ReturnsOne()
+        {
+            var processor = new AnalogCurveProcessor { preset = 3 };
+
+            float result = processor.Process(1f, control: null);
+
+            Assert.That(result, Is.EqualTo(1f).Within(Tolerance));
         }
     }
 }
