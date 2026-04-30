@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
 using UnityEngine;
 
 namespace Hidano.FacialControl.Adapters.InputSources
@@ -105,6 +106,30 @@ namespace Hidano.FacialControl.Adapters.InputSources
                 typeof(LipSyncOptionsDto),
                 () => new LipSyncOptionsDto(),
                 (options, blendShapeCount, profile) => CreateLipSync(blendShapeCount));
+        
+            Register(
+                CoreControllerExpressionSource.ReservedId,
+                typeof(ExpressionTriggerCoreFallbackOptionsDto),
+                () => new ExpressionTriggerCoreFallbackOptionsDto(),
+                (options, blendShapeCount, profile) =>
+                {
+                    var opts = options as ExpressionTriggerCoreFallbackOptionsDto ?? new ExpressionTriggerCoreFallbackOptionsDto();
+                    int depth = opts.maxStackDepth > 0 ? opts.maxStackDepth : DefaultMaxStackDepth;
+                    var mode = GetFirstLayerExclusionMode(profile);
+                    return new CoreControllerExpressionSource(blendShapeCount, depth, mode, System.Array.Empty<string>(), profile);
+                });
+
+            Register(
+                CoreKeyboardExpressionSource.ReservedId,
+                typeof(ExpressionTriggerCoreFallbackOptionsDto),
+                () => new ExpressionTriggerCoreFallbackOptionsDto(),
+                (options, blendShapeCount, profile) =>
+                {
+                    var opts = options as ExpressionTriggerCoreFallbackOptionsDto ?? new ExpressionTriggerCoreFallbackOptionsDto();
+                    int depth = opts.maxStackDepth > 0 ? opts.maxStackDepth : DefaultMaxStackDepth;
+                    var mode = GetFirstLayerExclusionMode(profile);
+                    return new CoreKeyboardExpressionSource(blendShapeCount, depth, mode, System.Array.Empty<string>(), profile);
+                });
         }
 
         /// <inheritdoc />
@@ -296,6 +321,66 @@ namespace Hidano.FacialControl.Adapters.InputSources
                 DefaultFactory = defaultFactory;
                 Creator = creator;
             }
+        }
+
+        private static ExclusionMode GetFirstLayerExclusionMode(FacialProfile profile)
+        {
+            var layers = profile.Layers;
+            if (layers.Length > 0)
+            {
+                return layers.Span[0].ExclusionMode;
+            }
+            return ExclusionMode.LastWins;
+        }
+
+        /// <summary>
+        /// コアパッケージ内の controller-expr コアフォールバック実装。
+        /// InputSystem サブパッケージが RegisterReserved で上書きしない限り、
+        /// controller-expr 宣言時にこのシンプルな実装が使用される。
+        /// </summary>
+        private sealed class CoreControllerExpressionSource : ExpressionTriggerInputSourceBase
+        {
+            public const string ReservedId = "controller-expr";
+
+            public CoreControllerExpressionSource(
+                int blendShapeCount,
+                int maxStackDepth,
+                ExclusionMode exclusionMode,
+                System.Collections.Generic.IReadOnlyList<string> blendShapeNames,
+                FacialProfile profile)
+                : base(InputSourceId.Parse(ReservedId), blendShapeCount, maxStackDepth, exclusionMode, blendShapeNames, profile)
+            {
+            }
+        }
+
+        /// <summary>
+        /// コアパッケージ内の keyboard-expr コアフォールバック実装。
+        /// InputSystem サブパッケージが RegisterReserved で上書きしない限り、
+        /// keyboard-expr 宣言時にこのシンプルな実装が使用される。
+        /// </summary>
+        private sealed class CoreKeyboardExpressionSource : ExpressionTriggerInputSourceBase
+        {
+            public const string ReservedId = "keyboard-expr";
+
+            public CoreKeyboardExpressionSource(
+                int blendShapeCount,
+                int maxStackDepth,
+                ExclusionMode exclusionMode,
+                System.Collections.Generic.IReadOnlyList<string> blendShapeNames,
+                FacialProfile profile)
+                : base(InputSourceId.Parse(ReservedId), blendShapeCount, maxStackDepth, exclusionMode, blendShapeNames, profile)
+            {
+            }
+        }
+
+        /// <summary>
+        /// controller-expr / keyboard-expr のコアフォールバック登録用 DTO。
+        /// maxStackDepth が 0 以下の場合は InputSourceFactory.DefaultMaxStackDepth が使用される。
+        /// </summary>
+        [System.Serializable]
+        private sealed class ExpressionTriggerCoreFallbackOptionsDto : InputSourceOptionsDto
+        {
+            public int maxStackDepth = 0;
         }
     }
 }
