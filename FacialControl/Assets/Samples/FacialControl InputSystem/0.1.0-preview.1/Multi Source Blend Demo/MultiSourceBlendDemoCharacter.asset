@@ -1,0 +1,109 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 66b402a1dc2b31045843ee6bec45348a, type: 3}
+  m_Name: MultiSourceBlendDemoCharacter
+  m_EditorClassIdentifier:
+  _schemaVersion: "1.0"
+  _layers:
+  - name: emotion
+    priority: 0
+    exclusionMode: 0
+    inputSources:
+    - id: controller-expr
+      weight: 0.5
+      optionsJson: '{"maxStackDepth":4}'
+    - id: keyboard-expr
+      weight: 0.5
+      optionsJson: '{"maxStackDepth":4}'
+  _expressions:
+  - id: smile
+    name: smile
+    layer: emotion
+    transitionDuration: 0.25
+    transitionCurve:
+      type: 0
+      keys: []
+    blendShapeValues:
+    - name: 笑い
+      value: 1
+      renderer:
+    - name: 口角上げ
+      value: 0.6
+      renderer:
+    layerSlots: []
+  - id: angry
+    name: angry
+    layer: emotion
+    transitionDuration: 0.25
+    transitionCurve:
+      type: 0
+      keys: []
+    blendShapeValues:
+    - name: 怒り
+      value: 1
+      renderer:
+    - name: 左眉下げ
+      value: 0.5
+      renderer:
+    - name: 右眉下げ
+      value: 0.5
+      renderer:
+    layerSlots: []
+  - id: surprise
+    name: surprise
+    layer: emotion
+    transitionDuration: 0.2
+    transitionCurve:
+      type: 0
+      keys: []
+    blendShapeValues:
+    - name: びっくり
+      value: 1
+      renderer:
+    - name: ▲
+      value: 0.8
+      renderer:
+    layerSlots: []
+  - id: troubled
+    name: troubled
+    layer: emotion
+    transitionDuration: 0.25
+    transitionCurve:
+      type: 0
+      keys: []
+    blendShapeValues:
+    - name: 困る
+      value: 0.8
+      renderer:
+    - name: 口角下げ
+      value: 0.4
+      renderer:
+    layerSlots: []
+  _rendererPaths: []
+  _bonePoses: []
+  _referenceModel: {fileID: 0}
+  _inputActionAsset: {fileID: -944628639613478452, guid: a3b4c5d6e7f8091a2b3c4d5e6f708192, type: 3}
+  _actionMapName: Expression
+  _expressionBindings:
+  - actionName: Trigger1
+    expressionId: smile
+    category: 1
+  - actionName: Trigger2
+    expressionId: angry
+    category: 1
+  - actionName: Trigger3
+    expressionId: surprise
+    category: 1
+  - actionName: Trigger4
+    expressionId: troubled
+    category: 1
+  _analogBindings: []

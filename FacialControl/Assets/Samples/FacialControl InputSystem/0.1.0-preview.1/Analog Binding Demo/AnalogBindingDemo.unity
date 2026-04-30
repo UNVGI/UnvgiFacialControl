@@ -320,6 +320,7 @@ GameObject:
   - component: {fileID: 300300002}
   - component: {fileID: 300300003}
   - component: {fileID: 300300004}
+  - component: {fileID: 300300005}
   m_Layer: 0
   m_Name: Character
   m_TagString: Untagged
@@ -375,7 +376,8 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2500426d3a5631846ac056195a7cc50a, type: 3}
   m_Name:
-  m_EditorClassIdentifier: Hidano.FacialControl.Adapters::Hidano.FacialControl.Adapters.Playable.FacialController
+  m_EditorClassIdentifier:
+  _characterSO: {fileID: 11400000, guid: 6e1a3c5f8b2d4e9a7c3f1d5b8e2a4c6f, type: 2}
   _profileSO: {fileID: 0}
   _skinnedMeshRenderers: []
 --- !u!114 &300300004
@@ -389,102 +391,21 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 84132a162f5174b44ac175f15db583f4, type: 3}
   m_Name:
-  m_EditorClassIdentifier: Hidano.FacialControl.InputSystem::Hidano.FacialControl.InputSystem.InputFacialControllerExtension
+  m_EditorClassIdentifier:
   _defaultExclusionMode: 0
---- !u!1 &400400000
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 400400001}
-  - component: {fileID: 400400002}
-  m_Layer: 0
-  m_Name: Facial Analog Input Binder
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &400400001
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 400400000}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &400400002
+--- !u!114 &300300005
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 400400000}
+  m_GameObject: {fileID: 300300000}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9e4f6a8b0c2d4e6f8a0b1c2d3e4f5a06, type: 3}
+  m_Script: {fileID: 11500000, guid: 8a37e0c5c1f24f8db9e7e8b12c4d3a7e, type: 3}
   m_Name:
-  m_EditorClassIdentifier: Hidano.FacialControl.InputSystem::Hidano.FacialControl.Adapters.Input.FacialAnalogInputBinder
+  m_EditorClassIdentifier:
   _facialController: {fileID: 300300003}
-  _profile: {fileID: 11400000, guid: 6e1a3c5f8b2d4e9a7c3f1d5b8e2a4c6f, type: 2}
-  _actionAsset: {fileID: 0}
-  _actionMapName: Analog
---- !u!1 &500500000
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 500500001}
-  - component: {fileID: 500500002}
-  m_Layer: 0
-  m_Name: Facial Input Binder
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &500500001
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 500500000}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &500500002
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 500500000}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4b2f1d8e7a4c4c8ba7c14bf8a3e29a12, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Hidano.FacialControl.InputSystem::Hidano.FacialControl.Adapters.Input.FacialInputBinder
-  _facialController: {fileID: 300300003}
-  _bindingProfile: {fileID: 0}
 --- !u!1 &600600000
 GameObject:
   m_ObjectHideFlags: 0
@@ -526,11 +447,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 600600000}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7a3c8e2f9b1d4a6e5c8b3f7d9e2a1c4b, type: 3}
+  m_Script: {fileID: 11500000, guid: 7a3c8e2f9b1d4a6e5c8a2f4d6b1e9c3a5f, type: 3}
   m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::Hidano.FacialControl.Samples.AnalogBindingDemoHUD
+  m_EditorClassIdentifier:
   _facialController: {fileID: 300300003}
-  _analogBinder: {fileID: 400400002}
   _leftEye: {fileID: 0}
   _rightEye: {fileID: 0}
   _meshRenderer: {fileID: 0}
@@ -545,6 +465,4 @@ SceneRoots:
   - {fileID: 200200001}
   - {fileID: 100100002}
   - {fileID: 300300001}
-  - {fileID: 400400001}
-  - {fileID: 500500001}
   - {fileID: 600600001}

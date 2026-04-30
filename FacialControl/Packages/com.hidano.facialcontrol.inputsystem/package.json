@@ -15,12 +15,12 @@
     "samples": [
         {
             "displayName": "Multi Source Blend Demo",
-            "description": "同一レイヤーに controller-expr と keyboard-expr を並置し、OnGUI 経由で加重和ブレンドを目視確認するサンプル。Scene / FacialProfileSO / InputBindingProfileSO / JSON / HUD 一式を同梱し、ユーザーはモデルを Character の子に配置するだけで動作する。",
+            "description": "同一レイヤーに controller-expr と keyboard-expr を並置し、OnGUI 経由で加重和ブレンドを目視確認するサンプル。Scene / FacialCharacterSO / StreamingAssets JSON / HUD 一式を同梱し、ユーザーはモデルを Character の子に配置するだけで動作する (新統合 SO 形式)。",
             "path": "Samples~/MultiSourceBlendDemo"
         },
         {
             "displayName": "Analog Binding Demo",
-            "description": "FacialAnalogInputBinder を介して右スティック → LeftEye/RightEye Euler、ARKit/OSC float → mouth-open BlendShape を駆動するサンプル。Scene / AnalogInputBindingProfileSO / JSON / HUD 一式を同梱。離散トリガー側 FacialInputBinder と並走する構成を確認できる。",
+            "description": "FacialCharacterSO のアナログバインディングで右スティック → LeftEye/RightEye Euler、ARKit/OSC float → mouth-open BlendShape を駆動するサンプル。Scene / FacialCharacterSO / StreamingAssets JSON / HUD 一式を同梱 (新統合 SO 形式)。",
             "path": "Samples~/AnalogBindingDemo"
         }
     ],

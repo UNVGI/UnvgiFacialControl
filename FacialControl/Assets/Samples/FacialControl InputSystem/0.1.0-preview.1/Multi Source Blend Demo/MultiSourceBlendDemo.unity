@@ -228,6 +228,7 @@ GameObject:
   - component: {fileID: 345471963}
   - component: {fileID: 345471962}
   - component: {fileID: 345471961}
+  - component: {fileID: 345471965}
   m_Layer: 0
   m_Name: Character
   m_TagString: Untagged
@@ -235,38 +236,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!1 &512341001
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 512341002}
-  - component: {fileID: 345471960}
-  m_Layer: 0
-  m_Name: Facial Input Binder
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &512341002
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 512341001}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &823412001
 GameObject:
   m_ObjectHideFlags: 0
@@ -310,26 +279,11 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 87665ebea9129824b90cb4ca6819c07c, type: 3}
   m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::Hidano.FacialControl.Samples.MultiSourceBlendDemoHUD
+  m_EditorClassIdentifier:
   _facialController: {fileID: 345471962}
-  _profileJson: {fileID: 4900000, guid: 4ae8518b46747f341bda0656660f70ab, type: 3}
   _layerIndex: 0
   _controllerSourceIndex: 1
   _keyboardSourceIndex: 2
---- !u!114 &345471960
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 512341001}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4b2f1d8e7a4c4c8ba7c14bf8a3e29a12, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Hidano.FacialControl.InputSystem::Hidano.FacialControl.Adapters.Input.FacialInputBinder
-  _facialController: {fileID: 345471962}
-  _bindingProfile: {fileID: 11400000, guid: 0053dab565d04cb4abd2e5890f6355e1, type: 2}
 --- !u!114 &345471961
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -340,8 +294,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 84132a162f5174b44ac175f15db583f4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Hidano.FacialControl.InputSystem::Hidano.FacialControl.InputSystem.InputFacialControllerExtension
+  m_Name:
+  m_EditorClassIdentifier:
   _defaultExclusionMode: 0
 --- !u!114 &345471962
 MonoBehaviour:
@@ -353,10 +307,24 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2500426d3a5631846ac056195a7cc50a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Hidano.FacialControl.Adapters::Hidano.FacialControl.Adapters.Playable.FacialController
+  m_Name:
+  m_EditorClassIdentifier:
+  _characterSO: {fileID: 11400000, guid: 998b06c123dcd304db38f158f30a1fac, type: 2}
   _profileSO: {fileID: 0}
   _skinnedMeshRenderers: []
+--- !u!114 &345471965
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 345471958}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a37e0c5c1f24f8db9e7e8b12c4d3a7e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  _facialController: {fileID: 345471962}
 --- !u!95 &345471963
 Animator:
   serializedVersion: 7
@@ -374,7 +342,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage: 
+  m_WarningMessage:
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -493,5 +461,4 @@ SceneRoots:
   - {fileID: 2031058189}
   - {fileID: 28788804}
   - {fileID: 345471964}
-  - {fileID: 512341002}
   - {fileID: 823412002}

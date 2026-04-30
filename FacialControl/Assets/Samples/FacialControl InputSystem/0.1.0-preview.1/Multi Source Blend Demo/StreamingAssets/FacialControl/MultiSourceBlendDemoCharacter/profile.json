@@ -9,14 +9,6 @@
                 {"id": "controller-expr", "weight": 0.5, "options": {"maxStackDepth": 4}},
                 {"id": "keyboard-expr", "weight": 0.5, "options": {"maxStackDepth": 4}}
             ]
-        },
-        {
-            "name": "eye",
-            "priority": 1,
-            "exclusionMode": "lastWins",
-            "inputSources": [
-                {"id": "osc", "weight": 1.0, "options": {"stalenessSeconds": 1.0}}
-            ]
         }
     ],
     "expressions": [
@@ -66,17 +58,6 @@
             "blendShapeValues": [
                 {"name": "困る", "value": 0.8, "renderer": ""},
                 {"name": "口角下げ", "value": 0.4, "renderer": ""}
-            ],
-            "layerSlots": []
-        },
-        {
-            "id": "blink",
-            "name": "blink",
-            "layer": "eye",
-            "transitionDuration": 0.08,
-            "transitionCurve": {"type": "linear", "keys": []},
-            "blendShapeValues": [
-                {"name": "まばたき", "value": 1.0, "renderer": ""}
             ],
             "layerSlots": []
         }
