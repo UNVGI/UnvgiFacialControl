@@ -13,31 +13,30 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Adapters.ScriptableObj
     public class FacialCharacterSOTests
     {
         [Test]
-        public void GetExpressionBindings_FilteredByCategory_ReturnsOnlyMatching()
+        public void GetExpressionBindings_ReturnsAllNonEmptyEntries()
         {
             var so = ScriptableObject.CreateInstance<FacialCharacterSO>();
             try
             {
                 so.ExpressionBindings.Add(new ExpressionBindingEntry
                 {
-                    actionName = "Trigger1", expressionId = "smile", category = InputSourceCategory.Controller,
+                    actionName = "Trigger1", expressionId = "smile",
                 });
                 so.ExpressionBindings.Add(new ExpressionBindingEntry
                 {
-                    actionName = "Trigger2", expressionId = "angry", category = InputSourceCategory.Keyboard,
+                    actionName = "Trigger2", expressionId = "angry",
                 });
                 so.ExpressionBindings.Add(new ExpressionBindingEntry
                 {
-                    actionName = "Trigger3", expressionId = "joy", category = InputSourceCategory.Controller,
+                    actionName = "Trigger3", expressionId = "joy",
                 });
 
-                var controllerBindings = so.GetExpressionBindings(InputSourceCategory.Controller);
-                var keyboardBindings = so.GetExpressionBindings(InputSourceCategory.Keyboard);
+                var bindings = so.GetExpressionBindings();
 
-                Assert.That(controllerBindings.Count, Is.EqualTo(2));
-                Assert.That(keyboardBindings.Count, Is.EqualTo(1));
-                Assert.That(keyboardBindings[0].ActionName, Is.EqualTo("Trigger2"));
-                Assert.That(keyboardBindings[0].ExpressionId, Is.EqualTo("angry"));
+                Assert.That(bindings.Count, Is.EqualTo(3));
+                Assert.That(bindings[0].ActionName, Is.EqualTo("Trigger1"));
+                Assert.That(bindings[1].ActionName, Is.EqualTo("Trigger2"));
+                Assert.That(bindings[2].ExpressionId, Is.EqualTo("joy"));
             }
             finally
             {
@@ -53,18 +52,18 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Adapters.ScriptableObj
             {
                 so.ExpressionBindings.Add(new ExpressionBindingEntry
                 {
-                    actionName = "", expressionId = "smile", category = InputSourceCategory.Controller,
+                    actionName = "", expressionId = "smile",
                 });
                 so.ExpressionBindings.Add(new ExpressionBindingEntry
                 {
-                    actionName = "Trigger1", expressionId = "", category = InputSourceCategory.Controller,
+                    actionName = "Trigger1", expressionId = "",
                 });
                 so.ExpressionBindings.Add(new ExpressionBindingEntry
                 {
-                    actionName = "Trigger2", expressionId = "joy", category = InputSourceCategory.Controller,
+                    actionName = "Trigger2", expressionId = "joy",
                 });
 
-                var bindings = so.GetExpressionBindings(InputSourceCategory.Controller);
+                var bindings = so.GetExpressionBindings();
 
                 Assert.That(bindings.Count, Is.EqualTo(1));
                 Assert.That(bindings[0].ActionName, Is.EqualTo("Trigger2"));

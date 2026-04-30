@@ -5,26 +5,33 @@ using UnityEngine;
 namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 {
     /// <summary>
-    /// アナログ入力バインディング 1 件 (analog binding profile: bindings[])。
-    /// 入力源軸 → BlendShape または BonePose 軸への 1 対 1 マッピングを定義する。
-    /// <see cref="Hidano.FacialControl.Domain.Models.AnalogBindingEntry"/> の Unity Serializable 投影。
+    /// アナログ入力バインディング 1 件 (analog binding profile: bindings[]) の Inspector シリアライズ表現。
+    /// 入力源 (InputAction) → BlendShape / BonePose 軸への 1 対 1 写像を宣言する
+    /// （<see cref="Hidano.FacialControl.Domain.Models.AnalogBindingEntry"/> の Adapters 側プロジェクション）。
     /// </summary>
     /// <remarks>
-    /// Phase 3.5 で <c>mapping</c> field を撤去した（Req 6.2, 6.3）。dead-zone / scale / offset / curve /
-    /// invert / clamp の値変換は Adapters 側 InputProcessor 経路で扱う（Decision 4 / Req 13.3）。
+    /// <para>
+    /// Phase 4.7 で 3 フィールドに簡素化済（Req 6.2）:
+    /// <see cref="inputActionRef"/> + <see cref="targetIdentifier"/> + <see cref="targetAxis"/>。
+    /// 旧 <c>sourceId / sourceAxis / targetKind / mapping</c> field は撤去。
+    /// </para>
+    /// <para>
+    /// 値変換 (deadzone / scale / offset / curve / invert / clamp) は InputActionAsset 側
+    /// processor チェーンで完結する（Decision 4 / Req 13.3）。Adapters 側 InputProcessor は
+    /// Phase 4.1-4.3 で登録済み。
+    /// </para>
+    /// <para>
+    /// 本型は core パッケージ (com.hidano.facialcontrol) に所属する asmdef 制約上
+    /// <c>UnityEngine.InputSystem.InputActionReference</c> を直接 SerializeField に持てないため、
+    /// <see cref="inputActionRef"/> は InputAction の <c>id</c> (GUID 文字列) を保持する。
+    /// 実体解決は inputsystem パッケージ側で <c>InputActionAsset.FindAction(id)</c> で行う。
+    /// </para>
     /// </remarks>
     [Serializable]
     public sealed class AnalogBindingEntrySerializable
     {
-        [Tooltip("入力源 ID。InputSourceId 規約 ([a-zA-Z0-9_.-]{1,64})。例: x-right-stick")]
-        public string sourceId;
-
-        [Tooltip("入力源側の軸番号 (0 以上)。scalar=0、Vector2 では X=0 / Y=1。")]
-        [Min(0)]
-        public int sourceAxis = 0;
-
-        [Tooltip("ターゲット種別。BlendShape 名またはボーン名のいずれを指す宣言か。")]
-        public AnalogBindingTargetKind targetKind = AnalogBindingTargetKind.BlendShape;
+        [Tooltip("入力源 InputAction の参照識別子。InputAction.id の GUID 文字列または action 名を保持する。")]
+        public string inputActionRef;
 
         [Tooltip("ターゲット識別子。BlendShape ターゲットなら BlendShape 名、BonePose ターゲットならボーン名。")]
         public string targetIdentifier;

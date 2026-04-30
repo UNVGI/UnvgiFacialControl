@@ -1,23 +1,21 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
-using Hidano.FacialControl.Adapters.Json;
 using Hidano.FacialControl.Adapters.Playable;
-using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
-using Hidano.FacialControl.Adapters.FileSystem;
-using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.Common;
+using Hidano.FacialControl.Editor.Sampling;
 
 namespace Hidano.FacialControl.Editor.Tools
 {
     /// <summary>
-    /// Expression 作成支援ツール。
-    /// BlendShape スライダーを操作してリアルタイムプレビューしながら Expression を作成する。
+    /// Expression 作成支援ツール（Phase 5.2 改修）。
+    /// BlendShape スライダーをリアルタイムプレビューしながら AnimationClip にベイクする。
+    /// 既存 AnimationClip を割り当てると <see cref="IExpressionAnimationClipSampler.SampleSnapshot"/>
+    /// 経由でスライダー値が復元される。
     /// </summary>
     public class ExpressionCreatorWindow : EditorWindow
     {
@@ -43,23 +41,24 @@ namespace Hidano.FacialControl.Editor.Tools
         private TextField _blendShapeSearchField;
         private string _blendShapeSearchText = "";
 
-        // Expression 設定
-        private TextField _expressionNameField;
-        private DropdownField _layerDropdown;
+        // ベイク先 AnimationClip + 遷移メタデータ
+        private ObjectField _clipField;
+        private AnimationClip _targetClip;
         private FloatField _transitionDurationField;
         private DropdownField _curveTypeDropdown;
-
-        // プロファイル
-        private FacialCharacterProfileSO _profileSO;
-        private FacialProfile _currentProfile;
-        private string _currentJsonPath;
+        private static readonly List<string> CurvePresetChoices = new List<string>
+        {
+            nameof(TransitionCurvePreset.Linear),
+            nameof(TransitionCurvePreset.EaseIn),
+            nameof(TransitionCurvePreset.EaseOut),
+            nameof(TransitionCurvePreset.EaseInOut),
+        };
 
         // ステータス
         private Label _statusLabel;
 
         // 依存
-        private IJsonParser _parser;
-        private IProfileRepository _repository;
+        private IExpressionAnimationClipSampler _sampler;
 
         [MenuItem("FacialControl/Expression 作成", false, 20)]
         public static void ShowWindow()
@@ -71,8 +70,7 @@ namespace Hidano.FacialControl.Editor.Tools
 
         private void OnEnable()
         {
-            _parser = new SystemTextJsonParser();
-            _repository = new FileProfileRepository(_parser);
+            _sampler = new AnimationClipExpressionSampler();
             _previewWrapper = new PreviewRenderWrapper();
         }
 
@@ -90,7 +88,6 @@ namespace Hidano.FacialControl.Editor.Tools
             if (styleSheet != null)
                 root.styleSheets.Add(styleSheet);
 
-            // メインレイアウト: 左右分割
             var mainContainer = new VisualElement();
             mainContainer.style.flexDirection = FlexDirection.Row;
             mainContainer.style.flexGrow = 1;
@@ -107,24 +104,21 @@ namespace Hidano.FacialControl.Editor.Tools
             leftPanel.style.paddingTop = 4;
             mainContainer.Add(leftPanel);
 
-            // モデル選択
             _modelField = new ObjectField("モデル")
             {
                 objectType = typeof(GameObject),
                 allowSceneObjects = true,
-                tooltip = "BlendShape 名候補の取得元モデル。プロファイル SO の参照モデル未設定時やシーンに FacialController が無い時の手動選択用。"
+                tooltip = "BlendShape プレビュー対象のモデル。シーン上に FacialController があれば自動解決される。"
             };
             _modelField.RegisterValueChangedCallback(OnModelChanged);
             leftPanel.Add(_modelField);
 
-            // BlendShape 名ドロップダウン候補案内（モデル未設定時）
             _blendShapeHelpBox = new HelpBox(
-                "モデルを設定するか、参照モデル付きのプロファイル SO を選択すると、BlendShape 名がドロップダウンで選択できるようになります。",
+                "モデルを設定するか、シーン上に FacialController を配置すると BlendShape スライダーが表示されます。",
                 HelpBoxMessageType.Info);
             _blendShapeHelpBox.style.marginTop = 4;
             leftPanel.Add(_blendShapeHelpBox);
 
-            // プレビュー領域（IMGUI で PreviewRenderUtility を描画）
             _previewContainer = new IMGUIContainer(OnPreviewGUI);
             _previewContainer.style.width = PreviewSize;
             _previewContainer.style.height = PreviewSize;
@@ -132,20 +126,18 @@ namespace Hidano.FacialControl.Editor.Tools
             _previewContainer.style.backgroundColor = new Color(0.15f, 0.15f, 0.15f, 1f);
             leftPanel.Add(_previewContainer);
 
-            // カメラリセットボタン
             var cameraResetButton = new Button(OnCameraReset) { text = "カメラリセット" };
             cameraResetButton.AddToClassList(FacialControlStyles.ActionButton);
             cameraResetButton.style.marginTop = 4;
             leftPanel.Add(cameraResetButton);
 
-            // リセットボタン
             var resetButton = new Button(OnResetBlendShapes) { text = "全スライダーリセット" };
             resetButton.AddToClassList(FacialControlStyles.ActionButton);
             resetButton.style.marginTop = 4;
             leftPanel.Add(resetButton);
 
             // ========================================
-            // 右パネル: Expression 設定 + BlendShape スライダー
+            // 右パネル: AnimationClip + BlendShape スライダー
             // ========================================
             var rightPanel = new VisualElement();
             rightPanel.style.flexGrow = 1;
@@ -154,38 +146,33 @@ namespace Hidano.FacialControl.Editor.Tools
             rightPanel.style.paddingTop = 4;
             mainContainer.Add(rightPanel);
 
-            // プロファイル SO 選択
-            var profileField = new ObjectField("プロファイル SO")
+            _clipField = new ObjectField("AnimationClip")
             {
-                objectType = typeof(FacialCharacterProfileSO),
-                allowSceneObjects = false
+                objectType = typeof(AnimationClip),
+                allowSceneObjects = false,
+                tooltip = "ベイク対象の AnimationClip。割り当てると現在の値がスライダーに復元される。"
             };
-            profileField.RegisterValueChangedCallback(OnProfileSOChanged);
-            rightPanel.Add(profileField);
+            _clipField.RegisterValueChangedCallback(OnClipFieldChanged);
+            rightPanel.Add(_clipField);
 
-            // Expression 名
-            _expressionNameField = new TextField("Expression 名")
+            // 遷移メタデータ foldout（OQ4: スライダーペイン下部の foldout 配置）
+            var transitionFoldout = new Foldout
             {
-                value = "New Expression"
+                text = "遷移メタデータ",
+                value = true,
             };
-            rightPanel.Add(_expressionNameField);
+            transitionFoldout.style.marginTop = 4;
+            rightPanel.Add(transitionFoldout);
 
-            // レイヤー選択
-            _layerDropdown = new DropdownField("レイヤー", new List<string> { "emotion" }, 0);
-            rightPanel.Add(_layerDropdown);
-
-            // 遷移時間
             _transitionDurationField = new FloatField("遷移時間 (秒)")
             {
-                value = 0.25f
+                value = 0.25f,
+                tooltip = "0〜1 秒（範囲外は AnimationEvent 経由で運搬される）",
             };
-            _transitionDurationField.tooltip = "0〜1 秒";
-            rightPanel.Add(_transitionDurationField);
+            transitionFoldout.Add(_transitionDurationField);
 
-            // カーブ種類
-            var curveTypes = new List<string> { "Linear", "EaseIn", "EaseOut", "EaseInOut", "Custom" };
-            _curveTypeDropdown = new DropdownField("遷移カーブ", curveTypes, 0);
-            rightPanel.Add(_curveTypeDropdown);
+            _curveTypeDropdown = new DropdownField("遷移カーブ", CurvePresetChoices, 0);
+            transitionFoldout.Add(_curveTypeDropdown);
 
             // BlendShape 検索
             _blendShapeSearchField = new TextField("BlendShape 検索");
@@ -200,7 +187,7 @@ namespace Hidano.FacialControl.Editor.Tools
             rightPanel.Add(_blendShapeListView);
 
             // ========================================
-            // 下部: 保存ボタン + ステータス
+            // 下部: ベイクボタン + ステータス
             // ========================================
             var bottomSection = new VisualElement();
             bottomSection.style.flexDirection = FlexDirection.Row;
@@ -210,18 +197,19 @@ namespace Hidano.FacialControl.Editor.Tools
             bottomSection.style.paddingTop = 4;
             bottomSection.style.justifyContent = Justify.FlexEnd;
 
-            var saveButton = new Button(OnSaveExpressionClicked) { text = "Expression を保存" };
-            saveButton.AddToClassList(FacialControlStyles.ActionButton);
-            bottomSection.Add(saveButton);
+            var bakeButton = new Button(OnBakeClicked) { text = "AnimationClip にベイク" };
+            bakeButton.AddToClassList(FacialControlStyles.ActionButton);
+            bottomSection.Add(bakeButton);
 
             root.Add(bottomSection);
 
-            // ステータスラベル
             _statusLabel = new Label();
             _statusLabel.AddToClassList(FacialControlStyles.StatusLabel);
             _statusLabel.style.paddingLeft = 4;
             _statusLabel.style.paddingBottom = 4;
             root.Add(_statusLabel);
+
+            TryAutoResolveModelFromScene();
         }
 
         // ========================================
@@ -235,13 +223,9 @@ namespace Hidano.FacialControl.Editor.Tools
             RefreshBlendShapeNameChoices();
             RebuildBlendShapeList();
             SetupPreview();
+            RestoreSliderValuesFromTargetClip();
         }
 
-        /// <summary>
-        /// 現在の <see cref="_targetObject"/> から BlendShape 名候補配列を再構築する。
-        /// <see cref="BlendShapeNameProvider"/> を経由して重複排除・ソート済みの配列を取得する。
-        /// 取得結果が空であれば BlendShape 名の選択案内 HelpBox を表示する。
-        /// </summary>
         private void RefreshBlendShapeNameChoices()
         {
             _availableBlendShapeNames = BlendShapeNameProvider.GetBlendShapeNames(_targetObject);
@@ -254,14 +238,11 @@ namespace Hidano.FacialControl.Editor.Tools
             }
         }
 
-        /// <summary>
-        /// 現在利用可能な BlendShape 名候補。モデル未設定時は空配列。
-        /// BlendShape 検索フィルタやタイポ検出の補助として参照する。
-        /// </summary>
         private string[] AvailableBlendShapeNames => _availableBlendShapeNames ?? Array.Empty<string>();
 
         /// <summary>
-        /// 対象モデルから全 SkinnedMeshRenderer の BlendShape を収集する
+        /// 対象モデル配下の全 SkinnedMeshRenderer から BlendShape を収集し、
+        /// 各エントリに Transform 階層パス（AnimationClip binding.path 用）を付与する。
         /// </summary>
         private void CollectBlendShapes()
         {
@@ -281,6 +262,9 @@ namespace Hidano.FacialControl.Editor.Tools
                 if (smr.sharedMesh == null)
                     continue;
 
+                var rendererPath = AnimationUtility.CalculateTransformPath(
+                    smr.transform, _targetObject.transform);
+
                 int count = smr.sharedMesh.blendShapeCount;
                 for (int i = 0; i < count; i++)
                 {
@@ -289,11 +273,24 @@ namespace Hidano.FacialControl.Editor.Tools
                     {
                         RendererName = smr.name,
                         RendererIndex = r,
+                        RendererPath = rendererPath ?? string.Empty,
                         BlendShapeName = shapeName,
                         BlendShapeIndex = i,
                         Value = 0f
                     });
                 }
+            }
+        }
+
+        private void TryAutoResolveModelFromScene()
+        {
+            if (_modelField == null || _targetObject != null)
+                return;
+
+            var controller = UnityEngine.Object.FindObjectOfType<FacialController>();
+            if (controller != null)
+            {
+                _modelField.value = controller.gameObject;
             }
         }
 
@@ -307,9 +304,6 @@ namespace Hidano.FacialControl.Editor.Tools
             RebuildBlendShapeList();
         }
 
-        /// <summary>
-        /// BlendShape スライダーリスト UI を再構築する
-        /// </summary>
         private void RebuildBlendShapeList()
         {
             if (_blendShapeListView == null)
@@ -336,14 +330,12 @@ namespace Hidano.FacialControl.Editor.Tools
             {
                 var entry = _blendShapeEntries[i];
 
-                // 検索フィルタ
                 if (!string.IsNullOrEmpty(_blendShapeSearchText)
                     && entry.BlendShapeName.IndexOf(_blendShapeSearchText, StringComparison.OrdinalIgnoreCase) < 0)
                 {
                     continue;
                 }
 
-                // Renderer ヘッダー
                 if (currentRenderer != entry.RendererName)
                 {
                     currentRenderer = entry.RendererName;
@@ -353,15 +345,11 @@ namespace Hidano.FacialControl.Editor.Tools
                     _blendShapeListView.Add(header);
                 }
 
-                // スライダー行
                 var row = CreateBlendShapeSliderRow(i);
                 _blendShapeListView.Add(row);
             }
         }
 
-        /// <summary>
-        /// BlendShape スライダー行を生成する
-        /// </summary>
         private VisualElement CreateBlendShapeSliderRow(int entryIndex)
         {
             var entry = _blendShapeEntries[entryIndex];
@@ -371,7 +359,6 @@ namespace Hidano.FacialControl.Editor.Tools
             row.style.alignItems = Align.Center;
             row.style.marginBottom = 1;
 
-            // BlendShape 名ラベル
             var nameLabel = new Label(entry.BlendShapeName);
             nameLabel.style.width = 160;
             nameLabel.style.minWidth = 100;
@@ -379,19 +366,16 @@ namespace Hidano.FacialControl.Editor.Tools
             nameLabel.style.unityTextAlign = TextAnchor.MiddleLeft;
             row.Add(nameLabel);
 
-            // スライダー
             var slider = new Slider(0f, 1f);
             slider.value = entry.Value;
             slider.style.flexGrow = 1;
             slider.style.minWidth = 80;
 
-            // 値フィールド
             var valueField = new FloatField();
             valueField.value = entry.Value;
             valueField.style.width = 55;
             valueField.style.marginLeft = 4;
 
-            // キャプチャ用ローカル変数
             int capturedIndex = entryIndex;
 
             slider.RegisterValueChangedCallback(evt =>
@@ -416,9 +400,6 @@ namespace Hidano.FacialControl.Editor.Tools
             return row;
         }
 
-        /// <summary>
-        /// 全 BlendShape スライダーをリセットする
-        /// </summary>
         private void OnResetBlendShapes()
         {
             for (int i = 0; i < _blendShapeEntries.Count; i++)
@@ -440,25 +421,18 @@ namespace Hidano.FacialControl.Editor.Tools
         // プレビュー
         // ========================================
 
-        /// <summary>
-        /// PreviewRenderWrapper を使ってプレビューインスタンスを作成する
-        /// </summary>
         private void SetupPreview()
         {
             _previewWrapper.Setup(_targetObject);
 
             if (_previewWrapper.IsInitialized)
             {
-                // プレビュー用 SkinnedMeshRenderer を更新
                 _skinnedMeshRenderers = _previewWrapper.PreviewInstance.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             }
 
             ApplyAllBlendShapesToPreview();
         }
 
-        /// <summary>
-        /// 特定の BlendShape 値をプレビューに反映する
-        /// </summary>
         private void ApplyBlendShapeToPreview(int entryIndex)
         {
             if (!_previewWrapper.IsInitialized || _skinnedMeshRenderers == null)
@@ -478,9 +452,6 @@ namespace Hidano.FacialControl.Editor.Tools
             _previewContainer?.MarkDirtyRepaint();
         }
 
-        /// <summary>
-        /// 全 BlendShape 値をプレビューに反映する
-        /// </summary>
         private void ApplyAllBlendShapesToPreview()
         {
             if (!_previewWrapper.IsInitialized || _skinnedMeshRenderers == null)
@@ -502,9 +473,6 @@ namespace Hidano.FacialControl.Editor.Tools
             _previewContainer?.MarkDirtyRepaint();
         }
 
-        /// <summary>
-        /// IMGUI ベースのプレビュー描画
-        /// </summary>
         private void OnPreviewGUI()
         {
             if (!_previewWrapper.IsInitialized)
@@ -532,237 +500,102 @@ namespace Hidano.FacialControl.Editor.Tools
         }
 
         // ========================================
-        // プロファイル管理
+        // AnimationClip ロード
         // ========================================
 
-        private void OnProfileSOChanged(ChangeEvent<UnityEngine.Object> evt)
+        private void OnClipFieldChanged(ChangeEvent<UnityEngine.Object> evt)
         {
-            _profileSO = evt.newValue as FacialCharacterProfileSO;
-            LoadProfile();
-            TryAutoResolveReferenceModel();
+            _targetClip = evt.newValue as AnimationClip;
+            RestoreSliderValuesFromTargetClip();
         }
 
         /// <summary>
-        /// モデル未選択時に、参照モデルを自動解決してモデルフィールドへ反映する。
-        /// 優先順位:
-        /// 1. 選択中 FacialProfileSO の ReferenceModel
-        /// 2. シーン上の FacialController の GameObject
-        /// どちらも取得できない場合は何もしない（ユーザーが手動で選ぶ既存動線を維持）。
+        /// 現在の <see cref="_targetClip"/> から <see cref="IExpressionAnimationClipSampler"/> 経由で
+        /// BlendShape 値および TransitionDuration / TransitionCurvePreset メタデータを取得し、
+        /// スライダーと遷移メタ UI を復元する。clip 未設定時は何もしない。
         /// </summary>
-        private void TryAutoResolveReferenceModel()
+        private void RestoreSliderValuesFromTargetClip()
         {
-            if (_modelField == null)
+            if (_targetClip == null || _sampler == null || _blendShapeEntries.Count == 0)
                 return;
-
-            // 既にユーザーがモデルを手動で設定している場合は上書きしない
-            if (_targetObject != null)
-                return;
-
-            GameObject resolved = null;
-
-#if UNITY_EDITOR
-            if (_profileSO != null && _profileSO.ReferenceModel != null)
-            {
-                resolved = _profileSO.ReferenceModel;
-            }
-#endif
-
-            if (resolved == null)
-            {
-                var controller = UnityEngine.Object.FindObjectOfType<FacialController>();
-                if (controller != null)
-                {
-                    resolved = controller.gameObject;
-                }
-            }
-
-            if (resolved != null)
-            {
-                // ChangeEvent<Object> を通して OnModelChanged が呼ばれ、BlendShape 収集が行われる
-                _modelField.value = resolved;
-            }
-        }
-
-        /// <summary>
-        /// プロファイルを JSON から読み込む。新統合 SO の規約パス
-        /// (<c>StreamingAssets/FacialControl/{SO 名}/profile.json</c>) を解決する。
-        /// </summary>
-        private void LoadProfile()
-        {
-            if (_profileSO == null)
-            {
-                _currentProfile = default;
-                _currentJsonPath = null;
-                UpdateLayerDropdown();
-                return;
-            }
-
-            var fullPath = FacialCharacterProfileSO.GetStreamingAssetsProfilePath(_profileSO.CharacterAssetName);
-            if (string.IsNullOrEmpty(fullPath))
-            {
-                ShowStatus("SO のアセット名が解決できません。", isError: true);
-                _currentProfile = default;
-                _currentJsonPath = null;
-                UpdateLayerDropdown();
-                return;
-            }
-
-            if (!File.Exists(fullPath))
-            {
-                // JSON が未生成 (Inspector データのみ) の場合は SO のフォールバック構築値で初期化する。
-                try
-                {
-                    _currentProfile = _profileSO.BuildFallbackProfile();
-                    _currentJsonPath = fullPath;
-                    UpdateLayerDropdown();
-                    ShowStatus($"SO のフォールバックデータを使用します (JSON 未生成)。", isError: false);
-                }
-                catch (Exception ex)
-                {
-                    ShowStatus($"フォールバック構築エラー: {ex.Message}", isError: true);
-                    _currentProfile = default;
-                    _currentJsonPath = null;
-                    UpdateLayerDropdown();
-                }
-                return;
-            }
 
             try
             {
-                var json = File.ReadAllText(fullPath, System.Text.Encoding.UTF8);
-                _currentProfile = _parser.ParseProfile(json);
-                _currentJsonPath = fullPath;
-                UpdateLayerDropdown();
-                ShowStatus($"プロファイルを読み込みました。", isError: false);
+                var values = ExpressionClipBakery.LoadBlendShapeValues(_targetClip, _sampler);
+                for (int i = 0; i < _blendShapeEntries.Count; i++)
+                {
+                    var entry = _blendShapeEntries[i];
+                    var key = (entry.RendererPath ?? string.Empty, entry.BlendShapeName ?? string.Empty);
+                    entry.Value = values.TryGetValue(key, out var value) ? Mathf.Clamp01(value) : 0f;
+                }
+
+                var summary = _sampler.SampleSummary(_targetClip);
+                if (_transitionDurationField != null)
+                {
+                    _transitionDurationField.value = summary.TransitionDuration;
+                }
+                if (_curveTypeDropdown != null)
+                {
+                    var curveName = summary.TransitionCurve.ToString();
+                    var idx = CurvePresetChoices.IndexOf(curveName);
+                    _curveTypeDropdown.index = idx >= 0 ? idx : 0;
+                }
+
+                RebuildBlendShapeList();
+                ApplyAllBlendShapesToPreview();
+                ShowStatus($"AnimationClip を読み込みました: {_targetClip.name}", isError: false);
             }
             catch (Exception ex)
             {
-                ShowStatus($"読み込みエラー: {ex.Message}", isError: true);
-                Debug.LogError($"[ExpressionCreatorWindow] JSON 読み込みエラー: {ex}");
-                _currentProfile = default;
-                _currentJsonPath = null;
-                UpdateLayerDropdown();
+                ShowStatus($"AnimationClip 読み込みエラー: {ex.Message}", isError: true);
+                Debug.LogError($"[ExpressionCreatorWindow] AnimationClip 読み込みエラー: {ex}");
             }
         }
 
-        /// <summary>
-        /// プロファイルのレイヤー情報でドロップダウンを更新する
-        /// </summary>
-        private void UpdateLayerDropdown()
-        {
-            if (_layerDropdown == null)
-                return;
-
-            var layerNames = new List<string>();
-
-            if (!string.IsNullOrEmpty(_currentJsonPath))
-            {
-                var layerSpan = _currentProfile.Layers.Span;
-                for (int i = 0; i < layerSpan.Length; i++)
-                    layerNames.Add(layerSpan[i].Name);
-            }
-
-            if (layerNames.Count == 0)
-                layerNames.Add("emotion");
-
-            _layerDropdown.choices = layerNames;
-            _layerDropdown.index = 0;
-        }
-
         // ========================================
-        // 保存
+        // ベイク
         // ========================================
 
-        /// <summary>
-        /// 現在のスライダー値から Expression を作成してプロファイルに保存する
-        /// </summary>
-        private void OnSaveExpressionClicked()
+        private void OnBakeClicked()
         {
-            // バリデーション
-            var name = _expressionNameField?.value;
-            if (string.IsNullOrWhiteSpace(name))
+            if (_targetClip == null)
             {
-                ShowStatus("Expression 名を入力してください。", isError: true);
+                ShowStatus("ベイク対象の AnimationClip を割り当ててください。", isError: true);
                 return;
             }
 
-            if (string.IsNullOrEmpty(_currentJsonPath) || _profileSO == null)
+            if (_blendShapeEntries.Count == 0)
             {
-                ShowStatus("プロファイル SO を選択してください。", isError: true);
+                ShowStatus("BlendShape を持つモデルを選択してください。", isError: true);
                 return;
             }
 
-            var layer = _layerDropdown?.value;
-            if (string.IsNullOrWhiteSpace(layer))
-            {
-                ShowStatus("レイヤーを選択してください。", isError: true);
-                return;
-            }
-
-            // BlendShape 値を収集（値が 0 以外のもの）
-            var mappings = new List<BlendShapeMapping>();
+            var entries = new List<ExpressionClipBakery.BlendShapeBakeEntry>(_blendShapeEntries.Count);
             for (int i = 0; i < _blendShapeEntries.Count; i++)
             {
-                var entry = _blendShapeEntries[i];
-                if (entry.Value > 0f)
+                var e = _blendShapeEntries[i];
+                if (e.Value > 0f)
                 {
-                    mappings.Add(new BlendShapeMapping(
-                        entry.BlendShapeName,
-                        entry.Value,
-                        entry.RendererName));
+                    entries.Add(new ExpressionClipBakery.BlendShapeBakeEntry(
+                        e.RendererPath, e.BlendShapeName, e.Value));
                 }
             }
 
-            // 遷移カーブの作成
-            var curveType = ParseCurveType(_curveTypeDropdown?.value ?? "Linear");
-            var transitionCurve = new TransitionCurve(curveType);
+            var transitionDuration = _transitionDurationField?.value ?? 0.25f;
+            var transitionCurvePreset = ParseCurvePreset(_curveTypeDropdown?.value);
 
-            // Expression 生成
-            var expression = new Expression(
-                id: Guid.NewGuid().ToString(),
-                name: name,
-                layer: layer,
-                transitionDuration: _transitionDurationField?.value ?? 0.25f,
-                transitionCurve: transitionCurve,
-                blendShapeValues: mappings.ToArray());
-
-            // プロファイルに追加
-            var expressions = new List<Expression>();
-            var exprSpan = _currentProfile.Expressions.Span;
-            for (int i = 0; i < exprSpan.Length; i++)
-                expressions.Add(exprSpan[i]);
-            expressions.Add(expression);
-
-            var layers = ToArray(_currentProfile.Layers);
-
-            Undo.RecordObject(_profileSO, "Expression 作成");
-
-            _currentProfile = new FacialProfile(
-                _currentProfile.SchemaVersion,
-                layers,
-                expressions.ToArray(),
-                ToArray(_currentProfile.RendererPaths));
-
-            // JSON 保存。新統合 SO は OnEnable / Inspector 表示時に JSON を読み込み返す設計のため、
-            // ここでは JSON 上書き + SO の Dirty 化に留める (mapper 経路は不要)。
             try
             {
-                var dir = Path.GetDirectoryName(_currentJsonPath);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                {
-                    Directory.CreateDirectory(dir);
-                }
-
-                var json = _parser.SerializeProfile(_currentProfile);
-                File.WriteAllText(_currentJsonPath, json, System.Text.Encoding.UTF8);
-                EditorUtility.SetDirty(_profileSO);
-                AssetDatabase.Refresh();
-                ShowStatus($"Expression を保存しました: {name}", isError: false);
+                Undo.RecordObject(_targetClip, "Expression ベイク");
+                ExpressionClipBakery.Bake(_targetClip, entries, transitionDuration, transitionCurvePreset);
+                EditorUtility.SetDirty(_targetClip);
+                AssetDatabase.SaveAssetIfDirty(_targetClip);
+                ShowStatus($"AnimationClip にベイクしました: {_targetClip.name}", isError: false);
             }
             catch (Exception ex)
             {
-                ShowStatus($"保存エラー: {ex.Message}", isError: true);
-                Debug.LogError($"[ExpressionCreatorWindow] 保存エラー: {ex}");
+                ShowStatus($"ベイクエラー: {ex.Message}", isError: true);
+                Debug.LogError($"[ExpressionCreatorWindow] ベイクエラー: {ex}");
             }
         }
 
@@ -786,34 +619,22 @@ namespace Hidano.FacialControl.Editor.Tools
             _statusLabel.style.display = DisplayStyle.Flex;
         }
 
-        private static TransitionCurveType ParseCurveType(string value)
+        private static TransitionCurvePreset ParseCurvePreset(string value)
         {
             return value switch
             {
-                "EaseIn" => TransitionCurveType.EaseIn,
-                "EaseOut" => TransitionCurveType.EaseOut,
-                "EaseInOut" => TransitionCurveType.EaseInOut,
-                "Custom" => TransitionCurveType.Custom,
-                _ => TransitionCurveType.Linear
+                nameof(TransitionCurvePreset.EaseIn) => TransitionCurvePreset.EaseIn,
+                nameof(TransitionCurvePreset.EaseOut) => TransitionCurvePreset.EaseOut,
+                nameof(TransitionCurvePreset.EaseInOut) => TransitionCurvePreset.EaseInOut,
+                _ => TransitionCurvePreset.Linear,
             };
         }
 
-        private static T[] ToArray<T>(ReadOnlyMemory<T> memory)
-        {
-            var span = memory.Span;
-            var result = new T[span.Length];
-            for (int i = 0; i < span.Length; i++)
-                result[i] = span[i];
-            return result;
-        }
-
-        /// <summary>
-        /// BlendShape エントリ。スライダーの状態を保持する。
-        /// </summary>
         private class BlendShapeEntry
         {
             public string RendererName;
             public int RendererIndex;
+            public string RendererPath;
             public string BlendShapeName;
             public int BlendShapeIndex;
             public float Value;

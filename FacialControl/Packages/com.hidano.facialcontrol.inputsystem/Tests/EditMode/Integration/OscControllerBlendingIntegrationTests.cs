@@ -34,7 +34,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
     /// </list>
     /// </para>
     /// <para>
-    /// 本テストは <see cref="ControllerExpressionInputSource"/> と
+    /// 本テストは <see cref="ExpressionTriggerInputSource"/> と
     /// <see cref="OscInputSource"/> の実装を直接使い、モックは <see cref="OscDoubleBuffer"/>
     /// の書込側と <see cref="ManualTimeProvider"/> (時刻決定論化) のみを用いる。
     /// 集約経路は <see cref="LayerInputSourceAggregator.AggregateAndBlend"/> を通すことで
@@ -82,13 +82,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
 
         /// <summary>
         /// 本テストフィクスチャ共通の構成: 1 レイヤーに controller-expr (sourceIdx 0) と
-        /// osc (sourceIdx 1) を登録し、<see cref="ControllerExpressionInputSource"/> で
+        /// osc (sourceIdx 1) を登録し、<see cref="ExpressionTriggerInputSource"/> で
         /// smile をトリガー + <see cref="OscDoubleBuffer"/> に mouth_open=1.0 を書込む。
         /// </summary>
         private sealed class Harness : IDisposable
         {
             public readonly FacialProfile Profile;
-            public readonly ControllerExpressionInputSource Controller;
+            public readonly ExpressionTriggerInputSource Controller;
             public readonly OscDoubleBuffer OscBuffer;
             public readonly OscInputSource Osc;
             public readonly ManualTimeProvider Time;
@@ -99,7 +99,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
             public Harness()
             {
                 Profile = BuildSingleLayerProfile();
-                Controller = new ControllerExpressionInputSource(
+                Controller = new ExpressionTriggerInputSource(
+                    id: InputSourceId.Parse(ExpressionTriggerInputSource.ControllerReservedId),
                     blendShapeCount: BlendShapeCount,
                     maxStackDepth: 4,
                     exclusionMode: ExclusionMode.LastWins,

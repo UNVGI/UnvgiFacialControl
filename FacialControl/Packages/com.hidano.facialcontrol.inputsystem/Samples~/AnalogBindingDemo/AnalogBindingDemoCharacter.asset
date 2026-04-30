@@ -25,82 +25,22 @@ MonoBehaviour:
   _rendererPaths: []
   _bonePoses: []
   _referenceModel: {fileID: 0}
-  _inputActionAsset: {fileID: 0}
+  _inputActionAsset: {fileID: -944628639613478452, guid: 7d3a9c1b5e2f48a3b6c1d4e8f2a7b3c5, type: 3}
   _actionMapName: Analog
   _expressionBindings: []
   _analogBindings:
-  - sourceId: right_stick
-    sourceAxis: 0
-    targetKind: 1
+  - inputActionRef: aaaa1111-bbbb-2222-cccc-3333dddd4444
     targetIdentifier: LeftEye
     targetAxis: 1
-    mapping:
-      deadZone: 0.05
-      scale: 30
-      offset: 0
-      curve:
-        type: 0
-        keys: []
-      invert: 0
-      min: -45
-      max: 45
-  - sourceId: right_stick
-    sourceAxis: 1
-    targetKind: 1
+  - inputActionRef: aaaa1111-bbbb-2222-cccc-3333dddd5555
     targetIdentifier: LeftEye
     targetAxis: 0
-    mapping:
-      deadZone: 0.05
-      scale: 30
-      offset: 0
-      curve:
-        type: 0
-        keys: []
-      invert: 1
-      min: -30
-      max: 30
-  - sourceId: right_stick
-    sourceAxis: 0
-    targetKind: 1
+  - inputActionRef: aaaa1111-bbbb-2222-cccc-3333dddd4444
     targetIdentifier: RightEye
     targetAxis: 1
-    mapping:
-      deadZone: 0.05
-      scale: 30
-      offset: 0
-      curve:
-        type: 0
-        keys: []
-      invert: 0
-      min: -45
-      max: 45
-  - sourceId: right_stick
-    sourceAxis: 1
-    targetKind: 1
+  - inputActionRef: aaaa1111-bbbb-2222-cccc-3333dddd5555
     targetIdentifier: RightEye
     targetAxis: 0
-    mapping:
-      deadZone: 0.05
-      scale: 30
-      offset: 0
-      curve:
-        type: 0
-        keys: []
-      invert: 1
-      min: -30
-      max: 30
-  - sourceId: arkit_jaw_open
-    sourceAxis: 0
-    targetKind: 0
+  - inputActionRef: aaaa1111-bbbb-2222-cccc-3333dddd6666
     targetIdentifier: jawOpen
     targetAxis: 0
-    mapping:
-      deadZone: 0
-      scale: 100
-      offset: 0
-      curve:
-        type: 0
-        keys: []
-      invert: 0
-      min: 0
-      max: 100

@@ -19,11 +19,12 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
     /// <remarks>
     /// <para>
     /// 旧 <c>FacialInputBinder</c> の責務を <c>FacialCharacterSO</c> 経由で結線するパターンに対し、
-    /// 以下を End-to-End で検証する。
+    /// 以下を End-to-End で検証する。device 種別 (Keyboard / Controller) は adapter 側で
+    /// InputAction.bindings から自動推定される (tasks.md 4.6)。
     /// <list type="bullet">
-    ///   <item>Controller カテゴリの Press → Expression Activate</item>
-    ///   <item>Keyboard カテゴリの Press → Expression Activate</item>
-    ///   <item>Controller / Keyboard 両カテゴリ混在時の独立駆動</item>
+    ///   <item>Gamepad 由来 Action の Press → Expression Activate</item>
+    ///   <item>Keyboard 由来 Action の Press → Expression Activate</item>
+    ///   <item>Gamepad / Keyboard 両 device の混在時の独立駆動</item>
     ///   <item>OnDisable 後はバインディングが解除されること</item>
     ///   <item>SO に analog binding が存在する場合 InputSourceFactory に
     ///         <c>analog-blendshape</c> 予約 ID が登録され、Aggregator スナップショットに現れること</item>
@@ -83,7 +84,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             _actionAsset = CreateActionAsset(new[] { ("ControllerTrigger", "<Gamepad>/buttonSouth") });
             _characterSO = CreateCharacterSO(_actionAsset, new[]
             {
-                ("ControllerTrigger", "expr-001", InputSourceCategory.Controller),
+                ("ControllerTrigger", "expr-001"),
             });
 
             BuildRig(profile, _characterSO, out var controller, out _);
@@ -109,7 +110,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             _actionAsset = CreateActionAsset(new[] { ("KeyboardTrigger", "<Keyboard>/1") });
             _characterSO = CreateCharacterSO(_actionAsset, new[]
             {
-                ("KeyboardTrigger", "expr-001", InputSourceCategory.Keyboard),
+                ("KeyboardTrigger", "expr-001"),
             });
 
             BuildRig(profile, _characterSO, out var controller, out _);
@@ -139,8 +140,8 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             });
             _characterSO = CreateCharacterSO(_actionAsset, new[]
             {
-                ("ControllerTrigger", "expr-001", InputSourceCategory.Controller),
-                ("KeyboardTrigger", "expr-002", InputSourceCategory.Keyboard),
+                ("ControllerTrigger", "expr-001"),
+                ("KeyboardTrigger", "expr-002"),
             });
 
             BuildRig(profile, _characterSO, out var controller, out _);
@@ -177,7 +178,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             _actionAsset = CreateActionAsset(new[] { ("KeyboardTrigger", "<Keyboard>/1") });
             _characterSO = CreateCharacterSO(_actionAsset, new[]
             {
-                ("KeyboardTrigger", "expr-001", InputSourceCategory.Keyboard),
+                ("KeyboardTrigger", "expr-001"),
             });
 
             BuildRig(profile, _characterSO, out var controller, out var extension);
@@ -371,7 +372,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
         /// </summary>
         private static FacialCharacterSO CreateCharacterSO(
             InputActionAsset actionAsset,
-            (string actionName, string expressionId, InputSourceCategory category)[] entries)
+            (string actionName, string expressionId)[] entries)
         {
             var so = ScriptableObject.CreateInstance<FacialCharacterSO>();
             so.InputActionAsset = actionAsset;
@@ -380,12 +381,11 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             so.ExpressionBindings.Clear();
             for (int i = 0; i < entries.Length; i++)
             {
-                var (actionName, expressionId, category) = entries[i];
+                var (actionName, expressionId) = entries[i];
                 so.ExpressionBindings.Add(new ExpressionBindingEntry
                 {
                     actionName = actionName,
                     expressionId = expressionId,
-                    category = category,
                 });
             }
             return so;

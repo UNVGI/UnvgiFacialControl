@@ -65,12 +65,13 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
                 AnalogBindingEntry entry;
                 try
                 {
-                    // Phase 3.5: Mapping field を撤去（dead-zone / scale / offset / curve / invert / clamp の値変換は
-                    // Adapters 側 InputProcessor 経路で扱う。Decision 4 / Req 13.3）。
+                    // Phase 4.7: AnalogBindingEntrySerializable は 3 フィールドに簡素化済（Req 6.2）。
+                    // sourceId は inputActionRef を継承し、sourceAxis は scalar=0 既定、
+                    // targetKind は BlendShape 既定とする（BonePose は今後 InputProcessor 経由で扱う）。
                     entry = new AnalogBindingEntry(
-                        src.sourceId ?? string.Empty,
-                        src.sourceAxis,
-                        src.targetKind,
+                        src.inputActionRef ?? string.Empty,
+                        0,
+                        AnalogBindingTargetKind.BlendShape,
                         src.targetIdentifier,
                         src.targetAxis);
                 }
