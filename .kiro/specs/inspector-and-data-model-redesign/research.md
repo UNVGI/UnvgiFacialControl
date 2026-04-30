@@ -110,6 +110,15 @@
   - **採用**: 案 A（`GetCurveBindings + GetEditorCurve + Evaluate(0f)` 経路）を主として採用。GameObject 依存を排除。
   - **補助**: ExpressionCreatorWindow はライブプレビュー用に referenceModel 上で `SampleAnimation` を呼ぶが、これは Inspector 保存経路とは独立。
   - 0-alloc 影響なし（Editor 専用処理のため）。
+- **Performance Benchmark（Phase 2.4）**:
+  - 計測対象: `AnimationClipExpressionSampler.SampleSnapshot` / `SampleSummary`
+  - クリップ構成: 10 BlendShape カーブ + 1 ボーン × 9 軸（Position/Euler/Scale 各 X/Y/Z）= 19 binding
+  - 計測条件: ウォームアップ 3 回 + 計測 30 回、`System.Diagnostics.Stopwatch` 平均
+  - 結果（Windows 11 / Unity 6000.3.2f1, EditMode）:
+    - `SampleSnapshot`: avg ≈ 0.04ms（min 0.030ms / max 0.068ms）
+    - `SampleSummary`: avg ≈ 0.011ms
+  - 50ms 予算（Req 11.2 / 9.4）に対して 1000 倍以上の余裕。OQ5（0-alloc 制約緩和度合い）は緩和不要と判断。
+  - テスト: `Tests/EditMode/Editor/Sampling/AnimationClipExpressionSamplerBenchmarkTests.cs`
 
 ### Topic 6: Inspector MaskField for LayerOverrideMask（Req 3.3）
 

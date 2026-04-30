@@ -4,6 +4,9 @@ using UnityEngine;
 using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Domain.Models;
 
+// schema v1.0 用の Obsolete DTO を意図的にテストするため、CS0618 警告を抑制する。
+// 物理削除は Phase 3.6（タスク 3.6 / 3.3）で行われる。
+#pragma warning disable 618
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 {
     /// <summary>

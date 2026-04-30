@@ -6,6 +6,9 @@ using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 
+// schema v1.0 専用の Obsolete DTO（BonePoseDto / BonePoseEntryDto）を bridge 期間として
+// 引き続き使用するため、CS0618 警告を抑制する。Phase 3.6（タスク 3.6）で v1.0 経路ごと物理削除予定。
+#pragma warning disable 618
 namespace Hidano.FacialControl.Adapters.Json
 {
     /// <summary>
@@ -16,6 +19,12 @@ namespace Hidano.FacialControl.Adapters.Json
     public sealed class SystemTextJsonParser : IJsonParser
     {
         private const string SupportedSchemaVersion = "1.0";
+
+        /// <summary>
+        /// 中間 JSON Schema v2.0（タスク 2.3）の strict version 文字列。
+        /// <see cref="ParseProfileSnapshotV2(string)"/> はこの値以外を <see cref="InvalidOperationException"/> で拒否する（Req 10.1）。
+        /// </summary>
+        public const string SchemaVersionV2 = "2.0";
 
         /// <inheritdoc/>
         public FacialProfile ParseProfile(string json)
@@ -41,6 +50,111 @@ namespace Hidano.FacialControl.Adapters.Json
         {
             var dto = ParseProfileDto(json);
             return ExtractInputSources(dto);
+        }
+
+        /// <summary>
+        /// 中間 JSON Schema v2.0（タスク 2.3）の専用パース経路。
+        /// <c>schemaVersion</c> が <see cref="SchemaVersionV2"/>（<c>"2.0"</c>）以外の場合は
+        /// <see cref="Debug.LogError(object)"/> で報告した上で <see cref="InvalidOperationException"/> を投げる（Req 10.1）。
+        /// <para>
+        /// 欠落 / null の <see cref="ProfileSnapshotDto.expressions"/> エントリ内 snapshot は
+        /// 既定値（<see cref="ExpressionSnapshotDto.transitionDuration"/> = 0.25,
+        /// <see cref="ExpressionSnapshotDto.transitionCurvePreset"/> = "Linear", 各配列空）に正規化する。
+        /// </para>
+        /// <para>
+        /// 本メソッドは v2.0 schema を Domain <see cref="FacialProfile"/> へ変換する責務までは持たない。
+        /// snapshot DTO 形式での round-trip 確立のみを行う（Domain 変換は Phase 3.6 / タスク 3.6 で実装される）。
+        /// </para>
+        /// </summary>
+        /// <param name="json">v2.0 schema 準拠のプロファイル JSON 文字列</param>
+        /// <returns>正規化済み <see cref="ProfileSnapshotDto"/></returns>
+        /// <exception cref="ArgumentNullException">json が null</exception>
+        /// <exception cref="ArgumentException">json が空 / 全空白</exception>
+        /// <exception cref="InvalidOperationException">
+        /// schemaVersion が欠落、またはサポート対象 v2.0 と一致しない場合（Req 10.1）。
+        /// </exception>
+        /// <exception cref="FormatException">JSON 自体のパースに失敗した場合</exception>
+        public ProfileSnapshotDto ParseProfileSnapshotV2(string json)
+        {
+            if (json == null)
+                throw new ArgumentNullException(nameof(json));
+            if (string.IsNullOrWhiteSpace(json))
+                throw new ArgumentException("JSON 文字列を空にすることはできません。", nameof(json));
+
+            ProfileSnapshotDto dto;
+            try
+            {
+                dto = JsonUtility.FromJson<ProfileSnapshotDto>(json);
+            }
+            catch (Exception ex)
+            {
+                throw new FormatException("プロファイル JSON (v2.0) のパースに失敗しました。", ex);
+            }
+
+            if (dto == null)
+                throw new FormatException("プロファイル JSON (v2.0) のパースに失敗しました。結果が null です。");
+
+            if (string.IsNullOrEmpty(dto.schemaVersion) || dto.schemaVersion != SchemaVersionV2)
+            {
+                var actual = string.IsNullOrEmpty(dto.schemaVersion) ? "<missing>" : dto.schemaVersion;
+                Debug.LogError(
+                    $"SystemTextJsonParser: 中間 JSON schema v2.0 の strict チェックに失敗しました。" +
+                    $"期待値 '{SchemaVersionV2}'、実際 '{actual}'。Req 10.1 により旧 schema は拒否されます。");
+                throw new InvalidOperationException(
+                    $"サポートされていないスキーマバージョンです: '{actual}' (期待値 '{SchemaVersionV2}')。");
+            }
+
+            NormalizeProfileSnapshotDto(dto);
+            return dto;
+        }
+
+        /// <summary>
+        /// <see cref="ParseProfileSnapshotV2(string)"/> の後処理: null collection を空 collection に、
+        /// 欠落 snapshot を既定値の <see cref="ExpressionSnapshotDto"/> に正規化する。
+        /// </summary>
+        private static void NormalizeProfileSnapshotDto(ProfileSnapshotDto dto)
+        {
+            if (dto.layers == null)
+                dto.layers = new List<LayerDefinitionDto>();
+            if (dto.expressions == null)
+            {
+                // private inner ExpressionDto と Dto.ExpressionDto の名前衝突を避けるため fully qualified を使う。
+                dto.expressions = new List<Hidano.FacialControl.Adapters.Json.Dto.ExpressionDto>();
+            }
+            if (dto.rendererPaths == null)
+                dto.rendererPaths = new List<string>();
+
+            for (int i = 0; i < dto.expressions.Count; i++)
+            {
+                var expr = dto.expressions[i];
+                if (expr == null)
+                    continue;
+
+                if (expr.layerOverrideMask == null)
+                    expr.layerOverrideMask = new List<string>();
+
+                if (expr.snapshot == null)
+                {
+                    expr.snapshot = new ExpressionSnapshotDto
+                    {
+                        transitionDuration = 0.25f,
+                        transitionCurvePreset = "Linear",
+                        blendShapes = new List<BlendShapeSnapshotDto>(),
+                        bones = new List<BoneSnapshotDto>(),
+                        rendererPaths = new List<string>(),
+                    };
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(expr.snapshot.transitionCurvePreset))
+                    expr.snapshot.transitionCurvePreset = "Linear";
+                if (expr.snapshot.blendShapes == null)
+                    expr.snapshot.blendShapes = new List<BlendShapeSnapshotDto>();
+                if (expr.snapshot.bones == null)
+                    expr.snapshot.bones = new List<BoneSnapshotDto>();
+                if (expr.snapshot.rendererPaths == null)
+                    expr.snapshot.rendererPaths = new List<string>();
+            }
         }
 
         private static ProfileDto ParseProfileDto(string json)
