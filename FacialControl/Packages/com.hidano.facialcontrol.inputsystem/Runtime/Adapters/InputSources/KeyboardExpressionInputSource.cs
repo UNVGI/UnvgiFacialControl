@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
+using Hidano.FacialControl.InputSystem.Adapters.ScriptableObject;
 
 namespace Hidano.FacialControl.Adapters.InputSources
 {

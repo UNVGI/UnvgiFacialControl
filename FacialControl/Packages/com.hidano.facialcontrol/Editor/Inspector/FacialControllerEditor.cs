@@ -3,21 +3,21 @@ using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Hidano.FacialControl.Adapters.Playable;
-using Hidano.FacialControl.Adapters.ScriptableObject;
+using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Editor.Common;
 
 namespace Hidano.FacialControl.Editor.Inspector
 {
     /// <summary>
     /// FacialController のカスタム Inspector。
-    /// UI Toolkit で実装し、プロファイル参照、SkinnedMeshRenderer リスト、
+    /// UI Toolkit で実装し、統合 SO 参照、SkinnedMeshRenderer リスト、
     /// プロファイル概要を表示する。OSC 設定はサブパッケージ
     /// <c>com.hidano.facialcontrol.osc</c> の専用 MonoBehaviour 側に移管されている。
     /// </summary>
     [CustomEditor(typeof(FacialController))]
     public class FacialControllerEditor : UnityEditor.Editor
     {
-        private const string ProfileSectionLabel = "プロファイル";
+        private const string ProfileSectionLabel = "キャラクター SO";
         private const string RenderersSectionLabel = "SkinnedMeshRenderer";
         private const string ProfileInfoSectionLabel = "プロファイル情報";
 
@@ -34,10 +34,10 @@ namespace Hidano.FacialControl.Editor.Inspector
                 root.styleSheets.Add(styleSheet);
 
             // ========================================
-            // プロファイルセクション
+            // 統合 SO セクション
             // ========================================
             var profileFoldout = new Foldout { text = ProfileSectionLabel, value = true };
-            var profileField = new PropertyField(serializedObject.FindProperty("_profileSO"));
+            var profileField = new PropertyField(serializedObject.FindProperty("_characterSO"));
             profileField.RegisterValueChangeCallback(_ => UpdateProfileInfo());
             profileFoldout.Add(profileField);
             root.Add(profileFoldout);
@@ -77,7 +77,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         }
 
         /// <summary>
-        /// ProfileSO から概要情報を読み取って表示を更新する
+        /// CharacterSO から概要情報を読み取って表示を更新する。
         /// </summary>
         private void UpdateProfileInfo()
         {
@@ -85,14 +85,14 @@ namespace Hidano.FacialControl.Editor.Inspector
             if (controller == null)
                 return;
 
-            var profileSO = controller.ProfileSO;
-            if (profileSO != null)
+            var so = controller.CharacterSO;
+            if (so != null)
             {
-                string version = !string.IsNullOrEmpty(profileSO.SchemaVersion)
-                    ? profileSO.SchemaVersion
+                string version = !string.IsNullOrEmpty(so.SchemaVersion)
+                    ? so.SchemaVersion
                     : "---";
-                int layers = profileSO.LayerCount;
-                int expressions = profileSO.ExpressionCount;
+                int layers = so.Layers != null ? so.Layers.Count : 0;
+                int expressions = so.Expressions != null ? so.Expressions.Count : 0;
 
                 if (_schemaVersionLabel != null)
                     _schemaVersionLabel.text = $"スキーマバージョン: {version}";

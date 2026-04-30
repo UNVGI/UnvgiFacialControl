@@ -1,4 +1,6 @@
-# JSON スキーマリファレンス
+# JSON スキーマリファレンス (上級者向け)
+
+> **このドキュメントを読む必要があるのは「ビルド後にコンテンツを JSON で差し替えたい」「外部ツールから FacialControl 用プロファイルを生成したい」場合のみです**。通常の運用では `FacialCharacterSO` の Inspector セクションだけで設定が完結し、JSON は Editor が `StreamingAssets/FacialControl/{SO 名}/profile.json` に自動エクスポートします。ユーザーがパスを書いたり中身を編集したりする必要はありません ([quickstart.md](quickstart.md) 参照)。
 
 FacialControl で使用する JSON ファイルのスキーマ定義です。
 

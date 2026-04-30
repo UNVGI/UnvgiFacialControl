@@ -4,13 +4,13 @@
 
 ## 概要
 
-このパッケージは FacialControl コアに InputSystem 経由のキーボード／コントローラ入力機能を追加します。
+このパッケージは FacialControl コアに **InputActionAsset 1 個 + キャラクター SO 1 個** で完結する入力結線を提供します。長文の README を読ませず、SO Inspector の Foldout セクションだけで設定が完結する UX を目指しています。
 
-- **ControllerExpressionInputSource**: 予約 id `controller-expr`。コントローラ入力で Expression をトリガーする `IInputSource` 実装
-- **KeyboardExpressionInputSource**: 予約 id `keyboard-expr`。キーボード入力で Expression をトリガーする `IInputSource` 実装
-- **InputBindingProfileSO**: `InputAction` 名と Expression ID のバインディングを ScriptableObject として永続化
-- **FacialInputBinder**: `InputBindingProfileSO` を読み込み、`InputSystemAdapter` 経由で `FacialController` を駆動する MonoBehaviour
-- **InputFacialControllerExtension**: `FacialController` と同じ GameObject に配置するだけで Controller / Keyboard 入力源を登録する MonoBehaviour
+- **FacialCharacterSO**: キャラクター単位の統合 ScriptableObject。InputActionAsset / キーバインディング (Action ↔ Expression) / アナログバインディング (連続値 → BlendShape / BonePose) / レイヤー / Expression / BonePose を 1 アセットに集約
+- **FacialCharacterInputExtension**: `IFacialControllerExtension` 実装の MonoBehaviour。`FacialController` と同じ GameObject に配置すると SO の入力結線とアナログ入力源登録を自動実施
+- **ControllerExpressionInputSource** (予約 id `controller-expr`) / **KeyboardExpressionInputSource** (予約 id `keyboard-expr`): Expression をトリガーする `IInputSource` 実装
+- **InputFacialControllerExtension**: コア機能のトリガー入力源 (controller-expr / keyboard-expr) を `InputSourceFactory.RegisterReserved` 経由で登録する MonoBehaviour
+- **JSON 自動エクスポート (Editor 専用)**: SO 保存時に `StreamingAssets/FacialControl/{SO 名}/profile.json` および `analog_bindings.json` を AssetModificationProcessor 経由で自動更新
 
 ## 依存パッケージ
 
@@ -22,19 +22,24 @@
 ## 使い方
 
 1. `com.hidano.facialcontrol` と本パッケージを `Packages/manifest.json` に追加
-2. キャラクターの GameObject に `FacialController` を追加
-3. 同 GameObject に **Input Facial Extension** (`InputFacialControllerExtension`) を追加
-4. キーバインドを Inspector で設定する場合は同 GameObject に `FacialInputBinder` と `InputBindingProfileSO`（プロジェクト内 ScriptableObject）を追加
+2. Project ウィンドウで **Create** → **FacialControl** → **Facial Character** から `FacialCharacterSO` を作成
+3. SO Inspector の各 Foldout セクション (入力 / キーバインディング / アナログ / レイヤー / Expression / BonePose / デバッグ) で設定を埋める
+4. キャラクターの GameObject に `FacialController` を追加し、SO を `Character SO` フィールドに結線
+5. 同 GameObject に `FacialCharacterInputExtension` を追加
+6. (任意) `InputFacialControllerExtension` も同 GameObject に追加するとコア標準のトリガー入力源 (controller-expr / keyboard-expr) も登録される
 
 ```csharp
-// 手動でコード配線する場合
+// 手動でコード配線する場合 (コアから直接トリガー入力源を登録)
 var factory = new InputSourceFactory();
 InputRegistration.Register(factory, blendShapeNames, ExclusionMode.LastWins);
 ```
 
 ## サンプル
 
-`Multi Source Blend Demo` — 同一レイヤーに `controller-expr` と `keyboard-expr` を並置し、OnGUI 経由で加重和ブレンドを目視確認するサンプル。Package Manager から Import 可能。Scene / FacialProfileSO / InputBindingProfileSO / HUD / JSON を同梱し、ユーザーはモデルを Scene の Character の子に配置するだけで動作する。
+- **Multi Source Blend Demo** — 同一レイヤーに `controller-expr` と `keyboard-expr` を並置して加重和ブレンドを目視確認するサンプル。Scene / `FacialCharacterSO` / InputActionAsset / HUD を同梱、ユーザーはモデルを Scene の Character の子に配置するだけで動作。Package Manager から Import 可能
+- **Analog Binding Demo** — 右スティック等の連続値を BlendShape / BonePose 軸に写像するアナログ結線サンプル
+
+各サンプルの詳細は `Samples~/<sample-name>/README.md` を参照。
 
 ## ライセンス
 

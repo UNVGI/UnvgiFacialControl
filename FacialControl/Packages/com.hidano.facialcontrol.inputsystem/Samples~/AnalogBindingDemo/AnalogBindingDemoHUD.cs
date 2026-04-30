@@ -1,29 +1,23 @@
-using System.Collections.Generic;
 using UnityEngine;
-using Hidano.FacialControl.Adapters.Bone;
-using Hidano.FacialControl.Adapters.Input;
 using Hidano.FacialControl.Adapters.Playable;
-using Hidano.FacialControl.Adapters.ScriptableObject;
-using Hidano.FacialControl.Domain.Models;
 
 namespace Hidano.FacialControl.Samples
 {
     /// <summary>
     /// アナログ入力 (右スティック → LeftEye/RightEye Euler、ARKit jawOpen / OSC float
-    /// → mouth-open BlendShape) の入出力を OnGUI で目視確認するための PlayMode 専用 HUD
-    /// (tasks.md 7.2、Req 11.1〜11.6)。
+    /// → mouth-open BlendShape) の入出力を OnGUI で目視確認するための PlayMode 専用 HUD。
     /// </summary>
     /// <remarks>
     /// <para>
     /// 詳しい使い方は本サンプル同梱の README.md を参照。
     /// 本 HUD は <see cref="FacialController"/> の既存公開 API のみを利用し、
-    /// <see cref="FacialAnalogInputBinder"/> によって駆動される BonePose / BlendShape の
-    /// 値を読み取るだけのオブザーバとして振る舞う（書込はしない）。
+    /// 同 GameObject 上の <c>FacialCharacterInputExtension</c> によって駆動される
+    /// BonePose / BlendShape の値を読み取るだけのオブザーバとして振る舞う（書込はしない）。
     /// </para>
     /// <para>
-    /// FacialController の初期化 JSON は別の <see cref="FacialProfileSO"/> 経由で
-    /// 行う想定 (Multi Source Blend Demo と同様)。本 HUD では追加のブートストラップは
-    /// 行わず、Inspector で割り当てられた eye / mouth ターゲットを表示するのみ。
+    /// 表情データの読込は新統合 SO (<c>FacialCharacterSO</c>) 経由で
+    /// <c>FacialController.OnEnable</c> が StreamingAssets/FacialControl/{SO 名}/profile.json を
+    /// 自動探索して行う想定 (3-B モデル)。アナログバインディングは SO の Inspector で編集する。
     /// </para>
     /// </remarks>
     [DefaultExecutionOrder(-100)]
@@ -33,10 +27,6 @@ namespace Hidano.FacialControl.Samples
         [Tooltip("対象の FacialController。BlendShape の現在値読取に使用する。")]
         [SerializeField]
         private FacialController _facialController;
-
-        [Tooltip("対象の FacialAnalogInputBinder。アナログ入力の生値読取に使用する。")]
-        [SerializeField]
-        private FacialAnalogInputBinder _analogBinder;
 
         [Tooltip("HUD で観測する LeftEye Transform (BonePose ターゲット)。")]
         [SerializeField]
@@ -76,8 +66,6 @@ namespace Hidano.FacialControl.Samples
 
             DrawControllerSection();
             GUILayout.Space(8);
-            DrawBindingSection();
-            GUILayout.Space(8);
             DrawBoneSection();
             GUILayout.Space(8);
             DrawBlendShapeSection();
@@ -97,18 +85,6 @@ namespace Hidano.FacialControl.Samples
                 return;
             }
             GUILayout.Label($"  IsInitialized: {_facialController.IsInitialized}");
-        }
-
-        private void DrawBindingSection()
-        {
-            GUILayout.Label("<b>FacialAnalogInputBinder</b>", RichStyle());
-            if (_analogBinder == null)
-            {
-                GUILayout.Label("  (未割当)");
-                return;
-            }
-            var profile = _analogBinder.Profile;
-            GUILayout.Label($"  Profile: {(profile == null ? "(なし)" : profile.name)}");
         }
 
         private void DrawBoneSection()

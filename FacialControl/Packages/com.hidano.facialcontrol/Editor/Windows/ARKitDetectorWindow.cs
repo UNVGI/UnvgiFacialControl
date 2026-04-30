@@ -4,7 +4,7 @@ using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
-using Hidano.FacialControl.Adapters.ScriptableObject;
+using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Application.UseCases;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
@@ -48,7 +48,7 @@ namespace Hidano.FacialControl.Editor.Windows
 
         // 出力先選択状態
         private OutputMode _outputMode = OutputMode.NewJson;
-        private FacialProfileSO _mergeTargetProfile;
+        private FacialCharacterProfileSO _mergeTargetProfile;
 
         // 依存
         private ARKitEditorService _editorService;
@@ -61,7 +61,7 @@ namespace Hidano.FacialControl.Editor.Windows
             /// <summary>新規 JSON として保存（既定）</summary>
             NewJson,
 
-            /// <summary>既存 FacialProfileSO の JSON に追記</summary>
+            /// <summary>既存 FacialCharacterProfileSO の JSON に追記</summary>
             MergeIntoExisting
         }
 
@@ -165,9 +165,9 @@ namespace Hidano.FacialControl.Editor.Windows
 
             _mergeTargetField = new ObjectField("マージ先プロファイル")
             {
-                objectType = typeof(FacialProfileSO),
+                objectType = typeof(FacialCharacterProfileSO),
                 allowSceneObjects = false,
-                tooltip = "追記先の FacialProfileSO（参照する JSON に新規 Expression / OSC マッピングが追記されます）"
+                tooltip = "追記先の FacialCharacterProfileSO（参照する JSON に新規 Expression / OSC マッピングが追記されます）"
             };
             _mergeTargetField.RegisterValueChangedCallback(OnMergeTargetChanged);
             _mergeTargetField.style.display = DisplayStyle.None;
@@ -422,11 +422,11 @@ namespace Hidano.FacialControl.Editor.Windows
         }
 
         /// <summary>
-        /// マージ先 FacialProfileSO 変更時の処理。
+        /// マージ先 FacialCharacterProfileSO 変更時の処理。
         /// </summary>
         private void OnMergeTargetChanged(ChangeEvent<UnityEngine.Object> evt)
         {
-            _mergeTargetProfile = evt.newValue as FacialProfileSO;
+            _mergeTargetProfile = evt.newValue as FacialCharacterProfileSO;
         }
 
         /// <summary>
@@ -495,13 +495,13 @@ namespace Hidano.FacialControl.Editor.Windows
         }
 
         /// <summary>
-        /// 既存 FacialProfileSO の JSON に Expression を追記するマージモードの処理。
+        /// 既存 FacialCharacterProfileSO の JSON に Expression を追記するマージモードの処理。
         /// </summary>
         private void GenerateExpressionsMergeMode(Expression[] expressions)
         {
             if (_mergeTargetProfile == null)
             {
-                ShowStatus("マージ先の FacialProfileSO を指定してください。", isError: true);
+                ShowStatus("マージ先の FacialCharacterProfileSO を指定してください。", isError: true);
                 return;
             }
 
@@ -514,7 +514,7 @@ namespace Hidano.FacialControl.Editor.Windows
                            $"BlendShape: {expressions[i].BlendShapeValues.Length})\n";
             }
 
-            message += $"\nマージ先: {_mergeTargetProfile.name} ({_mergeTargetProfile.JsonFilePath})\n";
+            message += $"\nマージ先: {_mergeTargetProfile.name}\n";
             message += "ID / 名前が衝突する場合は自動的にリネームされます。続行しますか？";
 
             if (!EditorUtility.DisplayDialog("Expression 追記マージ", message, "マージ", "キャンセル"))
@@ -603,13 +603,13 @@ namespace Hidano.FacialControl.Editor.Windows
         }
 
         /// <summary>
-        /// マージ先 FacialProfileSO の JSON と隣接する config.json に OSC マッピングを追記するモードの処理。
+        /// マージ先 FacialCharacterProfileSO の JSON と隣接する config.json に OSC マッピングを追記するモードの処理。
         /// </summary>
         private void GenerateOscMergeMode()
         {
             if (_mergeTargetProfile == null)
             {
-                ShowStatus("マージ先の FacialProfileSO を指定してください。", isError: true);
+                ShowStatus("マージ先の FacialCharacterProfileSO を指定してください。", isError: true);
                 return;
             }
 
@@ -627,7 +627,7 @@ namespace Hidano.FacialControl.Editor.Windows
                 message += $"  ... 他 {_oscMappings.Length - previewCount} 件\n";
             }
 
-            message += $"\nマージ先: {_mergeTargetProfile.name} ({_mergeTargetProfile.JsonFilePath})\n";
+            message += $"\nマージ先: {_mergeTargetProfile.name}\n";
             message += "OSC アドレスが既存と重複する場合はスキップされます。続行しますか？";
 
             if (!EditorUtility.DisplayDialog("OSC マッピング追記マージ", message, "マージ", "キャンセル"))

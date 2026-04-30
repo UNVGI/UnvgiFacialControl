@@ -5,7 +5,7 @@ using UnityEditor;
 using UnityEngine;
 using Hidano.FacialControl.Application.UseCases;
 using Hidano.FacialControl.Adapters.Json;
-using Hidano.FacialControl.Adapters.ScriptableObject;
+using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
@@ -147,9 +147,10 @@ namespace Hidano.FacialControl.Editor.Tools
         }
 
         /// <summary>
-        /// 新規に生成した Expression / OSC マッピングを、既存の FacialProfileSO が参照する JSON にマージする。
+        /// 新規に生成した Expression / OSC マッピングを、既存の <see cref="FacialCharacterProfileSO"/>
+        /// が参照する JSON にマージする。
         /// </summary>
-        /// <param name="targetProfile">マージ先の FacialProfileSO。<see cref="FacialProfileSO.JsonFilePath"/> が指す JSON を書き換える</param>
+        /// <param name="targetProfile">マージ先の統合 SO。<c>StreamingAssets/FacialControl/{SO 名}/profile.json</c> を書き換える</param>
         /// <param name="newExpressions">追記する Expression 配列。null または空配列の場合は Expression 追加をスキップする</param>
         /// <param name="newMappings">追記する OSC マッピング配列。null または空配列の場合は OSC 追加をスキップする</param>
         /// <remarks>
@@ -159,21 +160,21 @@ namespace Hidano.FacialControl.Editor.Tools
         /// 処理前に <see cref="Undo.RecordObject"/> を呼び出すため Undo 可能。
         /// </remarks>
         public void MergeIntoExistingProfile(
-            FacialProfileSO targetProfile,
+            FacialCharacterProfileSO targetProfile,
             Expression[] newExpressions,
             OscMapping[] newMappings = null)
         {
             if (targetProfile == null)
                 throw new ArgumentNullException(nameof(targetProfile));
-            if (string.IsNullOrWhiteSpace(targetProfile.JsonFilePath))
+
+            var fullPath = FacialCharacterProfileSO.GetStreamingAssetsProfilePath(targetProfile.CharacterAssetName);
+            if (string.IsNullOrEmpty(fullPath))
                 throw new InvalidOperationException(
-                    "マージ先 FacialProfileSO の JsonFilePath が未設定です。");
+                    "マージ先 SO の CharacterAssetName が未設定です。");
 
             // Undo 登録（SO 自体の変更は発生しなくても、ユーザーに操作取り消しの機会を提供する）
             Undo.RecordObject(targetProfile, "Merge ARKit Profile");
 
-            // 既存 JSON を StreamingAssets 相対パスから解決して読み込む
-            var fullPath = Path.Combine(UnityEngine.Application.streamingAssetsPath, targetProfile.JsonFilePath);
             if (!File.Exists(fullPath))
                 throw new FileNotFoundException(
                     $"マージ先 JSON ファイルが見つかりません: {fullPath}", fullPath);

@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using Hidano.FacialControl.Adapters.InputSources;
-using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.InputSystem.Adapters.ScriptableObject;
 
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
 {

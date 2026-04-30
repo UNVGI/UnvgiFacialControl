@@ -1,56 +1,60 @@
 # Analog Binding Demo
 
-`FacialAnalogInputBinder` を介して、アナログ入力 (右スティック / ARKit `jawOpen` / OSC float) を BonePose と BlendShape にリアルタイム駆動するサンプル。離散トリガー側の `FacialInputBinder` と並走する構成を確認するための PlayMode 専用サンプルです (Req 11.1〜11.6)。
+新統合 SO (`FacialCharacterSO`) のアナログバインディングを介して、アナログ入力 (右スティック / ARKit `jawOpen` / OSC float) を BonePose と BlendShape にリアルタイム駆動するサンプル。1 SO + Scene 上のコンポーネント 1 個 (FacialController) という最小結線で動かせる構成を確認するための PlayMode 専用サンプルです。
 
 ## 同梱物
 
 | ファイル | 役割 |
 |---------|------|
-| `AnalogBindingDemo.unity` | `FacialController` + `FacialAnalogInputBinder` + `FacialInputBinder` を併置した Scene |
-| `AnalogBindingProfile.asset` | `AnalogInputBindingProfileSO` (右スティック → eye Euler + jawOpen → mouth-open BS) |
-| `analog_binding_demo.json` | SO の JSON 表現 (Req 11.4)。Inspector の Import/Export ボタンから差し替え可能 |
+| `AnalogBindingDemo.unity` | `FacialController` + `InputFacialControllerExtension` + `FacialCharacterInputExtension` + HUD を結線済みの Scene |
+| `AnalogBindingDemoCharacter.asset` | `FacialCharacterSO`（右スティック → eye Euler + jawOpen → mouth-open BS をアナログバインディングで宣言） |
 | `AnalogBindingDemoHUD.cs` | アナログ入力値 / BonePose 出力 / BlendShape 出力を OnGUI で可視化する HUD |
+| `StreamingAssets/FacialControl/AnalogBindingDemoCharacter/profile.json` | 最小プロファイル定義 (FacialController が起動時に自動探索) |
+| `StreamingAssets/FacialControl/AnalogBindingDemoCharacter/analog_bindings.json` | アナログバインディングの正規化 JSON 表現 (SO の Inspector 編集時に AutoExporter が同期) |
 | `README.md` | 本ファイル |
 
 モデル (prefab / FBX / VRM) はライセンスの都合で同梱しません。ユーザー自身で用意してください。
 
 ## 必要な Humanoid rig
 
-`AnalogBindingProfile` は以下の rig 構造に依存します。実機モデルではこれらの bone / BlendShape 名が一致している必要があります (Req 11.6)。
+`AnalogBindingDemoCharacter` の `_analogBindings` は以下の rig 構造に依存します。実機モデルではこれらの bone / BlendShape 名が一致している必要があります。
 
 | ターゲット種別 | 必要な識別子 |
 |------------|-----------|
 | BonePose | `LeftEye`, `RightEye` (Humanoid の eye bones) |
 | BlendShape | `jawOpen` (ARKit / PerfectSync 互換) |
 
-> Humanoid アバターでない場合は `AnalogInputBindingProfileSOEditor` の **Humanoid 自動割当** ボタンが disabled になります。手動で `targetIdentifier` を rig に合わせて書き換えてください。
+> Humanoid アバターでない場合は SO の Inspector で `targetIdentifier` を rig に合わせて手動編集してください。
 
 ## セットアップ手順
 
 ### 1. Scene を開く
 
-Package Manager で本サンプルを Import すると `Assets/Samples/FacialControl InputSystem/<version>/Analog Binding Demo/AnalogBindingDemo.unity` に配置されます。これをダブルクリックで開いてください。
+Package Manager で本サンプルを Import すると以下に展開されます。
 
-Scene には既に以下の GameObject が存在します。
+- `Assets/Samples/FacialControl InputSystem/<version>/Analog Binding Demo/AnalogBindingDemo.unity`
+- `Assets/Samples/FacialControl InputSystem/<version>/Analog Binding Demo/AnalogBindingDemoCharacter.asset`
+- `Assets/Samples/FacialControl InputSystem/<version>/Analog Binding Demo/StreamingAssets/FacialControl/AnalogBindingDemoCharacter/profile.json`
+- `Assets/Samples/FacialControl InputSystem/<version>/Analog Binding Demo/StreamingAssets/FacialControl/AnalogBindingDemoCharacter/analog_bindings.json`
+
+`StreamingAssets/...` 配下の JSON は **Project ルート直下の `Assets/StreamingAssets/`** に手動で配置し直す必要があります。Sample import 後、フォルダごと `Assets/StreamingAssets/FacialControl/AnalogBindingDemoCharacter/` にコピー (または移動) してください。
+
+`AnalogBindingDemo.unity` をダブルクリックで開いてください。Scene には既に以下の GameObject が存在します。
 
 - **Character** — モデルを配置するルート GameObject
   - `Animator`
-  - `FacialController`
-  - `InputFacialControllerExtension`
-  - `AnalogBlendShapeRegistration` (FacialAnalogInputBinder.OnEnable 時に自動付与される)
-- **Facial Analog Input Binder** — アナログ入力を結線する GO
-  - `FacialAnalogInputBinder` (`_profile` に AnalogBindingProfile.asset、`_actionAsset` に Analog ActionMap を持つ InputActionAsset)
-- **Facial Input Binder** — 離散トリガー (`InputBindingProfileSO`) と並走する GO
-  - `FacialInputBinder`
+  - `FacialController`（`Character SO` に `AnalogBindingDemoCharacter` が結線済み）
+  - `InputFacialControllerExtension`（`controller-expr` / `keyboard-expr` 予約 ID 登録）
+  - `FacialCharacterInputExtension`（SO の `_analogBindings` から analog source / BonePose provider を構築）
 - **Analog Binding Demo HUD**
-  - `AnalogBindingDemoHUD`
+  - `AnalogBindingDemoHUD`（`_facialController` は Character の FacialController を参照）
 - Main Camera / Directional Light
 
 ### 2. モデルを Character の子に配置
 
 Humanoid rig を持つモデル (FBX / VRM / prefab) を Character の子にドラッグ & ドロップしてください。
 
-- LeftEye / RightEye の bone が rig 上で `LeftEye` / `RightEye` という名前で存在すること、または `AnalogInputBindingProfileSOEditor` の **Humanoid 自動割当** ボタンで Humanoid muscle 経由で解決できること
+- LeftEye / RightEye の bone が rig 上で `LeftEye` / `RightEye` という名前で存在すること
 - SkinnedMeshRenderer の sharedMesh に `jawOpen` BlendShape が存在すること
 
 ### 3. Play
@@ -63,19 +67,19 @@ Play モードに入ります。画面左上に HUD が表示されます。
 ### トラブルシューティング
 
 - **HUD が表示されない**: Play モードに入っているか、`Application.runInBackground` が有効か確認
-- **eye が動かない**: `targetIdentifier` (LeftEye/RightEye) が rig の bone 名と完全一致しているか、Humanoid 自動割当ボタンを試す
+- **eye が動かない**: SO Inspector の `_analogBindings` で `targetIdentifier` (LeftEye/RightEye) が rig の bone 名と完全一致しているか確認
 - **`jawOpen` が動かない**: SkinnedMeshRenderer の sharedMesh に該当 BlendShape が存在するか確認
 
 ## カスタマイズ
 
 ### 独自 binding プロファイルへ差し替える
 
-1. `AnalogBindingProfile.asset` を Inspector で開き、**Import JSON...** ボタンから別 JSON を読み込む
-2. 別の `AnalogInputBindingProfileSO` を新規作成し、`FacialAnalogInputBinder._profile` を差し替える
+1. `AnalogBindingDemoCharacter` SO を Inspector で開き、`_analogBindings` セクションを直接編集する
+2. SO の保存時に裏で `StreamingAssets/.../analog_bindings.json` が自動エクスポートされ、ランタイムへ反映されます
 
 ### OSC で動作確認する
 
-`com.hidano.facialcontrol.osc` パッケージの `OscReceiver` を Scene に配置し、`FacialAnalogInputBinder.RegisterExternalSource("arkit_jaw_open", new ArKitOscAnalogSource(...))` 等で外部ソースを登録してください。
+`com.hidano.facialcontrol.osc` パッケージの `OscReceiver` を Scene に配置してください。`arkit_jaw_open` などの sourceId が外部から push される構成であれば、`FacialCharacterInputExtension` が解決できなかったソースは ActionMap 経由で結線されないため、別途 OSC アダプタ経由での `IAnalogInputSource` 提供が必要です。
 
 ## 参考
 

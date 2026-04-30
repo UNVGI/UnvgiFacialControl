@@ -7,8 +7,7 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.PlayMode.Samples
 {
     /// <summary>
-    /// Phase 7.2: <c>AnalogBindingDemo</c> サンプル一式の smoke テスト
-    /// (tasks.md 7.2、Req 11.1〜11.6)。
+    /// <c>AnalogBindingDemo</c> サンプル一式の smoke テスト (新統合 SO 形式)。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -16,8 +15,8 @@ namespace Hidano.FacialControl.Tests.PlayMode.Samples
     /// ロードする経路は存在しない。代わりに以下を整合性として検証する:
     /// </para>
     /// <list type="bullet">
-    ///   <item>Samples~/AnalogBindingDemo/ に必須ファイルが揃っていること</item>
-    ///   <item>analog_binding_demo.json が <see cref="AnalogInputBindingJsonLoader.Load"/> で
+    ///   <item>Samples~/AnalogBindingDemo/ に必須ファイル (新形式) が揃っていること</item>
+    ///   <item>StreamingAssets/.../analog_bindings.json が <see cref="AnalogInputBindingJsonLoader.Load"/> で
     ///         パースでき、想定の binding 件数 (right_stick × 4 + arkit_jaw_open × 1) を持つこと</item>
     ///   <item>JSON が round-trip (Load → Save → Load) で安定すること</item>
     ///   <item>dev mirror (Assets/Samples) と Samples~ の <c>*.cs</c> / <c>*.json</c> が drift していないこと</item>
@@ -32,13 +31,20 @@ namespace Hidano.FacialControl.Tests.PlayMode.Samples
         private const string SamplesMirrorDir =
             "Assets/Samples/FacialControl InputSystem/0.1.0-preview.1/Analog Binding Demo";
 
+        private const string AnalogBindingsRelativePath =
+            "StreamingAssets/FacialControl/AnalogBindingDemoCharacter/analog_bindings.json";
+
+        private const string ProfileRelativePath =
+            "StreamingAssets/FacialControl/AnalogBindingDemoCharacter/profile.json";
+
         private static readonly string[] s_requiredFiles = new[]
         {
             "AnalogBindingDemo.unity",
-            "AnalogBindingProfile.asset",
-            "analog_binding_demo.json",
+            "AnalogBindingDemoCharacter.asset",
             "AnalogBindingDemoHUD.cs",
-            "README.md"
+            "README.md",
+            AnalogBindingsRelativePath,
+            ProfileRelativePath
         };
 
         [Test]
@@ -56,7 +62,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Samples
         [Test]
         public void AnalogBindingDemoJson_LoadsExpectedBindings()
         {
-            var json = LoadCanonicalJson();
+            var json = LoadCanonicalAnalogJson();
             var profile = AnalogInputBindingJsonLoader.Load(json);
 
             Assert.AreEqual("1.0.0", profile.Version, "version は 1.0.0 を期待");
@@ -78,7 +84,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Samples
         [Test]
         public void AnalogBindingDemoJson_RoundTripsStably()
         {
-            var json = LoadCanonicalJson();
+            var json = LoadCanonicalAnalogJson();
             var first = AnalogInputBindingJsonLoader.Load(json);
             var resaved = AnalogInputBindingJsonLoader.Save(first);
             var second = AnalogInputBindingJsonLoader.Load(resaved);
@@ -108,7 +114,12 @@ namespace Hidano.FacialControl.Tests.PlayMode.Samples
             string projectRoot = Directory.GetCurrentDirectory();
             // .cs と .json はランタイム挙動に直結するため drift があると Package Manager 経由
             // で import したユーザーと dev の挙動が乖離する。同期されていることをアサート。
-            string[] driftCriticalFiles = { "AnalogBindingDemoHUD.cs", "analog_binding_demo.json" };
+            string[] driftCriticalFiles =
+            {
+                "AnalogBindingDemoHUD.cs",
+                AnalogBindingsRelativePath,
+                ProfileRelativePath
+            };
 
             foreach (var name in driftCriticalFiles)
             {
@@ -126,10 +137,10 @@ namespace Hidano.FacialControl.Tests.PlayMode.Samples
             }
         }
 
-        private static string LoadCanonicalJson()
+        private static string LoadCanonicalAnalogJson()
         {
             string projectRoot = Directory.GetCurrentDirectory();
-            var path = Path.Combine(projectRoot, SamplesCanonicalDir, "analog_binding_demo.json");
+            var path = Path.Combine(projectRoot, SamplesCanonicalDir, AnalogBindingsRelativePath);
             Assert.IsTrue(File.Exists(path), $"canonical JSON 不在: {path}");
             return File.ReadAllText(path);
         }
