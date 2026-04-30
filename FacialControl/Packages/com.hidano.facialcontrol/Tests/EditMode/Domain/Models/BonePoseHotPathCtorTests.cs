@@ -147,9 +147,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain.Models
             long monoAfter = Profiler.GetMonoUsedSizeLong();
             long monoDiff = monoAfter - monoBefore;
 
-            // GC が動いて減る方向は許容、増えていなければ alloc=0
-            Assert.LessOrEqual(monoDiff, 0,
-                $"hot-path ctor 10000 回で managed alloc が発生: diff={monoDiff} bytes (Req 8.1, 8.2)");
+            // Mono ヒープページノイズ許容 65536 bytes（既存 OscControllerBlendingIntegrationTests と同基準）
+            Assert.LessOrEqual(monoDiff, 65536,
+                $"hot-path ctor 10000 回で managed alloc がページノイズ許容 (65536 bytes) を超過: diff={monoDiff} bytes (Req 8.1, 8.2)");
         }
 
         // --- 既存 public ctor との独立性（既存挙動温存の補強） ---

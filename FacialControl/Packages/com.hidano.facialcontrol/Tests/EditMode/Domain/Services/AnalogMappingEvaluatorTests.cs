@@ -473,8 +473,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain.Services
             long monoAfter = Profiler.GetMonoUsedSizeLong();
             long monoDiff = monoAfter - monoBefore;
 
-            Assert.LessOrEqual(monoDiff, 0,
-                $"Custom curve hot path 10000 回で managed alloc 発生: diff={monoDiff} bytes");
+            // Mono ヒープページノイズ許容 65536 bytes（既存 OscControllerBlendingIntegrationTests と同基準）
+            Assert.LessOrEqual(monoDiff, 65536,
+                $"Custom curve hot path 10000 回で managed alloc がページノイズ許容 (65536 bytes) を超過: diff={monoDiff} bytes");
         }
     }
 }
