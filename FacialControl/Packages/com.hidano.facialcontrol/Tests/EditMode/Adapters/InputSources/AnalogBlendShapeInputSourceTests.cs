@@ -477,9 +477,11 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
 
             var output = new float[2];
 
-            // ウォームアップ
+            // ウォームアップ：測定と同じ入力分布で全 JIT ブランチを事前コンパイル
             for (int i = 0; i < 200; i++)
             {
+                src.SetAxis(0, i * 0.001f);
+                src.SetAxis(1, i * 0.0005f);
                 inputSource.TryWriteValues(output);
             }
 

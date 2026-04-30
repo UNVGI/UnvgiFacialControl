@@ -113,11 +113,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain.Models
             };
             const string id = "analog-bonepose";
 
-            // ウォームアップ
+            // ウォームアップ：測定と同じバッファ書換えパターンで全 JIT ブランチを事前コンパイル
             int warmLen = 0;
             for (int i = 0; i < 1000; i++)
             {
-                sharedBuffer[0] = new BonePoseEntry("LeftEye", i * 0.01f, 0f, 0f);
+                sharedBuffer[0] = new BonePoseEntry("LeftEye", i * 0.001f, 0f, 0f);
+                sharedBuffer[1] = new BonePoseEntry("RightEye", -i * 0.001f, 0f, 0f);
+                sharedBuffer[2] = new BonePoseEntry("Head", 0f, i * 0.0005f, 0f);
                 var warm = new BonePose(id, sharedBuffer, skipValidation: true);
                 warmLen += warm.Entries.Length;
             }

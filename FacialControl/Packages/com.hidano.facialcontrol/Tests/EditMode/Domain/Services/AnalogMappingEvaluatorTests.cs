@@ -446,11 +446,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain.Services
                 curve: curve, invert: false,
                 min: 0f, max: 1f);
 
-            // ウォームアップ
+            // ウォームアップ：測定と同じ入力分布で EvaluateCustom の全 JIT ブランチを事前コンパイル
+            // （input <= keys[0].Time の早期 return / input >= keys[last].Time の早期 return / Hermite 補間 の 3 ブランチ）
             float warm = 0f;
             for (int i = 0; i < 1000; i++)
             {
-                warm += AnalogMappingEvaluator.Evaluate(fn, 0.5f);
+                float input = (i % 11) * 0.1f;
+                warm += AnalogMappingEvaluator.Evaluate(fn, input);
             }
             Assert.IsTrue(warm >= 0f);
 

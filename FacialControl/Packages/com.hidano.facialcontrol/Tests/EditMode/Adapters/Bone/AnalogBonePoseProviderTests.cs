@@ -372,9 +372,11 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Bone
             var bp = new FakeBonePoseProvider();
             using var provider = new AnalogBonePoseProvider(bp, sources, bindings);
 
-            // ウォームアップ
+            // ウォームアップ：測定と同じ入力分布で全 JIT ブランチを事前コンパイル
             for (int i = 0; i < 200; i++)
             {
+                src.SetAxis(0, i * 0.001f);
+                src.SetAxis(1, i * 0.0005f);
                 provider.BuildAndPush();
             }
 
