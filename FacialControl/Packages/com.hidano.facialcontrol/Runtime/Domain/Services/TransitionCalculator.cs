@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using Hidano.FacialControl.Domain.Models;
 
 namespace Hidano.FacialControl.Domain.Services
@@ -105,6 +106,7 @@ namespace Hidano.FacialControl.Domain.Services
         /// キーフレームが空の場合は Linear にフォールバック。
         /// キーフレームが 1 つの場合はその値を返す。
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static float EvaluateCustom(ReadOnlySpan<CurveKeyFrame> keys, float t)
         {
             if (keys.Length == 0)
