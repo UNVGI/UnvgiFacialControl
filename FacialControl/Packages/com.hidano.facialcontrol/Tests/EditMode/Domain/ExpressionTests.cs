@@ -4,341 +4,160 @@ using Hidano.FacialControl.Domain.Models;
 
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
+    /// <summary>
+    /// Phase 3.1 (inspector-and-data-model-redesign) 対応で全面書き換え済みの ExpressionTests。
+    /// 新スキーマ (Id / Name / Layer / OverrideMask: LayerOverrideMask / SnapshotId: string) を中心に検証する。
+    /// </summary>
     [TestFixture]
     public class ExpressionTests
     {
-        // --- 正常系 ---
+        // --- 新スキーマ: Ctor_StoresAllFields ---
 
         [Test]
-        public void Constructor_ValidParameters_CreatesInstance()
+        public void Ctor_StoresAllFields()
         {
-            var blendShapes = new[]
-            {
-                new BlendShapeMapping("Fcl_MTH_A", 0.5f)
-            };
-            var layerSlots = new[]
-            {
-                new LayerSlot("lipsync", new[] { new BlendShapeMapping("Fcl_MTH_O", 0.3f) })
-            };
-            var curve = TransitionCurve.Linear;
-
             var expression = new Expression(
-                "test-id",
-                "smile",
-                "emotion",
-                0.25f,
-                curve,
-                blendShapes,
-                layerSlots);
+                id: "expr-id-001",
+                name: "smile",
+                layer: "emotion",
+                overrideMask: LayerOverrideMask.Bit0 | LayerOverrideMask.Bit2,
+                snapshotId: "snap-id-001");
 
-            Assert.AreEqual("test-id", expression.Id);
+            Assert.AreEqual("expr-id-001", expression.Id);
             Assert.AreEqual("smile", expression.Name);
             Assert.AreEqual("emotion", expression.Layer);
-            Assert.AreEqual(0.25f, expression.TransitionDuration);
-            Assert.AreEqual(TransitionCurveType.Linear, expression.TransitionCurve.Type);
-            Assert.AreEqual(1, expression.BlendShapeValues.Length);
-            Assert.AreEqual("Fcl_MTH_A", expression.BlendShapeValues.Span[0].Name);
-            Assert.AreEqual(1, expression.LayerSlots.Length);
-            Assert.AreEqual("lipsync", expression.LayerSlots.Span[0].Layer);
+            Assert.AreEqual(LayerOverrideMask.Bit0 | LayerOverrideMask.Bit2, expression.OverrideMask);
+            Assert.AreEqual("snap-id-001", expression.SnapshotId);
         }
 
+        // --- 新スキーマ: OverrideMask は None でも Domain 上は許容（zero-mask validation は Adapters/Editor 層で実施） ---
+
         [Test]
-        public void Constructor_DefaultTransitionDuration_Is025()
+        public void OverrideMask_DefaultsToNone_AllowedByDomain()
         {
             var expression = new Expression(
-                "id-1",
-                "neutral",
-                "emotion");
+                id: "expr-id-002",
+                name: "neutral",
+                layer: "emotion",
+                overrideMask: LayerOverrideMask.None,
+                snapshotId: "snap-id-002");
 
-            Assert.AreEqual(0.25f, expression.TransitionDuration);
+            Assert.AreEqual(LayerOverrideMask.None, expression.OverrideMask);
+        }
+
+        // --- 新スキーマ: SnapshotId は非空必須 ---
+
+        [Test]
+        public void SnapshotId_NonEmpty()
+        {
+            Assert.Throws<ArgumentException>(() => new Expression(
+                id: "expr-id-003",
+                name: "broken",
+                layer: "emotion",
+                overrideMask: LayerOverrideMask.None,
+                snapshotId: ""));
         }
 
         [Test]
-        public void Constructor_DefaultTransitionCurve_IsLinear()
+        public void SnapshotId_Whitespace_Throws()
+        {
+            Assert.Throws<ArgumentException>(() => new Expression(
+                id: "expr-id-004",
+                name: "broken-ws",
+                layer: "emotion",
+                overrideMask: LayerOverrideMask.None,
+                snapshotId: "   "));
+        }
+
+        [Test]
+        public void SnapshotId_Null_ThrowsArgumentNullException()
+        {
+            Assert.Throws<ArgumentNullException>(() => new Expression(
+                id: "expr-id-005",
+                name: "broken-null",
+                layer: "emotion",
+                overrideMask: LayerOverrideMask.None,
+                snapshotId: null));
+        }
+
+        // --- 新スキーマ: 既存 Id/Name/Layer バリデーションも維持 ---
+
+        [Test]
+        public void Ctor_NullId_ThrowsArgumentNullException()
+        {
+            Assert.Throws<ArgumentNullException>(() => new Expression(
+                id: null,
+                name: "smile",
+                layer: "emotion",
+                overrideMask: LayerOverrideMask.None,
+                snapshotId: "snap"));
+        }
+
+        [Test]
+        public void Ctor_EmptyId_ThrowsArgumentException()
+        {
+            Assert.Throws<ArgumentException>(() => new Expression(
+                id: "",
+                name: "smile",
+                layer: "emotion",
+                overrideMask: LayerOverrideMask.None,
+                snapshotId: "snap"));
+        }
+
+        [Test]
+        public void Ctor_NullName_ThrowsArgumentNullException()
+        {
+            Assert.Throws<ArgumentNullException>(() => new Expression(
+                id: "expr-id-x",
+                name: null,
+                layer: "emotion",
+                overrideMask: LayerOverrideMask.None,
+                snapshotId: "snap"));
+        }
+
+        [Test]
+        public void Ctor_EmptyLayer_ThrowsArgumentException()
+        {
+            Assert.Throws<ArgumentException>(() => new Expression(
+                id: "expr-id-x",
+                name: "smile",
+                layer: "",
+                overrideMask: LayerOverrideMask.None,
+                snapshotId: "snap"));
+        }
+
+        // --- Refactor: ToString() フォーマット ---
+
+        [Test]
+        public void ToString_ReturnsIdNameLayerFormat()
         {
             var expression = new Expression(
-                "id-1",
-                "neutral",
-                "emotion");
+                id: "expr-007",
+                name: "wink",
+                layer: "eye",
+                overrideMask: LayerOverrideMask.None,
+                snapshotId: "snap-007");
 
-            Assert.AreEqual(TransitionCurveType.Linear, expression.TransitionCurve.Type);
+            Assert.AreEqual("expr-007:wink@eye", expression.ToString());
         }
 
+        // --- 新スキーマ: 多 bit OverrideMask の保持 ---
+
         [Test]
-        public void Constructor_DefaultBlendShapeValues_IsEmpty()
+        public void OverrideMask_MultipleBits_Preserved()
         {
+            var mask = LayerOverrideMask.Bit0 | LayerOverrideMask.Bit3 | LayerOverrideMask.Bit7;
             var expression = new Expression(
-                "id-1",
-                "neutral",
-                "emotion");
+                id: "expr-008",
+                name: "complex",
+                layer: "emotion",
+                overrideMask: mask,
+                snapshotId: "snap-008");
 
-            Assert.AreEqual(0, expression.BlendShapeValues.Length);
-        }
-
-        [Test]
-        public void Constructor_DefaultLayerSlots_IsEmpty()
-        {
-            var expression = new Expression(
-                "id-1",
-                "neutral",
-                "emotion");
-
-            Assert.AreEqual(0, expression.LayerSlots.Length);
-        }
-
-        [Test]
-        public void Constructor_TransitionDurationZero_IsValid()
-        {
-            var expression = new Expression(
-                "id-1",
-                "instant",
-                "emotion",
-                0f);
-
-            Assert.AreEqual(0f, expression.TransitionDuration);
-        }
-
-        [Test]
-        public void Constructor_TransitionDurationOne_IsValid()
-        {
-            var expression = new Expression(
-                "id-1",
-                "slow",
-                "emotion",
-                1f);
-
-            Assert.AreEqual(1f, expression.TransitionDuration);
-        }
-
-        [Test]
-        public void Constructor_MultipleBlendShapeValues_CreatesInstance()
-        {
-            var blendShapes = new[]
-            {
-                new BlendShapeMapping("Fcl_EYE_Close_L", 1.0f),
-                new BlendShapeMapping("Fcl_EYE_Close_R", 1.0f),
-                new BlendShapeMapping("Fcl_BRW_Down", 0.5f)
-            };
-
-            var expression = new Expression(
-                "id-2",
-                "wink",
-                "emotion",
-                0.1f,
-                TransitionCurve.Linear,
-                blendShapes);
-
-            Assert.AreEqual(3, expression.BlendShapeValues.Length);
-            Assert.AreEqual("Fcl_EYE_Close_L", expression.BlendShapeValues.Span[0].Name);
-            Assert.AreEqual("Fcl_EYE_Close_R", expression.BlendShapeValues.Span[1].Name);
-            Assert.AreEqual("Fcl_BRW_Down", expression.BlendShapeValues.Span[2].Name);
-        }
-
-        [Test]
-        public void Constructor_MultipleLayerSlots_CreatesInstance()
-        {
-            var slots = new[]
-            {
-                new LayerSlot("lipsync", new[] { new BlendShapeMapping("Fcl_MTH_A", 0.3f) }),
-                new LayerSlot("eye", new[] { new BlendShapeMapping("Fcl_EYE_Close", 1.0f) })
-            };
-
-            var expression = new Expression(
-                "id-3",
-                "angry",
-                "emotion",
-                0.25f,
-                TransitionCurve.Linear,
-                null,
-                slots);
-
-            Assert.AreEqual(2, expression.LayerSlots.Length);
-            Assert.AreEqual("lipsync", expression.LayerSlots.Span[0].Layer);
-            Assert.AreEqual("eye", expression.LayerSlots.Span[1].Layer);
-        }
-
-        [Test]
-        public void Constructor_CustomCurve_CreatesInstance()
-        {
-            var keys = new[]
-            {
-                new CurveKeyFrame(0f, 0f, 0f, 1f),
-                new CurveKeyFrame(1f, 1f, 1f, 0f)
-            };
-            var curve = new TransitionCurve(TransitionCurveType.Custom, keys);
-
-            var expression = new Expression(
-                "id-4",
-                "custom-transition",
-                "emotion",
-                0.5f,
-                curve);
-
-            Assert.AreEqual(TransitionCurveType.Custom, expression.TransitionCurve.Type);
-            Assert.AreEqual(2, expression.TransitionCurve.Keys.Length);
-        }
-
-        [Test]
-        public void Constructor_JapaneseName_CreatesInstance()
-        {
-            var expression = new Expression(
-                "id-jp",
-                "笑顔",
-                "感情");
-
-            Assert.AreEqual("笑顔", expression.Name);
-            Assert.AreEqual("感情", expression.Layer);
-        }
-
-        [Test]
-        public void Constructor_SpecialCharacterName_CreatesInstance()
-        {
-            var expression = new Expression(
-                "id-spec",
-                "expression-01_test",
-                "layer-01_test");
-
-            Assert.AreEqual("expression-01_test", expression.Name);
-            Assert.AreEqual("layer-01_test", expression.Layer);
-        }
-
-        // --- TransitionDuration クランプ ---
-
-        [Test]
-        public void Constructor_TransitionDurationNegative_ClampsToZero()
-        {
-            var expression = new Expression(
-                "id-clamp",
-                "test",
-                "emotion",
-                -0.5f);
-
-            Assert.AreEqual(0f, expression.TransitionDuration);
-        }
-
-        [Test]
-        public void Constructor_TransitionDurationOverOne_ClampsToOne()
-        {
-            var expression = new Expression(
-                "id-clamp2",
-                "test",
-                "emotion",
-                2.0f);
-
-            Assert.AreEqual(1f, expression.TransitionDuration);
-        }
-
-        // --- バリデーション ---
-
-        [Test]
-        public void Constructor_NullId_ThrowsArgumentNullException()
-        {
-            Assert.Throws<ArgumentNullException>(() =>
-                new Expression(null, "smile", "emotion"));
-        }
-
-        [Test]
-        public void Constructor_EmptyId_ThrowsArgumentException()
-        {
-            Assert.Throws<ArgumentException>(() =>
-                new Expression("", "smile", "emotion"));
-        }
-
-        [Test]
-        public void Constructor_WhitespaceId_ThrowsArgumentException()
-        {
-            Assert.Throws<ArgumentException>(() =>
-                new Expression("   ", "smile", "emotion"));
-        }
-
-        [Test]
-        public void Constructor_NullName_ThrowsArgumentNullException()
-        {
-            Assert.Throws<ArgumentNullException>(() =>
-                new Expression("id-1", null, "emotion"));
-        }
-
-        [Test]
-        public void Constructor_EmptyName_ThrowsArgumentException()
-        {
-            Assert.Throws<ArgumentException>(() =>
-                new Expression("id-1", "", "emotion"));
-        }
-
-        [Test]
-        public void Constructor_WhitespaceName_ThrowsArgumentException()
-        {
-            Assert.Throws<ArgumentException>(() =>
-                new Expression("id-1", "   ", "emotion"));
-        }
-
-        [Test]
-        public void Constructor_NullLayer_ThrowsArgumentNullException()
-        {
-            Assert.Throws<ArgumentNullException>(() =>
-                new Expression("id-1", "smile", null));
-        }
-
-        [Test]
-        public void Constructor_EmptyLayer_ThrowsArgumentException()
-        {
-            Assert.Throws<ArgumentException>(() =>
-                new Expression("id-1", "smile", ""));
-        }
-
-        [Test]
-        public void Constructor_WhitespaceLayer_ThrowsArgumentException()
-        {
-            Assert.Throws<ArgumentException>(() =>
-                new Expression("id-1", "smile", "   "));
-        }
-
-        // --- 防御的コピー ---
-
-        [Test]
-        public void BlendShapeValues_IsDefensiveCopy_OriginalArrayModificationDoesNotAffect()
-        {
-            var values = new[]
-            {
-                new BlendShapeMapping("Fcl_MTH_A", 0.5f)
-            };
-
-            var expression = new Expression(
-                "id-def",
-                "test",
-                "emotion",
-                0.25f,
-                TransitionCurve.Linear,
-                values);
-
-            // 元配列を変更しても Expression の値は変わらない
-            values[0] = new BlendShapeMapping("modified", 1.0f);
-
-            Assert.AreEqual("Fcl_MTH_A", expression.BlendShapeValues.Span[0].Name);
-            Assert.AreEqual(0.5f, expression.BlendShapeValues.Span[0].Value);
-        }
-
-        [Test]
-        public void LayerSlots_IsDefensiveCopy_OriginalArrayModificationDoesNotAffect()
-        {
-            var slots = new[]
-            {
-                new LayerSlot("lipsync", new[] { new BlendShapeMapping("test", 0.5f) })
-            };
-
-            var expression = new Expression(
-                "id-def2",
-                "test",
-                "emotion",
-                0.25f,
-                TransitionCurve.Linear,
-                null,
-                slots);
-
-            // 元配列を変更しても Expression の値は変わらない
-            slots[0] = new LayerSlot("modified", new[] { new BlendShapeMapping("other", 1.0f) });
-
-            Assert.AreEqual("lipsync", expression.LayerSlots.Span[0].Layer);
+            Assert.AreEqual(mask, expression.OverrideMask);
+            Assert.IsTrue((expression.OverrideMask & LayerOverrideMask.Bit0) != 0);
+            Assert.IsTrue((expression.OverrideMask & LayerOverrideMask.Bit3) != 0);
+            Assert.IsTrue((expression.OverrideMask & LayerOverrideMask.Bit7) != 0);
         }
     }
 }
