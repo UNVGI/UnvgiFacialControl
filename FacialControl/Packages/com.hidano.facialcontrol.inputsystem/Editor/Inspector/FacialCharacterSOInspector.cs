@@ -625,23 +625,26 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             }
 #endif
 
-            if (_expressionsProperty != null)
-            {
-                var expressionsField = new PropertyField(_expressionsProperty, "Expressions");
-                expressionsField.RegisterCallback<SerializedPropertyChangeEvent>(_ => RefreshExpressionChoices());
-                foldout.Add(expressionsField);
-            }
-
-            // Expression Creator ウィンドウを開くボタン
+            // Expression Creator ウィンドウを開くボタン (Expression リストの前に置く)。
+            // Expression の編集経路はこのウィンドウに統一し、下のリストは状態確認用の読み取り専用とする。
             var openCreatorButton = new Button(OpenExpressionCreatorWindow)
             {
                 name = "openExpressionCreatorButton",
                 text = "Expression Creator を開く",
-                tooltip = "BlendShape スライダーをプレビューしながら Expression を作成する Editor ウィンドウを開きます。",
+                tooltip = "BlendShape スライダーをプレビューしながら Expression を作成・編集する Editor ウィンドウを開きます。Expression はここから編集してください。",
             };
             openCreatorButton.AddToClassList(FacialControlStyles.ActionButton);
             openCreatorButton.style.marginTop = 4;
+            openCreatorButton.style.marginBottom = 4;
             foldout.Add(openCreatorButton);
+
+            if (_expressionsProperty != null)
+            {
+                var expressionsField = new PropertyField(_expressionsProperty, "Expressions (読み取り専用)");
+                expressionsField.RegisterCallback<SerializedPropertyChangeEvent>(_ => RefreshExpressionChoices());
+                expressionsField.SetEnabled(false);
+                foldout.Add(expressionsField);
+            }
 
             // RendererPaths は Expression セクション末尾に置く (BlendShape/Renderer 関連の編集対象)
             if (_rendererPathsProperty != null)
