@@ -8,40 +8,41 @@ using UnityEngine;
 namespace Hidano.FacialControl.Adapters.Bone
 {
     /// <summary>
-    /// アナログバインディングを毎フレーム評価し <see cref="BonePose"/> を構築、
-    /// <see cref="IBonePoseProvider.SetActiveBonePose"/> 経由で注入するアダプタ
+    /// アナログバインディングを毎フレーム評価し <see cref="BoneSnapshot"/> 列を構築、
+    /// <see cref="IBonePoseProvider.SetActiveBoneSnapshots"/> 経由で注入するアダプタ
     /// （Req 4.1〜4.9、tasks.md 4.1）。
     /// </summary>
     /// <remarks>
     /// <para>
     /// 構築時に <see cref="AnalogBindingTargetKind.BonePose"/> の binding を抽出し、
-    /// ユニークな bone 名ごとに <see cref="BonePoseEntry"/> スロットを 1 度だけ確保する（Req 4.7）。
+    /// ユニークな bone 名ごとに <see cref="BoneSnapshot"/> スロットを 1 度だけ確保する（Req 4.7）。
     /// 毎フレーム <see cref="BuildAndPush"/> で同一スロットの値だけを書換え、
-    /// Phase 2.1 で追加された internal <see cref="BonePose"/> hot-path ctor
-    /// (<c>BonePose(string, BonePoseEntry[], skipValidation:true)</c>) で構築する。
+    /// <see cref="ReadOnlyMemory{T}"/> 経由で <see cref="IBonePoseProvider"/> に渡す。
     /// </para>
     /// <para>
     /// 同一 (bone, axis) への複数 binding は post-mapping 値の sum（Req 4.6）。
-    /// bindings が 0 件 / 全ソースが無効の場合は空 <see cref="BonePose"/> を発行し、
+    /// bindings が 0 件 / 全ソースが無効の場合は空 <see cref="ReadOnlyMemory{T}"/> を発行し、
     /// <see cref="UnityEngine.Debug"/> を呼ばない（<see cref="BoneWriter.Apply"/> は空エントリで no-op）。
     /// </para>
     /// </remarks>
     public sealed class AnalogBonePoseProvider : IDisposable
     {
-        /// <summary>本アダプタが発行する <see cref="BonePose.Id"/>。</summary>
+        /// <summary>
+        /// 本アダプタが発行する論理 ID（preview.1 では参照キー未使用、互換目的のみ）。
+        /// </summary>
         public const string PoseId = "analog-bonepose";
 
         private readonly IBonePoseProvider _boneProvider;
         private readonly IReadOnlyDictionary<string, IAnalogInputSource> _sources;
         private readonly ResolvedBinding[] _resolvedBindings;
         private readonly BonePoseSlot[] _slots;
-        private readonly BonePoseEntry[] _entryBuffer;
+        private readonly BoneSnapshot[] _snapshotBuffer;
         private bool _disposed;
 
         /// <summary>
         /// <see cref="AnalogBonePoseProvider"/> を構築する。
         /// </summary>
-        /// <param name="boneProvider">BonePose 注入先（<see cref="FacialController"/> 等）。</param>
+        /// <param name="boneProvider">BoneSnapshot 注入先（<see cref="FacialController"/> 等）。</param>
         /// <param name="sources">sourceId → <see cref="IAnalogInputSource"/> の辞書。</param>
         /// <param name="bonePoseBindings">バインディング集合。<see cref="AnalogBindingTargetKind.BonePose"/> のみ採用。</param>
         public AnalogBonePoseProvider(
@@ -91,7 +92,7 @@ namespace Hidano.FacialControl.Adapters.Bone
                 ? Array.Empty<ResolvedBinding>()
                 : resolvedList.ToArray();
 
-            // Step 2: ユニーク bone のスロット配列と pre-alloc 済 entry buffer を作る。
+            // Step 2: ユニーク bone のスロット配列と pre-alloc 済 snapshot buffer を作る。
             int slotCount = boneNameToSlot.Count;
             _slots = slotCount == 0 ? Array.Empty<BonePoseSlot>() : new BonePoseSlot[slotCount];
             foreach (var kv in boneNameToSlot)
@@ -99,17 +100,21 @@ namespace Hidano.FacialControl.Adapters.Bone
                 _slots[kv.Value] = new BonePoseSlot(kv.Key);
             }
 
-            _entryBuffer = slotCount == 0 ? Array.Empty<BonePoseEntry>() : new BonePoseEntry[slotCount];
-            // 初期 entries に 0 度を書込む。BoneName は構築後不変なので毎フレーム書換える必要なし。
+            _snapshotBuffer = slotCount == 0 ? Array.Empty<BoneSnapshot>() : new BoneSnapshot[slotCount];
+            // 初期 snapshot に 0 度 / scale=1 を書込む。BonePath は構築後不変なので毎フレーム書換える必要なし。
             for (int s = 0; s < slotCount; s++)
             {
-                _entryBuffer[s] = new BonePoseEntry(_slots[s].BoneName, 0f, 0f, 0f);
+                _snapshotBuffer[s] = new BoneSnapshot(
+                    _slots[s].BoneName,
+                    0f, 0f, 0f,
+                    0f, 0f, 0f,
+                    1f, 1f, 1f);
             }
         }
 
         /// <summary>
-        /// per-frame に呼出され、binding 評価 → <see cref="BonePose"/> 構築 →
-        /// <see cref="IBonePoseProvider.SetActiveBonePose"/> を 1 回行う（Req 4.5）。
+        /// per-frame に呼出され、binding 評価 → <see cref="BoneSnapshot"/> 列構築 →
+        /// <see cref="IBonePoseProvider.SetActiveBoneSnapshots"/> を 1 回行う（Req 4.5）。
         /// </summary>
         public void BuildAndPush()
         {
@@ -163,17 +168,19 @@ namespace Hidano.FacialControl.Adapters.Bone
                 }
             }
 
-            // pre-alloc 済 _entryBuffer に値を書込む（BoneName は ctor で確定済）。
+            // pre-alloc 済 _snapshotBuffer に値を書込む（BonePath は ctor で確定済、
+            // Position / Scale は default で固定）。
             for (int s = 0; s < slotCount; s++)
             {
                 var slot = _slots[s];
-                _entryBuffer[s] = new BonePoseEntry(slot.BoneName, slot.EulerX, slot.EulerY, slot.EulerZ);
+                _snapshotBuffer[s] = new BoneSnapshot(
+                    slot.BoneName,
+                    0f, 0f, 0f,
+                    slot.EulerX, slot.EulerY, slot.EulerZ,
+                    1f, 1f, 1f);
             }
 
-            // Phase 2.1 で追加された internal hot-path ctor で BonePose を構築する。
-            // 既存 public ctor は防御的コピー + O(N²) 重複検出を行うため alloc=0 を満たさない。
-            var pose = new BonePose(PoseId, _entryBuffer, skipValidation: true);
-            _boneProvider.SetActiveBonePose(in pose);
+            _boneProvider.SetActiveBoneSnapshots(new ReadOnlyMemory<BoneSnapshot>(_snapshotBuffer, 0, slotCount));
         }
 
         /// <inheritdoc />

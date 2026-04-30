@@ -1,6 +1,6 @@
-using System;
 using System.Collections.Generic;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
 
 namespace Hidano.FacialControl.Application.UseCases
 {
@@ -13,15 +13,41 @@ namespace Hidano.FacialControl.Application.UseCases
     {
         private FacialProfile _profile;
         private readonly Dictionary<string, List<Expression>> _activeByLayer;
+        private ExpressionResolver _resolver;
+
+        /// <summary>
+        /// 紐付けられた <see cref="ExpressionResolver"/>（未注入の場合 null）。
+        /// </summary>
+        public ExpressionResolver Resolver => _resolver;
 
         /// <summary>
         /// ExpressionUseCase を生成する。
         /// </summary>
         /// <param name="profile">対象の表情設定プロファイル</param>
         public ExpressionUseCase(FacialProfile profile)
+            : this(profile, resolver: null)
+        {
+        }
+
+        /// <summary>
+        /// ExpressionUseCase を生成する（<see cref="ExpressionResolver"/> 注入版）。
+        /// </summary>
+        /// <param name="profile">対象の表情設定プロファイル</param>
+        /// <param name="resolver">SnapshotId → 値解決サービス（null 許容、tasks.md 3.4）</param>
+        public ExpressionUseCase(FacialProfile profile, ExpressionResolver resolver)
         {
             _profile = profile;
             _activeByLayer = new Dictionary<string, List<Expression>>();
+            _resolver = resolver;
+        }
+
+        /// <summary>
+        /// <see cref="ExpressionResolver"/> を後付けで注入する（tasks.md 3.4）。
+        /// </summary>
+        /// <param name="resolver">SnapshotId → 値解決サービス（null で解除）</param>
+        public void SetResolver(ExpressionResolver resolver)
+        {
+            _resolver = resolver;
         }
 
         /// <summary>

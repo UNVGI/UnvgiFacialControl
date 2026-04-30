@@ -1,24 +1,21 @@
 using System;
 using System.Reflection;
 using NUnit.Framework;
-using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
 
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
     /// <summary>
-    /// Req 7.1 契約テスト (tasks.md 5.4):
-    /// layer-input-source-blending 機能は <see cref="LayerBlender"/> のシグネチャを一切変更しない。
-    /// 既存 <c>Blend</c> / <c>ApplyLayerSlotOverrides</c> の public static API が同一シグネチャで
-    /// 存在し続けることをリフレクションで回帰検証する。
+    /// Req 7.1 契約テスト (tasks.md 5.4 / Phase 3.2 inspector-and-data-model-redesign):
+    /// layer-input-source-blending 機能は <see cref="LayerBlender"/> の <c>Blend</c> シグネチャを変更しない。
+    /// Phase 3.2 で <c>ApplyLayerSlotOverrides</c> オーバーロード群と <c>LayerSlot</c> 型は撤去された
+    /// （オーバーライドは Phase 3.4 の <c>ExpressionResolver</c> 経由で再設計される）。
     /// </summary>
     /// <remarks>
     /// シグネチャ要件:
     /// <list type="bullet">
     ///   <item><c>public static void Blend(ReadOnlySpan&lt;LayerBlender.LayerInput&gt;, Span&lt;float&gt;)</c></item>
     ///   <item><c>public static void Blend(LayerBlender.LayerInput[], float[])</c></item>
-    ///   <item><c>public static void ApplyLayerSlotOverrides(ReadOnlySpan&lt;string&gt;, LayerSlot[], Span&lt;float&gt;)</c></item>
-    ///   <item><c>public static void ApplyLayerSlotOverrides(string[], LayerSlot[], float[])</c></item>
     /// </list>
     /// </remarks>
     [TestFixture]

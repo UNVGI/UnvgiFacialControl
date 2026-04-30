@@ -119,8 +119,11 @@ namespace Hidano.FacialControl.Adapters.Json
                 /// <summary>BlendShape 値の配列</summary>
                 public const string BlendShapeValues = "blendShapeValues";
 
-                /// <summary>レイヤースロット（他レイヤーへのオーバーライド）</summary>
-                public const string LayerSlots = "layerSlots";
+                /// <summary>
+                /// LayerOverrideMask の永続化形式（layer 名配列）。Phase 3.2 (inspector-and-data-model-redesign)
+                /// で旧 <c>layerSlots</c> 配列を撤去し、本フィールドで他レイヤーへのオーバーライド対象を表現する。
+                /// </summary>
+                public const string LayerOverrideMask = "layerOverrideMask";
             }
 
             /// <summary>
@@ -175,18 +178,6 @@ namespace Hidano.FacialControl.Adapters.Json
 
                 /// <summary>対象 Renderer 名（省略可）</summary>
                 public const string Renderer = "renderer";
-            }
-
-            /// <summary>
-            /// LayerSlot のフィールド名
-            /// </summary>
-            public static class LayerSlot
-            {
-                /// <summary>ターゲットレイヤー名</summary>
-                public const string Layer = "layer";
-
-                /// <summary>BlendShape 値の配列</summary>
-                public const string BlendShapeValues = "blendShapeValues";
             }
 
             /// <summary>
@@ -302,14 +293,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 {""name"": ""Fcl_EYE_Joy"", ""value"": 0.8},
                 {""name"": ""Fcl_EYE_Joy_R"", ""value"": 0.6, ""renderer"": ""Face""}
             ],
-            ""layerSlots"": [
-                {
-                    ""layer"": ""lipsync"",
-                    ""blendShapeValues"": [
-                        {""name"": ""Fcl_MTH_A"", ""value"": 0.5}
-                    ]
-                }
-            ]
+            ""layerOverrideMask"": [""lipsync""]
         },
         {
             ""id"": ""661f9511-f30c-52e5-b827-557766551111"",
@@ -323,7 +307,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 {""name"": ""Fcl_ALL_Angry"", ""value"": 1.0},
                 {""name"": ""Fcl_BRW_Angry"", ""value"": 0.9}
             ],
-            ""layerSlots"": []
+            ""layerOverrideMask"": []
         },
         {
             ""id"": ""772a0622-a41d-63f6-c938-668877662222"",
@@ -336,7 +320,7 @@ namespace Hidano.FacialControl.Adapters.Json
             ""blendShapeValues"": [
                 {""name"": ""Fcl_EYE_Close"", ""value"": 1.0}
             ],
-            ""layerSlots"": []
+            ""layerOverrideMask"": []
         }
     ]
 }";

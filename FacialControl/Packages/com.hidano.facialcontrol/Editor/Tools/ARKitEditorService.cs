@@ -223,8 +223,7 @@ namespace Hidano.FacialControl.Editor.Tools
                         layer: source.Layer,
                         transitionDuration: source.TransitionDuration,
                         transitionCurve: source.TransitionCurve,
-                        blendShapeValues: source.BlendShapeValues.ToArray(),
-                        layerSlots: source.LayerSlots.ToArray());
+                        blendShapeValues: source.BlendShapeValues.ToArray());
 
                     mergedExpressions.Add(merged);
                     existingIds.Add(resolvedId);

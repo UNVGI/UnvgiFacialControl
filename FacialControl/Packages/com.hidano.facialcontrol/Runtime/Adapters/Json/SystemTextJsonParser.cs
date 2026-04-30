@@ -6,9 +6,6 @@ using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 
-// schema v1.0 専用の Obsolete DTO（BonePoseDto / BonePoseEntryDto）を bridge 期間として
-// 引き続き使用するため、CS0618 警告を抑制する。Phase 3.6（タスク 3.6）で v1.0 経路ごと物理削除予定。
-#pragma warning disable 618
 namespace Hidano.FacialControl.Adapters.Json
 {
     /// <summary>
@@ -777,7 +774,6 @@ namespace Hidano.FacialControl.Adapters.Json
             {
                 var d = dtos[i];
                 var blendShapes = ConvertBlendShapeMappings(d.blendShapeValues);
-                var layerSlots = ConvertLayerSlots(d.layerSlots);
                 var curve = ConvertTransitionCurve(d.transitionCurve);
 
                 expressions[i] = new Expression(
@@ -786,8 +782,7 @@ namespace Hidano.FacialControl.Adapters.Json
                     d.layer,
                     d.transitionDuration,
                     curve,
-                    blendShapes,
-                    layerSlots);
+                    blendShapes);
             }
             return expressions;
         }
@@ -807,21 +802,6 @@ namespace Hidano.FacialControl.Adapters.Json
                     string.IsNullOrEmpty(d.renderer) ? null : d.renderer);
             }
             return mappings;
-        }
-
-        private static LayerSlot[] ConvertLayerSlots(List<LayerSlotDto> dtos)
-        {
-            if (dtos == null || dtos.Count == 0)
-                return Array.Empty<LayerSlot>();
-
-            var slots = new LayerSlot[dtos.Count];
-            for (int i = 0; i < dtos.Count; i++)
-            {
-                var d = dtos[i];
-                var blendShapes = ConvertBlendShapeMappings(d.blendShapeValues);
-                slots[i] = new LayerSlot(d.layer, blendShapes);
-            }
-            return slots;
         }
 
         private static TransitionCurve ConvertTransitionCurve(TransitionCurveDto dto)
@@ -932,8 +912,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 layer = expr.Layer,
                 transitionDuration = expr.TransitionDuration,
                 transitionCurve = ConvertToTransitionCurveDto(expr.TransitionCurve),
-                blendShapeValues = new List<BlendShapeMappingDto>(),
-                layerSlots = new List<LayerSlotDto>()
+                blendShapeValues = new List<BlendShapeMappingDto>()
             };
 
             var bsSpan = expr.BlendShapeValues.Span;
@@ -945,29 +924,6 @@ namespace Hidano.FacialControl.Adapters.Json
                     value = bsSpan[i].Value,
                     renderer = bsSpan[i].Renderer ?? ""
                 });
-            }
-
-            var slotSpan = expr.LayerSlots.Span;
-            for (int i = 0; i < slotSpan.Length; i++)
-            {
-                var slotDto = new LayerSlotDto
-                {
-                    layer = slotSpan[i].Layer,
-                    blendShapeValues = new List<BlendShapeMappingDto>()
-                };
-
-                var slotBsSpan = slotSpan[i].BlendShapeValues.Span;
-                for (int j = 0; j < slotBsSpan.Length; j++)
-                {
-                    slotDto.blendShapeValues.Add(new BlendShapeMappingDto
-                    {
-                        name = slotBsSpan[j].Name,
-                        value = slotBsSpan[j].Value,
-                        renderer = slotBsSpan[j].Renderer ?? ""
-                    });
-                }
-
-                dto.layerSlots.Add(slotDto);
             }
 
             return dto;
@@ -1117,7 +1073,6 @@ namespace Hidano.FacialControl.Adapters.Json
             public float transitionDuration = 0.25f;
             public TransitionCurveDto transitionCurve;
             public List<BlendShapeMappingDto> blendShapeValues;
-            public List<LayerSlotDto> layerSlots;
         }
 
         [Serializable]
@@ -1145,13 +1100,6 @@ namespace Hidano.FacialControl.Adapters.Json
             public string name;
             public float value;
             public string renderer;
-        }
-
-        [Serializable]
-        private class LayerSlotDto
-        {
-            public string layer;
-            public List<BlendShapeMappingDto> blendShapeValues;
         }
 
         [Serializable]

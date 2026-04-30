@@ -267,15 +267,9 @@ namespace Hidano.FacialControl.Adapters.Playable
                 }
             }
 
-            // 初期 BonePose は profile.BonePoses[0]（存在しなければ default = 空）。
-            BonePose initialPose = default;
-            var bonePosesSpan = profile.BonePoses.Span;
-            if (bonePosesSpan.Length > 0)
-            {
-                initialPose = bonePosesSpan[0];
-            }
-
-            _boneWriter.Initialize(in initialPose, basisBoneName);
+            // Phase 3.3 (inspector-and-data-model-redesign) 以降、初期 BoneSnapshot 列は profile から
+            // 撤去されたため空で初期化する。analog-input-binding 等が後から SetActiveBoneSnapshots で流す。
+            _boneWriter.Initialize(ReadOnlyMemory<BoneSnapshot>.Empty, basisBoneName);
         }
 
         private void ApplyExtensions(FacialProfile profile, string[] blendShapeNames)
@@ -504,31 +498,31 @@ namespace Hidano.FacialControl.Adapters.Playable
         }
 
         /// <summary>
-        /// 外部 (analog-input-binding 等) から現在 active な <see cref="BonePose"/> を差替える
+        /// 外部 (analog-input-binding 等) から現在 active な <see cref="BoneSnapshot"/> 列を差替える
         /// (Req 11.1, 11.2, 11.3, 11.4, 11.5)。次フレームの <see cref="BoneWriter.Apply"/> から有効。
         /// </summary>
-        public void SetActiveBonePose(in BonePose pose)
+        public void SetActiveBoneSnapshots(ReadOnlyMemory<BoneSnapshot> snapshots)
         {
             if (_boneWriter == null)
             {
-                Debug.LogWarning("FacialController が初期化されていません。SetActiveBonePose は無視されます。");
+                Debug.LogWarning("FacialController が初期化されていません。SetActiveBoneSnapshots は無視されます。");
                 return;
             }
 
-            _boneWriter.SetActiveBonePose(in pose);
+            _boneWriter.SetActiveBoneSnapshots(snapshots);
         }
 
         /// <summary>
-        /// 現在 active な <see cref="BonePose"/> を返す (Req 5.6, 11.1)。
+        /// 現在 active な <see cref="BoneSnapshot"/> 列を返す (Req 5.6, 11.1)。
         /// </summary>
-        public BonePose GetActiveBonePose()
+        public ReadOnlyMemory<BoneSnapshot> GetActiveBoneSnapshots()
         {
             if (_boneWriter == null)
             {
                 return default;
             }
 
-            return _boneWriter.GetActiveBonePose();
+            return _boneWriter.GetActiveBoneSnapshots();
         }
 
         /// <summary>

@@ -181,7 +181,6 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
                 }
 
                 var blendShapes = ConvertBlendShapes(src.blendShapeValues);
-                var slots = ConvertLayerSlots(src.layerSlots);
                 var curve = ConvertTransitionCurve(src.transitionCurve);
 
                 result.Add(new Expression(
@@ -190,8 +189,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
                     src.layer,
                     src.transitionDuration,
                     curve,
-                    blendShapes,
-                    slots));
+                    blendShapes));
             }
             return result.ToArray();
         }
@@ -213,27 +211,6 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
                 }
                 string renderer = string.IsNullOrEmpty(src.renderer) ? null : src.renderer;
                 result.Add(new BlendShapeMapping(src.name, src.value, renderer));
-            }
-            return result.ToArray();
-        }
-
-        private static LayerSlot[] ConvertLayerSlots(IReadOnlyList<LayerSlotSerializable> slots)
-        {
-            if (slots == null || slots.Count == 0)
-            {
-                return Array.Empty<LayerSlot>();
-            }
-
-            var result = new List<LayerSlot>(slots.Count);
-            for (int i = 0; i < slots.Count; i++)
-            {
-                var src = slots[i];
-                if (src == null || string.IsNullOrWhiteSpace(src.layer))
-                {
-                    continue;
-                }
-                var blendShapes = ConvertBlendShapes(src.blendShapeValues);
-                result.Add(new LayerSlot(src.layer, blendShapes));
             }
             return result.ToArray();
         }
