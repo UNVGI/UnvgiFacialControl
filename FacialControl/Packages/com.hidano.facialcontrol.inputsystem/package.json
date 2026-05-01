@@ -20,7 +20,7 @@
         },
         {
             "displayName": "Analog Binding Demo",
-            "description": "FacialCharacterSO のアナログバインディングで右スティック → LeftEye/RightEye Euler、ARKit/OSC float → mouth-open BlendShape を駆動するサンプル。Scene / FacialCharacterSO / StreamingAssets JSON / HUD 一式を同梱 (新統合 SO 形式)。",
+            "description": "FacialCharacterSO のアナログバインディングで左スティック → LeftEye/RightEye Euler、ARKit/OSC float → mouth-open BlendShape を駆動するサンプル。Scene / FacialCharacterSO / StreamingAssets JSON / HUD 一式を同梱 (新統合 SO 形式)。",
             "path": "Samples~/AnalogBindingDemo"
         }
     ],

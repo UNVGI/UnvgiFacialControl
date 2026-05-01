@@ -456,7 +456,7 @@ MonoBehaviour:
   _meshRenderer: {fileID: 0}
   _mouthOpenBlendShapeName: jawOpen
   _displayedSourceIds:
-  - right_stick
+  - left_stick
   - arkit_jaw_open
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

@@ -4,7 +4,7 @@ using Hidano.FacialControl.Adapters.Playable;
 namespace Hidano.FacialControl.Samples
 {
     /// <summary>
-    /// アナログ入力 (右スティック → LeftEye/RightEye Euler、ARKit jawOpen / OSC float
+    /// アナログ入力 (左スティック → LeftEye/RightEye Euler、ARKit jawOpen / OSC float
     /// → mouth-open BlendShape) の入出力を OnGUI で目視確認するための PlayMode 専用 HUD。
     /// </summary>
     /// <remarks>
@@ -46,7 +46,7 @@ namespace Hidano.FacialControl.Samples
 
         [Tooltip("HUD で表示するアナログソース ID (informational)。")]
         [SerializeField]
-        private string[] _displayedSourceIds = { "right_stick", "arkit_jaw_open" };
+        private string[] _displayedSourceIds = { "left_stick", "arkit_jaw_open" };
 
         private Vector2 _scroll;
 
@@ -62,7 +62,7 @@ namespace Hidano.FacialControl.Samples
             _scroll = GUILayout.BeginScrollView(_scroll);
 
             GUILayout.Label("<b>Analog Binding Demo</b>", RichStyle());
-            GUILayout.Label("右スティック → LeftEye/RightEye Euler、jawOpen → mouth-open BS");
+            GUILayout.Label("左スティック → LeftEye/RightEye Euler、jawOpen → mouth-open BS");
 
             DrawControllerSection();
             GUILayout.Space(8);
