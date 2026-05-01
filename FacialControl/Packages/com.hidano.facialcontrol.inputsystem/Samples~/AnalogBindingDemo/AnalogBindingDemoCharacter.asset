@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 66b402a1dc2b31045843ee6bec45348a, type: 3}
   m_Name: AnalogBindingDemoCharacter
   m_EditorClassIdentifier:
-  _schemaVersion: "1.0"
+  _schemaVersion: "2.0"
   _layers:
   - name: emotion
     priority: 0
@@ -23,7 +23,6 @@ MonoBehaviour:
       optionsJson:
   _expressions: []
   _rendererPaths: []
-  _bonePoses: []
   _referenceModel: {fileID: 0}
   _inputActionAsset: {fileID: -944628639613478452, guid: 7d3a9c1b5e2f48a3b6c1d4e8f2a7b3c5, type: 3}
   _actionMapName: Analog

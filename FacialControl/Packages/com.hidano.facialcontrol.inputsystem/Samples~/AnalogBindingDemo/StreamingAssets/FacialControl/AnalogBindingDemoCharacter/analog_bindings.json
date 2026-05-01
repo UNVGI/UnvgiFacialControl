@@ -1,38 +1,28 @@
 {
-    "version": "1.0.0",
+    "schemaVersion": "2.0",
     "bindings": [
         {
-            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd4444",
-            "sourceAxis": 0,
-            "targetKind": "bonepose",
+            "inputActionRef": "aaaa1111-bbbb-2222-cccc-3333dddd4444",
             "targetIdentifier": "LeftEye",
             "targetAxis": "Y"
         },
         {
-            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd5555",
-            "sourceAxis": 0,
-            "targetKind": "bonepose",
+            "inputActionRef": "aaaa1111-bbbb-2222-cccc-3333dddd5555",
             "targetIdentifier": "LeftEye",
             "targetAxis": "X"
         },
         {
-            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd4444",
-            "sourceAxis": 0,
-            "targetKind": "bonepose",
+            "inputActionRef": "aaaa1111-bbbb-2222-cccc-3333dddd4444",
             "targetIdentifier": "RightEye",
             "targetAxis": "Y"
         },
         {
-            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd5555",
-            "sourceAxis": 0,
-            "targetKind": "bonepose",
+            "inputActionRef": "aaaa1111-bbbb-2222-cccc-3333dddd5555",
             "targetIdentifier": "RightEye",
             "targetAxis": "X"
         },
         {
-            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd6666",
-            "sourceAxis": 0,
-            "targetKind": "blendshape",
+            "inputActionRef": "aaaa1111-bbbb-2222-cccc-3333dddd6666",
             "targetIdentifier": "jawOpen",
             "targetAxis": "X"
         }
