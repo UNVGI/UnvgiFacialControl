@@ -101,3 +101,19 @@ Mode: --max-turns 200, timeout 3600s (60min)
 3. ✅ コンパイル成功、無関係領域への regression なし
 4. ✅ Req 11.1 / 11.3 / 11.4 / 11.5 / 12.7 を Performance テスト経路で保証
 | 4.8 | 0-alloc 検証 PlayMode/Performance テストを整備する | OK | 336s | run-logs-retry/task-4.8.log |
+| 5.1 | FacialCharacterSOInspector を UI Toolkit で全面改修し | OK | 571s | run-logs-retry/task-5.1.log |
+| 5.2 | ExpressionCreatorWindow を AnimationClip ベイク経路に改修する | OK | - | test-results/editmode-task-5-2-retry-v2.xml |
+
+## Task 5.2 結果
+
+判定: **OK**（前 batch run の commit 4bdbf4b + e2130d8 で実装済。RETRY 検証で再確認）
+
+### 検証結果
+
+1. ✅ `Editor/Tools/ExpressionCreatorWindow.cs` が AnimationClip ベイク経路に改修済（Domain Expression 保存ではなく `AnimationUtility.SetEditorCurve` + `SetAnimationEvents` 経由）
+2. ✅ ベイクロジックが `Editor/Tools/ExpressionClipBakery.cs` static helper に抽出済（Refactor 完了）
+3. ✅ TransitionDuration / Curve preset 編集 UI が遷移メタデータ foldout（スライダーペイン下部）として配置済（OQ4 解決）
+4. ✅ 逆ロード経路は `IExpressionAnimationClipSampler.SampleSnapshot` / `SampleSummary` 経由でスライダー値・遷移メタを復元
+5. ✅ Unity Test Runner EditMode: `ExpressionCreatorWindowTests` 6/6 緑（Bake_BlendShapeSliders / Bake_TransitionMetadata / LoadExistingClip / Bake_NullClip_Throws / Bake_NullEntries_Throws / Bake_RebakeOverwritesExistingCurves）
+6. ✅ 既存 PreviewRenderWrapper / BlendShapeNameProvider 再利用、Preview 機能維持
+7. ✅ コンパイル成功、無関係領域への regression なし
