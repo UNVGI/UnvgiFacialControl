@@ -10,12 +10,6 @@ namespace Hidano.FacialControl.Domain.Models
     /// readonly struct + immutable string + float のため Domain レベルで防御コピーは不要。
     /// 配列としての防御コピー責務は ExpressionSnapshot 側が持つ。
     /// </para>
-    /// <para>
-    /// 注意: 既存の <see cref="BonePose"/> / <see cref="BonePoseEntry"/> と概念的に重複しているが、
-    /// 本仕様（inspector-and-data-model-redesign）の Phase 3 で旧型は物理削除予定。
-    /// 旧 <see cref="BonePoseEntry"/> は Euler 3 値のみ、本型は Position / Euler / Scale の 9 値を保持する点が差分。
-    /// それまでの bridge 期間は両者を共存させる。
-    /// </para>
     /// </summary>
     public readonly struct BoneSnapshot : IEquatable<BoneSnapshot>
     {
