@@ -53,3 +53,17 @@ Mode: --max-turns 200, timeout 3600s (60min)
 3. ✅ Unity Test Runner EditMode: `AnalogProcessorTests` 27/27 緑（4.1 の 12 ケース + 4.2 の Invert 3 + Curve 4preset×3=12 = 15 ケース）
 4. ✅ コンパイル成功、無関係領域への regression なし
 5. ✅ 既に Phase 4.3 (`AnalogProcessorRegistration`) で `InvertProcessorName` / `CurveProcessorName` 登録済
+| 4.2 | Analog curve / invert の 2 種 InputProcessor を stateless | OK | 164s | run-logs-retry/task-4.2.log |
+| 4.3 | InputProcessor 6 種を Editor / Runtime 両方で一括登録する初期化フックを設置する | OK | - | test-results/playmode-task-4-3-retry.xml |
+
+## Task 4.3 結果
+
+判定: **OK**（前 batch run の commit 3d65003 で実装済。RETRY 検証で再確認）
+
+### 検証結果
+
+1. ✅ `AnalogProcessorRegistration` 静的クラスが `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/Processors/AnalogProcessorRegistration.cs` に存在し、`#if UNITY_EDITOR [InitializeOnLoad]` + `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]` の両経路から `Register()` を呼び出す
+2. ✅ 6 processor (DeadZone / Scale / Offset / Clamp / Curve / Invert) を `InputSystem.RegisterProcessor<T>(name)` で一括登録
+3. ✅ 登録名定数 (`DeadZoneProcessorName` / `ScaleProcessorName` / `OffsetProcessorName` / `ClampProcessorName` / `CurveProcessorName` / `InvertProcessorName`) を `public const string` で公開、`ProcessorNames` 配列でも提供
+4. ✅ Unity Test Runner PlayMode: `AnalogProcessorRegistrationTests` 7/7 緑（ProcessorNames_HasSixDistinctEntries + Register_*_IsResolvableByName ×6）
+5. ✅ コンパイル成功、Exit code 0
