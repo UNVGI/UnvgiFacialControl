@@ -39,3 +39,17 @@ Mode: --max-turns 200, timeout 3600s (60min)
 2. ✅ `Process(value, control)` の挙動が design.md Topic 3 / 要件 6.1, 6.4 通り
 3. ✅ Unity Test Runner EditMode: `AnalogProcessorTests` 27/27 緑（4.1 の 12 ケース + 4.2 の 15 ケース）
 4. ✅ コンパイル成功、無関係領域への regression なし
+| 4.1 | Analog deadzone / scale / offset / clamp の 4 種 InputProc | OK | 474s | run-logs-retry/task-4.1.log |
+| 4.2 | Analog curve / invert の 2 種 InputProcessor を stateless で実装する | OK | - | test-results/editmode-task-4-2-retry.xml |
+
+## Task 4.2 結果
+
+判定: **OK**（前 batch run の commit 3d65003 で実装済。RETRY 検証で再確認）
+
+### 検証結果
+
+1. ✅ `AnalogInvertProcessor`（stateless、`-value`）と `AnalogCurveProcessor`（preset 4 種、Linear/EaseIn=v*v/EaseOut=1-(1-v)^2/EaseInOut=SmoothStep）が `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/Processors/` 配下に存在し、`InputProcessor<float>` 派生
+2. ✅ Curve preset enum 定数を `private const int` で定義済（PresetLinear=0, PresetEaseIn=1, PresetEaseOut=2, PresetEaseInOut=3）
+3. ✅ Unity Test Runner EditMode: `AnalogProcessorTests` 27/27 緑（4.1 の 12 ケース + 4.2 の Invert 3 + Curve 4preset×3=12 = 15 ケース）
+4. ✅ コンパイル成功、無関係領域への regression なし
+5. ✅ 既に Phase 4.3 (`AnalogProcessorRegistration`) で `InvertProcessorName` / `CurveProcessorName` 登録済
