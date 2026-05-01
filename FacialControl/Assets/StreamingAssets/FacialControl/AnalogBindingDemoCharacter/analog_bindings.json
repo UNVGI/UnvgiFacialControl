@@ -1,90 +1,40 @@
-{
-    "version": "1.0.0",
+﻿{
+    "version": "2.0",
     "bindings": [
         {
-            "sourceId": "right_stick",
+            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd4444",
             "sourceAxis": 0,
-            "targetKind": "bonepose",
+            "targetKind": "blendshape",
             "targetIdentifier": "LeftEye",
-            "targetAxis": "Y",
-            "mapping": {
-                "deadZone": 0.05,
-                "scale": 30.0,
-                "offset": 0.0,
-                "curveType": "linear",
-                "curveKeyFrames": [],
-                "invert": false,
-                "min": -45.0,
-                "max": 45.0
-            }
+            "targetAxis": "Y"
         },
         {
-            "sourceId": "right_stick",
-            "sourceAxis": 1,
-            "targetKind": "bonepose",
-            "targetIdentifier": "LeftEye",
-            "targetAxis": "X",
-            "mapping": {
-                "deadZone": 0.05,
-                "scale": 30.0,
-                "offset": 0.0,
-                "curveType": "linear",
-                "curveKeyFrames": [],
-                "invert": true,
-                "min": -30.0,
-                "max": 30.0
-            }
-        },
-        {
-            "sourceId": "right_stick",
+            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd5555",
             "sourceAxis": 0,
-            "targetKind": "bonepose",
-            "targetIdentifier": "RightEye",
-            "targetAxis": "Y",
-            "mapping": {
-                "deadZone": 0.05,
-                "scale": 30.0,
-                "offset": 0.0,
-                "curveType": "linear",
-                "curveKeyFrames": [],
-                "invert": false,
-                "min": -45.0,
-                "max": 45.0
-            }
+            "targetKind": "blendshape",
+            "targetIdentifier": "LeftEye",
+            "targetAxis": "X"
         },
         {
-            "sourceId": "right_stick",
-            "sourceAxis": 1,
-            "targetKind": "bonepose",
+            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd4444",
+            "sourceAxis": 0,
+            "targetKind": "blendshape",
             "targetIdentifier": "RightEye",
-            "targetAxis": "X",
-            "mapping": {
-                "deadZone": 0.05,
-                "scale": 30.0,
-                "offset": 0.0,
-                "curveType": "linear",
-                "curveKeyFrames": [],
-                "invert": true,
-                "min": -30.0,
-                "max": 30.0
-            }
+            "targetAxis": "Y"
         },
         {
-            "sourceId": "arkit_jaw_open",
+            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd5555",
+            "sourceAxis": 0,
+            "targetKind": "blendshape",
+            "targetIdentifier": "RightEye",
+            "targetAxis": "X"
+        },
+        {
+            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd6666",
             "sourceAxis": 0,
             "targetKind": "blendshape",
             "targetIdentifier": "jawOpen",
-            "targetAxis": "X",
-            "mapping": {
-                "deadZone": 0.0,
-                "scale": 100.0,
-                "offset": 0.0,
-                "curveType": "linear",
-                "curveKeyFrames": [],
-                "invert": false,
-                "min": 0.0,
-                "max": 100.0
-            }
+            "targetAxis": "X"
         }
     ]
 }

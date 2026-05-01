@@ -11,6 +11,7 @@ using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.Common;
 using Hidano.FacialControl.Editor.Sampling;
 using Hidano.FacialControl.InputSystem.Adapters.ScriptableObject;
+using Hidano.FacialControl.InputSystem.Editor.AutoExport;
 
 namespace Hidano.FacialControl.InputSystem.Editor.Inspector
 {
@@ -172,8 +173,31 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             {
                 return;
             }
+
+            // フォーカス中の TextField 等の未確定値を反映する
+            serializedObject.ApplyModifiedProperties();
+
+            // OnWillSaveAssets 経路が発火しない環境でも JSON が更新されるよう、明示的に実行する
+            if (target is FacialCharacterProfileSO profileSO)
+            {
+                try
+                {
+                    FacialCharacterSOAutoExporter.SampleAnimationClipsIntoCachedSnapshots(
+                        profileSO, _sampler ?? new AnimationClipExpressionSampler());
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError(
+                        $"FacialCharacterSOInspector: AnimationClip サンプリングに失敗したため保存を中止します: {ex}");
+                    return;
+                }
+
+                FacialCharacterSOAutoExporter.ExportToStreamingAssets(profileSO);
+            }
+
             EditorUtility.SetDirty(target);
             AssetDatabase.SaveAssetIfDirty(target);
+            AssetDatabase.Refresh();
         }
 
         // ====================================================================

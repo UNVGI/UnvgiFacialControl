@@ -1,12 +1,15 @@
-{
-    "schemaVersion": "1.0",
+﻿{
+    "schemaVersion": "2.0",
     "layers": [
         {
             "name": "emotion",
             "priority": 0,
             "exclusionMode": "lastWins",
             "inputSources": [
-                {"id": "controller-expr", "weight": 1.0, "options": {}}
+                {
+                    "id": "controller-expr",
+                    "weight": 1.0
+                }
             ]
         }
     ],
