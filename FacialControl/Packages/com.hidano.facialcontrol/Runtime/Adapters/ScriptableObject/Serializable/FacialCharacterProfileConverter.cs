@@ -1,9 +1,17 @@
 using System;
 using System.Collections.Generic;
+using Hidano.FacialControl.Adapters.Json;
+using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Domain.Models;
 
 namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 {
+    /// <summary>
+    /// SO Serializable → Domain <see cref="FacialProfile"/> 変換器。
+    /// Phase 3.6 (inspector-and-data-model-redesign) で schema v2.0 専用となり、
+    /// <see cref="ExpressionSerializable.cachedSnapshot"/> から BlendShape 値 / 遷移メタを
+    /// 展開（snapshot 展開ロジック）して Domain Expression を構築する。
+    /// </summary>
     public static class FacialCharacterProfileConverter
     {
         public static FacialProfile ToFacialProfile(
@@ -12,7 +20,9 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             IReadOnlyList<ExpressionSerializable> expressions,
             IReadOnlyList<string> rendererPaths)
         {
-            string version = string.IsNullOrWhiteSpace(schemaVersion) ? "1.0" : schemaVersion;
+            string version = string.IsNullOrWhiteSpace(schemaVersion)
+                ? SystemTextJsonParser.SchemaVersionV2
+                : schemaVersion;
             var layerArr = ConvertLayers(layers);
             var inputSourceArr = ConvertLayerInputSources(layers);
             var expressionArr = ConvertExpressions(expressions);
@@ -87,7 +97,25 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             {
                 var src = expressions[i];
                 if (src == null || string.IsNullOrWhiteSpace(src.id) || string.IsNullOrWhiteSpace(src.name) || string.IsNullOrWhiteSpace(src.layer)) continue;
-                result.Add(new Expression(src.id, src.name, src.layer, src.transitionDuration, ConvertTransitionCurve(src.transitionCurve), ConvertBlendShapes(src.blendShapeValues)));
+
+                float duration;
+                TransitionCurve curve;
+                BlendShapeMapping[] blendShapes;
+
+                if (src.cachedSnapshot != null)
+                {
+                    duration = src.cachedSnapshot.transitionDuration;
+                    curve = ConvertTransitionCurvePreset(src.cachedSnapshot.transitionCurvePreset);
+                    blendShapes = ConvertSnapshotBlendShapes(src.cachedSnapshot.blendShapes);
+                }
+                else
+                {
+                    duration = src.transitionDuration;
+                    curve = ConvertTransitionCurve(src.transitionCurve);
+                    blendShapes = ConvertBlendShapes(src.blendShapeValues);
+                }
+
+                result.Add(new Expression(src.id, src.name, src.layer, duration, curve, blendShapes));
             }
             return result.ToArray();
         }
@@ -101,6 +129,20 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
                 var src = mappings[i];
                 if (src == null || string.IsNullOrEmpty(src.name)) continue;
                 string renderer = string.IsNullOrEmpty(src.renderer) ? null : src.renderer;
+                result.Add(new BlendShapeMapping(src.name, src.value, renderer));
+            }
+            return result.ToArray();
+        }
+
+        private static BlendShapeMapping[] ConvertSnapshotBlendShapes(IReadOnlyList<BlendShapeSnapshotDto> snapshots)
+        {
+            if (snapshots == null || snapshots.Count == 0) return Array.Empty<BlendShapeMapping>();
+            var result = new List<BlendShapeMapping>(snapshots.Count);
+            for (int i = 0; i < snapshots.Count; i++)
+            {
+                var src = snapshots[i];
+                if (src == null || string.IsNullOrEmpty(src.name)) continue;
+                string renderer = string.IsNullOrEmpty(src.rendererPath) ? null : src.rendererPath;
                 result.Add(new BlendShapeMapping(src.name, src.value, renderer));
             }
             return result.ToArray();
@@ -121,6 +163,21 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
                 }
             }
             return new TransitionCurve(curve.type, keys);
+        }
+
+        private static TransitionCurve ConvertTransitionCurvePreset(string preset)
+        {
+            if (string.IsNullOrEmpty(preset))
+                return TransitionCurve.Linear;
+
+            return preset.Trim() switch
+            {
+                "Linear"    => new TransitionCurve(TransitionCurveType.Linear),
+                "EaseIn"    => new TransitionCurve(TransitionCurveType.EaseIn),
+                "EaseOut"   => new TransitionCurve(TransitionCurveType.EaseOut),
+                "EaseInOut" => new TransitionCurve(TransitionCurveType.EaseInOut),
+                _ => TransitionCurve.Linear
+            };
         }
 
         private static string[] ConvertStrings(IReadOnlyList<string> values)

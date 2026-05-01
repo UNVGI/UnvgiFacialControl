@@ -256,7 +256,7 @@ namespace Hidano.FacialControl.Editor.Tools
 
             // RendererPaths と LayerInputSources は round-trip のため既存値を維持する
             var mergedProfile = new FacialProfile(
-                schemaVersion: string.IsNullOrEmpty(existingProfile.SchemaVersion) ? "1.0" : existingProfile.SchemaVersion,
+                schemaVersion: string.IsNullOrEmpty(existingProfile.SchemaVersion) ? Hidano.FacialControl.Adapters.Json.SystemTextJsonParser.SchemaVersionV2 : existingProfile.SchemaVersion,
                 layers: mergedLayers.ToArray(),
                 expressions: mergedExpressions.ToArray(),
                 rendererPaths: existingProfile.RendererPaths.ToArray(),

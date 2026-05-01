@@ -209,7 +209,7 @@ namespace Hidano.FacialControl.Editor.Windows
 
         /// <summary>
         /// FacialProfile ドメインモデルを構築する。
-        /// スキーマバージョンは "1.0"。
+        /// スキーマバージョンは "2.0"。
         /// <see cref="IncludeSampleExpressions"/> が true かつ <see cref="Naming"/> が
         /// <see cref="NamingConvention.None"/> でない場合、雛形 Expression を含める。
         /// </summary>
@@ -228,7 +228,7 @@ namespace Hidano.FacialControl.Editor.Windows
                 ? BuildSampleExpressions(Naming)
                 : Array.Empty<Expression>();
 
-            return new FacialProfile("1.0", layerDefinitions, expressions);
+            return new FacialProfile("2.0", layerDefinitions, expressions);
         }
     }
 }

@@ -43,7 +43,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseLayerInputSources_IdViolatesRegex_LogsWarningAndSkips()
         {
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""invalid id with space"",""weight"":1.0},
@@ -67,7 +67,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             // D-5: legacy フォールバック廃止。InputSourceId は 'legacy' を受理しない。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""legacy"",""weight"":1.0},
@@ -91,7 +91,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // 65 文字 ID は regex {1,64} に違反する。
             string tooLong = new string('a', 65);
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""" + tooLong + @""",""weight"":1.0},
@@ -118,7 +118,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             // 'unknown-source' は予約 ID でも x- 拡張でもない。Factory 未登録扱い。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""unknown-source"",""weight"":1.0},
@@ -140,7 +140,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseLayerInputSources_ReservedAndExtensionIds_BothAccepted()
         {
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""controller-expr"",""weight"":0.5},
@@ -166,7 +166,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseLayerInputSources_DuplicateId_LogsWarningAndKeepsLast()
         {
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""osc"",""weight"":0.25,""options"":{""stalenessSeconds"":1.0}},
@@ -194,7 +194,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             // 入力: [A1, B, A2, C]  → 出力: [B, A2, C] (A は最後の出現位置で保持)
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""osc"",""weight"":0.1},
@@ -222,7 +222,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             // 異なるレイヤーなら同 id は重複ではない。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""osc"",""weight"":1.0}
@@ -252,7 +252,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // 1 つのレイヤーに regex 違反 / 未知 / 重複 が混在していても parse は成功し、
             // 有効な最後の 'osc' エントリだけが残る。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""bad id"",""weight"":1.0},

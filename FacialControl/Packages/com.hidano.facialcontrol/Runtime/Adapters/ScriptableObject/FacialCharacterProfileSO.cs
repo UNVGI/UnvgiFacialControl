@@ -12,7 +12,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
         public const string StreamingAssetsRootFolder = "FacialControl";
         public const string ProfileJsonFileName = "profile.json";
 
-        [SerializeField] protected string _schemaVersion = "1.0";
+        [SerializeField] protected string _schemaVersion = "2.0";
         [SerializeField] protected List<LayerDefinitionSerializable> _layers = new List<LayerDefinitionSerializable>();
         [SerializeField] protected List<ExpressionSerializable> _expressions = new List<ExpressionSerializable>();
         [SerializeField] protected List<string> _rendererPaths = new List<string>();

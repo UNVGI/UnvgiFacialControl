@@ -58,7 +58,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
                     })
             };
 
-            return new FacialProfile("1.0", layers, expressions);
+            return new FacialProfile(SystemTextJsonParser.SchemaVersionV2, layers, expressions);
         }
 
         /// <summary>
@@ -87,7 +87,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
                     })
             };
 
-            return new FacialProfile("1.0", layers, expressions, rendererPaths);
+            return new FacialProfile(SystemTextJsonParser.SchemaVersionV2, layers, expressions, rendererPaths);
         }
 
         /// <summary>
@@ -191,7 +191,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
             var rebuilt = RebuildWithRendererPaths(original, new[] { "Body" });
             var parsed = RoundTrip(rebuilt);
 
-            Assert.AreEqual("1.0", parsed.SchemaVersion);
+            Assert.AreEqual(SystemTextJsonParser.SchemaVersionV2, parsed.SchemaVersion);
         }
 
         [Test]

@@ -8,7 +8,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
 {
     /// <summary>
     /// P17-T01: 新規プロファイル JSON 生成の検証。
-    /// デフォルトレイヤー構成、空 Expression リスト、スキーマバージョン "1.0" を検証する。
+    /// デフォルトレイヤー構成、空 Expression リスト、スキーマバージョン "2.0" を検証する。
     /// </summary>
     [TestFixture]
     public class ProfileCreationTests
@@ -65,13 +65,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
         // --- プロファイル生成テスト ---
 
         [Test]
-        public void BuildProfile_SchemaVersionIs1_0()
+        public void BuildProfile_SchemaVersionIsV2()
         {
             var data = ProfileCreationData.CreateDefault("test");
 
             var profile = data.BuildProfile();
 
-            Assert.AreEqual("1.0", profile.SchemaVersion);
+            Assert.AreEqual(SystemTextJsonParser.SchemaVersionV2, profile.SchemaVersion);
         }
 
         [Test]
@@ -178,7 +178,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
             var json = _parser.SerializeProfile(profile);
             var parsed = _parser.ParseProfile(json);
 
-            Assert.AreEqual("1.0", parsed.SchemaVersion);
+            Assert.AreEqual(SystemTextJsonParser.SchemaVersionV2, parsed.SchemaVersion);
         }
 
         [Test]

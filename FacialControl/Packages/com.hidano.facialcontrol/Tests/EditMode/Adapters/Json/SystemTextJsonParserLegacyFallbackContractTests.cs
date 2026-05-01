@@ -37,7 +37,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // Arrange: inputSources を一切宣言しないレイヤー。preview 破壊的変更 (D-5) により
             // 暗黙の legacy フォールバックは廃止されたため、例外でなければならない。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""}
                 ],
@@ -56,7 +56,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             // 空配列も「必須かつ非空」契約違反として FormatException になる (D-5)。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[]}
                 ],
@@ -74,7 +74,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             // ParseLayerInputSources の経路でも同じ契約が成立する必要がある。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""lipsync"",""priority"":1,""exclusionMode"":""blend""}
                 ],
@@ -98,7 +98,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // これにより、FacialController 側で Aggregator / Registry を組み立てるための
             // LayerInputSources 情報が伝播せず、暗黙の Expression パイプラインフォールバックが成立し得ない。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""}
                 ],
@@ -126,7 +126,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // 他のレイヤーが正しく宣言されていても、1 つでも欠落していれば例外になる。
             // これは「他レイヤーの宣言を流用して暗黙補完する」フォールバック禁止を意味する。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]},
                     {""name"":""lipsync"",""priority"":1,""exclusionMode"":""blend""}
@@ -177,7 +177,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // 宣言自体は存在するため schema チェックは通り FormatException にはならないが、
             // 有効な input source として扱われることは無い。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""legacy"",""weight"":1.0}

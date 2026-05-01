@@ -11,3 +11,4 @@ Mode: --max-turns 200, timeout 3600s (60min)
 | 3.2 | LayerSlot struct を撤去し、LayerOverrideMask への置� | OK | 265s | run-logs-retry/task-3.2.log |
 | 3.3 | FacialProfile から BonePoses 配列を撤去し、Expressi | OK | 395s | run-logs-retry/task-3.3.log |
 | 3.4 | ExpressionResolver サービスを新設し、SnapshotId → | OK | 270s | run-logs-retry/task-3.4.log |
+| 3.5 | Domain AnalogBindingEntry から Mapping field を撤去し� | OK | 308s | run-logs-retry/task-3.5.log |
