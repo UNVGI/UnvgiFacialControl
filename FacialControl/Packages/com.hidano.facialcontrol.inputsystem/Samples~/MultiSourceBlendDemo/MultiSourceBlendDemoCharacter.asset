@@ -96,14 +96,10 @@ MonoBehaviour:
   _expressionBindings:
   - actionName: Trigger1
     expressionId: smile
-    category: 1
   - actionName: Trigger2
     expressionId: angry
-    category: 1
   - actionName: Trigger3
     expressionId: surprise
-    category: 1
   - actionName: Trigger4
     expressionId: troubled
-    category: 1
   _analogBindings: []
