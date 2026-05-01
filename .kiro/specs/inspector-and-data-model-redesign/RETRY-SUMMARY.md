@@ -100,3 +100,4 @@ Mode: --max-turns 200, timeout 3600s (60min)
 2. ✅ Unity Test Runner PlayMode: `Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance` 16/16 緑（duration 0.144s）
 3. ✅ コンパイル成功、無関係領域への regression なし
 4. ✅ Req 11.1 / 11.3 / 11.4 / 11.5 / 12.7 を Performance テスト経路で保証
+| 4.8 | 0-alloc 検証 PlayMode/Performance テストを整備する | OK | 336s | run-logs-retry/task-4.8.log |

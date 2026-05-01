@@ -84,7 +84,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         private Label _debugJsonPathLabel;
         private HelpBox _expressionsValidationHelp;
         private Button _saveButton;
-        private ListView _expressionListView;
+        private VisualElement _expressionRowsContainer;
 
         // ====================================================================
         // 候補リスト
@@ -526,26 +526,31 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
 
             if (_expressionsProperty != null)
             {
-                _expressionListView = BuildArrayListView(
-                    _expressionsProperty,
-                    itemHeight: 280f,
-                    makeItem: () => CreateExpressionRow(),
-                    bindItem: (element, index) => BindExpressionRow(element, index));
-                _expressionListView.itemsAdded += indices =>
+                _expressionRowsContainer = new VisualElement();
+                _expressionRowsContainer.style.flexDirection = FlexDirection.Column;
+                foldout.Add(_expressionRowsContainer);
+
+                var footer = new VisualElement();
+                footer.style.flexDirection = FlexDirection.Row;
+                footer.style.marginTop = 4;
+
+                var addButton = new Button(() =>
                 {
                     serializedObject.Update();
-                    foreach (var addedIndex in indices)
-                    {
-                        if (addedIndex < 0 || addedIndex >= _expressionsProperty.arraySize)
-                        {
-                            continue;
-                        }
-                        AssignDefaultsForNewExpression(addedIndex);
-                    }
+                    int newIndex = _expressionsProperty.arraySize;
+                    _expressionsProperty.InsertArrayElementAtIndex(newIndex);
+                    AssignDefaultsForNewExpression(newIndex);
                     serializedObject.ApplyModifiedProperties();
+                    RebuildExpressionListView();
                     UpdateValidation();
+                })
+                {
+                    text = "+ Expression を追加",
                 };
-                foldout.Add(_expressionListView);
+                footer.Add(addButton);
+                foldout.Add(footer);
+
+                RebuildExpressionListView();
             }
 
             root.Add(foldout);
@@ -572,9 +577,10 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             };
             container.Add(nameField);
 
-            var clipField = new ObjectField("AnimationClip")
+            var clipField = new ExpressionClipObjectField
             {
                 name = ExpressionRowClipFieldName,
+                label = "AnimationClip",
                 objectType = typeof(AnimationClip),
                 allowSceneObjects = false,
                 tooltip = "時刻 0 の BlendShape / Bone 値と AnimationEvent メタデータをサンプリングするソース AnimationClip。",
@@ -669,14 +675,15 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 });
             }
 
-            var clipField = element.Q<ObjectField>(ExpressionRowClipFieldName);
+            var clipField = element.Q<ExpressionClipObjectField>(ExpressionRowClipFieldName);
             if (clipField != null && clipProp != null)
             {
+                clipField.OnValueAssigned = null;
                 clipField.SetValueWithoutNotify(clipProp.objectReferenceValue);
-                clipField.RegisterValueChangedCallback(evt =>
+                clipField.OnValueAssigned = newValue =>
                 {
-                    OnClipChanged(index, evt.newValue as AnimationClip, element);
-                });
+                    OnClipChanged(index, newValue as AnimationClip, element);
+                };
                 RefreshRendererSummary(element, clipProp.objectReferenceValue as AnimationClip);
             }
 
@@ -847,9 +854,38 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
 
         private void RebuildExpressionListView()
         {
-            if (_expressionListView != null)
+            if (_expressionRowsContainer == null || _expressionsProperty == null)
             {
-                _expressionListView.Rebuild();
+                return;
+            }
+            _expressionRowsContainer.Clear();
+
+            serializedObject.Update();
+            int count = _expressionsProperty.arraySize;
+            for (int i = 0; i < count; i++)
+            {
+                int capturedIndex = i;
+                var row = CreateExpressionRow();
+
+                var removeButton = new Button(() =>
+                {
+                    serializedObject.Update();
+                    if (capturedIndex >= 0 && capturedIndex < _expressionsProperty.arraySize)
+                    {
+                        _expressionsProperty.DeleteArrayElementAtIndex(capturedIndex);
+                        serializedObject.ApplyModifiedProperties();
+                        RebuildExpressionListView();
+                        UpdateValidation();
+                    }
+                })
+                {
+                    text = "削除",
+                };
+                removeButton.style.alignSelf = Align.FlexEnd;
+                row.Add(removeButton);
+
+                BindExpressionRow(row, capturedIndex);
+                _expressionRowsContainer.Add(row);
             }
         }
 
@@ -1004,9 +1040,18 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             }
 
             // 各行の HelpBox 状態を更新
-            if (_expressionListView != null)
+            if (_expressionRowsContainer != null)
             {
-                _expressionListView.RefreshItems();
+                for (int i = 0; i < _expressionRowsContainer.childCount && i < _expressionsProperty.arraySize; i++)
+                {
+                    var rowElem = _expressionRowsContainer[i];
+                    var entryProp = _expressionsProperty.GetArrayElementAtIndex(i);
+                    var clipProp = entryProp.FindPropertyRelative("animationClip");
+                    var maskProp = entryProp.FindPropertyRelative("layerOverrideMask");
+                    UpdateRowValidation(rowElem,
+                        clipProp != null ? clipProp.objectReferenceValue as AnimationClip : null,
+                        maskProp);
+                }
             }
         }
 
@@ -1279,6 +1324,28 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 }
             }
             return result;
+        }
+
+        /// <summary>
+        /// パネル未付与の Inspector でも値変更を検知できる ObjectField サブクラス。
+        /// <see cref="UnityEngine.UIElements.BaseField{TValueType}.value"/> setter は panel が無いと
+        /// ChangeEvent を dispatch しないため、<c>RegisterValueChangedCallback</c> は発火しない。
+        /// 本サブクラスは <see cref="SetValueWithoutNotify"/> 経路で
+        /// <see cref="OnValueAssigned"/> を呼出し、テスト・Editor 双方で動作するようにする。
+        /// </summary>
+        private sealed class ExpressionClipObjectField : ObjectField
+        {
+            public Action<UnityEngine.Object> OnValueAssigned;
+
+            public override void SetValueWithoutNotify(UnityEngine.Object newValue)
+            {
+                var previous = value;
+                base.SetValueWithoutNotify(newValue);
+                if (!ReferenceEquals(previous, newValue))
+                {
+                    OnValueAssigned?.Invoke(newValue);
+                }
+            }
         }
 
         /// <summary>
