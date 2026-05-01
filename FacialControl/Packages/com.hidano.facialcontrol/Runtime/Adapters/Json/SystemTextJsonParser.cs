@@ -245,6 +245,22 @@ namespace Hidano.FacialControl.Adapters.Json
             return PostprocessInputSourceOptions(raw);
         }
 
+        /// <summary>
+        /// 既に組み立て済みの <see cref="ProfileSnapshotDto"/> を schema v2.0 互換 JSON 文字列にシリアライズする。
+        /// AutoExporter が AnimationClip サンプリング結果を直接 JSON へ書き出す経路で使用する（Req 9.1, 9.2）。
+        /// </summary>
+        /// <param name="dto">トップレベル DTO。<see cref="ProfileSnapshotDto.schemaVersion"/> が空の場合は <see cref="SchemaVersionV2"/> を補完する。</param>
+        /// <returns>JsonUtility 整形済み JSON 文字列（<c>options</c> フィールドは生 JSON ブロックへ復元済）。</returns>
+        public string SerializeProfileSnapshot(ProfileSnapshotDto dto)
+        {
+            if (dto == null)
+                throw new ArgumentNullException(nameof(dto));
+            if (string.IsNullOrEmpty(dto.schemaVersion))
+                dto.schemaVersion = SchemaVersionV2;
+            var raw = JsonUtility.ToJson(dto, true);
+            return PostprocessInputSourceOptions(raw);
+        }
+
         /// <inheritdoc/>
         public FacialControlConfig ParseConfig(string json)
         {
