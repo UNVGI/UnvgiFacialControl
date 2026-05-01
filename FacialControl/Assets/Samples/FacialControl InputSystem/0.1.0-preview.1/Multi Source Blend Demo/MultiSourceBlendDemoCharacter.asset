@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 66b402a1dc2b31045843ee6bec45348a, type: 3}
   m_Name: MultiSourceBlendDemoCharacter
   m_EditorClassIdentifier:
-  _schemaVersion: "1.0"
+  _schemaVersion: "2.0"
   _layers:
   - name: emotion
     priority: 0
@@ -26,70 +26,103 @@ MonoBehaviour:
       optionsJson: '{"maxStackDepth":4}'
   _expressions:
   - id: smile
-    name: smile
+    name: Smile
     layer: emotion
+    animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e801, type: 2}
     transitionDuration: 0.25
     transitionCurve:
       type: 0
       keys: []
-    blendShapeValues:
-    - name: 笑い
-      value: 1
-      renderer:
-    - name: 口角上げ
-      value: 0.6
-      renderer:
-    layerSlots: []
-  - id: angry
-    name: angry
+    blendShapeValues: []
+    layerOverrideMask:
+    - emotion
+    cachedSnapshot:
+      transitionDuration: 0.25
+      transitionCurvePreset: Linear
+      blendShapes:
+      - rendererPath: Body
+        name: 笑い
+        value: 100
+      - rendererPath: Body
+        name: 口角上げ
+        value: 60
+      bones: []
+      rendererPaths:
+      - Body
+  - id: anger
+    name: Anger
     layer: emotion
+    animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e802, type: 2}
     transitionDuration: 0.25
     transitionCurve:
       type: 0
       keys: []
-    blendShapeValues:
-    - name: 怒り
-      value: 1
-      renderer:
-    - name: 左眉下げ
-      value: 0.5
-      renderer:
-    - name: 右眉下げ
-      value: 0.5
-      renderer:
-    layerSlots: []
+    blendShapeValues: []
+    layerOverrideMask:
+    - emotion
+    cachedSnapshot:
+      transitionDuration: 0.25
+      transitionCurvePreset: Linear
+      blendShapes:
+      - rendererPath: Body
+        name: 怒り
+        value: 100
+      - rendererPath: Body
+        name: 左眉下げ
+        value: 50
+      - rendererPath: Body
+        name: 右眉下げ
+        value: 50
+      bones: []
+      rendererPaths:
+      - Body
   - id: surprise
-    name: surprise
+    name: Surprise
     layer: emotion
+    animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e803, type: 2}
     transitionDuration: 0.2
     transitionCurve:
       type: 0
       keys: []
-    blendShapeValues:
-    - name: びっくり
-      value: 1
-      renderer:
-    - name: ▲
-      value: 0.8
-      renderer:
-    layerSlots: []
-  - id: troubled
-    name: troubled
+    blendShapeValues: []
+    layerOverrideMask:
+    - emotion
+    cachedSnapshot:
+      transitionDuration: 0.2
+      transitionCurvePreset: Linear
+      blendShapes:
+      - rendererPath: Body
+        name: びっくり
+        value: 100
+      - rendererPath: Body
+        name: ▲
+        value: 80
+      bones: []
+      rendererPaths:
+      - Body
+  - id: lipsync_a
+    name: Lipsync_A
     layer: emotion
-    transitionDuration: 0.25
+    animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e804, type: 2}
+    transitionDuration: 0.1
     transitionCurve:
       type: 0
       keys: []
-    blendShapeValues:
-    - name: 困る
-      value: 0.8
-      renderer:
-    - name: 口角下げ
-      value: 0.4
-      renderer:
-    layerSlots: []
-  _rendererPaths: []
-  _bonePoses: []
+    blendShapeValues: []
+    layerOverrideMask:
+    - emotion
+    cachedSnapshot:
+      transitionDuration: 0.1
+      transitionCurvePreset: Linear
+      blendShapes:
+      - rendererPath: Body
+        name: あ
+        value: 100
+      bones: []
+      rendererPaths:
+      - Body
+  _rendererPaths:
+  - Body
   _referenceModel: {fileID: 0}
   _inputActionAsset: {fileID: -944628639613478452, guid: a3b4c5d6e7f8091a2b3c4d5e6f708192, type: 3}
   _actionMapName: Expression
@@ -97,9 +130,9 @@ MonoBehaviour:
   - actionName: Trigger1
     expressionId: smile
   - actionName: Trigger2
-    expressionId: angry
+    expressionId: anger
   - actionName: Trigger3
     expressionId: surprise
   - actionName: Trigger4
-    expressionId: troubled
+    expressionId: lipsync_a
   _analogBindings: []

@@ -7,9 +7,10 @@
 | ファイル | 役割 |
 |---------|------|
 | `MultiSourceBlendDemo.unity` | Animator / FacialController / Extension / HUD を結線済みの Scene |
-| `MultiSourceBlendDemoCharacter.asset` | `FacialCharacterSO`（表情データ + 入力バインディングを 1 アセットに統合した新形式 SO） |
+| `MultiSourceBlendDemoCharacter.asset` | `FacialCharacterSO`（schema v2.0、表情 4 種を AnimationClip 参照で保持） |
+| `Smile.anim` / `Anger.anim` / `Surprise.anim` / `Lipsync_A.anim` | 各表情の AnimationClip。`FacialControlMeta_Set` AnimationEvent で transitionDuration / transitionCurvePreset を内蔵 |
 | `MultiSourceBlendDemoHUD.cs` | Weight スライダー + 各ソースごとの TriggerOn/Off ボタンを表示する HUD コンポーネント |
-| `StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/profile.json` | 2 source on the same layer + 4 Expression (smile / angry / surprise / troubled) を宣言したプロファイル定義 (FacialController が起動時に自動探索) |
+| `StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/profile.json` | 2 source on the same layer + 4 Expression (smile / anger / surprise / lipsync_a) を宣言した schema v2.0 プロファイル定義 (FacialController が起動時に自動探索) |
 | `README.md` | 本ファイル |
 
 モデル (prefab / FBX / VRM) はライセンスの都合で同梱しません。ユーザー自身で用意してください。
@@ -46,9 +47,9 @@ FBX / VRM / prefab いずれでも可。以下の BlendShape 名を持つ Skinne
 | Expression | 必要な BlendShape 名 |
 |-----------|-------------------|
 | smile | `笑い`, `口角上げ` |
-| angry | `怒り`, `左眉下げ`, `右眉下げ` |
+| anger | `怒り`, `左眉下げ`, `右眉下げ` |
 | surprise | `びっくり`, `▲` |
-| troubled | `困る`, `口角下げ` |
+| lipsync_a | `あ` |
 
 BlendShape 名が合致しないモデルを使う場合は、`MultiSourceBlendDemoCharacter` SO の Inspector を開き、Expression セクションで BlendShape 名をモデルに合わせて編集してください。SO の保存時に裏で `StreamingAssets/.../profile.json` が自動エクスポートされ、ランタイムへ反映されます。
 
@@ -63,10 +64,10 @@ BlendShape 名が合致しないモデルを使う場合は、`MultiSourceBlendD
 Play モードに入ります。画面左上に HUD が表示されます。
 
 - `Controller weight` / `Keyboard weight` スライダーで各ソースの重みを 0〜1 で調整
-- `Controller 入力源` ブロックで smile / angry / surprise / troubled の **On / Off** をトリガー
+- `Controller 入力源` ブロックで smile / anger / surprise / lipsync_a の **On / Off** をトリガー
 - `Keyboard 入力源` ブロックで同様にトリガー
 - 両ソースを同時にトリガーすると、モデルの BlendShape が加重和で合成される様子を確認できる
-- **キーボード 1 / 2 / 3 / 4** キーでも `keyboard-expr` 経由で smile / angry / surprise / troubled が発火します（SO の `ExpressionBindings` セクションで Action 名 → Expression ID をマッピング）
+- **キーボード 1 / 2 / 3 / 4** キーでも `keyboard-expr` 経由で smile / anger / surprise / lipsync_a が発火します（SO の `ExpressionBindings` セクションで Action 名 → Expression ID をマッピング）
 
 ### トラブルシューティング
 

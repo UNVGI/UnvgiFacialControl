@@ -39,7 +39,7 @@ namespace Hidano.FacialControl.Samples
         [SerializeField]
         private int _keyboardSourceIndex = 2;
 
-        private static readonly string[] s_expressionIds = { "smile", "angry", "surprise", "troubled" };
+        private static readonly string[] s_expressionIds = { "smile", "anger", "surprise", "lipsync_a" };
 
         private float _controllerWeight = 0.5f;
         private float _keyboardWeight = 0.5f;
