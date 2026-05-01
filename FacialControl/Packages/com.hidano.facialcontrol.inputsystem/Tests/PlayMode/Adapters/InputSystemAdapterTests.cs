@@ -269,6 +269,61 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters
         }
 
         // ================================================================
+        // Phase 4.7: device 推定経路（InputDeviceCategorizer 連携）
+        // ================================================================
+
+        [Test]
+        public void BindExpression_KeyboardBinding_DispatchesToKeyboardCategory()
+        {
+            var adapter = CreateAdapterWithBlendLayer(out var controller);
+            var expr = controller.CurrentProfile.Value.Expressions.Span[0];
+            var keyboardAction = CreateButtonAction("KeyboardTrigger", "<Keyboard>/1");
+
+            adapter.BindExpression(keyboardAction, expr);
+
+            Assert.IsTrue(adapter.TryGetDeviceCategory(keyboardAction, out var category));
+            Assert.AreEqual(DeviceCategory.Keyboard, category);
+        }
+
+        [Test]
+        public void BindExpression_GamepadBinding_DispatchesToControllerCategory()
+        {
+            var adapter = CreateAdapterWithBlendLayer(out var controller);
+            var expr = controller.CurrentProfile.Value.Expressions.Span[0];
+            var gamepadAction = CreateValueAction("GamepadTrigger", "<Gamepad>/leftTrigger");
+
+            adapter.BindExpression(gamepadAction, expr);
+
+            Assert.IsTrue(adapter.TryGetDeviceCategory(gamepadAction, out var category));
+            Assert.AreEqual(DeviceCategory.Controller, category);
+        }
+
+        [Test]
+        public void BindExpression_UnknownDevice_FallsBackToControllerWithWarning()
+        {
+            var adapter = CreateAdapterWithBlendLayer(out var controller);
+            var expr = controller.CurrentProfile.Value.Expressions.Span[0];
+            var unknownAction = CreateButtonAction("UnknownTrigger", "<Mystery>/button");
+
+            LogAssert.Expect(LogType.Warning,
+                new System.Text.RegularExpressions.Regex("InputSystemAdapter.*unrecognized device category"));
+            adapter.BindExpression(unknownAction, expr);
+
+            Assert.IsTrue(adapter.TryGetDeviceCategory(unknownAction, out var category));
+            Assert.AreEqual(DeviceCategory.Controller, category);
+        }
+
+        [Test]
+        public void TryGetDeviceCategory_UnregisteredAction_ReturnsFalse()
+        {
+            var adapter = CreateAdapterWithBlendLayer(out _);
+            var unboundAction = CreateButtonAction("Unbound", "<Keyboard>/2");
+
+            Assert.IsFalse(adapter.TryGetDeviceCategory(unboundAction, out var category));
+            Assert.AreEqual(DeviceCategory.Controller, category);
+        }
+
+        // ================================================================
         // Dispose
         // ================================================================
 
