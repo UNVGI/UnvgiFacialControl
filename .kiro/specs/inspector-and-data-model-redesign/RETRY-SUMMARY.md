@@ -145,3 +145,13 @@ Mode: --max-turns 200, timeout 3600s (60min)
    - Multi Source Blend Demo / Analog Binding Demo の Sample Scene を Unity Editor で開いて Play 実行
    - UPM Package Manager `Import Sample` 経由で空プロジェクトに import し動作確認
    - これらは batch retry の実行範囲外（GUI 操作が必要）。レビュー担当（Hidano + Junki Hiroi）の手元で次回確認
+| 6.5 | Phase 6 完了レビュー — Sample 結線確認と CI 全 | OK | 270s | run-logs-retry/task-6.5.log |
+
+Completed: 2026-05-01T03:28:01Z
+
+## Totals
+
+- OK: 23
+- FAIL: 0
+- TIMEOUT: 0
+- Total: 23
