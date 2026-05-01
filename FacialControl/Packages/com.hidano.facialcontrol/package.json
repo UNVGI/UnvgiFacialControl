@@ -1,6 +1,6 @@
 {
     "name": "jp.co.unvgi.facialcontrol",
-    "version": "0.1.0-preview.2",
+    "version": "0.1.0-preview.3",
     "displayName": "FacialControl",
     "description": "3D キャラクターの表情をリアルタイムに制御する Unity 向けライブラリ。OSC 配信は jp.co.unvgi.facialcontrol.osc、InputSystem 連携は jp.co.unvgi.facialcontrol.inputsystem を別途追加して使う。",
     "unity": "6000.3",
