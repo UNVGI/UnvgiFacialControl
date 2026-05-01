@@ -118,3 +118,4 @@ Mode: --max-turns 200, timeout 3600s (60min)
 6. ✅ 既存 PreviewRenderWrapper / BlendShapeNameProvider 再利用、Preview 機能維持
 7. ✅ コンパイル成功、無関係領域への regression なし
 | 5.2 | ExpressionCreatorWindow を AnimationClip ベイク経路に | OK | 252s | run-logs-retry/task-5.2.log |
+| 5.3 | FacialCharacterSOAutoExporter を AnimationClip サンプラ | OK | 765s | run-logs-retry/task-5.3.log |
