@@ -1,324 +1,297 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.TestTools;
-using Hidano.FacialControl.Adapters.FileSystem;
-using Hidano.FacialControl.Adapters.Json;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Editor.Sampling;
 using Hidano.FacialControl.InputSystem.Adapters.ScriptableObject;
 using Hidano.FacialControl.InputSystem.Editor.AutoExport;
-using DomainExpression = Hidano.FacialControl.Domain.Models.Expression;
 
 namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Editor.AutoExport
 {
     /// <summary>
-    /// Task 6: <see cref="FacialCharacterSOAutoExporter.ExportToStreamingAssets"/> の動作検証。
+    /// Phase 5.3: <see cref="FacialCharacterSOAutoExporter"/> の AnimationClip サンプラ経路 / 進捗 / abort 検証。
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// 検証観点:
+    /// <para>必須テスト（spec tasks.md 5.3 Red 段階）:</para>
     /// <list type="bullet">
-    ///   <item><see cref="FacialCharacterSO"/> 保存時に <c>profile.json</c> が StreamingAssets 配下に出力される</item>
-    ///   <item>同 SO で <c>analog_bindings.json</c> も併せて出力される</item>
-    ///   <item>抽象基底のみの具象 SO (<see cref="FacialCharacterSO"/> 以外) では analog_bindings.json は出力されない</item>
-    ///   <item>ラウンドトリップ: 出力 JSON を <see cref="FileProfileRepository"/> で読み戻すと SO データと一致する</item>
-    ///   <item>SO 名が空のときは警告ログのみで no-op</item>
+    ///   <item><c>OnWillSaveAssets_ValidSO_WritesV2JsonToStreamingAssets</c></item>
+    ///   <item><c>OnWillSaveAssets_SamplerThrows_AbortsSaveAndLogsError</c></item>
+    ///   <item><c>OnWillSaveAssets_ProgressBarShown_When_LongerThan200ms</c></item>
+    ///   <item><c>OnWillSaveAssets_NonFacialAsset_PassesThrough</c></item>
     /// </list>
-    /// </para>
-    /// <para>
-    /// テスト用ファイルは <see cref="Application.streamingAssetsPath"/> 配下の専用フォルダに書き出され、
-    /// <see cref="TearDown"/> で必ず削除する (dev プロジェクトの version control に diff を残さない)。
-    /// </para>
     /// </remarks>
     [TestFixture]
     public class FacialCharacterSOAutoExporterTests
     {
-        /// <summary>
-        /// 抽象 <see cref="FacialCharacterProfileSO"/> のみを継承するテスト用具象 SO。
-        /// アナログバインディングは持たないため、analog_bindings.json は出力されない想定。
-        /// </summary>
-        private sealed class TestCoreOnlyCharacterSO : FacialCharacterProfileSO { }
-
-        private string _tempAssetName;
-        private string _tempCharacterFolder;
-
-        [SetUp]
-        public void SetUp()
-        {
-            // 衝突回避のため毎回 GUID で一意化。先頭にプレフィックスを付けて手動清掃を可能にする。
-            _tempAssetName = "AutoExporterTest_" + Guid.NewGuid().ToString("N");
-            _tempCharacterFolder = Path.Combine(
-                UnityEngine.Application.streamingAssetsPath,
-                FacialCharacterProfileSO.StreamingAssetsRootFolder,
-                _tempAssetName);
-        }
+        private readonly List<string> _streamingAssetsCleanupRoots = new List<string>();
+        private readonly List<UnityEngine.Object> _objectsToDestroy = new List<UnityEngine.Object>();
 
         [TearDown]
         public void TearDown()
         {
-            // テスト出力フォルダを丸ごと削除し、dev プロジェクトに残骸を残さない。
-            try
+            // Test seam を必ず元に戻す
+            FacialCharacterSOAutoExporter.SamplerOverride = null;
+            FacialCharacterSOAutoExporter.ProgressBarPresenterOverride = null;
+            FacialCharacterSOAutoExporter.StopwatchProviderOverride = null;
+            FacialCharacterSOAutoExporter.AssetLoaderOverride = null;
+
+            for (int i = 0; i < _objectsToDestroy.Count; i++)
             {
-                if (!string.IsNullOrEmpty(_tempCharacterFolder) && Directory.Exists(_tempCharacterFolder))
+                if (_objectsToDestroy[i] != null)
                 {
-                    Directory.Delete(_tempCharacterFolder, recursive: true);
-                }
-                // .meta が AssetDatabase 経由で生成されている場合は併せて削除。
-                string metaPath = _tempCharacterFolder + ".meta";
-                if (File.Exists(metaPath))
-                {
-                    File.Delete(metaPath);
+                    UnityEngine.Object.DestroyImmediate(_objectsToDestroy[i]);
                 }
             }
-            catch (Exception ex)
+            _objectsToDestroy.Clear();
+
+            for (int i = 0; i < _streamingAssetsCleanupRoots.Count; i++)
             {
-                Debug.LogWarning(
-                    $"FacialCharacterSOAutoExporterTests: TearDown でテストフォルダ削除に失敗しました: {ex.Message}");
+                try
+                {
+                    if (Directory.Exists(_streamingAssetsCleanupRoots[i]))
+                    {
+                        Directory.Delete(_streamingAssetsCleanupRoots[i], recursive: true);
+                    }
+                }
+                catch (IOException) { }
             }
+            _streamingAssetsCleanupRoots.Clear();
         }
 
-        // ============================================================
-        // Helpers
-        // ============================================================
+        // ------------------------------------------------------------------
+        // ヘルパー
+        // ------------------------------------------------------------------
 
-        private FacialCharacterSO CreateInputCharacterSO()
+        private FacialCharacterSO CreateFacialCharacterSOWithBlendShapeClip(string soName, string clipBlendShapeName, float clipValue)
         {
             var so = ScriptableObject.CreateInstance<FacialCharacterSO>();
-            so.name = _tempAssetName;
-            so.SchemaVersion = "1.0";
+            so.name = soName;
+            _objectsToDestroy.Add(so);
 
-            so.Layers.Add(new LayerDefinitionSerializable
+            // Layer 追加
+            var layer = new LayerDefinitionSerializable
             {
                 name = "emotion",
                 priority = 0,
                 exclusionMode = ExclusionMode.LastWins,
-            });
+                inputSources = new List<InputSourceDeclarationSerializable>
+                {
+                    new InputSourceDeclarationSerializable { id = "controller-expr", weight = 1.0f }
+                }
+            };
+            so.Layers.Add(layer);
+
+            // AnimationClip 作成（時刻 0 で blendShape の値）
+            var clip = new AnimationClip { name = "TestClip" };
+            _objectsToDestroy.Add(clip);
+            var binding = new EditorCurveBinding
+            {
+                path = "Body",
+                propertyName = $"blendShape.{clipBlendShapeName}",
+                type = typeof(SkinnedMeshRenderer),
+            };
+            AnimationUtility.SetEditorCurve(clip, binding, AnimationCurve.Constant(0f, 0f, clipValue));
+
+            // Expression 追加
             so.Expressions.Add(new ExpressionSerializable
             {
-                id = "smile",
+                id = "expr-A",
                 name = "Smile",
                 layer = "emotion",
-                transitionDuration = 0.25f,
-            });
-            so.RendererPaths.Add("Body");
-
-            so.AnalogBindings.Add(new AnalogBindingEntrySerializable
-            {
-                sourceId = "x-right-stick",
-                sourceAxis = 0,
-                targetKind = AnalogBindingTargetKind.BlendShape,
-                targetIdentifier = "Mouth_A",
-                targetAxis = AnalogTargetAxis.X,
-                mapping = new AnalogMappingFunctionSerializable
-                {
-                    deadZone = 0.1f,
-                    scale = 1.0f,
-                    offset = 0.0f,
-                    invert = false,
-                    min = 0.0f,
-                    max = 1.0f,
-                },
+                animationClip = clip,
+                layerOverrideMask = new List<string> { "emotion" },
             });
 
             return so;
         }
 
-        // ============================================================
-        // profile.json: 出力されること
-        // ============================================================
+        private void RegisterStreamingAssetsCleanup(string soName)
+        {
+            var root = Path.Combine(
+                UnityEngine.Application.streamingAssetsPath,
+                FacialCharacterProfileSO.StreamingAssetsRootFolder,
+                soName);
+            _streamingAssetsCleanupRoots.Add(root);
+        }
+
+        private static string ExpectedProfileJsonPath(string soName)
+        {
+            return FacialCharacterProfileSO.GetStreamingAssetsProfilePath(soName);
+        }
+
+        // ------------------------------------------------------------------
+        // 1. ValidSO → schema v2.0 JSON が StreamingAssets に書き出される
+        // ------------------------------------------------------------------
 
         [Test]
-        public void ExportToStreamingAssets_FacialCharacterSO_WritesProfileJson()
+        public void OnWillSaveAssets_ValidSO_WritesV2JsonToStreamingAssets()
         {
-            var so = CreateInputCharacterSO();
-            try
+            string soName = "AutoExporterTestSO_Valid_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            var so = CreateFacialCharacterSOWithBlendShapeClip(soName, "Smile", 0.75f);
+            RegisterStreamingAssetsCleanup(soName);
+
+            string fakePath = $"Assets/{soName}.asset";
+            FacialCharacterSOAutoExporter.AssetLoaderOverride = path => path == fakePath ? so : null;
+
+            var resultPaths = FacialCharacterSOAutoExporter.ProcessAssetSavePaths(new[] { fakePath });
+
+            CollectionAssert.Contains(resultPaths, fakePath, "Valid SO の path は戻り値に維持されるべきです。");
+
+            string profilePath = ExpectedProfileJsonPath(soName);
+            Assert.IsTrue(File.Exists(profilePath), $"profile.json が書き出されるはず: {profilePath}");
+
+            string json = File.ReadAllText(profilePath, System.Text.Encoding.UTF8);
+            StringAssert.Contains("\"schemaVersion\": \"2.0\"", json, "schemaVersion=2.0 が出力されるべきです。");
+            StringAssert.Contains("\"id\": \"expr-A\"", json, "Expression id が JSON に含まれるべきです。");
+            StringAssert.Contains("\"name\": \"Smile\"", json, "blendShape 名が snapshot.blendShapes[].name に含まれるべきです。");
+            StringAssert.Contains("\"snapshot\":", json, "expressions[].snapshot が出力されるべきです（v2.0）。");
+
+            // cachedSnapshot が ExpressionSerializable に書き戻されていること
+            Assert.IsNotNull(so.Expressions[0].cachedSnapshot, "AutoExporter は cachedSnapshot を populate するべきです。");
+            Assert.AreEqual(1, so.Expressions[0].cachedSnapshot.blendShapes.Count);
+            Assert.AreEqual("Smile", so.Expressions[0].cachedSnapshot.blendShapes[0].name);
+            Assert.AreEqual(0.75f, so.Expressions[0].cachedSnapshot.blendShapes[0].value, 1e-5f);
+        }
+
+        // ------------------------------------------------------------------
+        // 2. Sampler が throw → 当該 SO の path は除外される + LogError
+        // ------------------------------------------------------------------
+
+        [Test]
+        public void OnWillSaveAssets_SamplerThrows_AbortsSaveAndLogsError()
+        {
+            string soName = "AutoExporterTestSO_Throw_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            var so = CreateFacialCharacterSOWithBlendShapeClip(soName, "Anger", 1.0f);
+            RegisterStreamingAssetsCleanup(soName);
+
+            string fakePath = $"Assets/{soName}.asset";
+            FacialCharacterSOAutoExporter.AssetLoaderOverride = path => path == fakePath ? so : null;
+            FacialCharacterSOAutoExporter.SamplerOverride = new ThrowingSampler();
+
+            // 内部で LogError を発行する想定（Req 9.6）。Regex で functionName 部分文字列を許容。
+            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex(".*FacialCharacterSOAutoExporter.*"));
+
+            var resultPaths = FacialCharacterSOAutoExporter.ProcessAssetSavePaths(new[] { fakePath });
+
+            Assert.IsFalse(System.Array.Exists(resultPaths, p => p == fakePath),
+                "Sampler が throw した SO の path は戻り値から除外されるべきです（Req 9.6）。");
+            string profilePath = ExpectedProfileJsonPath(soName);
+            Assert.IsFalse(File.Exists(profilePath), "abort された SO の profile.json は書き出されないべきです。");
+        }
+
+        // ------------------------------------------------------------------
+        // 3. 200ms 超で progress bar が表示され、try/finally で Clear される
+        // ------------------------------------------------------------------
+
+        [Test]
+        public void OnWillSaveAssets_ProgressBarShown_When_LongerThan200ms()
+        {
+            string soName = "AutoExporterTestSO_Progress_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            var so = CreateFacialCharacterSOWithBlendShapeClip(soName, "Surprise", 0.5f);
+            RegisterStreamingAssetsCleanup(soName);
+
+            string fakePath = $"Assets/{soName}.asset";
+            FacialCharacterSOAutoExporter.AssetLoaderOverride = path => path == fakePath ? so : null;
+
+            var fakeStopwatch = new FakeStopwatch { ElapsedMilliseconds = 250L };
+            FacialCharacterSOAutoExporter.StopwatchProviderOverride = new ConstantStopwatchProvider(fakeStopwatch);
+
+            var fakePresenter = new FakeProgressBarPresenter();
+            FacialCharacterSOAutoExporter.ProgressBarPresenterOverride = fakePresenter;
+
+            FacialCharacterSOAutoExporter.ProcessAssetSavePaths(new[] { fakePath });
+
+            Assert.GreaterOrEqual(fakePresenter.ShowCallCount, 1,
+                "経過時間が 200ms 超であれば progress bar の Show が呼ばれるべきです（Req 9.5）。");
+            Assert.GreaterOrEqual(fakePresenter.ClearCallCount, 1,
+                "try/finally で progress bar の Clear が呼ばれるべきです（Req 9.5）。");
+        }
+
+        // ------------------------------------------------------------------
+        // 4. 非 FacialCharacterProfileSO の path はそのまま素通し
+        // ------------------------------------------------------------------
+
+        [Test]
+        public void OnWillSaveAssets_NonFacialAsset_PassesThrough()
+        {
+            string fakePath = "Assets/SomeOtherAsset.asset";
+            string nonAssetPath = "ProjectSettings/SomeSettings.asset.txt";
+
+            FacialCharacterSOAutoExporter.AssetLoaderOverride = _ => null;
+
+            var inputPaths = new[] { fakePath, nonAssetPath };
+            var resultPaths = FacialCharacterSOAutoExporter.ProcessAssetSavePaths(inputPaths);
+
+            CollectionAssert.AreEquivalent(inputPaths, resultPaths,
+                "FacialCharacterProfileSO 由来でない path は順序維持で素通しされるべきです。");
+        }
+
+        // ------------------------------------------------------------------
+        // Test doubles
+        // ------------------------------------------------------------------
+
+        private sealed class ThrowingSampler : IExpressionAnimationClipSampler
+        {
+            public ExpressionSnapshot SampleSnapshot(string snapshotId, AnimationClip clip)
             {
-                bool result = FacialCharacterSOAutoExporter.ExportToStreamingAssets(so);
-
-                Assert.IsTrue(result, "ExportToStreamingAssets は true を返すべきです (少なくとも 1 ファイルを書き出す)。");
-
-                string profilePath = FacialCharacterProfileSO.GetStreamingAssetsProfilePath(_tempAssetName);
-                Assert.IsTrue(File.Exists(profilePath),
-                    $"profile.json が規約パスに出力されるべきです: {profilePath}");
+                throw new InvalidOperationException("intentional sampling failure for test");
             }
-            finally
+
+            public ClipSummary SampleSummary(AnimationClip clip)
             {
-                UnityEngine.Object.DestroyImmediate(so);
+                return new ClipSummary(
+                    new List<string>(),
+                    new List<string>(),
+                    0.25f,
+                    TransitionCurvePreset.Linear);
             }
         }
 
-        // ============================================================
-        // analog_bindings.json: FacialCharacterSO で出力されること
-        // ============================================================
-
-        [Test]
-        public void ExportToStreamingAssets_FacialCharacterSO_WritesAnalogBindingsJson()
+        private sealed class FakeStopwatch : FacialCharacterSOAutoExporter.IElapsedStopwatch
         {
-            var so = CreateInputCharacterSO();
-            try
-            {
-                FacialCharacterSOAutoExporter.ExportToStreamingAssets(so);
+            public long ElapsedMilliseconds { get; set; }
+        }
 
-                string analogPath = FacialCharacterSOAutoExporter
-                    .GetStreamingAssetsAnalogBindingsPath(_tempAssetName);
-                Assert.IsTrue(File.Exists(analogPath),
-                    $"analog_bindings.json が規約パスに出力されるべきです: {analogPath}");
-            }
-            finally
+        private sealed class ConstantStopwatchProvider : FacialCharacterSOAutoExporter.IStopwatchProvider
+        {
+            private readonly FacialCharacterSOAutoExporter.IElapsedStopwatch _stopwatch;
+
+            public ConstantStopwatchProvider(FacialCharacterSOAutoExporter.IElapsedStopwatch stopwatch)
             {
-                UnityEngine.Object.DestroyImmediate(so);
+                _stopwatch = stopwatch;
+            }
+
+            public FacialCharacterSOAutoExporter.IElapsedStopwatch Start()
+            {
+                return _stopwatch;
             }
         }
 
-        // ============================================================
-        // 抽象基底のみ: analog_bindings.json は出力されない
-        // ============================================================
-
-        [Test]
-        public void ExportToStreamingAssets_CoreOnlySO_DoesNotWriteAnalogBindings()
+        private sealed class FakeProgressBarPresenter : FacialCharacterSOAutoExporter.IProgressBarPresenter
         {
-            var so = ScriptableObject.CreateInstance<TestCoreOnlyCharacterSO>();
-            try
+            public int ShowCallCount;
+            public int ClearCallCount;
+            public string LastTitle;
+            public string LastInfo;
+            public float LastProgress;
+
+            public void Show(string title, string info, float progress)
             {
-                so.name = _tempAssetName;
-                so.SchemaVersion = "1.0";
-                so.Layers.Add(new LayerDefinitionSerializable
-                {
-                    name = "emotion",
-                    priority = 0,
-                    exclusionMode = ExclusionMode.LastWins,
-                });
-
-                bool result = FacialCharacterSOAutoExporter.ExportToStreamingAssets(so);
-                Assert.IsTrue(result, "profile.json だけでも書き出せれば true を返すべきです。");
-
-                string profilePath = FacialCharacterProfileSO.GetStreamingAssetsProfilePath(_tempAssetName);
-                Assert.IsTrue(File.Exists(profilePath), "profile.json は出力されるべきです。");
-
-                string analogPath = FacialCharacterSOAutoExporter
-                    .GetStreamingAssetsAnalogBindingsPath(_tempAssetName);
-                Assert.IsFalse(File.Exists(analogPath),
-                    "FacialCharacterSO 派生でない SO に対して analog_bindings.json は出力されてはなりません。");
+                ShowCallCount++;
+                LastTitle = title;
+                LastInfo = info;
+                LastProgress = progress;
             }
-            finally
+
+            public void Clear()
             {
-                UnityEngine.Object.DestroyImmediate(so);
+                ClearCallCount++;
             }
-        }
-
-        // ============================================================
-        // ラウンドトリップ: 出力 JSON を読み戻し、元の SO データと一致
-        // ============================================================
-
-        [Test]
-        public void ExportedProfileJson_RoundTripsThroughFileProfileRepository()
-        {
-            var so = CreateInputCharacterSO();
-            try
-            {
-                FacialCharacterSOAutoExporter.ExportToStreamingAssets(so);
-
-                string profilePath = FacialCharacterProfileSO.GetStreamingAssetsProfilePath(_tempAssetName);
-                Assert.IsTrue(File.Exists(profilePath), "profile.json が事前に出力されている必要があります。");
-
-                var repo = new FileProfileRepository(new SystemTextJsonParser());
-                FacialProfile loaded = repo.LoadProfile(profilePath);
-                FacialProfile expected = so.BuildFallbackProfile();
-
-                Assert.AreEqual(expected.SchemaVersion, loaded.SchemaVersion,
-                    "schemaVersion がラウンドトリップで一致するべきです。");
-                Assert.AreEqual(expected.Layers.Length, loaded.Layers.Length,
-                    "Layer 数がラウンドトリップで一致するべきです。");
-                Assert.AreEqual(expected.Expressions.Length, loaded.Expressions.Length,
-                    "Expression 数がラウンドトリップで一致するべきです。");
-                Assert.AreEqual(expected.RendererPaths.Length, loaded.RendererPaths.Length,
-                    "RendererPaths 数がラウンドトリップで一致するべきです。");
-
-                if (expected.Expressions.Length > 0 && loaded.Expressions.Length > 0)
-                {
-                    DomainExpression expectedFirst = expected.Expressions.Span[0];
-                    DomainExpression loadedFirst = loaded.Expressions.Span[0];
-                    Assert.AreEqual(expectedFirst.Id, loadedFirst.Id,
-                        "先頭 Expression の Id がラウンドトリップで一致するべきです。");
-                }
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(so);
-            }
-        }
-
-        // ============================================================
-        // ラウンドトリップ: analog_bindings.json
-        // ============================================================
-
-        [Test]
-        public void ExportedAnalogBindingsJson_RoundTripsThroughLoader()
-        {
-            var so = CreateInputCharacterSO();
-            try
-            {
-                FacialCharacterSOAutoExporter.ExportToStreamingAssets(so);
-
-                string analogPath = FacialCharacterSOAutoExporter
-                    .GetStreamingAssetsAnalogBindingsPath(_tempAssetName);
-                Assert.IsTrue(File.Exists(analogPath), "analog_bindings.json が事前に出力されている必要があります。");
-
-                string json = File.ReadAllText(analogPath, System.Text.Encoding.UTF8);
-                AnalogInputBindingProfile loaded = AnalogInputBindingJsonLoader.Load(json);
-
-                Assert.AreEqual(1, loaded.Bindings.Length,
-                    "ラウンドトリップしたアナログバインディング件数は元の SO データと一致するべきです。");
-
-                AnalogBindingEntry first = loaded.Bindings.Span[0];
-                Assert.AreEqual("x-right-stick", first.SourceId);
-                Assert.AreEqual(0, first.SourceAxis);
-                Assert.AreEqual(AnalogBindingTargetKind.BlendShape, first.TargetKind);
-                Assert.AreEqual("Mouth_A", first.TargetIdentifier);
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(so);
-            }
-        }
-
-        // ============================================================
-        // SO 名が空: 警告のみで no-op
-        // ============================================================
-
-        [Test]
-        public void ExportToStreamingAssets_EmptyAssetName_LogsWarningAndReturnsFalse()
-        {
-            var so = ScriptableObject.CreateInstance<FacialCharacterSO>();
-            try
-            {
-                so.name = string.Empty;
-
-                LogAssert.Expect(LogType.Warning,
-                    new System.Text.RegularExpressions.Regex("SO 名が空のため"));
-
-                bool result = FacialCharacterSOAutoExporter.ExportToStreamingAssets(so);
-
-                Assert.IsFalse(result, "SO 名が空のときは false を返すべきです。");
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(so);
-            }
-        }
-
-        // ============================================================
-        // null 入力: no-op
-        // ============================================================
-
-        [Test]
-        public void ExportToStreamingAssets_NullSO_ReturnsFalseSilently()
-        {
-            bool result = FacialCharacterSOAutoExporter.ExportToStreamingAssets(null);
-            Assert.IsFalse(result, "null 入力に対しては false を返すべきです (例外を投げない)。");
         }
     }
 }

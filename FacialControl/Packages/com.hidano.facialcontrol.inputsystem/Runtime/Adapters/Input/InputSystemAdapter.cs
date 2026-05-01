@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.InputSystem;
 using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Domain.Models;
@@ -12,11 +13,19 @@ namespace Hidano.FacialControl.Adapters.Input
     /// Button 型: ボタン押下で Expression をアクティブ/非アクティブにトグル切り替え。
     /// Value 型: 0 より大きい値でアクティブ化、0 で非アクティブ化。
     /// </summary>
+    /// <remarks>
+    /// Phase 4.7 (inspector-and-data-model-redesign) で <see cref="BindExpression"/> の入口に
+    /// <see cref="InputDeviceCategorizer.Categorize"/> 経路を追加した。バインディング毎に
+    /// <see cref="DeviceCategory"/> が決定され、<see cref="TryGetDeviceCategory"/> で参照できる。
+    /// 未認識 device は <see cref="DeviceCategory.Controller"/> に fallback し、本インスタンスで
+    /// 1 回のみ <see cref="Debug.LogWarning(object)"/> を出力する（Req 7.5）。
+    /// </remarks>
     public class InputSystemAdapter : IDisposable
     {
         private FacialController _facialController;
         private readonly Dictionary<InputAction, BindingEntry> _bindings = new Dictionary<InputAction, BindingEntry>();
         private bool _disposed;
+        private bool _hasWarnedUnknownDevice;
 
         /// <summary>
         /// 制御対象の FacialController を指定して生成する。
@@ -49,7 +58,9 @@ namespace Hidano.FacialControl.Adapters.Input
 
             UnbindExpression(action);
 
-            var entry = new BindingEntry(expression, action);
+            DeviceCategory category = ClassifyAction(action);
+
+            var entry = new BindingEntry(expression, action, category);
             _bindings[action] = entry;
 
             if (action.type == InputActionType.Button)
@@ -63,6 +74,46 @@ namespace Hidano.FacialControl.Adapters.Input
             }
 
             entry.Adapter = this;
+        }
+
+        /// <summary>
+        /// 既登録の <see cref="InputAction"/> に推定された <see cref="DeviceCategory"/> を返す（Req 7.2）。
+        /// </summary>
+        /// <param name="action">対象 <see cref="InputAction"/>。null は false を返す。</param>
+        /// <param name="category">推定 <see cref="DeviceCategory"/>（未登録時は <see cref="DeviceCategory.Controller"/>）。</param>
+        /// <returns>登録済みであれば true。</returns>
+        public bool TryGetDeviceCategory(InputAction action, out DeviceCategory category)
+        {
+            if (action != null && _bindings.TryGetValue(action, out var entry))
+            {
+                category = entry.Category;
+                return true;
+            }
+            category = DeviceCategory.Controller;
+            return false;
+        }
+
+        private DeviceCategory ClassifyAction(InputAction action)
+        {
+            string path = null;
+            var bindings = action.bindings;
+            if (bindings.Count > 0)
+            {
+                path = bindings[0].path;
+            }
+
+            DeviceCategory category = InputDeviceCategorizer.Categorize(path, out bool wasFallback);
+
+            if (wasFallback && !_hasWarnedUnknownDevice)
+            {
+                _hasWarnedUnknownDevice = true;
+                Debug.LogWarning(
+                    $"[InputSystemAdapter] unrecognized device category for action " +
+                    $"'{action.name}' (binding path='{path}'). Falling back to Controller. " +
+                    "This warning is emitted only once per instance.");
+            }
+
+            return category;
         }
 
         /// <summary>
@@ -154,13 +205,15 @@ namespace Hidano.FacialControl.Adapters.Input
         {
             public Expression Expression { get; }
             public InputAction Action { get; }
+            public DeviceCategory Category { get; }
             public bool IsActive { get; set; }
             public InputSystemAdapter Adapter { get; set; }
 
-            public BindingEntry(Expression expression, InputAction action)
+            public BindingEntry(Expression expression, InputAction action, DeviceCategory category)
             {
                 Expression = expression;
                 Action = action;
+                Category = category;
                 IsActive = false;
             }
 

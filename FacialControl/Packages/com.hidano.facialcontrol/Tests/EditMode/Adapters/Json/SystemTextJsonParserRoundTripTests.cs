@@ -5,14 +5,15 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 {
     /// <summary>
-    /// tasks.md 7.4: <see cref="SystemTextJsonParser"/> の順序保持と round-trip 安定性の契約テスト
-    /// (Req 3.5, 8.4, D-5)。
+    /// Phase 3.6 (inspector-and-data-model-redesign) tasks.md 3.6:
+    /// <see cref="SystemTextJsonParser"/> の schema v2.0 専用 round-trip 契約テスト
+    /// (Req 3.5, 8.4, 9.1, 9.7, 10.1)。
     /// <para>
     /// 観測完了条件:
     /// <list type="bullet">
     ///     <item><c>SerializeProfile → ParseProfile → SerializeProfile</c> が同一文字列を返す</item>
     ///     <item><c>inputSources</c> の宣言順が round-trip で保持される</item>
-    ///     <item>既定値（<c>weight=1.0</c>）の省略規則が一貫する</item>
+    ///     <item>schemaVersion は <c>"2.0"</c> 固定で出力される</item>
     /// </list>
     /// </para>
     /// </summary>
@@ -53,7 +54,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 new LayerDefinition("emotion", 0, ExclusionMode.LastWins),
                 new LayerDefinition("lipsync", 1, ExclusionMode.Blend)
             };
-            var profile = new FacialProfile("1.0", layers);
+            var profile = new FacialProfile(SystemTextJsonParser.SchemaVersionV2, layers);
 
             var s1 = _parser.SerializeProfile(profile);
             var s2 = _parser.SerializeProfile(_parser.ParseProfile(s1));
@@ -65,14 +66,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void SerializeParseSerialize_MultipleInputSourcesPerLayer_PreservesOrderAndString()
         {
             var json = @"{
-    ""schemaVersion"": ""1.0"",
+    ""schemaVersion"": ""2.0"",
     ""layers"": [
         {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [
             {""id"": ""controller-expr"", ""weight"": 0.5},
             {""id"": ""osc"", ""weight"": 0.5}
         ]}
     ],
-    ""expressions"": []
+    ""expressions"": [],
+    ""rendererPaths"": []
 }";
 
             var p1 = _parser.ParseProfile(json);
@@ -92,13 +94,14 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void SerializeParseSerialize_WithOscOptions_PreservesOptionsAndString()
         {
             var json = @"{
-    ""schemaVersion"": ""1.0"",
+    ""schemaVersion"": ""2.0"",
     ""layers"": [
         {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [
             {""id"": ""osc"", ""weight"": 1.0, ""options"": {""stalenessSeconds"": 2.5}}
         ]}
     ],
-    ""expressions"": []
+    ""expressions"": [],
+    ""rendererPaths"": []
 }";
 
             var p1 = _parser.ParseProfile(json);
@@ -125,7 +128,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseProfile_PreservesInputSourceDeclarationOrder()
         {
             var json = @"{
-    ""schemaVersion"": ""1.0"",
+    ""schemaVersion"": ""2.0"",
     ""layers"": [
         {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [
             {""id"": ""osc"", ""weight"": 0.3},
@@ -133,7 +136,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             {""id"": ""keyboard-expr"", ""weight"": 0.4}
         ]}
     ],
-    ""expressions"": []
+    ""expressions"": [],
+    ""rendererPaths"": []
 }";
 
             var profile = _parser.ParseProfile(json);
@@ -149,14 +153,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void SerializeProfile_EmitsInputSourcesInDeclarationOrder()
         {
             var profile = _parser.ParseProfile(@"{
-    ""schemaVersion"": ""1.0"",
+    ""schemaVersion"": ""2.0"",
     ""layers"": [
         {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [
             {""id"": ""osc"", ""weight"": 0.3},
             {""id"": ""controller-expr"", ""weight"": 0.7}
         ]}
     ],
-    ""expressions"": []
+    ""expressions"": [],
+    ""rendererPaths"": []
 }");
 
             var serialized = _parser.SerializeProfile(profile);
@@ -172,18 +177,24 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         [Test]
         public void SerializeProfile_WeightIsAlwaysEmittedConsistently()
         {
-            // 既定値 (weight=1.0) でも一貫して weight フィールドが emit される
-            // (JsonUtility はフィールドを省略しないため、omission 規則は『常に出力』で一貫)。
             var layers = new[]
             {
                 new LayerDefinition("emotion", 0, ExclusionMode.LastWins)
             };
-            var profile = new FacialProfile("1.0", layers);
+            var profile = new FacialProfile(SystemTextJsonParser.SchemaVersionV2, layers);
 
             var serialized = _parser.SerializeProfile(profile);
 
             StringAssert.Contains("\"weight\":", serialized);
             StringAssert.Contains("1", serialized);
+        }
+
+        [Test]
+        public void SerializeProfile_EmitsSchemaVersionV2()
+        {
+            var profile = new FacialProfile(SystemTextJsonParser.SchemaVersionV2);
+            var serialized = _parser.SerializeProfile(profile);
+            StringAssert.Contains("\"schemaVersion\": \"2.0\"", serialized);
         }
 
         // ================================================================
@@ -219,7 +230,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                     new InputSourceDeclaration("osc", 0.5f, "{\"stalenessSeconds\":1.0}")
                 }
             };
-            var profile = new FacialProfile("1.0", layers, null, null, layerInputSources);
+            var profile = new FacialProfile(SystemTextJsonParser.SchemaVersionV2, layers, null, null, layerInputSources);
 
             var s1 = _parser.SerializeProfile(profile);
             var p2 = _parser.ParseProfile(s1);

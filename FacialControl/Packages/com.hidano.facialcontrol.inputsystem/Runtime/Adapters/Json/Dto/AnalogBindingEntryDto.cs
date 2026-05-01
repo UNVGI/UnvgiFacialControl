@@ -27,8 +27,5 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
 
         /// <summary>BonePose ターゲットの Euler 軸文字列（"X"/"Y"/"Z"、大小無視）。BlendShape では無視。</summary>
         public string targetAxis;
-
-        /// <summary>マッピング関数 DTO。</summary>
-        public AnalogMappingDto mapping;
     }
 }

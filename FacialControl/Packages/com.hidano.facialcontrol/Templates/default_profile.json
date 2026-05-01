@@ -1,5 +1,6 @@
 {
-    "schemaVersion": "1.0",
+    "schemaVersion": "2.0",
+    "rendererPaths": [],
     "layers": [
         {"name": "emotion", "priority": 0, "exclusionMode": "lastWins", "inputSources": [
             {"id": "controller-expr", "weight": 0.5},
@@ -15,45 +16,53 @@
             "id": "00000000-0000-0000-0000-000000000001",
             "name": "default",
             "layer": "emotion",
-            "transitionDuration": 0.25,
-            "transitionCurve": {
-                "type": "linear"
-            },
-            "blendShapeValues": [],
-            "layerSlots": []
+            "layerOverrideMask": [],
+            "snapshot": {
+                "transitionDuration": 0.25,
+                "transitionCurvePreset": "Linear",
+                "blendShapes": [],
+                "bones": [],
+                "rendererPaths": []
+            }
         },
         {
             "id": "00000000-0000-0000-0000-000000000002",
             "name": "blink",
             "layer": "eye",
-            "transitionDuration": 0.08,
-            "transitionCurve": {
-                "type": "linear"
-            },
-            "blendShapeValues": [],
-            "layerSlots": []
+            "layerOverrideMask": [],
+            "snapshot": {
+                "transitionDuration": 0.08,
+                "transitionCurvePreset": "Linear",
+                "blendShapes": [],
+                "bones": [],
+                "rendererPaths": []
+            }
         },
         {
             "id": "00000000-0000-0000-0000-000000000003",
             "name": "gaze_follow",
             "layer": "eye",
-            "transitionDuration": 0.25,
-            "transitionCurve": {
-                "type": "linear"
-            },
-            "blendShapeValues": [],
-            "layerSlots": []
+            "layerOverrideMask": [],
+            "snapshot": {
+                "transitionDuration": 0.25,
+                "transitionCurvePreset": "Linear",
+                "blendShapes": [],
+                "bones": [],
+                "rendererPaths": []
+            }
         },
         {
             "id": "00000000-0000-0000-0000-000000000004",
             "name": "gaze_camera",
             "layer": "eye",
-            "transitionDuration": 0.25,
-            "transitionCurve": {
-                "type": "linear"
-            },
-            "blendShapeValues": [],
-            "layerSlots": []
+            "layerOverrideMask": [],
+            "snapshot": {
+                "transitionDuration": 0.25,
+                "transitionCurvePreset": "Linear",
+                "blendShapes": [],
+                "bones": [],
+                "rendererPaths": []
+            }
         }
     ]
 }

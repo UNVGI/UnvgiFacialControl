@@ -2,6 +2,67 @@
 
 すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
 
+## [0.1.0-preview.2] - 2026-05-01
+
+### ⚠ BREAKING CHANGES
+
+> 本リリースは spec `inspector-and-data-model-redesign` に基づく Domain モデル / 中間 JSON schema / InputSystem 連携の全面改修を含みます。**v0.1.0-preview.1 以前の `FacialCharacterSO` / JSON / Scene / Prefab はロードできません**。アップグレード前に必ず [`Migration Guide v0.x → v1.0`](../com.hidano.facialcontrol.inputsystem/Documentation~/MIGRATION-v0.x-to-v1.0.md) の手順で資産を変換してください（Req 10.1, 10.6）。
+
+#### 中間 JSON schema 破壊
+
+- `schemaVersion` を `"2.0"` に bump。`SystemTextJsonParser` は `schemaVersion != "2.0"` を `Debug.LogError` + `InvalidOperationException` で拒否（schema v1.0 ロード不可）
+- `expressions[]` を `id / name / layer / layerOverrideMask: List<string> / snapshot: ExpressionSnapshotDto` の snapshot table 形式に再構成。旧 `transitionDuration / transitionCurve / blendShapeValues / layerSlots` field を撤去
+- top-level `rendererPaths[]` を新設し、各 Expression snapshot の `rendererPaths[]` がそのサブセットであることを保証
+
+#### Domain モデルの撤去
+
+- `Hidano.FacialControl.Domain.Models.LayerSlot` — `LayerOverrideMask` (`[Flags] enum : int`、32 bit) に置換
+- `Hidano.FacialControl.Domain.Models.BonePose` / `BonePoseEntry` — `BoneSnapshot` (`ReadOnlyMemory<BoneSnapshot>`) に統合
+- `Hidano.FacialControl.Domain.Models.FacialProfile.BonePoses` プロパティ — Expression snapshot 経路に一元化
+- `Hidano.FacialControl.Domain.Models.AnalogMappingFunction` — InputAction Asset の processors チェーンに置換
+- `Hidano.FacialControl.Domain.Services.AnalogMappingEvaluator` — 上記に伴い物理削除
+- `Hidano.FacialControl.Domain.Models.Expression` の独立 field（`TransitionDuration / TransitionCurve / BlendShapeValues / LayerSlots`） — `SnapshotId` 参照に集約
+- `TransitionCurve` enum — `TransitionCurvePreset` enum (`Linear=0 / EaseIn=1 / EaseOut=2 / EaseInOut=3`) に置換
+
+#### InputSystem 連携の撤去
+
+- `KeyboardExpressionInputSource` / `ControllerExpressionInputSource` MonoBehaviour — `ExpressionInputSourceAdapter` 1 個に統合（`com.hidano.facialcontrol.inputsystem` パッケージで管理）
+- `ExpressionBindingEntry.Category` field — `InputDeviceCategorizer.Categorize(bindingPath)` で自動分類
+- `InputSourceCategory` enum — 参照ゼロ確認のうえ撤去（OSC 別 spec で再導入の余地）
+- `FacialCharacterSO.GetExpressionBindings(InputSourceCategory category)` — 引数なし版に縮退
+- `AnalogBindingEntry.Mapping` field — `*.inputactions` 内の processors 文字列に移行
+
+### Added
+
+#### Domain 層
+
+- `LayerOverrideMask`（`[Flags] enum : int`、32 bit）— レイヤーオーバーライド bit マスク
+- `BlendShapeSnapshot`（`readonly struct`、`RendererPath / Name / Value`）
+- `BoneSnapshot`（`readonly struct`、`BonePath / Position(X,Y,Z) / Euler(X,Y,Z) / Scale(X,Y,Z)`）
+- `ExpressionSnapshot`（`Id / TransitionDuration / TransitionCurvePreset / BlendShapes / Bones / RendererPaths`、防御コピー + `ReadOnlyMemory<T>` 公開）
+- `TransitionCurvePreset` enum（`Linear=0 / EaseIn=1 / EaseOut=2 / EaseInOut=3`）
+- `Domain.Services.ExpressionResolver` — `TryResolve(snapshotId, Span<float> blendShapeOutput, Span<BoneSnapshot> boneOutput)` の 0-alloc preallocated 解決経路
+
+#### Adapters / Editor 層
+
+- `Editor/Sampling/IExpressionAnimationClipSampler` interface と `AnimationClipExpressionSampler` 実装 — `AnimationUtility.GetCurveBindings` / `GetEditorCurve(...).Evaluate(0f)` で AnimationClip → `ExpressionSnapshot` をサンプリング
+- AnimationEvent 経由のメタデータ運搬規約（予約 functionName `FacialControlMeta_Set`、key `transitionDuration` / `transitionCurvePreset`）
+- 中間 JSON schema v2.0 DTO（`ExpressionSnapshotDto` / `BlendShapeSnapshotDto` / `BoneSnapshotDto`）
+- `FacialCharacterSOAutoExporter` の `OnWillSaveAssets` 経路 — 200ms 超で `EditorUtility.DisplayProgressBar` 発火、サンプリング失敗時は当該 SO の save abort + `Debug.LogError`
+- `FacialCharacterSOInspector` UI Toolkit 全面改修 — AnimationClip ObjectField / Layer DropdownField / LayerOverrideMask MaskField / read-only RendererPath summary、validation エラー時の HelpBox + Save 無効化、Guid 自動採番、AnimationClip 名からの Name 派生
+
+### Changed
+
+- `Domain.Models.AnalogBindingEntry` を `SourceId / SourceAxis / TargetKind / TargetIdentifier / TargetAxis` の 5 field に縮退（Mapping は Adapters 側 `InputActionReference` の processors に移管）
+- `BonePoseComposer` の入力型を `BoneSnapshot` 経路に統一
+- `ExpressionCreatorWindow` を AnimationClip ベイク経路に改修（`AnimationUtility.SetEditorCurve` + `SetAnimationEvents`）
+
+### Removed
+
+- `Domain.Models.LayerSlot`、`Domain.Models.BonePose`、`Domain.Models.BonePoseEntry`、`Domain.Models.AnalogMappingFunction`、`Domain.Services.AnalogMappingEvaluator`
+- `FacialProfile.BonePoses` プロパティ
+- 旧 `BonePoseDto` / `BonePoseEntryDto` / `LayerSlotDto` / `AnalogMappingFunctionSerializable`
+
 ## [0.1.0-preview.1] - Unreleased
 
 初回プレリリース。3 パッケージ構成（コア + `com.hidano.facialcontrol.osc` + `com.hidano.facialcontrol.inputsystem`）で提供。

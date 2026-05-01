@@ -26,3 +26,15 @@
 .fc-action-button {
     margin-top: 4px;
 }
+
+/* HelpBox の長文が縦方向に潰れて文字が縮小される Unity 6 の挙動への対策。
+   内部 Label の whiteSpace を Normal にして折り返し表示させる。 */
+.unity-help-box {
+    margin-top: 2px;
+    margin-bottom: 4px;
+}
+.unity-help-box Label,
+.unity-help-box .unity-label,
+.unity-help-box .unity-text-element {
+    white-space: normal;
+}

@@ -34,7 +34,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseProfile_LayerMissingInputSources_ThrowsFormatException()
         {
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""}
                 ],
@@ -51,7 +51,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseProfile_LayerInputSourcesEmptyArray_ThrowsFormatException()
         {
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[]}
                 ],
@@ -69,7 +69,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             // 1 つでも欠落していればエラーとして扱う (Req 3.2)。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]},
                     {""name"":""lipsync"",""priority"":1,""exclusionMode"":""blend""}
@@ -84,7 +84,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseLayerInputSources_LayerMissingInputSources_ThrowsFormatException()
         {
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins""}
                 ],
@@ -102,7 +102,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseProfile_ValidInputSources_DoesNotThrow()
         {
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""controller-expr"",""weight"":1.0}
@@ -118,7 +118,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseLayerInputSources_SingleEntry_ReturnsCorrectArray()
         {
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""controller-expr"",""weight"":0.75}
@@ -139,7 +139,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseLayerInputSources_MultipleLayers_PreservesLayerOrder()
         {
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]},
                     {""name"":""lipsync"",""priority"":1,""exclusionMode"":""blend"",""inputSources"":[{""id"":""lipsync"",""weight"":1.0}]}
@@ -158,7 +158,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseLayerInputSources_MultipleEntriesPerLayer_PreservesDeclarationOrder()
         {
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""controller-expr"",""weight"":0.5},
@@ -184,7 +184,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             // 観測完了条件: options は raw JSON 文字列として optionsJson に保持される。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""osc"",""weight"":1.0,""options"":{""stalenessSeconds"":2.5}}
@@ -213,7 +213,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             // Critical 2: 切り出した raw JSON が JsonUtility で DTO に逆シリアライズできること。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""osc"",""weight"":1.0,""options"":{""stalenessSeconds"":2.5}}
@@ -236,7 +236,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             // ネストしたオブジェクトを含む options も brace マッチで正しく抽出できる。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""x-custom"",""weight"":1.0,""options"":{""outer"":1,""nested"":{""inner"":42}}}
@@ -258,7 +258,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseLayerInputSources_OptionsAbsent_OptionsJsonIsNullOrEmpty()
         {
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""controller-expr"",""weight"":1.0}
@@ -277,7 +277,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             // options の値が文字列などの JSON エスケープを含む場合も raw JSON として保持される。
             var json = @"{
-                ""schemaVersion"":""1.0"",
+                ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""x-sensor"",""weight"":1.0,""options"":{""label"":""テスト""}}

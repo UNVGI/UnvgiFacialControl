@@ -1,5 +1,61 @@
 {
   "dependencies": {
+    "com.hidano.facialcontrol": {
+      "version": "file:com.hidano.facialcontrol",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.hidano.scene-view-style-camera-controller": "1.0.0"
+      }
+    },
+    "com.hidano.facialcontrol.inputsystem": {
+      "version": "file:com.hidano.facialcontrol.inputsystem",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.hidano.facialcontrol": "0.1.0-preview.2",
+        "com.unity.inputsystem": "1.17.0"
+      }
+    },
+    "com.hidano.facialcontrol.osc": {
+      "version": "file:com.hidano.facialcontrol.osc",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.hidano.facialcontrol": "0.1.0-preview.1",
+        "com.hidano.uosc": "1.0.0"
+      }
+    },
+    "com.hidano.scene-view-style-camera-controller": {
+      "version": "1.0.0",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.inputsystem": "1.4.0"
+      },
+      "url": "https://registry.npmjs.org"
+    },
+    "com.hidano.uosc": {
+      "version": "1.0.0",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://registry.npmjs.org"
+    },
+    "com.mikunote.hatsunemiku-sample": {
+      "version": "git+ssh://git@github.com/NHidano/Mikunote_Models.git?path=/Mikunote_Models/Assets/HatsuneMiku_Sample",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "41ad48d9313638ba6ff85febe06bf9cdf9b726a3"
+    },
+    "com.mikunote.magica-cloth-2": {
+      "version": "git+ssh://git@github.com/NHidano/Mikunote_Models.git?path=/Mikunote_Models/Assets/MagicaCloth2",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "f29d0af15a508941504f696f595c27a38b8a69f2"
+    },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
       "depth": 1,
@@ -72,9 +128,18 @@
       },
       "url": "https://packages.unity.com"
     },
+    "com.unity.ide.visualstudio": {
+      "version": "2.0.25",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.test-framework": "1.1.31"
+      },
+      "url": "https://packages.unity.com"
+    },
     "com.unity.inputsystem": {
       "version": "1.17.0",
-      "depth": 1,
+      "depth": 0,
       "source": "registry",
       "dependencies": {
         "com.unity.modules.uielements": "1.0.0"
@@ -201,47 +266,12 @@
         "com.unity.modules.imgui": "1.0.0"
       }
     },
-    "jp.co.unvgi.facialcontrol": {
-      "version": "file:com.hidano.facialcontrol",
+    "jp.lilxyzw.liltoon": {
+      "version": "git+ssh://git@github.com/NHidano/Mikunote_Models.git?path=/Mikunote_Models/Packages/jp.lilxyzw.liltoon",
       "depth": 0,
-      "source": "embedded",
-      "dependencies": {
-        "jp.co.unvgi.scene-view-style-camera-controller": "1.0.1"
-      }
-    },
-    "jp.co.unvgi.facialcontrol.inputsystem": {
-      "version": "file:com.hidano.facialcontrol.inputsystem",
-      "depth": 0,
-      "source": "embedded",
-      "dependencies": {
-        "jp.co.unvgi.facialcontrol": "0.1.0-preview.1",
-        "com.unity.inputsystem": "1.17.0"
-      }
-    },
-    "jp.co.unvgi.facialcontrol.osc": {
-      "version": "file:com.hidano.facialcontrol.osc",
-      "depth": 0,
-      "source": "embedded",
-      "dependencies": {
-        "jp.co.unvgi.facialcontrol": "0.1.0-preview.1",
-        "jp.co.unvgi.uosc": "1.0.0"
-      }
-    },
-    "jp.co.unvgi.scene-view-style-camera-controller": {
-      "version": "1.0.1",
-      "depth": 1,
-      "source": "registry",
-      "dependencies": {
-        "com.unity.inputsystem": "1.4.0"
-      },
-      "url": "https://npm.unvgi.com"
-    },
-    "jp.co.unvgi.uosc": {
-      "version": "1.0.0",
-      "depth": 1,
-      "source": "registry",
+      "source": "git",
       "dependencies": {},
-      "url": "https://npm.unvgi.com"
+      "hash": "f23be65e21f80d2ba7a92123192328e77e72b715"
     },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",

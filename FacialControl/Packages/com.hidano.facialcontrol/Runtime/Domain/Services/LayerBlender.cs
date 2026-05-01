@@ -4,8 +4,14 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Domain.Services
 {
     /// <summary>
-    /// レイヤー優先度に基づくウェイトブレンドと layerSlots オーバーライドを行う静的サービス。
+    /// レイヤー優先度に基づくウェイトブレンドを行う静的サービス。
     /// 全メソッドは GC フリーで動作する（事前確保済み配列の再利用を前提）。
+    /// <para>
+    /// Phase 3.2 (inspector-and-data-model-redesign) で旧 <c>LayerSlot</c> ベースの
+    /// <c>ApplyLayerSlotOverrides</c> オーバーロード群は撤去された。
+    /// オーバーライドは Phase 3.4 で導入される <c>ExpressionResolver</c> 経由で
+    /// <see cref="LayerOverrideMask"/> を解釈する形に再設計される。
+    /// </para>
     /// </summary>
     public static class LayerBlender
     {
@@ -108,51 +114,6 @@ namespace Hidano.FacialControl.Domain.Services
         {
             Blend(
                 new ReadOnlySpan<LayerInput>(layers),
-                new Span<float>(output));
-        }
-
-        /// <summary>
-        /// LayerSlot によるオーバーライドを適用する。
-        /// 指定された BlendShape 名に一致する値を完全置換する。
-        /// </summary>
-        /// <param name="blendShapeNames">BlendShape 名のリスト（output と同じインデックス）</param>
-        /// <param name="slots">適用する LayerSlot 配列</param>
-        /// <param name="output">上書き対象の BlendShape ウェイト配列</param>
-        public static void ApplyLayerSlotOverrides(ReadOnlySpan<string> blendShapeNames, LayerSlot[] slots, Span<float> output)
-        {
-            if (slots == null || slots.Length == 0)
-                return;
-
-            for (int s = 0; s < slots.Length; s++)
-            {
-                var slotValues = slots[s].BlendShapeValues.Span;
-
-                for (int v = 0; v < slotValues.Length; v++)
-                {
-                    string targetName = slotValues[v].Name;
-                    float targetValue = slotValues[v].Value;
-
-                    // BlendShape 名でインデックスを検索
-                    for (int i = 0; i < blendShapeNames.Length && i < output.Length; i++)
-                    {
-                        if (blendShapeNames[i] == targetName)
-                        {
-                            output[i] = Clamp01(targetValue);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// LayerSlot オーバーライド: 配列ベースのオーバーロード。
-        /// </summary>
-        public static void ApplyLayerSlotOverrides(string[] blendShapeNames, LayerSlot[] slots, float[] output)
-        {
-            ApplyLayerSlotOverrides(
-                new ReadOnlySpan<string>(blendShapeNames),
-                slots,
                 new Span<float>(output));
         }
 

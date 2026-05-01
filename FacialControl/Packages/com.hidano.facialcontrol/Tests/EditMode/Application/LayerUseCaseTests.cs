@@ -663,7 +663,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
             var expressionUseCase = new ExpressionUseCase(profile);
             var blendShapeNames = new[] { "bs_smile", "bs_sad", "bs_blink" };
 
-            var controller = new global::Hidano.FacialControl.Adapters.InputSources.ControllerExpressionInputSource(
+            var controller = new global::Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource(
+                id: global::Hidano.FacialControl.Domain.Models.InputSourceId.Parse(
+                    global::Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.ControllerReservedId),
                 blendShapeCount: blendShapeNames.Length,
                 maxStackDepth: 4,
                 exclusionMode: ExclusionMode.LastWins,

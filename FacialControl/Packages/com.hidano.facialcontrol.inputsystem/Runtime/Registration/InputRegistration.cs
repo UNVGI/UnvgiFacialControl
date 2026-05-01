@@ -7,11 +7,19 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.InputSystem
 {
     /// <summary>
-    /// FacialControl コアの <see cref="InputSourceFactory"/> に予約 id <c>controller-expr</c>
-    /// および <c>keyboard-expr</c> のアダプタ生成器を登録するヘルパー。
+    /// FacialControl コアの <see cref="InputSourceFactory"/> に
+    /// Expression トリガー型アダプタ生成器を登録するヘルパー。
     /// 通常は <c>InputFacialControllerExtension</c> MonoBehaviour 経由で自動的に呼ばれるが、
     /// テストや手動配線でも直接利用できる。
     /// </summary>
+    /// <remarks>
+    /// tasks.md 4.6 で <c>KeyboardExpressionInputSource</c> / <c>ControllerExpressionInputSource</c> は
+    /// <see cref="ExpressionTriggerInputSource"/> 1 種に統合された。後方互換のため、JSON Layer
+    /// <c>inputSources[]</c> 宣言で従来通り両予約 id (<c>controller-expr</c> / <c>keyboard-expr</c>)
+    /// を併用できるよう、両 id を同じ <see cref="ExpressionTriggerInputSource"/> に解決する。
+    /// device 別の dispatch は <see cref="ExpressionInputSourceAdapter"/> +
+    /// <see cref="Hidano.FacialControl.Adapters.Input.InputDeviceCategorizer"/> が行う。
+    /// </remarks>
     public static class InputRegistration
     {
         /// <summary>
@@ -21,8 +29,8 @@ namespace Hidano.FacialControl.InputSystem
         public const int DefaultMaxStackDepth = 8;
 
         /// <summary>
-        /// <paramref name="factory"/> に <see cref="ControllerExpressionInputSource"/> および
-        /// <see cref="KeyboardExpressionInputSource"/> 生成器を登録する。
+        /// <paramref name="factory"/> に <see cref="ExpressionTriggerInputSource"/> 生成器を
+        /// 予約 id <c>controller-expr</c> / <c>keyboard-expr</c> の双方で登録する。
         /// </summary>
         /// <param name="factory">登録対象のファクトリ。</param>
         /// <param name="blendShapeNames">BlendShape 名の列（名前→インデックス解決用）。</param>
@@ -36,22 +44,31 @@ namespace Hidano.FacialControl.InputSystem
             if (factory == null) throw new ArgumentNullException(nameof(factory));
             var names = blendShapeNames ?? Array.Empty<string>();
 
-            factory.RegisterReserved<ExpressionTriggerOptionsDto>(
-                InputSourceId.Parse(ControllerExpressionInputSource.ReservedId),
-                (options, blendShapeCount, profile) =>
-                {
-                    int depth = options.maxStackDepth > 0 ? options.maxStackDepth : DefaultMaxStackDepth;
-                    return new ControllerExpressionInputSource(
-                        blendShapeCount, depth, defaultExclusionMode, names, profile);
-                });
+            RegisterReservedId(
+                factory,
+                InputSourceId.Parse(ExpressionTriggerInputSource.ControllerReservedId),
+                names,
+                defaultExclusionMode);
+            RegisterReservedId(
+                factory,
+                InputSourceId.Parse(ExpressionTriggerInputSource.KeyboardReservedId),
+                names,
+                defaultExclusionMode);
+        }
 
+        private static void RegisterReservedId(
+            InputSourceFactory factory,
+            InputSourceId reservedId,
+            IReadOnlyList<string> names,
+            ExclusionMode defaultExclusionMode)
+        {
             factory.RegisterReserved<ExpressionTriggerOptionsDto>(
-                InputSourceId.Parse(KeyboardExpressionInputSource.ReservedId),
+                reservedId,
                 (options, blendShapeCount, profile) =>
                 {
                     int depth = options.maxStackDepth > 0 ? options.maxStackDepth : DefaultMaxStackDepth;
-                    return new KeyboardExpressionInputSource(
-                        blendShapeCount, depth, defaultExclusionMode, names, profile);
+                    return new ExpressionTriggerInputSource(
+                        reservedId, blendShapeCount, depth, defaultExclusionMode, names, profile);
                 });
         }
     }

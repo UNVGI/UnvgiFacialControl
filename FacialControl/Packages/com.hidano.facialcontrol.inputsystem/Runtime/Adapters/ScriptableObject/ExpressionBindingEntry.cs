@@ -7,6 +7,11 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
     /// InputAction 名と Expression ID を 1 対 1 に対応させる Inspector 編集用エントリ。
     /// <see cref="FacialCharacterSO"/> 内のリスト要素として使用。
     /// </summary>
+    /// <remarks>
+    /// device 種別 (Keyboard / Controller) は <c>ExpressionInputSourceAdapter</c> が
+    /// <see cref="UnityEngine.InputSystem.InputAction.bindings"/> から自動推定するため、
+    /// 旧 <c>category</c> field は撤去された (Req 7.1, tasks.md 4.6)。
+    /// </remarks>
     [Serializable]
     public sealed class ExpressionBindingEntry
     {
@@ -15,8 +20,5 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
 
         [Tooltip("発火対象の Expression の ID (FacialCharacterSO.Expressions[].id と一致させる)。")]
         public string expressionId;
-
-        [Tooltip("入力源カテゴリ。Controller=ゲームパッド系、Keyboard=キーボード系。InputAction の Bindings がどのデバイスを参照しているかに合わせる。")]
-        public InputSourceCategory category = InputSourceCategory.Controller;
     }
 }

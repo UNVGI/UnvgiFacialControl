@@ -32,8 +32,10 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Input
     ///   <item><see cref="ConfigureFactory"/>: <see cref="FacialController.Initialize"/> が呼んだ
     ///         <see cref="InputSourceFactory"/> 構築直後に呼ばれる。
     ///         ActionMap Instantiate/Enable + analog sources の構築 + factory への RegisterReserved を行う。</item>
-    ///   <item><see cref="OnEnable"/>: Expression トリガー結線 (Controller / Keyboard 両カテゴリ) を
-    ///         <see cref="AdapterInputSystemAdapter"/> 経由で行う。FC が初期化済みでない場合は
+    ///   <item><see cref="OnEnable"/>: Expression トリガー結線を <see cref="AdapterInputSystemAdapter"/>
+    ///         経由で行う。device 種別 (Keyboard / Controller) は adapter 側で
+    ///         <c>InputAction.bindings</c> から自動推定されるため、本拡張側で category 別に分岐する
+    ///         必要はない (Req 7.1, 8.1, tasks.md 4.6)。FC が初期化済みでない場合は
     ///         <see cref="FacialController.OnEnable"/> 後に再エントリされる想定。</item>
     ///   <item><see cref="LateUpdate"/>: analog sources の Tick + BonePose の BuildAndPush。
     ///         <see cref="FacialController.LateUpdate"/> よりも先に評価する必要があるため
@@ -326,18 +328,17 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Input
 
             _adapter = new AdapterInputSystemAdapter(_facialController);
 
-            // Controller / Keyboard 両カテゴリの結線を順に処理する。
-            // 旧 InputBindingProfileSO は SO 全体に 1 カテゴリだったが、
-            // FacialCharacterSO は entry 毎に category を持つため両カテゴリをまとめて取り出す。
-            BindCategory(so, InputSourceCategory.Controller);
-            BindCategory(so, InputSourceCategory.Keyboard);
+            // device 種別 (Keyboard / Controller) は ExpressionInputSourceAdapter が
+            // InputAction.bindings から自動推定するため、ここでは category 別に分岐せず
+            // 全 binding を 1 ループで処理する (Req 7.1, 8.1, tasks.md 4.6)。
+            BindAllExpressions(so);
 
             _inputBound = true;
         }
 
-        private void BindCategory(FacialCharacterSO so, InputSourceCategory category)
+        private void BindAllExpressions(FacialCharacterSO so)
         {
-            IReadOnlyList<DomainInputBinding> bindings = so.GetExpressionBindings(category);
+            IReadOnlyList<DomainInputBinding> bindings = so.GetExpressionBindings();
             for (int i = 0; i < bindings.Count; i++)
             {
                 var binding = bindings[i];
@@ -347,8 +348,7 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Input
                 {
                     Debug.LogWarning(
                         $"FacialCharacterInputExtension: ExpressionId '{binding.ExpressionId}' が "
-                        + "FacialController のプロファイルに存在しないためバインディング ("
-                        + $"category={category}) をスキップします。");
+                        + "FacialController のプロファイルに存在しないためバインディングをスキップします。");
                     continue;
                 }
 
@@ -357,7 +357,7 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Input
                 {
                     Debug.LogWarning(
                         $"FacialCharacterInputExtension: Action '{binding.ActionName}' が "
-                        + $"ActionMap '{_runtimeActionMap.name}' に見つかりません (category={category})。");
+                        + $"ActionMap '{_runtimeActionMap.name}' に見つかりません。");
                     continue;
                 }
 

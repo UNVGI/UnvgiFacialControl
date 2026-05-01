@@ -39,7 +39,7 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
         private string _actionMapName = "Expression";
 
         [Header("キーバインディング (Action ↔ Expression)")]
-        [Tooltip("InputAction 名と Expression ID の対応一覧。Controller / Keyboard のカテゴリも個別に設定可能。")]
+        [Tooltip("InputAction 名と Expression ID の対応一覧。Keyboard / Controller の振分けは ExpressionInputSourceAdapter が自動推定する (Req 7.1)。")]
         [SerializeField]
         private List<ExpressionBindingEntry> _expressionBindings = new List<ExpressionBindingEntry>();
 
@@ -71,9 +71,10 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
         /// <summary>
         /// 登録された Expression バインディングを Domain 値に変換して返す。
         /// 空文字エントリ (action 名 / expression ID 未設定) はスキップ。
+        /// device 種別 (Keyboard / Controller) は呼出側 (ExpressionInputSourceAdapter) が
+        /// InputAction.bindings から自動推定するため category 引数は不要 (Req 7.1, 8.1)。
         /// </summary>
-        /// <param name="category">対象の入力カテゴリで絞り込む。</param>
-        public IReadOnlyList<DomainInputBinding> GetExpressionBindings(InputSourceCategory category)
+        public IReadOnlyList<DomainInputBinding> GetExpressionBindings()
         {
             if (_expressionBindings == null || _expressionBindings.Count == 0)
             {
@@ -85,7 +86,6 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
             {
                 var entry = _expressionBindings[i];
                 if (entry == null
-                    || entry.category != category
                     || string.IsNullOrWhiteSpace(entry.actionName)
                     || string.IsNullOrWhiteSpace(entry.expressionId))
                 {

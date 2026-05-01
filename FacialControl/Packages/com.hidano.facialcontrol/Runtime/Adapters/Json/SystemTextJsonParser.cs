@@ -10,75 +10,141 @@ namespace Hidano.FacialControl.Adapters.Json
 {
     /// <summary>
     /// IJsonParser の実装。Unity の JsonUtility をベースに、
-    /// DTO を介してドメインモデルとの変換を行う。
-    /// schemaVersion チェックと不正 JSON 時の例外スローを提供する。
+    /// 中間 JSON Schema v2.0 専用 DTO 群（<see cref="ProfileSnapshotDto"/> 等）を介して
+    /// ドメインモデルとの変換を行う。
+    /// <para>
+    /// Phase 3.6 (inspector-and-data-model-redesign) で schema v1.0 経路を撤去し、
+    /// schemaVersion <c>"2.0"</c> 以外を <see cref="Debug.LogError(object)"/> +
+    /// <see cref="InvalidOperationException"/> で拒否する（Req 10.1）。
+    /// </para>
     /// </summary>
     public sealed class SystemTextJsonParser : IJsonParser
     {
-        private const string SupportedSchemaVersion = "1.0";
+        /// <summary>
+        /// 中間 JSON Schema v2.0 の strict version 文字列。
+        /// </summary>
+        public const string SchemaVersionV2 = "2.0";
+
+        /// <summary>
+        /// 設定 JSON のサポートバージョン。Profile JSON とは別系統で v1.0 を維持する。
+        /// </summary>
+        private const string SupportedConfigSchemaVersion = "1.0";
 
         /// <inheritdoc/>
         public FacialProfile ParseProfile(string json)
         {
-            var dto = ParseProfileDto(json);
+            var dto = ParseProfileSnapshotV2Internal(json, out string preprocessed);
             var inputSources = ExtractInputSources(dto);
-            var bonePoses = ExtractBonePoses(dto);
-            return ConvertToProfile(dto, inputSources, bonePoses);
+            return ConvertToProfile(dto, inputSources);
         }
 
         /// <summary>
         /// <c>layers[].inputSources[]</c> をパースして、レイヤー順に <see cref="InputSourceDto"/> 配列を返す。
-        /// <see cref="InputSourceDto.optionsJson"/> は JSON 上の <c>options</c> オブジェクトの生 JSON サブ文字列を保持する
-        /// （JsonUtility の 1 段ネスト object 非対応を回避、Req 3.1 / 3.7, Critical 2）。
+        /// schemaVersion は <see cref="SchemaVersionV2"/> を要求する（Req 10.1）。
         /// </summary>
-        /// <param name="json">プロファイル JSON 文字列</param>
-        /// <returns>レイヤー順に並んだ <see cref="InputSourceDto"/> 配列の配列</returns>
-        /// <exception cref="FormatException">
-        /// いずれかのレイヤーで <c>inputSources</c> が欠落 / 空配列の場合
-        /// （preview 破壊的変更 D-5, Req 3.2）。
-        /// </exception>
         public InputSourceDto[][] ParseLayerInputSources(string json)
         {
-            var dto = ParseProfileDto(json);
+            var dto = ParseProfileSnapshotV2Internal(json, out _);
             return ExtractInputSources(dto);
         }
 
-        private static ProfileDto ParseProfileDto(string json)
+        /// <summary>
+        /// 中間 JSON Schema v2.0 の専用パース経路。
+        /// <c>schemaVersion</c> が <see cref="SchemaVersionV2"/> 以外の場合は
+        /// <see cref="Debug.LogError(object)"/> + <see cref="InvalidOperationException"/> で拒否する（Req 10.1）。
+        /// 欠落 / null の snapshot は既定値（<c>transitionDuration=0.25</c>, <c>transitionCurvePreset="Linear"</c>,
+        /// 各配列空）に正規化される。
+        /// </summary>
+        public ProfileSnapshotDto ParseProfileSnapshotV2(string json)
+        {
+            return ParseProfileSnapshotV2Internal(json, out _);
+        }
+
+        private static ProfileSnapshotDto ParseProfileSnapshotV2Internal(string json, out string preprocessed)
         {
             if (json == null)
                 throw new ArgumentNullException(nameof(json));
             if (string.IsNullOrWhiteSpace(json))
                 throw new ArgumentException("JSON 文字列を空にすることはできません。", nameof(json));
 
-            // JsonUtility は 1 段ネスト object を直接デシリアライズできないため、
-            // inputSources[].options を生 JSON 文字列として optionsJson フィールドに退避する。
-            string preprocessed = PreprocessInputSourceOptions(json);
+            preprocessed = PreprocessInputSourceOptions(json);
 
-            ProfileDto dto;
+            ProfileSnapshotDto dto;
             try
             {
-                dto = JsonUtility.FromJson<ProfileDto>(preprocessed);
+                dto = JsonUtility.FromJson<ProfileSnapshotDto>(preprocessed);
             }
             catch (Exception ex)
             {
-                throw new FormatException("プロファイル JSON のパースに失敗しました。", ex);
+                throw new FormatException("プロファイル JSON (v2.0) のパースに失敗しました。", ex);
             }
 
             if (dto == null)
-                throw new FormatException("プロファイル JSON のパースに失敗しました。結果が null です。");
+                throw new FormatException("プロファイル JSON (v2.0) のパースに失敗しました。結果が null です。");
 
-            if (string.IsNullOrEmpty(dto.schemaVersion))
-                throw new FormatException("schemaVersion が指定されていません。");
+            if (string.IsNullOrEmpty(dto.schemaVersion) || dto.schemaVersion != SchemaVersionV2)
+            {
+                var actual = string.IsNullOrEmpty(dto.schemaVersion) ? "<missing>" : dto.schemaVersion;
+                Debug.LogError(
+                    $"SystemTextJsonParser: 中間 JSON schema v2.0 の strict チェックに失敗しました。" +
+                    $"期待値 '{SchemaVersionV2}'、実際 '{actual}'。Req 10.1 により旧 schema は拒否されます。");
+                throw new InvalidOperationException(
+                    $"サポートされていないスキーマバージョンです: '{actual}' (期待値 '{SchemaVersionV2}')。");
+            }
 
-            ValidateSchemaVersion(dto.schemaVersion);
-
+            NormalizeProfileSnapshotDto(dto);
             ValidateLayerInputSources(dto);
-
             return dto;
         }
 
+        /// <summary>
+        /// 後処理: null collection を空 collection に、欠落 snapshot を既定値の
+        /// <see cref="ExpressionSnapshotDto"/> に正規化する。
+        /// </summary>
+        private static void NormalizeProfileSnapshotDto(ProfileSnapshotDto dto)
+        {
+            if (dto.layers == null)
+                dto.layers = new List<LayerDefinitionDto>();
+            if (dto.expressions == null)
+                dto.expressions = new List<ExpressionDto>();
+            if (dto.rendererPaths == null)
+                dto.rendererPaths = new List<string>();
+
+            for (int i = 0; i < dto.expressions.Count; i++)
+            {
+                var expr = dto.expressions[i];
+                if (expr == null)
+                    continue;
+
+                if (expr.layerOverrideMask == null)
+                    expr.layerOverrideMask = new List<string>();
+
+                if (expr.snapshot == null)
+                {
+                    expr.snapshot = new ExpressionSnapshotDto
+                    {
+                        transitionDuration = 0.25f,
+                        transitionCurvePreset = "Linear",
+                        blendShapes = new List<BlendShapeSnapshotDto>(),
+                        bones = new List<BoneSnapshotDto>(),
+                        rendererPaths = new List<string>(),
+                    };
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(expr.snapshot.transitionCurvePreset))
+                    expr.snapshot.transitionCurvePreset = "Linear";
+                if (expr.snapshot.blendShapes == null)
+                    expr.snapshot.blendShapes = new List<BlendShapeSnapshotDto>();
+                if (expr.snapshot.bones == null)
+                    expr.snapshot.bones = new List<BoneSnapshotDto>();
+                if (expr.snapshot.rendererPaths == null)
+                    expr.snapshot.rendererPaths = new List<string>();
+            }
+        }
+
         // preview 破壊的変更 (D-5, Req 3.2): inputSources は必須フィールド。欠落 / 空配列はエラー。
-        private static void ValidateLayerInputSources(ProfileDto dto)
+        private static void ValidateLayerInputSources(ProfileSnapshotDto dto)
         {
             if (dto.layers == null)
                 return;
@@ -99,11 +165,7 @@ namespace Hidano.FacialControl.Adapters.Json
         }
 
         // Req 1.7, 3.3, 3.4 / D-5, D-6: inputSources エントリの識別子検証と重複解決。
-        // - regex 違反 (InputSourceId.TryParse が false) → 警告 + skip
-        // - 予約 ID でも x- プレフィックスでもない id (= 仕様上未登録) → 警告 + skip
-        // - 同レイヤー内の重複 id → 警告 + last-wins (最後の出現を採用し、最後の位置で保持)
-        // いずれの場合も例外は投げず、他レイヤー・他エントリの parse は継続する。
-        private static InputSourceDto[][] ExtractInputSources(ProfileDto dto)
+        private static InputSourceDto[][] ExtractInputSources(ProfileSnapshotDto dto)
         {
             if (dto.layers == null || dto.layers.Count == 0)
                 return Array.Empty<InputSourceDto[]>();
@@ -119,7 +181,6 @@ namespace Hidano.FacialControl.Adapters.Json
                 lastValidIndexById.Clear();
                 duplicateWarned.Clear();
 
-                // 1 pass 目: 各エントリを検証し、有効なもののみ「id → 最終インデックス」を記録する。
                 var validSchema = new bool[entries.Count];
                 for (int j = 0; j < entries.Count; j++)
                 {
@@ -146,7 +207,6 @@ namespace Hidano.FacialControl.Adapters.Json
                     lastValidIndexById[rawId] = j;
                 }
 
-                // 2 pass 目: 最後の出現位置のみを採用し、宣言順を保った結果リストを構築する。
                 var accepted = new List<InputSourceDto>(entries.Count);
                 for (int j = 0; j < entries.Count; j++)
                 {
@@ -164,8 +224,6 @@ namespace Hidano.FacialControl.Adapters.Json
                         continue;
                     }
 
-                    // JsonUtility はフィールドの初期化子を尊重しないケースがあるため、
-                    // optionsJson が未設定のときは空文字列として扱わない（null のまま返す）。
                     accepted.Add(new InputSourceDto
                     {
                         id = src.id,
@@ -182,11 +240,24 @@ namespace Hidano.FacialControl.Adapters.Json
         /// <inheritdoc/>
         public string SerializeProfile(FacialProfile profile)
         {
-            var dto = ConvertToProfileDto(profile);
+            var dto = ConvertToProfileSnapshotDto(profile);
             var raw = JsonUtility.ToJson(dto, true);
-            // JsonUtility は optionsJson を文字列フィールドとして常時出力する。
-            // スキーマ上は "options": {...} 形式であり、round-trip 安定性 (Req 3.5, 8.4) のため
-            // 出力側で optionsJson を options に戻す（空値フィールドは削除、非空は JSON オブジェクトに展開）。
+            return PostprocessInputSourceOptions(raw);
+        }
+
+        /// <summary>
+        /// 既に組み立て済みの <see cref="ProfileSnapshotDto"/> を schema v2.0 互換 JSON 文字列にシリアライズする。
+        /// AutoExporter が AnimationClip サンプリング結果を直接 JSON へ書き出す経路で使用する（Req 9.1, 9.2）。
+        /// </summary>
+        /// <param name="dto">トップレベル DTO。<see cref="ProfileSnapshotDto.schemaVersion"/> が空の場合は <see cref="SchemaVersionV2"/> を補完する。</param>
+        /// <returns>JsonUtility 整形済み JSON 文字列（<c>options</c> フィールドは生 JSON ブロックへ復元済）。</returns>
+        public string SerializeProfileSnapshot(ProfileSnapshotDto dto)
+        {
+            if (dto == null)
+                throw new ArgumentNullException(nameof(dto));
+            if (string.IsNullOrEmpty(dto.schemaVersion))
+                dto.schemaVersion = SchemaVersionV2;
+            var raw = JsonUtility.ToJson(dto, true);
             return PostprocessInputSourceOptions(raw);
         }
 
@@ -214,7 +285,9 @@ namespace Hidano.FacialControl.Adapters.Json
             if (string.IsNullOrEmpty(dto.schemaVersion))
                 throw new FormatException("schemaVersion が指定されていません。");
 
-            ValidateSchemaVersion(dto.schemaVersion);
+            if (dto.schemaVersion != SupportedConfigSchemaVersion)
+                throw new FormatException(
+                    $"サポートされていない設定スキーマバージョンです: {dto.schemaVersion}（サポート対象: {SupportedConfigSchemaVersion}）");
 
             return ConvertToConfig(dto);
         }
@@ -226,15 +299,10 @@ namespace Hidano.FacialControl.Adapters.Json
             return JsonUtility.ToJson(dto, true);
         }
 
-        private static void ValidateSchemaVersion(string version)
-        {
-            if (version != SupportedSchemaVersion)
-                throw new FormatException(
-                    $"サポートされていないスキーマバージョンです: {version}（サポート対象: {SupportedSchemaVersion}）");
-        }
+        // ====================================================================
+        // options 抽出ヘルパー（PreprocessInputSourceOptions / PostprocessInputSourceOptions）
+        // ====================================================================
 
-        // "options": { ... } を "optionsJson": "<escaped>" に書き換える。
-        // JsonUtility が自由形式のネスト object を扱えないため、生 JSON サブ文字列に退避する。
         private static string PreprocessInputSourceOptions(string json)
         {
             if (string.IsNullOrEmpty(json))
@@ -262,7 +330,6 @@ namespace Hidano.FacialControl.Adapters.Json
 
                 if (colonIdx >= json.Length || json[colonIdx] != ':')
                 {
-                    // "options" が field key ではなく文字列中の単語として出現したケース。そのまま通す。
                     sb.Append(json, keyStart, afterKey - keyStart);
                     i = afterKey;
                     continue;
@@ -274,7 +341,6 @@ namespace Hidano.FacialControl.Adapters.Json
 
                 if (valueStart >= json.Length || json[valueStart] != '{')
                 {
-                    // options の値が object でない場合（null, string 等）は変換しない。
                     sb.Append(json, keyStart, valueStart - keyStart);
                     i = valueStart;
                     continue;
@@ -283,7 +349,6 @@ namespace Hidano.FacialControl.Adapters.Json
                 int objectEnd = FindMatchingBrace(json, valueStart);
                 if (objectEnd < 0)
                 {
-                    // 閉じブラケットが見つからない不正 JSON。残りをそのまま通して、後段で例外にさせる。
                     sb.Append(json, keyStart, json.Length - keyStart);
                     i = json.Length;
                     break;
@@ -356,7 +421,6 @@ namespace Hidano.FacialControl.Adapters.Json
             }
         }
 
-        // InputSourceDeclaration[] → List<InputSourceDto>。宣言が空の場合は placeholder を返す。
         private static List<InputSourceDto> BuildInputSourceDtoList(InputSourceDeclaration[] declarations)
         {
             if (declarations != null && declarations.Length > 0)
@@ -381,10 +445,6 @@ namespace Hidano.FacialControl.Adapters.Json
             };
         }
 
-        // "optionsJson" フィールドを "options" に戻す後処理 (PreprocessInputSourceOptions の逆変換)。
-        // - "optionsJson": "" → フィールドごと削除（直前のカンマも含めて）
-        // - "optionsJson": "<escaped JSON>" → "options": <unescaped JSON>
-        // InputSourceDto では optionsJson が最後のフィールドなので、基本形は「カンマ + 空白 + key」。
         private static string PostprocessInputSourceOptions(string json)
         {
             if (string.IsNullOrEmpty(json))
@@ -438,7 +498,6 @@ namespace Hidano.FacialControl.Adapters.Json
 
                 if (escaped.Length == 0)
                 {
-                    // フィールド削除: 直前のカンマから後ろを捨てる。先頭フィールドの場合は後続カンマを飛ばす。
                     int removeFromBack = keyStart;
                     int p = keyStart - 1;
                     while (p >= 0 && char.IsWhiteSpace(json[p]))
@@ -451,7 +510,6 @@ namespace Hidano.FacialControl.Adapters.Json
                     }
                     else
                     {
-                        // 先頭フィールドなので後続カンマをスキップする。
                         int q = afterValue;
                         while (q < json.Length && char.IsWhiteSpace(json[q]))
                             q++;
@@ -464,7 +522,6 @@ namespace Hidano.FacialControl.Adapters.Json
                 }
                 else
                 {
-                    // 置換: "optionsJson":"..." → "options":<unescaped JSON>
                     sb.Append(json, cursor, keyStart - cursor);
                     sb.Append("\"options\":");
                     sb.Append(UnescapeJsonString(escaped));
@@ -538,74 +595,19 @@ namespace Hidano.FacialControl.Adapters.Json
             return sb.ToString();
         }
 
-        // --- Profile 変換 ---
+        // ====================================================================
+        // Profile 変換 (DTO → Domain)
+        // ====================================================================
 
-        private static FacialProfile ConvertToProfile(ProfileDto dto, InputSourceDto[][] inputSourceDtos, BonePose[] bonePoses)
+        private static FacialProfile ConvertToProfile(ProfileSnapshotDto dto, InputSourceDto[][] inputSourceDtos)
         {
             var layers = ConvertLayers(dto.layers);
             var expressions = ConvertExpressions(dto.expressions);
             var rendererPaths = ConvertRendererPaths(dto.rendererPaths);
             var layerInputSources = ConvertLayerInputSources(inputSourceDtos);
-            return new FacialProfile(dto.schemaVersion, layers, expressions, rendererPaths, layerInputSources, bonePoses);
+            return new FacialProfile(dto.schemaVersion, layers, expressions, rendererPaths, layerInputSources);
         }
 
-        // Req 7.1, 7.2, 7.4, 7.5: bonePoses ブロックを Domain BonePose[] に変換する。
-        // - boneName が null / 空 / 全空白のエントリは Warning + skip + 続行 (Req 7.4)
-        // - Domain ctor が ArgumentException を投げる pose（同名 boneName 重複等）は
-        //   その BonePose 全体を Warning + skip + 続行 (Req 7.4 / Req 1.7)
-        // - bonePoses 自体の欠落 / null / 空配列は空 BonePose[] を返す (Req 7.3 / 10.2)
-        private static BonePose[] ExtractBonePoses(ProfileDto dto)
-        {
-            if (dto.bonePoses == null || dto.bonePoses.Count == 0)
-                return Array.Empty<BonePose>();
-
-            var result = new List<BonePose>(dto.bonePoses.Count);
-            for (int i = 0; i < dto.bonePoses.Count; i++)
-            {
-                var poseDto = dto.bonePoses[i];
-                if (poseDto == null)
-                    continue;
-
-                var validEntries = new List<BonePoseEntry>(poseDto.entries != null ? poseDto.entries.Count : 0);
-                if (poseDto.entries != null)
-                {
-                    for (int j = 0; j < poseDto.entries.Count; j++)
-                    {
-                        var entryDto = poseDto.entries[j];
-                        if (entryDto == null || string.IsNullOrWhiteSpace(entryDto.boneName))
-                        {
-                            Debug.LogWarning(
-                                $"SystemTextJsonParser: bonePoses[{i}].entries[{j}] に boneName が指定されていません。スキップします。");
-                            continue;
-                        }
-
-                        validEntries.Add(new BonePoseEntry(
-                            entryDto.boneName,
-                            entryDto.eulerXYZ.x,
-                            entryDto.eulerXYZ.y,
-                            entryDto.eulerXYZ.z));
-                    }
-                }
-
-                BonePose pose;
-                try
-                {
-                    pose = new BonePose(poseDto.id, validEntries.ToArray());
-                }
-                catch (ArgumentException ex)
-                {
-                    Debug.LogWarning(
-                        $"SystemTextJsonParser: bonePoses[{i}] (id='{poseDto.id}') の構築に失敗したためスキップします: {ex.Message}");
-                    continue;
-                }
-
-                result.Add(pose);
-            }
-
-            return result.ToArray();
-        }
-
-        // InputSourceDto[][] → InputSourceDeclaration[][] 変換。round-trip 担体用。
         private static InputSourceDeclaration[][] ConvertLayerInputSources(InputSourceDto[][] dtos)
         {
             if (dtos == null || dtos.Length == 0)
@@ -638,7 +640,7 @@ namespace Hidano.FacialControl.Adapters.Json
             return paths.ToArray();
         }
 
-        private static LayerDefinition[] ConvertLayers(List<LayerDto> dtos)
+        private static LayerDefinition[] ConvertLayers(List<LayerDefinitionDto> dtos)
         {
             if (dtos == null || dtos.Count == 0)
                 return Array.Empty<LayerDefinition>();
@@ -662,23 +664,23 @@ namespace Hidano.FacialControl.Adapters.Json
             for (int i = 0; i < dtos.Count; i++)
             {
                 var d = dtos[i];
-                var blendShapes = ConvertBlendShapeMappings(d.blendShapeValues);
-                var layerSlots = ConvertLayerSlots(d.layerSlots);
-                var curve = ConvertTransitionCurve(d.transitionCurve);
+                var snapshot = d.snapshot;
+                float duration = snapshot != null ? snapshot.transitionDuration : 0.25f;
+                var curve = ConvertTransitionCurve(snapshot != null ? snapshot.transitionCurvePreset : "Linear");
+                var blendShapes = ConvertBlendShapeMappings(snapshot != null ? snapshot.blendShapes : null);
 
                 expressions[i] = new Expression(
                     d.id,
                     d.name,
                     d.layer,
-                    d.transitionDuration,
+                    duration,
                     curve,
-                    blendShapes,
-                    layerSlots);
+                    blendShapes);
             }
             return expressions;
         }
 
-        private static BlendShapeMapping[] ConvertBlendShapeMappings(List<BlendShapeMappingDto> dtos)
+        private static BlendShapeMapping[] ConvertBlendShapeMappings(List<BlendShapeSnapshotDto> dtos)
         {
             if (dtos == null || dtos.Count == 0)
                 return Array.Empty<BlendShapeMapping>();
@@ -690,50 +692,24 @@ namespace Hidano.FacialControl.Adapters.Json
                 mappings[i] = new BlendShapeMapping(
                     d.name,
                     d.value,
-                    string.IsNullOrEmpty(d.renderer) ? null : d.renderer);
+                    string.IsNullOrEmpty(d.rendererPath) ? null : d.rendererPath);
             }
             return mappings;
         }
 
-        private static LayerSlot[] ConvertLayerSlots(List<LayerSlotDto> dtos)
+        private static TransitionCurve ConvertTransitionCurve(string preset)
         {
-            if (dtos == null || dtos.Count == 0)
-                return Array.Empty<LayerSlot>();
-
-            var slots = new LayerSlot[dtos.Count];
-            for (int i = 0; i < dtos.Count; i++)
-            {
-                var d = dtos[i];
-                var blendShapes = ConvertBlendShapeMappings(d.blendShapeValues);
-                slots[i] = new LayerSlot(d.layer, blendShapes);
-            }
-            return slots;
-        }
-
-        private static TransitionCurve ConvertTransitionCurve(TransitionCurveDto dto)
-        {
-            if (dto == null)
+            if (string.IsNullOrEmpty(preset))
                 return TransitionCurve.Linear;
 
-            var type = ParseTransitionCurveType(dto.type);
-            var keys = ConvertCurveKeyFrames(dto.keys);
-            return new TransitionCurve(type, keys);
-        }
-
-        private static CurveKeyFrame[] ConvertCurveKeyFrames(List<CurveKeyFrameDto> dtos)
-        {
-            if (dtos == null || dtos.Count == 0)
-                return Array.Empty<CurveKeyFrame>();
-
-            var keys = new CurveKeyFrame[dtos.Count];
-            for (int i = 0; i < dtos.Count; i++)
+            return preset.Trim() switch
             {
-                var d = dtos[i];
-                keys[i] = new CurveKeyFrame(
-                    d.time, d.value, d.inTangent, d.outTangent,
-                    d.inWeight, d.outWeight, d.weightedMode);
-            }
-            return keys;
+                "Linear"    => new TransitionCurve(TransitionCurveType.Linear),
+                "EaseIn"    => new TransitionCurve(TransitionCurveType.EaseIn),
+                "EaseOut"   => new TransitionCurve(TransitionCurveType.EaseOut),
+                "EaseInOut" => new TransitionCurve(TransitionCurveType.EaseInOut),
+                _ => TransitionCurve.Linear
+            };
         }
 
         private static ExclusionMode ParseExclusionMode(string value)
@@ -749,30 +725,16 @@ namespace Hidano.FacialControl.Adapters.Json
             };
         }
 
-        private static TransitionCurveType ParseTransitionCurveType(string value)
+        // ====================================================================
+        // Profile → DTO 変換 (Domain → DTO)
+        // ====================================================================
+
+        private static ProfileSnapshotDto ConvertToProfileSnapshotDto(FacialProfile profile)
         {
-            if (string.IsNullOrEmpty(value))
-                return TransitionCurveType.Linear;
-
-            return value.ToLowerInvariant() switch
+            var dto = new ProfileSnapshotDto
             {
-                "linear" => TransitionCurveType.Linear,
-                "easein" => TransitionCurveType.EaseIn,
-                "easeout" => TransitionCurveType.EaseOut,
-                "easeinout" => TransitionCurveType.EaseInOut,
-                "custom" => TransitionCurveType.Custom,
-                _ => throw new FormatException($"不正な TransitionCurveType 値: {value}")
-            };
-        }
-
-        // --- Profile → DTO 変換 ---
-
-        private static ProfileDto ConvertToProfileDto(FacialProfile profile)
-        {
-            var dto = new ProfileDto
-            {
-                schemaVersion = profile.SchemaVersion,
-                layers = new List<LayerDto>(),
+                schemaVersion = SchemaVersionV2,
+                layers = new List<LayerDefinitionDto>(),
                 expressions = new List<ExpressionDto>(),
                 rendererPaths = new List<string>()
             };
@@ -787,11 +749,7 @@ namespace Hidano.FacialControl.Adapters.Json
             var lisSpan = profile.LayerInputSources.Span;
             for (int i = 0; i < layerSpan.Length; i++)
             {
-                // preview 破壊的変更 (D-5, Req 3.2): inputSources は必須フィールドのため、
-                // FacialProfile に保持された inputSources 宣言 (round-trip 担体) を使って復元する。
-                // 宣言が無い / 空のレイヤーは最小の placeholder (controller-expr, weight=1.0) を出力する
-                // (Req 3.5, 8.4: SerializeProfile 出力はスキーマ上 inputSources 非空を保証する)。
-                dto.layers.Add(new LayerDto
+                dto.layers.Add(new LayerDefinitionDto
                 {
                     name = layerSpan[i].Name,
                     priority = layerSpan[i].Priority,
@@ -816,69 +774,25 @@ namespace Hidano.FacialControl.Adapters.Json
                 id = expr.Id,
                 name = expr.Name,
                 layer = expr.Layer,
-                transitionDuration = expr.TransitionDuration,
-                transitionCurve = ConvertToTransitionCurveDto(expr.TransitionCurve),
-                blendShapeValues = new List<BlendShapeMappingDto>(),
-                layerSlots = new List<LayerSlotDto>()
+                layerOverrideMask = new List<string>(),
+                snapshot = new ExpressionSnapshotDto
+                {
+                    transitionDuration = expr.TransitionDuration,
+                    transitionCurvePreset = SerializeTransitionCurvePreset(expr.TransitionCurve),
+                    blendShapes = new List<BlendShapeSnapshotDto>(),
+                    bones = new List<BoneSnapshotDto>(),
+                    rendererPaths = new List<string>(),
+                }
             };
 
             var bsSpan = expr.BlendShapeValues.Span;
             for (int i = 0; i < bsSpan.Length; i++)
             {
-                dto.blendShapeValues.Add(new BlendShapeMappingDto
+                dto.snapshot.blendShapes.Add(new BlendShapeSnapshotDto
                 {
+                    rendererPath = bsSpan[i].Renderer ?? string.Empty,
                     name = bsSpan[i].Name,
-                    value = bsSpan[i].Value,
-                    renderer = bsSpan[i].Renderer ?? ""
-                });
-            }
-
-            var slotSpan = expr.LayerSlots.Span;
-            for (int i = 0; i < slotSpan.Length; i++)
-            {
-                var slotDto = new LayerSlotDto
-                {
-                    layer = slotSpan[i].Layer,
-                    blendShapeValues = new List<BlendShapeMappingDto>()
-                };
-
-                var slotBsSpan = slotSpan[i].BlendShapeValues.Span;
-                for (int j = 0; j < slotBsSpan.Length; j++)
-                {
-                    slotDto.blendShapeValues.Add(new BlendShapeMappingDto
-                    {
-                        name = slotBsSpan[j].Name,
-                        value = slotBsSpan[j].Value,
-                        renderer = slotBsSpan[j].Renderer ?? ""
-                    });
-                }
-
-                dto.layerSlots.Add(slotDto);
-            }
-
-            return dto;
-        }
-
-        private static TransitionCurveDto ConvertToTransitionCurveDto(TransitionCurve curve)
-        {
-            var dto = new TransitionCurveDto
-            {
-                type = SerializeTransitionCurveType(curve.Type),
-                keys = new List<CurveKeyFrameDto>()
-            };
-
-            var keysSpan = curve.Keys.Span;
-            for (int i = 0; i < keysSpan.Length; i++)
-            {
-                dto.keys.Add(new CurveKeyFrameDto
-                {
-                    time = keysSpan[i].Time,
-                    value = keysSpan[i].Value,
-                    inTangent = keysSpan[i].InTangent,
-                    outTangent = keysSpan[i].OutTangent,
-                    inWeight = keysSpan[i].InWeight,
-                    outWeight = keysSpan[i].OutWeight,
-                    weightedMode = keysSpan[i].WeightedMode
+                    value = bsSpan[i].Value
                 });
             }
 
@@ -895,20 +809,21 @@ namespace Hidano.FacialControl.Adapters.Json
             };
         }
 
-        private static string SerializeTransitionCurveType(TransitionCurveType type)
+        private static string SerializeTransitionCurvePreset(TransitionCurve curve)
         {
-            return type switch
+            return curve.Type switch
             {
-                TransitionCurveType.Linear => "linear",
-                TransitionCurveType.EaseIn => "easeIn",
-                TransitionCurveType.EaseOut => "easeOut",
-                TransitionCurveType.EaseInOut => "easeInOut",
-                TransitionCurveType.Custom => "custom",
-                _ => "linear"
+                TransitionCurveType.Linear    => "Linear",
+                TransitionCurveType.EaseIn    => "EaseIn",
+                TransitionCurveType.EaseOut   => "EaseOut",
+                TransitionCurveType.EaseInOut => "EaseInOut",
+                _ => "Linear"
             };
         }
 
-        // --- Config 変換 ---
+        // ====================================================================
+        // Config 変換
+        // ====================================================================
 
         private static FacialControlConfig ConvertToConfig(ConfigDto dto)
         {
@@ -972,73 +887,8 @@ namespace Hidano.FacialControl.Adapters.Json
         }
 
         // ====================================================================
-        // DTO 定義（JsonUtility 用の Serializable クラス）
+        // Config DTO 定義（JsonUtility 用 Serializable クラス）
         // ====================================================================
-
-        [Serializable]
-        private class ProfileDto
-        {
-            public string schemaVersion;
-            public List<LayerDto> layers;
-            public List<ExpressionDto> expressions;
-            public List<string> rendererPaths;
-            public List<BonePoseDto> bonePoses;
-        }
-
-        [Serializable]
-        private class LayerDto
-        {
-            public string name;
-            public int priority;
-            public string exclusionMode;
-            public List<InputSourceDto> inputSources;
-        }
-
-        [Serializable]
-        private class ExpressionDto
-        {
-            public string id;
-            public string name;
-            public string layer;
-            public float transitionDuration = 0.25f;
-            public TransitionCurveDto transitionCurve;
-            public List<BlendShapeMappingDto> blendShapeValues;
-            public List<LayerSlotDto> layerSlots;
-        }
-
-        [Serializable]
-        private class TransitionCurveDto
-        {
-            public string type;
-            public List<CurveKeyFrameDto> keys;
-        }
-
-        [Serializable]
-        private class CurveKeyFrameDto
-        {
-            public float time;
-            public float value;
-            public float inTangent;
-            public float outTangent;
-            public float inWeight;
-            public float outWeight;
-            public int weightedMode;
-        }
-
-        [Serializable]
-        private class BlendShapeMappingDto
-        {
-            public string name;
-            public float value;
-            public string renderer;
-        }
-
-        [Serializable]
-        private class LayerSlotDto
-        {
-            public string layer;
-            public List<BlendShapeMappingDto> blendShapeValues;
-        }
 
         [Serializable]
         private class ConfigDto

@@ -8,9 +8,14 @@ namespace Hidano.FacialControl.Adapters.Json
     public static class JsonSchemaDefinition
     {
         /// <summary>
-        /// 現在サポートするスキーマバージョン
+        /// 現在サポートする Profile JSON スキーマバージョン（Phase 3.6 で v2.0 へ移行）。
         /// </summary>
-        public const string CurrentSchemaVersion = "1.0";
+        public const string CurrentSchemaVersion = "2.0";
+
+        /// <summary>
+        /// 現在サポートする設定 JSON スキーマバージョン（Profile とは別系統）。
+        /// </summary>
+        public const string CurrentConfigSchemaVersion = "1.0";
 
         /// <summary>
         /// プロファイル JSON スキーマ定義（技術仕様書 §13.7）
@@ -119,8 +124,11 @@ namespace Hidano.FacialControl.Adapters.Json
                 /// <summary>BlendShape 値の配列</summary>
                 public const string BlendShapeValues = "blendShapeValues";
 
-                /// <summary>レイヤースロット（他レイヤーへのオーバーライド）</summary>
-                public const string LayerSlots = "layerSlots";
+                /// <summary>
+                /// LayerOverrideMask の永続化形式（layer 名配列）。Phase 3.2 (inspector-and-data-model-redesign)
+                /// で旧 <c>layerSlots</c> 配列を撤去し、本フィールドで他レイヤーへのオーバーライド対象を表現する。
+                /// </summary>
+                public const string LayerOverrideMask = "layerOverrideMask";
             }
 
             /// <summary>
@@ -175,18 +183,6 @@ namespace Hidano.FacialControl.Adapters.Json
 
                 /// <summary>対象 Renderer 名（省略可）</summary>
                 public const string Renderer = "renderer";
-            }
-
-            /// <summary>
-            /// LayerSlot のフィールド名
-            /// </summary>
-            public static class LayerSlot
-            {
-                /// <summary>ターゲットレイヤー名</summary>
-                public const string Layer = "layer";
-
-                /// <summary>BlendShape 値の配列</summary>
-                public const string BlendShapeValues = "blendShapeValues";
             }
 
             /// <summary>
@@ -271,11 +267,11 @@ namespace Hidano.FacialControl.Adapters.Json
         }
 
         /// <summary>
-        /// 技術仕様書 §13.7 のサンプルプロファイル JSON
+        /// 技術仕様書 §13.7 のサンプルプロファイル JSON（schema v2.0 / snapshot 形式）
         /// </summary>
         public const string SampleProfileJson = @"{
-    ""schemaVersion"": ""1.0"",
-    ""rendererPaths"": [""Armature/Body""],
+    ""schemaVersion"": ""2.0"",
+    ""rendererPaths"": [""Armature/Body"", ""Face""],
     ""layers"": [
         {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [
             {""id"": ""controller-expr"", ""weight"": 0.5},
@@ -293,50 +289,49 @@ namespace Hidano.FacialControl.Adapters.Json
             ""id"": ""550e8400-e29b-41d4-a716-446655440000"",
             ""name"": ""笑顔"",
             ""layer"": ""emotion"",
-            ""transitionDuration"": 0.25,
-            ""transitionCurve"": {
-                ""type"": ""easeInOut""
-            },
-            ""blendShapeValues"": [
-                {""name"": ""Fcl_ALL_Joy"", ""value"": 1.0},
-                {""name"": ""Fcl_EYE_Joy"", ""value"": 0.8},
-                {""name"": ""Fcl_EYE_Joy_R"", ""value"": 0.6, ""renderer"": ""Face""}
-            ],
-            ""layerSlots"": [
-                {
-                    ""layer"": ""lipsync"",
-                    ""blendShapeValues"": [
-                        {""name"": ""Fcl_MTH_A"", ""value"": 0.5}
-                    ]
-                }
-            ]
+            ""layerOverrideMask"": [""lipsync""],
+            ""snapshot"": {
+                ""transitionDuration"": 0.25,
+                ""transitionCurvePreset"": ""EaseInOut"",
+                ""blendShapes"": [
+                    {""rendererPath"": """", ""name"": ""Fcl_ALL_Joy"", ""value"": 1.0},
+                    {""rendererPath"": """", ""name"": ""Fcl_EYE_Joy"", ""value"": 0.8},
+                    {""rendererPath"": ""Face"", ""name"": ""Fcl_EYE_Joy_R"", ""value"": 0.6}
+                ],
+                ""bones"": [],
+                ""rendererPaths"": [""Armature/Body"", ""Face""]
+            }
         },
         {
             ""id"": ""661f9511-f30c-52e5-b827-557766551111"",
             ""name"": ""怒り"",
             ""layer"": ""emotion"",
-            ""transitionDuration"": 0.15,
-            ""transitionCurve"": {
-                ""type"": ""linear""
-            },
-            ""blendShapeValues"": [
-                {""name"": ""Fcl_ALL_Angry"", ""value"": 1.0},
-                {""name"": ""Fcl_BRW_Angry"", ""value"": 0.9}
-            ],
-            ""layerSlots"": []
+            ""layerOverrideMask"": [],
+            ""snapshot"": {
+                ""transitionDuration"": 0.15,
+                ""transitionCurvePreset"": ""Linear"",
+                ""blendShapes"": [
+                    {""rendererPath"": """", ""name"": ""Fcl_ALL_Angry"", ""value"": 1.0},
+                    {""rendererPath"": """", ""name"": ""Fcl_BRW_Angry"", ""value"": 0.9}
+                ],
+                ""bones"": [],
+                ""rendererPaths"": [""Armature/Body""]
+            }
         },
         {
             ""id"": ""772a0622-a41d-63f6-c938-668877662222"",
             ""name"": ""まばたき"",
             ""layer"": ""eye"",
-            ""transitionDuration"": 0.08,
-            ""transitionCurve"": {
-                ""type"": ""linear""
-            },
-            ""blendShapeValues"": [
-                {""name"": ""Fcl_EYE_Close"", ""value"": 1.0}
-            ],
-            ""layerSlots"": []
+            ""layerOverrideMask"": [],
+            ""snapshot"": {
+                ""transitionDuration"": 0.08,
+                ""transitionCurvePreset"": ""Linear"",
+                ""blendShapes"": [
+                    {""rendererPath"": """", ""name"": ""Fcl_EYE_Close"", ""value"": 1.0}
+                ],
+                ""bones"": [],
+                ""rendererPaths"": [""Armature/Body""]
+            }
         }
     ]
 }";

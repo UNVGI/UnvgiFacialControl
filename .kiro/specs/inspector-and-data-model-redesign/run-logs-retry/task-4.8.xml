@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="16" result="Passed" total="16" passed="16" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:46Z" duration="0.1449323">
+  <test-suite type="TestSuite" id="1365" name="FacialControl" fullname="FacialControl" runstate="Runnable" testcasecount="301" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:46Z" duration="0.144932" total="16" passed="16" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="PlayMode" />
+    </properties>
+    <test-suite type="Assembly" id="1071" name="Hidano.FacialControl.InputSystem.Tests.PlayMode.dll" fullname="D:/Personal/Repositries/FacialControl/FacialControl/Library/ScriptAssemblies/Hidano.FacialControl.InputSystem.Tests.PlayMode.dll" runstate="Runnable" testcasecount="63" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:46Z" duration="0.134711" total="16" passed="16" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="40100" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+        <property name="EditorOnly" value="False" />
+      </properties>
+      <test-suite type="TestSuite" id="1072" name="Hidano" fullname="Hidano" runstate="Runnable" testcasecount="63" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:46Z" duration="0.133489" total="16" passed="16" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1073" name="FacialControl" fullname="Hidano.FacialControl" runstate="Runnable" testcasecount="63" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:46Z" duration="0.132764" total="16" passed="16" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1078" name="InputSystem" fullname="Hidano.FacialControl.InputSystem" runstate="Runnable" testcasecount="27" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:46Z" duration="0.131355" total="16" passed="16" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestSuite" id="1079" name="Tests" fullname="Hidano.FacialControl.InputSystem.Tests" runstate="Runnable" testcasecount="27" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:46Z" duration="0.130657" total="16" passed="16" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="TestSuite" id="1080" name="PlayMode" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode" runstate="Runnable" testcasecount="27" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:46Z" duration="0.129851" total="16" passed="16" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-suite type="TestSuite" id="1081" name="Performance" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance" runstate="Runnable" testcasecount="16" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:46Z" duration="0.128986" total="16" passed="16" failed="0" inconclusive="0" skipped="0" asserts="0">
+                  <properties />
+                  <test-suite type="TestFixture" id="1039" name="AnalogProcessorAllocationTests" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests" runstate="Runnable" testcasecount="8" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:45Z" duration="0.022058" total="8" passed="8" failed="0" inconclusive="0" skipped="0" asserts="0">
+                    <properties />
+                    <test-case id="1040" name="Chain_PerProcess_ZeroGCAllocation_GetTotalMemory" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests.Chain_PerProcess_ZeroGCAllocation_GetTotalMemory" methodname="Chain_PerProcess_ZeroGCAllocation_GetTotalMemory" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests" runstate="Runnable" seed="1075577451" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:45Z" duration="0.008649" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1041" name="Chain_PerProcess_ZeroGCAllocation_ProfilerRecorder" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests.Chain_PerProcess_ZeroGCAllocation_ProfilerRecorder" methodname="Chain_PerProcess_ZeroGCAllocation_ProfilerRecorder" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests" runstate="Runnable" seed="1750537198" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:45Z" duration="0.002585" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1045" name="ClampProcessor_PerProcess_ZeroGCAllocation" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests.ClampProcessor_PerProcess_ZeroGCAllocation" methodname="ClampProcessor_PerProcess_ZeroGCAllocation" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests" runstate="Runnable" seed="1164994979" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:45Z" duration="0.000342" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1046" name="CurveProcessor_PerProcess_ZeroGCAllocation" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests.CurveProcessor_PerProcess_ZeroGCAllocation" methodname="CurveProcessor_PerProcess_ZeroGCAllocation" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests" runstate="Runnable" seed="1210684827" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:45Z" duration="0.000179" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1042" name="DeadZoneProcessor_PerProcess_ZeroGCAllocation" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests.DeadZoneProcessor_PerProcess_ZeroGCAllocation" methodname="DeadZoneProcessor_PerProcess_ZeroGCAllocation" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests" runstate="Runnable" seed="1931597471" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:45Z" duration="0.000247" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1047" name="InvertProcessor_PerProcess_ZeroGCAllocation" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests.InvertProcessor_PerProcess_ZeroGCAllocation" methodname="InvertProcessor_PerProcess_ZeroGCAllocation" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests" runstate="Runnable" seed="141383090" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:45Z" duration="0.000183" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1044" name="OffsetProcessor_PerProcess_ZeroGCAllocation" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests.OffsetProcessor_PerProcess_ZeroGCAllocation" methodname="OffsetProcessor_PerProcess_ZeroGCAllocation" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests" runstate="Runnable" seed="260815254" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:45Z" duration="0.000169" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1043" name="ScaleProcessor_PerProcess_ZeroGCAllocation" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests.ScaleProcessor_PerProcess_ZeroGCAllocation" methodname="ScaleProcessor_PerProcess_ZeroGCAllocation" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.AnalogProcessorAllocationTests" runstate="Runnable" seed="1659266588" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:45Z" duration="0.000179" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                  </test-suite>
+                  <test-suite type="TestFixture" id="1048" name="ExpressionInputSourceAdapterAllocationTests" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionInputSourceAdapterAllocationTests" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionInputSourceAdapterAllocationTests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-05-01 02:25:45Z" end-time="2026-05-01 02:25:46Z" duration="0.097121" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+                    <properties />
+                    <test-case id="1052" name="BindUnbind_DoesNotLeakAfterWarmup" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionInputSourceAdapterAllocationTests.BindUnbind_DoesNotLeakAfterWarmup" methodname="BindUnbind_DoesNotLeakAfterWarmup" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionInputSourceAdapterAllocationTests" runstate="Runnable" seed="568991014" result="Passed" start-time="2026-05-01 02:25:46Z" end-time="2026-05-01 02:25:46Z" duration="0.053598" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1050" name="GamepadPerformed_100Dispatches_ZeroGCAllocation" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionInputSourceAdapterAllocationTests.GamepadPerformed_100Dispatches_ZeroGCAllocation" methodname="GamepadPerformed_100Dispatches_ZeroGCAllocation" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionInputSourceAdapterAllocationTests" runstate="Runnable" seed="1812484874" result="Passed" start-time="2026-05-01 02:25:46Z" end-time="2026-05-01 02:25:46Z" duration="0.028522" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1049" name="KeyboardPerformed_100Dispatches_ZeroGCAllocation" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionInputSourceAdapterAllocationTests.KeyboardPerformed_100Dispatches_ZeroGCAllocation" methodname="KeyboardPerformed_100Dispatches_ZeroGCAllocation" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionInputSourceAdapterAllocationTests" runstate="Runnable" seed="2002847862" result="Passed" start-time="2026-05-01 02:25:46Z" end-time="2026-05-01 02:25:46Z" duration="0.008243" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1051" name="Tick_100Frames_ZeroGCAllocation" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionInputSourceAdapterAllocationTests.Tick_100Frames_ZeroGCAllocation" methodname="Tick_100Frames_ZeroGCAllocation" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionInputSourceAdapterAllocationTests" runstate="Runnable" seed="87974521" result="Passed" start-time="2026-05-01 02:25:46Z" end-time="2026-05-01 02:25:46Z" duration="0.004739" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                  </test-suite>
+                  <test-suite type="TestFixture" id="1053" name="ExpressionResolverAllocationTests" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionResolverAllocationTests" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionResolverAllocationTests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-05-01 02:25:46Z" end-time="2026-05-01 02:25:46Z" duration="0.008457" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+                    <properties />
+                    <test-case id="1057" name="TryGetSnapshot_100Frames_ZeroGCAllocation" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionResolverAllocationTests.TryGetSnapshot_100Frames_ZeroGCAllocation" methodname="TryGetSnapshot_100Frames_ZeroGCAllocation" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionResolverAllocationTests" runstate="Runnable" seed="69446719" result="Passed" start-time="2026-05-01 02:25:46Z" end-time="2026-05-01 02:25:46Z" duration="0.002354" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1054" name="TryResolve_100Frames_ZeroGCAllocation_GetTotalMemory" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionResolverAllocationTests.TryResolve_100Frames_ZeroGCAllocation_GetTotalMemory" methodname="TryResolve_100Frames_ZeroGCAllocation_GetTotalMemory" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionResolverAllocationTests" runstate="Runnable" seed="156522212" result="Passed" start-time="2026-05-01 02:25:46Z" end-time="2026-05-01 02:25:46Z" duration="0.001022" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1055" name="TryResolve_100Frames_ZeroGCAllocation_ProfilerRecorder" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionResolverAllocationTests.TryResolve_100Frames_ZeroGCAllocation_ProfilerRecorder" methodname="TryResolve_100Frames_ZeroGCAllocation_ProfilerRecorder" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionResolverAllocationTests" runstate="Runnable" seed="1162293733" result="Passed" start-time="2026-05-01 02:25:46Z" end-time="2026-05-01 02:25:46Z" duration="0.000408" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                    </test-case>
+                    <test-case id="1056" name="TryResolve_UnknownId_ZeroGCAllocation" fullname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionResolverAllocationTests.TryResolve_UnknownId_ZeroGCAllocation" methodname="TryResolve_UnknownId_ZeroGCAllocation" classname="Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance.ExpressionResolverAllocationTests" runstate="Runnable" seed="875994048" result="Passed" start-time="2026-05-01 02:25:46Z" end-time="2026-05-01 02:25:46Z" duration="0.000470" asserts="0">
+                      <properties>
+                        <property name="retryIteration" value="0" />
+                        <property name="repeatIteration" value="0" />
+                      </properties>
+                      <output><![CDATA[Saving results to: C:/Users/Hidano/AppData/LocalLow/DefaultCompany/FacialControl\TestResults.xml
+]]></output>
+                    </test-case>
+                  </test-suite>
+                </test-suite>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

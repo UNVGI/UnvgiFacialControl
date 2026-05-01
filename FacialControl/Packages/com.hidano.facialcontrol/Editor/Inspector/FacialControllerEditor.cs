@@ -11,18 +11,37 @@ namespace Hidano.FacialControl.Editor.Inspector
     /// <summary>
     /// FacialController のカスタム Inspector。
     /// UI Toolkit で実装し、統合 SO 参照、SkinnedMeshRenderer リスト、
-    /// プロファイル概要を表示する。OSC 設定はサブパッケージ
-    /// <c>com.hidano.facialcontrol.osc</c> の専用 MonoBehaviour 側に移管されている。
+    /// プロファイル概要 (Schema / Layer 数 / Expression 数 / Snapshot 数) を表示する。
+    /// OSC 設定はサブパッケージ <c>com.hidano.facialcontrol.osc</c> の専用 MonoBehaviour 側に移管されている。
     /// </summary>
+    /// <remarks>
+    /// Phase 5.4 (inspector-and-data-model-redesign) で BonePose 概念が消えたため、
+    /// 概要表示は AnimationClip 由来の Snapshot 数を表示する形に置き換えた。
+    /// </remarks>
     [CustomEditor(typeof(FacialController))]
     public class FacialControllerEditor : UnityEditor.Editor
     {
-        private const string ProfileSectionLabel = "キャラクター SO";
-        private const string RenderersSectionLabel = "SkinnedMeshRenderer";
-        private const string ProfileInfoSectionLabel = "プロファイル情報";
+        // ---- セクション見出し ----
+        public const string ProfileSectionLabel = "キャラクター SO";
+        public const string RenderersSectionLabel = "SkinnedMeshRenderer";
+        public const string ProfileInfoSectionLabel = "プロファイル情報";
+
+        // ---- 概要ラベルのフォーマット (テストから参照可能にするため public) ----
+        public const string SchemaVersionLabelFormat = "スキーマバージョン: {0}";
+        public const string LayerCountLabelFormat = "レイヤー数: {0}";
+        public const string ExpressionCountLabelFormat = "Expression 数: {0}";
+        public const string SnapshotCountLabelFormat = "Snapshot 数: {0}";
+        public const string EmptyValuePlaceholder = "---";
+
+        // ---- ラベルの name 属性 (UI Toolkit Q<>) ----
+        public const string SchemaVersionLabelName = "facial-controller-schema-version-label";
+        public const string LayerCountLabelName = "facial-controller-layer-count-label";
+        public const string ExpressionCountLabelName = "facial-controller-expression-count-label";
+        public const string SnapshotCountLabelName = "facial-controller-snapshot-count-label";
 
         private Label _layerCountLabel;
         private Label _expressionCountLabel;
+        private Label _snapshotCountLabel;
         private Label _schemaVersionLabel;
 
         public override VisualElement CreateInspectorGUI()
@@ -56,17 +75,33 @@ namespace Hidano.FacialControl.Editor.Inspector
             // ========================================
             var infoFoldout = new Foldout { text = ProfileInfoSectionLabel, value = true };
 
-            _schemaVersionLabel = new Label("スキーマバージョン: ---");
+            _schemaVersionLabel = new Label(string.Format(SchemaVersionLabelFormat, EmptyValuePlaceholder))
+            {
+                name = SchemaVersionLabelName,
+            };
             _schemaVersionLabel.AddToClassList(FacialControlStyles.InfoLabel);
             infoFoldout.Add(_schemaVersionLabel);
 
-            _layerCountLabel = new Label("レイヤー数: ---");
+            _layerCountLabel = new Label(string.Format(LayerCountLabelFormat, EmptyValuePlaceholder))
+            {
+                name = LayerCountLabelName,
+            };
             _layerCountLabel.AddToClassList(FacialControlStyles.InfoLabel);
             infoFoldout.Add(_layerCountLabel);
 
-            _expressionCountLabel = new Label("Expression 数: ---");
+            _expressionCountLabel = new Label(string.Format(ExpressionCountLabelFormat, EmptyValuePlaceholder))
+            {
+                name = ExpressionCountLabelName,
+            };
             _expressionCountLabel.AddToClassList(FacialControlStyles.InfoLabel);
             infoFoldout.Add(_expressionCountLabel);
+
+            _snapshotCountLabel = new Label(string.Format(SnapshotCountLabelFormat, EmptyValuePlaceholder))
+            {
+                name = SnapshotCountLabelName,
+            };
+            _snapshotCountLabel.AddToClassList(FacialControlStyles.InfoLabel);
+            infoFoldout.Add(_snapshotCountLabel);
 
             root.Add(infoFoldout);
 
@@ -90,26 +125,45 @@ namespace Hidano.FacialControl.Editor.Inspector
             {
                 string version = !string.IsNullOrEmpty(so.SchemaVersion)
                     ? so.SchemaVersion
-                    : "---";
+                    : EmptyValuePlaceholder;
                 int layers = so.Layers != null ? so.Layers.Count : 0;
                 int expressions = so.Expressions != null ? so.Expressions.Count : 0;
+                int snapshots = CountSnapshots(so);
 
                 if (_schemaVersionLabel != null)
-                    _schemaVersionLabel.text = $"スキーマバージョン: {version}";
+                    _schemaVersionLabel.text = string.Format(SchemaVersionLabelFormat, version);
                 if (_layerCountLabel != null)
-                    _layerCountLabel.text = $"レイヤー数: {layers}";
+                    _layerCountLabel.text = string.Format(LayerCountLabelFormat, layers);
                 if (_expressionCountLabel != null)
-                    _expressionCountLabel.text = $"Expression 数: {expressions}";
+                    _expressionCountLabel.text = string.Format(ExpressionCountLabelFormat, expressions);
+                if (_snapshotCountLabel != null)
+                    _snapshotCountLabel.text = string.Format(SnapshotCountLabelFormat, snapshots);
             }
             else
             {
                 if (_schemaVersionLabel != null)
-                    _schemaVersionLabel.text = "スキーマバージョン: ---";
+                    _schemaVersionLabel.text = string.Format(SchemaVersionLabelFormat, EmptyValuePlaceholder);
                 if (_layerCountLabel != null)
-                    _layerCountLabel.text = "レイヤー数: ---";
+                    _layerCountLabel.text = string.Format(LayerCountLabelFormat, EmptyValuePlaceholder);
                 if (_expressionCountLabel != null)
-                    _expressionCountLabel.text = "Expression 数: ---";
+                    _expressionCountLabel.text = string.Format(ExpressionCountLabelFormat, EmptyValuePlaceholder);
+                if (_snapshotCountLabel != null)
+                    _snapshotCountLabel.text = string.Format(SnapshotCountLabelFormat, EmptyValuePlaceholder);
             }
+        }
+
+        private static int CountSnapshots(FacialCharacterProfileSO so)
+        {
+            var expressions = so.Expressions;
+            if (expressions == null)
+                return 0;
+            int count = 0;
+            for (int i = 0; i < expressions.Count; i++)
+            {
+                if (expressions[i] != null && expressions[i].cachedSnapshot != null)
+                    count++;
+            }
+            return count;
         }
     }
 }

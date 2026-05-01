@@ -39,13 +39,6 @@ namespace Hidano.FacialControl.Domain.Models
         public ReadOnlyMemory<InputSourceDeclaration[]> LayerInputSources { get; }
 
         /// <summary>
-        /// プロファイル単位の BonePose 配列（Req 1.4 / 1.5）。
-        /// Expression には埋め込まず、独立した配列として保持する。
-        /// 既存コンストラクタ（bonePoses 引数なし）では空配列となる（後方互換）。
-        /// </summary>
-        public ReadOnlyMemory<BonePose> BonePoses { get; }
-
-        /// <summary>
         /// 表情設定プロファイルを生成する。配列パラメータは防御的コピーされる。
         /// </summary>
         /// <param name="schemaVersion">JSON スキーマバージョン（空文字不可）</param>
@@ -56,16 +49,12 @@ namespace Hidano.FacialControl.Domain.Models
         /// レイヤー毎の <c>inputSources</c> 宣言（外側インデックスは <paramref name="layers"/> と揃える想定）。
         /// null の場合は空配列。round-trip 用の担体として Parser が設定する。
         /// </param>
-        /// <param name="bonePoses">
-        /// プロファイル単位の BonePose 配列（Req 1.4 / 1.5）。null の場合は空配列。
-        /// </param>
         public FacialProfile(
             string schemaVersion,
             LayerDefinition[] layers = null,
             Expression[] expressions = null,
             string[] rendererPaths = null,
-            InputSourceDeclaration[][] layerInputSources = null,
-            BonePose[] bonePoses = null)
+            InputSourceDeclaration[][] layerInputSources = null)
         {
             if (schemaVersion == null)
                 throw new ArgumentNullException(nameof(schemaVersion));
@@ -130,17 +119,6 @@ namespace Hidano.FacialControl.Domain.Models
             else
             {
                 LayerInputSources = Array.Empty<InputSourceDeclaration[]>();
-            }
-
-            if (bonePoses != null && bonePoses.Length > 0)
-            {
-                var bpCopy = new BonePose[bonePoses.Length];
-                Array.Copy(bonePoses, bpCopy, bonePoses.Length);
-                BonePoses = bpCopy;
-            }
-            else
-            {
-                BonePoses = Array.Empty<BonePose>();
             }
         }
 

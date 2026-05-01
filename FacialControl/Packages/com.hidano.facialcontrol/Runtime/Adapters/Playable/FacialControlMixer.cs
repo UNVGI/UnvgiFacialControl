@@ -2,15 +2,19 @@ using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine.Playables;
-using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
 
 namespace Hidano.FacialControl.Adapters.Playable
 {
     /// <summary>
     /// PlayableGraph のルートノードとして機能する ScriptPlayable。
-    /// 複数の LayerPlayable からの出力をレイヤー優先度に基づいてブレンドし、
-    /// layerSlots によるオーバーライドを適用して最終出力を生成する。
+    /// 複数の LayerPlayable からの出力をレイヤー優先度に基づいてブレンドして最終出力を生成する。
+    /// <para>
+    /// Phase 3.2 (inspector-and-data-model-redesign) で旧 layer-slot ベースのオーバーライド
+    /// (<c>SetActiveLayerSlots</c> / <c>ClearActiveLayerSlots</c>) は撤去された。
+    /// オーバーライドは Phase 3.4 で導入される <c>ExpressionResolver</c> 経由で
+    /// <see cref="Hidano.FacialControl.Domain.Models.LayerOverrideMask"/> を解釈する形に再設計される。
+    /// </para>
     /// </summary>
     public class FacialControlMixer : PlayableBehaviour, IDisposable
     {
@@ -22,9 +26,6 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         // 登録レイヤー情報
         private readonly List<LayerEntry> _layers = new List<LayerEntry>();
-
-        // アクティブな layerSlots（Expression のオーバーライド用）
-        private LayerSlot[] _activeLayerSlots;
 
         // ComputeOutput 用の事前確保バッファ
         private LayerBlender.LayerInput[] _layerInputBuffer;
@@ -118,24 +119,6 @@ namespace Hidano.FacialControl.Adapters.Playable
         }
 
         /// <summary>
-        /// アクティブな layerSlots を設定する。
-        /// Expression がアクティブになった際にオーバーライド値を反映するために使用する。
-        /// </summary>
-        /// <param name="slots">適用する LayerSlot 配列。null の場合はオーバーライドなし。</param>
-        public void SetActiveLayerSlots(LayerSlot[] slots)
-        {
-            _activeLayerSlots = slots;
-        }
-
-        /// <summary>
-        /// アクティブな layerSlots をクリアする。
-        /// </summary>
-        public void ClearActiveLayerSlots()
-        {
-            _activeLayerSlots = null;
-        }
-
-        /// <summary>
         /// PlayableGraph のフレーム準備コールバック。
         /// 毎フレーム全レイヤーの遷移を進め、最終出力を計算する。
         /// </summary>
@@ -155,7 +138,7 @@ namespace Hidano.FacialControl.Adapters.Playable
         }
 
         /// <summary>
-        /// 全レイヤーの出力をブレンドし、layerSlots オーバーライドを適用して最終出力を計算する。
+        /// 全レイヤーの出力をブレンドして最終出力を計算する。
         /// </summary>
         public void ComputeOutput()
         {
@@ -207,12 +190,6 @@ namespace Hidano.FacialControl.Adapters.Playable
 
             // Domain サービスでブレンド計算
             LayerBlender.Blend(_layerInputBuffer, _outputBuffer);
-
-            // layerSlots オーバーライド適用
-            if (_activeLayerSlots != null && _activeLayerSlots.Length > 0)
-            {
-                LayerBlender.ApplyLayerSlotOverrides(_blendShapeNames, _activeLayerSlots, _outputBuffer);
-            }
 
             // 結果を NativeArray にコピー
             for (int i = 0; i < _blendShapeCount; i++)
@@ -274,7 +251,6 @@ namespace Hidano.FacialControl.Adapters.Playable
             }
 
             _layers.Clear();
-            _activeLayerSlots = null;
             _disposed = true;
         }
 
