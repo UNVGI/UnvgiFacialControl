@@ -26,3 +26,16 @@ Mode: --max-turns 200, timeout 3600s (60min)
 3. ⚠ Unity Test Runner EditMode: 910/913 pass。Domain layer は 769/769 全緑。3 件失敗はすべて `FacialCharacterSOInspectorTests`（Phase 5.1 担当範囲）の panel-less ListView Q<>() 起因で、Phase 3 retry による regression ではない（commit e31968a で test 追加時点から同じ pattern）
 
 詳細は `run-logs-retry/task-3.7.log` を参照。
+| 3.7 | Phase 3 完了レビュー — Domain 全層の破壊書換� | OK | 535s | run-logs-retry/task-3.7.log |
+| 4.1 | Analog deadzone / scale / offset / clamp の 4 種 InputProcessor を stateless で実装する | OK | - | run-logs-retry/task-4.1.log |
+
+## Task 4.1 結果
+
+判定: **OK**（前 batch run の commit 3d65003 で実装済。RETRY 検証で再確認）
+
+### 検証結果
+
+1. ✅ `AnalogDeadZoneProcessor` / `AnalogScaleProcessor` / `AnalogOffsetProcessor` / `AnalogClampProcessor` の 4 ファイルが `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/Processors/` 配下に存在し、`InputProcessor<float>` 派生で stateless（public な float field のみ serialize）
+2. ✅ `Process(value, control)` の挙動が design.md Topic 3 / 要件 6.1, 6.4 通り
+3. ✅ Unity Test Runner EditMode: `AnalogProcessorTests` 27/27 緑（4.1 の 12 ケース + 4.2 の 15 ケース）
+4. ✅ コンパイル成功、無関係領域への regression なし
