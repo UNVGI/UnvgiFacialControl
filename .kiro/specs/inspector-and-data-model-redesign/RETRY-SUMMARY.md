@@ -67,3 +67,17 @@ Mode: --max-turns 200, timeout 3600s (60min)
 3. ✅ 登録名定数 (`DeadZoneProcessorName` / `ScaleProcessorName` / `OffsetProcessorName` / `ClampProcessorName` / `CurveProcessorName` / `InvertProcessorName`) を `public const string` で公開、`ProcessorNames` 配列でも提供
 4. ✅ Unity Test Runner PlayMode: `AnalogProcessorRegistrationTests` 7/7 緑（ProcessorNames_HasSixDistinctEntries + Register_*_IsResolvableByName ×6）
 5. ✅ コンパイル成功、Exit code 0
+| 4.3 | InputProcessor 6 種を Editor / Runtime 両方で一括登� | OK | 182s | run-logs-retry/task-4.3.log |
+| 4.4 | InputDeviceCategorizer を新設し、InputBinding.path から DeviceCategory を 0-alloc で推定する | OK | - | test-results/editmode-task-4-4-retry.xml |
+
+## Task 4.4 結果
+
+判定: **OK**（前 batch run の commit f0b78ed で実装済。RETRY 検証で再確認）
+
+### 検証結果
+
+1. ✅ `Runtime/Adapters/Input/InputDeviceCategorizer.cs` に `DeviceCategory` enum (Keyboard=0 / Controller=1) と静的 `Categorize(string bindingPath, out bool wasFallback)` メソッドが存在
+2. ✅ 認識 prefix を `static readonly string[] ControllerPrefixes` で定数化（`<Gamepad>` / `<Joystick>` / `<XRController>` / `<Pen>` / `<Touchscreen>`）。`<Keyboard>` は別 const
+3. ✅ 0-alloc: `string.StartsWith(prefix, StringComparison.Ordinal)` で判別し、`null` / 空文字 / 未認識 prefix では `wasFallback=true` + `DeviceCategory.Controller` を返す（Req 7.5）
+4. ✅ Unity Test Runner EditMode: `InputDeviceCategorizerTests` 5/5 緑（Categorize_Keyboard / Gamepad / XRController / UnknownPrefix / NullOrEmpty）
+5. ✅ Phase 3 RETRY 完了後の現状で再コンパイル成功、Exit code 0
