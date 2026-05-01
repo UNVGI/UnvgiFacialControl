@@ -35,15 +35,6 @@
       },
       "url": "https://registry.npmjs.org"
     },
-    "com.hidano.unity-mcp-custom-tools": {
-      "version": "git+ssh://git@github-personal/NHidano/UnityMCPCustomTools.git?path=UnityMCPCustomTools/Packages/UnityMCPCustomTools",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {
-        "jp.shiranui-isuzu.unity-mcp": "1.1.2"
-      },
-      "hash": "bc59e8371497d14c27e1287123d4cf3603bd00b6"
-    },
     "com.hidano.uosc": {
       "version": "1.0.0",
       "depth": 1,
@@ -281,15 +272,6 @@
       "source": "git",
       "dependencies": {},
       "hash": "f23be65e21f80d2ba7a92123192328e77e72b715"
-    },
-    "jp.shiranui-isuzu.unity-mcp": {
-      "version": "https://github.com/isuzu-shiranui/UnityMCP.git?path=jp.shiranui-isuzu.unity-mcp",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {
-        "com.unity.nuget.newtonsoft-json": "3.2.1"
-      },
-      "hash": "35700c4534f586fc0c72c31076a8a04996e34005"
     },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",

@@ -24,7 +24,7 @@ MonoBehaviour:
   _expressions: []
   _rendererPaths: []
   _referenceModel: {fileID: 0}
-  _inputActionAsset: {fileID: -944628639613478452, guid: 8c4e2b1f7a3d5e9c4b8f1d2e6a3c7b5d, type: 3}
+  _inputActionAsset: {fileID: -944628639613478452, guid: 7d3a9c1b5e2f48a3b6c1d4e8f2a7b3c5, type: 3}
   _actionMapName: Analog
   _expressionBindings: []
   _analogBindings:
