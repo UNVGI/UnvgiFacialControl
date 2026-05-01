@@ -11,8 +11,8 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 66b402a1dc2b31045843ee6bec45348a, type: 3}
   m_Name: AnalogBindingDemoCharacter
-  m_EditorClassIdentifier:
-  _schemaVersion: "2.0"
+  m_EditorClassIdentifier: 
+  _schemaVersion: 2.0
   _layers:
   - name: emotion
     priority: 0
@@ -20,7 +20,7 @@ MonoBehaviour:
     inputSources:
     - id: controller-expr
       weight: 1
-      optionsJson:
+      optionsJson: 
   _expressions: []
   _rendererPaths: []
   _referenceModel: {fileID: 0}

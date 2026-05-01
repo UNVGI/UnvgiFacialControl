@@ -11,6 +11,7 @@ using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.Common;
 using Hidano.FacialControl.Editor.Sampling;
 using Hidano.FacialControl.InputSystem.Adapters.ScriptableObject;
+using Hidano.FacialControl.InputSystem.Editor.AutoExport;
 
 namespace Hidano.FacialControl.InputSystem.Editor.Inspector
 {
@@ -172,8 +173,31 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             {
                 return;
             }
+
+            // フォーカス中の TextField 等の未確定値を反映する
+            serializedObject.ApplyModifiedProperties();
+
+            // OnWillSaveAssets 経路が発火しない環境でも JSON が更新されるよう、明示的に実行する
+            if (target is FacialCharacterProfileSO profileSO)
+            {
+                try
+                {
+                    FacialCharacterSOAutoExporter.SampleAnimationClipsIntoCachedSnapshots(
+                        profileSO, _sampler ?? new AnimationClipExpressionSampler());
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError(
+                        $"FacialCharacterSOInspector: AnimationClip サンプリングに失敗したため保存を中止します: {ex}");
+                    return;
+                }
+
+                FacialCharacterSOAutoExporter.ExportToStreamingAssets(profileSO);
+            }
+
             EditorUtility.SetDirty(target);
             AssetDatabase.SaveAssetIfDirty(target);
+            AssetDatabase.Refresh();
         }
 
         // ====================================================================
@@ -1076,6 +1100,15 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             {
                 messages.Add("LayerOverrideMask が空です (Req 3.5)。少なくとも 1 つのレイヤーを選択してください。");
             }
+
+            // 参照モデルが設定されている場合、AnimationClip の rendererPath が
+            // モデル内の SkinnedMeshRenderer 階層と一致するか検証する（path mismatch の早期検出）
+            var mismatchMessage = BuildRendererPathMismatchMessage(clip);
+            if (!string.IsNullOrEmpty(mismatchMessage))
+            {
+                messages.Add(mismatchMessage);
+            }
+
             if (messages.Count == 0)
             {
                 help.text = string.Empty;
@@ -1372,6 +1405,91 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                     elem.stringValue = orderedLayerNames[b];
                 }
             }
+        }
+
+        /// <summary>
+        /// AnimationClip の rendererPath を参照モデル (<see cref="FacialCharacterProfileSO.ReferenceModel"/>) 内の
+        /// SkinnedMeshRenderer 階層と照合し、不一致があれば警告メッセージを返す。
+        /// 参照モデル未設定 / clip 未割当 / 完全一致のときは <c>null</c>。
+        /// </summary>
+        private string BuildRendererPathMismatchMessage(AnimationClip clip)
+        {
+            if (clip == null || _sampler == null)
+            {
+                return null;
+            }
+            var profileSO = target as FacialCharacterProfileSO;
+            var referenceModel = profileSO != null ? profileSO.ReferenceModel : null;
+            if (referenceModel == null)
+            {
+                return null;
+            }
+
+            HashSet<string> modelPaths;
+            try
+            {
+                modelPaths = CollectReferenceModelRendererPaths(referenceModel);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+            if (modelPaths.Count == 0)
+            {
+                return $"参照モデル '{referenceModel.name}' に SkinnedMeshRenderer が見つかりません。BlendShape 入りメッシュを含むモデルを割り当ててください。";
+            }
+
+            List<string> rendererPaths;
+            try
+            {
+                var summary = _sampler.SampleSummary(clip);
+                rendererPaths = summary.RendererPaths != null
+                    ? new List<string>(summary.RendererPaths)
+                    : new List<string>();
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+
+            var invalid = new List<string>();
+            for (int i = 0; i < rendererPaths.Count; i++)
+            {
+                var path = rendererPaths[i] ?? string.Empty;
+                if (!modelPaths.Contains(path))
+                {
+                    invalid.Add(string.IsNullOrEmpty(path) ? "(ルート)" : path);
+                }
+            }
+            if (invalid.Count == 0)
+            {
+                return null;
+            }
+
+            return $"AnimationClip の RendererPath [{string.Join(", ", invalid)}] が参照モデル '{referenceModel.name}' 内の SkinnedMeshRenderer と一致しません。"
+                + $" 参照モデル内の候補: [{string.Join(", ", modelPaths)}]。"
+                + " 'FacialControl > Expression 作成' ウィンドウに参照モデルを割り当てて AnimationClip を再ベイクしてください。";
+        }
+
+        private static HashSet<string> CollectReferenceModelRendererPaths(GameObject model)
+        {
+            var result = new HashSet<string>(StringComparer.Ordinal);
+            if (model == null)
+            {
+                return result;
+            }
+            var renderers = model.GetComponentsInChildren<SkinnedMeshRenderer>(includeInactive: true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                var smr = renderers[i];
+                if (smr == null || smr.sharedMesh == null || smr.sharedMesh.blendShapeCount == 0)
+                {
+                    continue;
+                }
+                var path = AnimationUtility.CalculateTransformPath(smr.transform, model.transform) ?? string.Empty;
+                result.Add(path);
+            }
+            return result;
         }
     }
 }
