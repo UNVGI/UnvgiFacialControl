@@ -93,8 +93,8 @@ namespace Hidano.FacialControl.Samples
                 return;
             }
 
-            var controllerSource = GetSource(ControllerExpressionInputSource.ReservedId);
-            var keyboardSource = GetSource(KeyboardExpressionInputSource.ReservedId);
+            var controllerSource = GetSource(Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.ControllerReservedId);
+            var keyboardSource = GetSource(Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.KeyboardReservedId);
 
             GUILayout.BeginArea(new Rect(10, 10, 480, Screen.height - 20), GUI.skin.box);
             _scroll = GUILayout.BeginScrollView(_scroll);
@@ -109,11 +109,11 @@ namespace Hidano.FacialControl.Samples
 
             GUILayout.Space(8);
             GUILayout.Label("<b>Controller 入力源 (controller-expr)</b>", RichStyle());
-            DrawSourceTriggerRow(controllerSource, ControllerExpressionInputSource.ReservedId);
+            DrawSourceTriggerRow(controllerSource, Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.ControllerReservedId);
 
             GUILayout.Space(6);
             GUILayout.Label("<b>Keyboard 入力源 (keyboard-expr)</b>", RichStyle());
-            DrawSourceTriggerRow(keyboardSource, KeyboardExpressionInputSource.ReservedId);
+            DrawSourceTriggerRow(keyboardSource, Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.KeyboardReservedId);
 
             GUILayout.Space(8);
             if (GUILayout.Button("全ソースの全 Expression を Off"))

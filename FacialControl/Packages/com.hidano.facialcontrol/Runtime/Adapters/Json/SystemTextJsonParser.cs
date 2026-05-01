@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -28,8 +28,8 @@ namespace Hidano.FacialControl.Adapters.Json
         {
             var dto = ParseProfileDto(json);
             var inputSources = ExtractInputSources(dto);
-            var bonePoses = ExtractBonePoses(dto);
-            return ConvertToProfile(dto, inputSources, bonePoses);
+
+            return ConvertToProfile(dto, inputSources);
         }
 
         /// <summary>
@@ -651,70 +651,70 @@ namespace Hidano.FacialControl.Adapters.Json
 
         // --- Profile 変換 ---
 
-        private static FacialProfile ConvertToProfile(ProfileDto dto, InputSourceDto[][] inputSourceDtos, BonePose[] bonePoses)
+        private static FacialProfile ConvertToProfile(ProfileDto dto, InputSourceDto[][] inputSourceDtos)
         {
             var layers = ConvertLayers(dto.layers);
             var expressions = ConvertExpressions(dto.expressions);
             var rendererPaths = ConvertRendererPaths(dto.rendererPaths);
             var layerInputSources = ConvertLayerInputSources(inputSourceDtos);
-            return new FacialProfile(dto.schemaVersion, layers, expressions, rendererPaths, layerInputSources, bonePoses);
+            return new FacialProfile(dto.schemaVersion, layers, expressions, rendererPaths, layerInputSources);
         }
 
-        // Req 7.1, 7.2, 7.4, 7.5: bonePoses ブロックを Domain BonePose[] に変換する。
-        // - boneName が null / 空 / 全空白のエントリは Warning + skip + 続行 (Req 7.4)
-        // - Domain ctor が ArgumentException を投げる pose（同名 boneName 重複等）は
-        //   その BonePose 全体を Warning + skip + 続行 (Req 7.4 / Req 1.7)
-        // - bonePoses 自体の欠落 / null / 空配列は空 BonePose[] を返す (Req 7.3 / 10.2)
-        private static BonePose[] ExtractBonePoses(ProfileDto dto)
-        {
-            if (dto.bonePoses == null || dto.bonePoses.Count == 0)
-                return Array.Empty<BonePose>();
 
-            var result = new List<BonePose>(dto.bonePoses.Count);
-            for (int i = 0; i < dto.bonePoses.Count; i++)
-            {
-                var poseDto = dto.bonePoses[i];
-                if (poseDto == null)
-                    continue;
 
-                var validEntries = new List<BonePoseEntry>(poseDto.entries != null ? poseDto.entries.Count : 0);
-                if (poseDto.entries != null)
-                {
-                    for (int j = 0; j < poseDto.entries.Count; j++)
-                    {
-                        var entryDto = poseDto.entries[j];
-                        if (entryDto == null || string.IsNullOrWhiteSpace(entryDto.boneName))
-                        {
-                            Debug.LogWarning(
-                                $"SystemTextJsonParser: bonePoses[{i}].entries[{j}] に boneName が指定されていません。スキップします。");
-                            continue;
-                        }
 
-                        validEntries.Add(new BonePoseEntry(
-                            entryDto.boneName,
-                            entryDto.eulerXYZ.x,
-                            entryDto.eulerXYZ.y,
-                            entryDto.eulerXYZ.z));
-                    }
-                }
 
-                BonePose pose;
-                try
-                {
-                    pose = new BonePose(poseDto.id, validEntries.ToArray());
-                }
-                catch (ArgumentException ex)
-                {
-                    Debug.LogWarning(
-                        $"SystemTextJsonParser: bonePoses[{i}] (id='{poseDto.id}') の構築に失敗したためスキップします: {ex.Message}");
-                    continue;
-                }
 
-                result.Add(pose);
-            }
 
-            return result.ToArray();
-        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         // InputSourceDto[][] → InputSourceDeclaration[][] 変換。round-trip 担体用。
         private static InputSourceDeclaration[][] ConvertLayerInputSources(InputSourceDto[][] dtos)
@@ -1052,7 +1052,7 @@ namespace Hidano.FacialControl.Adapters.Json
             public List<LayerDto> layers;
             public List<ExpressionDto> expressions;
             public List<string> rendererPaths;
-            public List<BonePoseDto> bonePoses;
+
         }
 
         [Serializable]

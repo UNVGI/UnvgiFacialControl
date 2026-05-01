@@ -14,11 +14,11 @@ namespace Hidano.FacialControl.Adapters.Processors
     /// </summary>
     /// <remarks>
     /// Editor では <c>[InitializeOnLoad]</c> 経由でドメインリロード直後に静的コンストラクタが走り、
-    /// 6 processor を <see cref="InputSystem.RegisterProcessor{T}(string)"/> で登録する。
+    /// 6 processor を <see cref="global::UnityEngine.InputSystem.InputSystem.RegisterProcessor{T}(string)"/> で登録する。
     /// Runtime ビルドでは <see cref="RuntimeInitializeOnLoadMethodAttribute"/> の
     /// <see cref="RuntimeInitializeLoadType.BeforeSceneLoad"/> フェーズで同じ登録が走る。
     /// 登録名は <see cref="ProcessorNames"/> として公開し、Migration Guide や Inspector からも参照する。
-    /// <see cref="InputSystem.RegisterProcessor{T}(string)"/> は冪等のため、Editor PlayMode 中に
+    /// <see cref="global::UnityEngine.InputSystem.InputSystem.RegisterProcessor{T}(string)"/> は冪等のため、Editor PlayMode 中に
     /// 両経路から二重に呼ばれても害は無い。
     /// </remarks>
 #if UNITY_EDITOR
@@ -70,12 +70,12 @@ namespace Hidano.FacialControl.Adapters.Processors
 
         private static void Register()
         {
-            InputSystem.RegisterProcessor<AnalogDeadZoneProcessor>(DeadZoneProcessorName);
-            InputSystem.RegisterProcessor<AnalogScaleProcessor>(ScaleProcessorName);
-            InputSystem.RegisterProcessor<AnalogOffsetProcessor>(OffsetProcessorName);
-            InputSystem.RegisterProcessor<AnalogClampProcessor>(ClampProcessorName);
-            InputSystem.RegisterProcessor<AnalogCurveProcessor>(CurveProcessorName);
-            InputSystem.RegisterProcessor<AnalogInvertProcessor>(InvertProcessorName);
+            global::UnityEngine.InputSystem.InputSystem.RegisterProcessor<AnalogDeadZoneProcessor>(DeadZoneProcessorName);
+            global::UnityEngine.InputSystem.InputSystem.RegisterProcessor<AnalogScaleProcessor>(ScaleProcessorName);
+            global::UnityEngine.InputSystem.InputSystem.RegisterProcessor<AnalogOffsetProcessor>(OffsetProcessorName);
+            global::UnityEngine.InputSystem.InputSystem.RegisterProcessor<AnalogClampProcessor>(ClampProcessorName);
+            global::UnityEngine.InputSystem.InputSystem.RegisterProcessor<AnalogCurveProcessor>(CurveProcessorName);
+            global::UnityEngine.InputSystem.InputSystem.RegisterProcessor<AnalogInvertProcessor>(InvertProcessorName);
         }
     }
 }

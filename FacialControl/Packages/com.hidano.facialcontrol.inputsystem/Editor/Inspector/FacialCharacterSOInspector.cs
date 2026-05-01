@@ -106,7 +106,6 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             _sampler = new AnimationClipExpressionSampler();
 
             // 既存 Expression のうち Id が空のエントリは GUID で自動採番（Req 1.3）
-            EnsureExpressionGuidIds();
 
             var root = new VisualElement();
 
