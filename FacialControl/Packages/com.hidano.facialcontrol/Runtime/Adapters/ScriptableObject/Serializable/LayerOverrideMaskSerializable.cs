@@ -7,7 +7,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
     /// <see cref="LayerOverrideMask"/> （Domain 値型: <c>[Flags] enum int</c>）と
     /// レイヤー名配列（永続化形式）の相互変換ヘルパー。
     /// <para>
-    /// Phase 3.2 (inspector-and-data-model-redesign) で旧 <c>LayerSlotSerializable</c>
+    /// Phase 3.2 (inspector-and-data-model-redesign) で旧 layer-slot Serializable
     /// （layer 名 + BlendShape 配列）を撤去し、本ヘルパーへ置換した。
     /// Domain は bit position と layer 名の対応を関知せず、bit 位置 ↔ layer 名 の
     /// 紐付けは <c>FacialCharacterProfileSO.Layers</c> の宣言順を起点として

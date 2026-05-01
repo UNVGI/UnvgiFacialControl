@@ -10,7 +10,7 @@ namespace Hidano.FacialControl.Adapters.Playable
     /// PlayableGraph のルートノードとして機能する ScriptPlayable。
     /// 複数の LayerPlayable からの出力をレイヤー優先度に基づいてブレンドして最終出力を生成する。
     /// <para>
-    /// Phase 3.2 (inspector-and-data-model-redesign) で <c>LayerSlot</c> ベースのオーバーライド
+    /// Phase 3.2 (inspector-and-data-model-redesign) で旧 layer-slot ベースのオーバーライド
     /// (<c>SetActiveLayerSlots</c> / <c>ClearActiveLayerSlots</c>) は撤去された。
     /// オーバーライドは Phase 3.4 で導入される <c>ExpressionResolver</c> 経由で
     /// <see cref="Hidano.FacialControl.Domain.Models.LayerOverrideMask"/> を解釈する形に再設計される。

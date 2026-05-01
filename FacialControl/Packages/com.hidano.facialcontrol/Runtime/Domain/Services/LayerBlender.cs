@@ -7,7 +7,7 @@ namespace Hidano.FacialControl.Domain.Services
     /// レイヤー優先度に基づくウェイトブレンドを行う静的サービス。
     /// 全メソッドは GC フリーで動作する（事前確保済み配列の再利用を前提）。
     /// <para>
-    /// Phase 3.2 (inspector-and-data-model-redesign) で <see cref="LayerSlot"/> ベースの
+    /// Phase 3.2 (inspector-and-data-model-redesign) で旧 <c>LayerSlot</c> ベースの
     /// <c>ApplyLayerSlotOverrides</c> オーバーロード群は撤去された。
     /// オーバーライドは Phase 3.4 で導入される <c>ExpressionResolver</c> 経由で
     /// <see cref="LayerOverrideMask"/> を解釈する形に再設計される。

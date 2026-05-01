@@ -6,8 +6,8 @@ namespace Hidano.FacialControl.Domain.Models
     /// 表情定義。AnimationClip 由来の <see cref="ExpressionSnapshot"/> を <see cref="SnapshotId"/> で参照する不変オブジェクト。
     /// <para>
     /// Phase 3.1 (inspector-and-data-model-redesign) で派生 5 値の independent field
-    /// (<c>BlendShapeValues / LayerSlots</c>) を撤去する第一歩として SnapshotId 参照型を導入し、
-    /// Phase 3.2 で <c>LayerSlots</c> field と <see cref="LayerSlot"/> 型本体を物理削除した。
+    /// (<c>BlendShapeValues</c> / 旧 <c>LayerSlots</c>) を撤去する第一歩として SnapshotId 参照型を導入し、
+    /// Phase 3.2 で 旧 <c>LayerSlots</c> field と旧 <c>LayerSlot</c> 型本体を物理削除した。
     /// 残る bridge field（<see cref="TransitionDuration"/> / <see cref="TransitionCurve"/> /
     /// <see cref="BlendShapeValues"/>）は Phase 3.3〜3.6 の連鎖破壊リファクタが完了するまで
     /// 互換目的で保持され、Domain の primary identity は (Id, Name, Layer, OverrideMask, SnapshotId) の 5 値である。
