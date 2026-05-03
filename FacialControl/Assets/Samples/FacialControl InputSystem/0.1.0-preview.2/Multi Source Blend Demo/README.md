@@ -1,16 +1,18 @@
 # Multi Source Blend Demo
 
-同一レイヤーに `controller-expr` と `keyboard-expr` の 2 つの ExpressionTrigger 入力源を並置し、ウェイトブレンドの振る舞いを OnGUI 経由で目視確認するための PlayMode 専用サンプルです。
+同一レイヤーに `controller-expr` と `keyboard-expr` の 2 つの ExpressionTrigger 入力源を並置してウェイトブレンドの振る舞いを目視確認することに加え、左スティック → LeftEye/RightEye Euler、ARKit/OSC float → mouth-open BlendShape のアナログバインディングまで 1 サンプルで網羅する PlayMode 専用サンプルです。
 
 ## 同梱物
 
 | ファイル | 役割 |
 |---------|------|
 | `MultiSourceBlendDemo.unity` | Animator / FacialController / Extension / HUD を結線済みの Scene |
-| `MultiSourceBlendDemoCharacter.asset` | `FacialCharacterSO`（schema v2.0、表情 4 種を AnimationClip 参照で保持） |
+| `MultiSourceBlendDemoCharacter.asset` | `FacialCharacterSO`（schema v2.0、表情 4 種を AnimationClip 参照で保持。Trigger1〜4 + LeftStickX/Y + ArkitJawOpen の Expression / Analog バインディングを内蔵） |
+| `MultiSourceBlendDemoActions.inputactions` | Expression 用 Trigger1〜12 + アナログ用 LeftStickX / LeftStickY / ArkitJawOpen を 1 つの ActionMap "Expression" にまとめた InputActionAsset |
 | `Smile.anim` / `Anger.anim` / `Surprise.anim` / `Lipsync_A.anim` | 各表情の AnimationClip。`FacialControlMeta_Set` AnimationEvent で transitionDuration / transitionCurvePreset を内蔵 |
-| `MultiSourceBlendDemoHUD.cs` | Weight スライダー + 各ソースごとの TriggerOn/Off ボタンを表示する HUD コンポーネント |
+| `MultiSourceBlendDemoHUD.cs` | Weight スライダー + 各ソースごとの TriggerOn/Off ボタン + LeftEye/RightEye Euler / mouth-open BlendShape の現在値を表示する HUD コンポーネント |
 | `StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/profile.json` | 2 source on the same layer + 4 Expression (smile / anger / surprise / lipsync_a) を宣言した schema v2.0 プロファイル定義 (FacialController が起動時に自動探索) |
+| `StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/analog_bindings.json` | LeftStickX/Y / ArkitJawOpen → LeftEye / RightEye / jawOpen のアナログバインディング定義 (FacialController が同様に自動探索) |
 | `README.md` | 本ファイル |
 
 モデル (prefab / FBX / VRM) はライセンスの都合で同梱しません。ユーザー自身で用意してください。
@@ -68,6 +70,8 @@ Play モードに入ります。画面左上に HUD が表示されます。
 - `Keyboard 入力源` ブロックで同様にトリガー
 - 両ソースを同時にトリガーすると、モデルの BlendShape が加重和で合成される様子を確認できる
 - **キーボード 1 / 2 / 3 / 4** キーでも `keyboard-expr` 経由で smile / anger / surprise / lipsync_a が発火します（SO の `ExpressionBindings` セクションで Action 名 → Expression ID をマッピング）
+- **左スティック** を倒すと、HUD 下部の `BonePose 出力 (Eye Euler)` セクションに LeftEye / RightEye の localRotation Euler が反映されます（HUD で観測する場合は HUD の `_leftEye` / `_rightEye` フィールドにモデル側のボーン Transform を設定）
+- ARKit/OSC 経由で `ArkitJawOpen` (0〜100) を流すと、HUD の `BlendShape 出力 (mouth-open)` セクションに `jawOpen` BlendShape の現在値が表示されます（モデルが該当 BlendShape を持つ前提。HUD の `_meshRenderer` 未設定時は FacialController から自動探索）
 
 ### トラブルシューティング
 
