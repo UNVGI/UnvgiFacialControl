@@ -8,12 +8,12 @@ namespace Hidano.FacialControl.Samples
     /// <summary>
     /// 同一レイヤーに複数の <c>ExpressionTrigger</c> 入力源 (controller-expr / keyboard-expr) を並置し、
     /// それぞれのウェイト比と独立トリガーで BlendShape 加重和がどう見えるかを目視検証するための
-    /// PlayMode 専用 HUD。EyeLook 表情 (Vector2 入力 → 両目 BlendShape) の現在値も同 HUD で観測する。
+    /// PlayMode 専用 HUD。アナログ操作 (Vector2 入力 → 両目ボーン / BlendShape) の現在値も同 HUD で観測する。
     /// </summary>
     /// <remarks>
     /// 詳しい使い方は本サンプル同梱の README.md 参照。
     /// 本 HUD は FacialController の既存公開 API のみを利用し、書込はしないオブザーバ。
-    /// EyeLook 表情の InputAction や BlendShape 名は SO の Inspector で編集する。
+    /// アナログ表情の InputAction やボーンパス / BlendShape 名は SO の Inspector で編集する。
     /// </remarks>
     [DefaultExecutionOrder(-100)]
     [AddComponentMenu("FacialControl/Samples/Multi Source Blend Demo HUD")]

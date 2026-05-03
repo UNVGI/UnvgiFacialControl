@@ -5,14 +5,13 @@ using UnityEngine.InputSystem;
 namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
 {
     /// <summary>
-    /// Vector2 入力（左スティック等）で両目を同時駆動する目線表情の設定。
+    /// Vector2 入力 (左スティック等) で両目を同時駆動するアナログ表情の設定。
     /// 対応する <see cref="Hidano.FacialControl.Adapters.ScriptableObject.Serializable.ExpressionSerializable"/>
-    /// に対して expressionId で紐づく。
+    /// (kind=Analog) に対して expressionId で紐づく。
     /// </summary>
     /// <remarks>
-    /// 入力 Vector2 の x 成分が左右両目の X 軸 BlendShape に、y 成分が左右両目の Y 軸 BlendShape に
-    /// それぞれ反映される。BlendShape の値域は 0〜100 を想定し、上流の InputProcessor チェーン
-    /// (analogScale 等) で適切にスケールされる。
+    /// 入力 Vector2 の x 成分が両目の左右回転 (バインディング側で軸を選択)、y 成分が上下回転にマップされる。
+    /// 多くのモデルでは目線はボーン操作だが、BlendShape ベースのモデルもあるため両方を任意に併用できる。
     /// </remarks>
     [Serializable]
     public sealed class GazeExpressionConfig
@@ -23,16 +22,32 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
         [Tooltip("Vector2 入力 (joystick 等) を提供する InputAction の参照。expectedControlType=Vector2 を推奨。")]
         public InputActionReference inputAction;
 
-        [Tooltip("入力 x 成分が反映される左目の BlendShape 名。空なら無効化。")]
+        // ----------------- ボーン制御 (主) -----------------
+
+        [Tooltip("左目ボーンの GameObject 階層パス (Animator のルートからの相対パス、例: Armature/.../LeftEye)。空なら無効。")]
+        public string leftEyeBonePath;
+
+        [Tooltip("左目ボーンの初期回転 (Euler 度)。アナログ入力 0 のときに保つ姿勢。アナログ入力はこの値に加算される。")]
+        public Vector3 leftEyeInitialRotation;
+
+        [Tooltip("右目ボーンの GameObject 階層パス。空なら無効。")]
+        public string rightEyeBonePath;
+
+        [Tooltip("右目ボーンの初期回転 (Euler 度)。")]
+        public Vector3 rightEyeInitialRotation;
+
+        // ----------------- BlendShape 制御 (オプション) -----------------
+
+        [Tooltip("入力 x 成分が反映される左目の BlendShape 名。空なら無効。")]
         public string leftEyeXBlendShape;
 
-        [Tooltip("入力 y 成分が反映される左目の BlendShape 名。空なら無効化。")]
+        [Tooltip("入力 y 成分が反映される左目の BlendShape 名。空なら無効。")]
         public string leftEyeYBlendShape;
 
-        [Tooltip("入力 x 成分が反映される右目の BlendShape 名。空なら無効化。")]
+        [Tooltip("入力 x 成分が反映される右目の BlendShape 名。空なら無効。")]
         public string rightEyeXBlendShape;
 
-        [Tooltip("入力 y 成分が反映される右目の BlendShape 名。空なら無効化。")]
+        [Tooltip("入力 y 成分が反映される右目の BlendShape 名。空なら無効。")]
         public string rightEyeYBlendShape;
     }
 }

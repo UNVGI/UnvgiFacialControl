@@ -24,7 +24,7 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
     /// </para>
     /// <para>
     /// 目線等の Vector2 アナログ表情は <see cref="GazeConfigs"/> として保持され、所属 Expression
-    /// (<see cref="ExpressionKind.EyeLook"/>) と id で紐づく。先代の per-axis <c>_analogBindings</c>
+    /// (<see cref="ExpressionKind.Analog"/>) と id で紐づく。先代の per-axis <c>_analogBindings</c>
     /// は legacy として温存されるが <see cref="GazeConfigs"/> が 1 件でもあれば無視される。
     /// </para>
     /// </remarks>
@@ -46,8 +46,8 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
         [SerializeField]
         private List<ExpressionBindingEntry> _expressionBindings = new List<ExpressionBindingEntry>();
 
-        [Tooltip("EyeLook 系 Expression ごとの Vector2 入力 + 両目 BlendShape 設定。"
-            + " Expressions リストの ExpressionKind.EyeLook なエントリと expressionId で紐づく。")]
+        [Tooltip("Analog 表情 (アナログ操作) ごとの Vector2 入力 + 両目ボーン/BlendShape 設定。"
+            + " Expressions リストの ExpressionKind.Analog なエントリと expressionId で紐づく。")]
         [SerializeField]
         private List<GazeExpressionConfig> _gazeConfigs = new List<GazeExpressionConfig>();
 
@@ -74,7 +74,7 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
         /// <summary>キーバインディング (編集用)。</summary>
         public List<ExpressionBindingEntry> ExpressionBindings => _expressionBindings;
 
-        /// <summary>EyeLook 系 Expression の Vector2 アナログ設定 (編集用)。</summary>
+        /// <summary>アナログ表情 (目線等) の Vector2 アナログ設定 (編集用)。</summary>
         public List<GazeExpressionConfig> GazeConfigs => _gazeConfigs;
 
         /// <summary>
@@ -119,7 +119,7 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
 
         private AnalogInputBindingProfile BuildAnalogProfileFromGazeConfigs()
         {
-            var entries = new List<AnalogBindingEntry>(_gazeConfigs.Count * 4);
+            var entries = new List<AnalogBindingEntry>(_gazeConfigs.Count * 8);
             for (int i = 0; i < _gazeConfigs.Count; i++)
             {
                 var cfg = _gazeConfigs[i];
@@ -133,12 +133,73 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
                     continue;
                 }
 
+                // ボーン制御 (主): 入力 x → bone Y 軸 (yaw)、入力 y → bone X 軸 (pitch)。
+                AppendBoneBinding(entries, sourceId, sourceAxis: 0, cfg.leftEyeBonePath, AnalogTargetAxis.Y);
+                AppendBoneBinding(entries, sourceId, sourceAxis: 1, cfg.leftEyeBonePath, AnalogTargetAxis.X);
+                AppendBoneBinding(entries, sourceId, sourceAxis: 0, cfg.rightEyeBonePath, AnalogTargetAxis.Y);
+                AppendBoneBinding(entries, sourceId, sourceAxis: 1, cfg.rightEyeBonePath, AnalogTargetAxis.X);
+
+                // BlendShape 制御 (オプション)。
                 AppendBlendShapeBinding(entries, sourceId, sourceAxis: 0, cfg.leftEyeXBlendShape);
                 AppendBlendShapeBinding(entries, sourceId, sourceAxis: 1, cfg.leftEyeYBlendShape);
                 AppendBlendShapeBinding(entries, sourceId, sourceAxis: 0, cfg.rightEyeXBlendShape);
                 AppendBlendShapeBinding(entries, sourceId, sourceAxis: 1, cfg.rightEyeYBlendShape);
             }
             return new AnalogInputBindingProfile(_schemaVersion, entries.ToArray());
+        }
+
+        /// <summary>
+        /// <see cref="GazeConfigs"/> に登録された左右目ボーンの初期回転 (Euler 度) を
+        /// ボーンパス → Vector3 の辞書にして返す。<see cref="AnalogBonePoseProvider"/>
+        /// にそのまま渡せる。同一パスが複数登録されている場合は先勝ち。
+        /// </summary>
+        public IReadOnlyDictionary<string, UnityEngine.Vector3> GetGazeBoneRestPoses()
+        {
+            var dict = new Dictionary<string, UnityEngine.Vector3>(StringComparer.Ordinal);
+            if (_gazeConfigs == null)
+            {
+                return dict;
+            }
+            for (int i = 0; i < _gazeConfigs.Count; i++)
+            {
+                var cfg = _gazeConfigs[i];
+                if (cfg == null)
+                {
+                    continue;
+                }
+                if (!string.IsNullOrWhiteSpace(cfg.leftEyeBonePath) && !dict.ContainsKey(cfg.leftEyeBonePath))
+                {
+                    dict.Add(cfg.leftEyeBonePath, cfg.leftEyeInitialRotation);
+                }
+                if (!string.IsNullOrWhiteSpace(cfg.rightEyeBonePath) && !dict.ContainsKey(cfg.rightEyeBonePath))
+                {
+                    dict.Add(cfg.rightEyeBonePath, cfg.rightEyeInitialRotation);
+                }
+            }
+            return dict;
+        }
+
+        private static void AppendBoneBinding(
+            List<AnalogBindingEntry> sink, string sourceId, int sourceAxis,
+            string bonePath, AnalogTargetAxis targetAxis)
+        {
+            if (string.IsNullOrWhiteSpace(bonePath))
+            {
+                return;
+            }
+            try
+            {
+                sink.Add(new AnalogBindingEntry(
+                    sourceId,
+                    sourceAxis,
+                    AnalogBindingTargetKind.BonePose,
+                    bonePath,
+                    targetAxis));
+            }
+            catch (ArgumentException)
+            {
+                // targetIdentifier が空など。スキップ。
+            }
         }
 
         private static void AppendBlendShapeBinding(

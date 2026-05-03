@@ -124,7 +124,7 @@ MonoBehaviour:
       rendererPaths:
       - Body
   - id: eye_look
-    name: EyeLook
+    name: 目線
     layer: emotion
     kind: 1
     animationClip: {fileID: 0}
@@ -157,6 +157,10 @@ MonoBehaviour:
   _gazeConfigs:
   - expressionId: eye_look
     inputAction: {fileID: 0}
+    leftEyeBonePath:
+    leftEyeInitialRotation: {x: 0, y: 0, z: 0}
+    rightEyeBonePath:
+    rightEyeInitialRotation: {x: 0, y: 0, z: 0}
     leftEyeXBlendShape:
     leftEyeYBlendShape:
     rightEyeXBlendShape:

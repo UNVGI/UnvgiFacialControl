@@ -78,7 +78,7 @@
         },
         {
             "id": "eye_look",
-            "name": "EyeLook",
+            "name": "目線",
             "layer": "emotion",
             "layerOverrideMask": ["emotion"],
             "snapshot": {

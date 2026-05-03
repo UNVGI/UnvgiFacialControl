@@ -44,10 +44,12 @@ namespace Hidano.FacialControl.Adapters.Bone
         /// <param name="boneProvider">BoneSnapshot 注入先（<see cref="FacialController"/> 等）。</param>
         /// <param name="sources">sourceId → <see cref="IAnalogInputSource"/> の辞書。</param>
         /// <param name="bonePoseBindings">バインディング集合。<see cref="AnalogBindingTargetKind.BonePose"/> のみ採用。</param>
+        /// <param name="restPoses">ボーンパス → 初期 Euler 回転 (度)。アナログ入力 0 のときに保つ姿勢。null 可。</param>
         public AnalogBonePoseProvider(
             IBonePoseProvider boneProvider,
             IReadOnlyDictionary<string, IAnalogInputSource> sources,
-            IReadOnlyList<AnalogBindingEntry> bonePoseBindings)
+            IReadOnlyList<AnalogBindingEntry> bonePoseBindings,
+            IReadOnlyDictionary<string, UnityEngine.Vector3> restPoses = null)
         {
             _boneProvider = boneProvider ?? throw new ArgumentNullException(nameof(boneProvider));
             _sources = sources ?? throw new ArgumentNullException(nameof(sources));
@@ -92,21 +94,28 @@ namespace Hidano.FacialControl.Adapters.Bone
                 : resolvedList.ToArray();
 
             // Step 2: ユニーク bone のスロット配列と pre-alloc 済 snapshot buffer を作る。
+            // 初期回転 (rest pose) があればスロット側に保持し、毎フレームの加算ベースとする。
             int slotCount = boneNameToSlot.Count;
             _slots = slotCount == 0 ? Array.Empty<BonePoseSlot>() : new BonePoseSlot[slotCount];
             foreach (var kv in boneNameToSlot)
             {
-                _slots[kv.Value] = new BonePoseSlot(kv.Key);
+                var rest = UnityEngine.Vector3.zero;
+                if (restPoses != null && restPoses.TryGetValue(kv.Key, out var pose))
+                {
+                    rest = pose;
+                }
+                _slots[kv.Value] = new BonePoseSlot(kv.Key, rest);
             }
 
             _snapshotBuffer = slotCount == 0 ? Array.Empty<BoneSnapshot>() : new BoneSnapshot[slotCount];
-            // 初期 snapshot に 0 度 / scale=1 を書込む。BonePath は構築後不変なので毎フレーム書換える必要なし。
+            // 初期 snapshot に rest pose を反映する。BonePath は構築後不変なので毎フレーム書換える必要なし。
             for (int s = 0; s < slotCount; s++)
             {
+                var slot = _slots[s];
                 _snapshotBuffer[s] = new BoneSnapshot(
-                    _slots[s].BoneName,
+                    slot.BoneName,
                     0f, 0f, 0f,
-                    0f, 0f, 0f,
+                    slot.RestEulerX, slot.RestEulerY, slot.RestEulerZ,
                     1f, 1f, 1f);
             }
         }
@@ -124,12 +133,13 @@ namespace Hidano.FacialControl.Adapters.Bone
 
             int slotCount = _slots.Length;
 
-            // 全スロットの (X, Y, Z) を 0 にリセットする。
+            // 全スロットの (X, Y, Z) を rest pose にリセットする。
+            // 以後の binding 評価結果はこのベースに加算される。
             for (int s = 0; s < slotCount; s++)
             {
-                _slots[s].EulerX = 0f;
-                _slots[s].EulerY = 0f;
-                _slots[s].EulerZ = 0f;
+                _slots[s].EulerX = _slots[s].RestEulerX;
+                _slots[s].EulerY = _slots[s].RestEulerY;
+                _slots[s].EulerZ = _slots[s].RestEulerZ;
             }
 
             // 各 binding を評価して該当 (slot, axis) に sum で加算する。
@@ -230,13 +240,19 @@ namespace Hidano.FacialControl.Adapters.Bone
             public float EulerX;
             public float EulerY;
             public float EulerZ;
+            public readonly float RestEulerX;
+            public readonly float RestEulerY;
+            public readonly float RestEulerZ;
 
-            public BonePoseSlot(string boneName)
+            public BonePoseSlot(string boneName, UnityEngine.Vector3 rest)
             {
                 BoneName = boneName;
-                EulerX = 0f;
-                EulerY = 0f;
-                EulerZ = 0f;
+                EulerX = rest.x;
+                EulerY = rest.y;
+                EulerZ = rest.z;
+                RestEulerX = rest.x;
+                RestEulerY = rest.y;
+                RestEulerZ = rest.z;
             }
         }
 

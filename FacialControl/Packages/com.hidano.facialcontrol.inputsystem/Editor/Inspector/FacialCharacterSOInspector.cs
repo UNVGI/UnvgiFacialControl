@@ -19,7 +19,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
     /// <see cref="FacialCharacterSO"/> 用の UI Toolkit カスタム Inspector。
     /// </summary>
     /// <remarks>
-    /// Layer-Expression ネスト + EyeLook 表情 + 自動保存対応。
+    /// Layer-Expression ネスト + アナログ表情 (目線等) + 自動保存対応。
     /// </remarks>
     [CustomEditor(typeof(FacialCharacterSO))]
     public sealed class FacialCharacterSOInspector : UnityEditor.Editor
@@ -45,6 +45,10 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         public const string ExpressionRowValidationHelpName = "expression-row-validation-help";
         public const string ExpressionRowTransitionDurationFieldName = "expression-row-transition-duration-field";
         public const string ExpressionRowGazeActionFieldName = "expression-row-gaze-action-field";
+        public const string ExpressionRowGazeLeftBonePathName = "expression-row-gaze-left-bone-path";
+        public const string ExpressionRowGazeLeftInitRotName = "expression-row-gaze-left-init-rot";
+        public const string ExpressionRowGazeRightBonePathName = "expression-row-gaze-right-bone-path";
+        public const string ExpressionRowGazeRightInitRotName = "expression-row-gaze-right-init-rot";
         public const string ExpressionRowGazeLeftXName = "expression-row-gaze-left-x";
         public const string ExpressionRowGazeLeftYName = "expression-row-gaze-left-y";
         public const string ExpressionRowGazeRightXName = "expression-row-gaze-right-x";
@@ -281,7 +285,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 text = text,
                 value = open,
             };
-            foldout.style.unityFontStyleAndWeight = FontStyle.Bold;
+            foldout.style.unityFontStyleAndWeight = FontStyle.Normal;
             foldout.style.fontSize = SectionFoldoutFontSize;
             return foldout;
         }
@@ -589,7 +593,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
 
             // 表情リスト
             var expressionHeader = new Label("表情");
-            expressionHeader.style.unityFontStyleAndWeight = FontStyle.Bold;
+            expressionHeader.style.unityFontStyleAndWeight = FontStyle.Normal;
             expressionHeader.style.marginTop = 8;
             card.Add(expressionHeader);
 
@@ -601,17 +605,17 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             expressionAddRow.style.flexDirection = FlexDirection.Row;
             expressionAddRow.style.marginTop = 4;
 
-            var addExpressionButton = new Button(() => AddExpressionForLayer(layerName, ExpressionKind.AnimationClip))
+            var addExpressionButton = new Button(() => AddExpressionForLayer(layerName, ExpressionKind.Digital))
             {
-                text = "+ 表情を追加",
+                text = "+ デジタル操作の表情を追加",
             };
             expressionAddRow.Add(addExpressionButton);
 
-            var addEyeLookButton = new Button(() => AddExpressionForLayer(layerName, ExpressionKind.EyeLook))
+            var addAnalogButton = new Button(() => AddExpressionForLayer(layerName, ExpressionKind.Analog))
             {
-                text = "+ EyeLook 表情を追加",
+                text = "+ アナログ操作の表情を追加",
             };
-            expressionAddRow.Add(addEyeLookButton);
+            expressionAddRow.Add(addAnalogButton);
 
             card.Add(expressionAddRow);
 
@@ -702,12 +706,12 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
 
             string newId = Guid.NewGuid().ToString("N");
             if (idProp != null) idProp.stringValue = newId;
-            if (nameProp != null) nameProp.stringValue = kind == ExpressionKind.EyeLook ? "EyeLook" : "新規表情";
+            if (nameProp != null) nameProp.stringValue = kind == ExpressionKind.Analog ? "アナログ表情" : "新規表情";
             if (layerProp != null) layerProp.stringValue = layerName ?? string.Empty;
             if (kindProp != null) kindProp.enumValueIndex = (int)kind;
 
-            // EyeLook なら GazeExpressionConfig も自動追加
-            if (kind == ExpressionKind.EyeLook)
+            // アナログ操作なら GazeExpressionConfig も自動追加
+            if (kind == ExpressionKind.Analog)
             {
                 int newCfgIndex = _gazeConfigsProperty.arraySize;
                 _gazeConfigsProperty.InsertArrayElementAtIndex(newCfgIndex);
@@ -772,16 +776,21 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             headerRow.style.flexDirection = FlexDirection.Row;
             headerRow.style.alignItems = Align.Center;
 
-            ExpressionKind currentKind = ExpressionKind.AnimationClip;
+            ExpressionKind currentKind = ExpressionKind.Digital;
             if (kindProp != null)
             {
                 currentKind = (ExpressionKind)kindProp.enumValueIndex;
             }
 
-            var kindDropdown = new EnumField("種別", currentKind)
+            // EnumField そのままだと表示ラベルが "Digital" / "Analog" の英語になる。
+            // ユーザー視点では「デジタル操作 / アナログ操作」のほうが意図が伝わるため
+            // DropdownField で日本語ラベルを供給し、選択値を ExpressionKind に同期させる。
+            var kindDropdown = new DropdownField("種別")
             {
                 name = ExpressionRowKindDropdownName,
+                choices = new List<string> { "デジタル操作", "アナログ操作" },
             };
+            kindDropdown.SetValueWithoutNotify(currentKind == ExpressionKind.Analog ? "アナログ操作" : "デジタル操作");
             kindDropdown.style.flexGrow = 1f;
             kindDropdown.RegisterValueChangedCallback(evt =>
             {
@@ -789,16 +798,18 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 var p = _expressionsProperty.GetArrayElementAtIndex(exprIndex).FindPropertyRelative("kind");
                 if (p != null)
                 {
-                    var newKind = (ExpressionKind)evt.newValue;
+                    var newKind = string.Equals(evt.newValue, "アナログ操作", StringComparison.Ordinal)
+                        ? ExpressionKind.Analog
+                        : ExpressionKind.Digital;
                     p.enumValueIndex = (int)newKind;
                     serializedObject.ApplyModifiedProperties();
 
                     var idForCfg = idProp != null ? idProp.stringValue : string.Empty;
-                    if (newKind == ExpressionKind.EyeLook && !HasGazeConfigForExpression(idForCfg))
+                    if (newKind == ExpressionKind.Analog && !HasGazeConfigForExpression(idForCfg))
                     {
                         AppendGazeConfigForExpression(idForCfg);
                     }
-                    else if (newKind == ExpressionKind.AnimationClip)
+                    else if (newKind == ExpressionKind.Digital)
                     {
                         RemoveGazeConfigByExpressionId(idForCfg);
                     }
@@ -848,7 +859,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             }
             row.Add(nameField);
 
-            // 遷移時間
+            // 遷移時間。アナログ操作では概念がないため非表示にする (データは互換目的で保持)。
             var transitionDurationField = new Slider("遷移時間 (秒)", 0f, 1f)
             {
                 name = ExpressionRowTransitionDurationFieldName,
@@ -858,14 +869,14 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             {
                 transitionDurationField.BindProperty(transitionDurationProp);
             }
+            transitionDurationField.style.display =
+                currentKind == ExpressionKind.Analog ? DisplayStyle.None : DisplayStyle.Flex;
             row.Add(transitionDurationField);
 
-            // kind 別の専用 UI
-            if (currentKind == ExpressionKind.AnimationClip)
-            {
-                BuildAnimationClipFields(row, exprIndex);
-            }
-            else
+            // kind 別の専用 UI。AnimationClip 指定はデジタル/アナログ双方で使えるため
+            // 共通で BuildAnimationClipFields を呼び、アナログのみ追加でボーン/BlendShape 設定を出す。
+            BuildAnimationClipFields(row, exprIndex);
+            if (currentKind == ExpressionKind.Analog)
             {
                 BuildEyeLookFields(row, exprIndex, idProp != null ? idProp.stringValue : string.Empty);
             }
@@ -933,7 +944,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         {
             row.Add(MakeHelpBox(
                 "Vector2 入力 (左スティック等) で両目を同時駆動します。"
-                + "x 成分が左右目の X 軸 BlendShape、y 成分が左右目の Y 軸 BlendShape に反映されます。"));
+                + "通常は目線ボーンの上下左右回転で制御し、必要に応じて BlendShape も併用できます。"));
 
             int cfgIndex = FindGazeConfigIndexByExpressionId(expressionId);
             if (cfgIndex < 0)
@@ -945,6 +956,10 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
 
             var cfgProp = _gazeConfigsProperty.GetArrayElementAtIndex(cfgIndex);
             var actionProp = cfgProp.FindPropertyRelative("inputAction");
+            var leftBonePathProp = cfgProp.FindPropertyRelative("leftEyeBonePath");
+            var leftInitRotProp = cfgProp.FindPropertyRelative("leftEyeInitialRotation");
+            var rightBonePathProp = cfgProp.FindPropertyRelative("rightEyeBonePath");
+            var rightInitRotProp = cfgProp.FindPropertyRelative("rightEyeInitialRotation");
             var leftXProp = cfgProp.FindPropertyRelative("leftEyeXBlendShape");
             var leftYProp = cfgProp.FindPropertyRelative("leftEyeYBlendShape");
             var rightXProp = cfgProp.FindPropertyRelative("rightEyeXBlendShape");
@@ -962,10 +977,58 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 row.Add(actionField);
             }
 
-            row.Add(BuildGazeBlendShapeField("左目 X (横方向)", leftXProp, ExpressionRowGazeLeftXName));
-            row.Add(BuildGazeBlendShapeField("左目 Y (縦方向)", leftYProp, ExpressionRowGazeLeftYName));
-            row.Add(BuildGazeBlendShapeField("右目 X (横方向)", rightXProp, ExpressionRowGazeRightXName));
-            row.Add(BuildGazeBlendShapeField("右目 Y (縦方向)", rightYProp, ExpressionRowGazeRightYName));
+            // ----- ボーン制御 (主) -----
+            var boneSection = new Foldout
+            {
+                text = "目線ボーン (主)",
+                value = true,
+            };
+            boneSection.style.marginTop = 4;
+            boneSection.Add(MakeHelpBox(
+                "Animator のルートからの相対パスで左右の目ボーンを指定します。"
+                + "初期回転 (Euler 度) はアナログ入力 0 のときに保たれる姿勢で、入力値はこの値に加算されます。"));
+
+            if (leftBonePathProp != null)
+            {
+                var f = new TextField("左目ボーンパス") { name = ExpressionRowGazeLeftBonePathName };
+                f.BindProperty(leftBonePathProp);
+                boneSection.Add(f);
+            }
+            if (leftInitRotProp != null)
+            {
+                var f = new Vector3Field("左目 初期回転 (Euler)") { name = ExpressionRowGazeLeftInitRotName };
+                f.BindProperty(leftInitRotProp);
+                boneSection.Add(f);
+            }
+            if (rightBonePathProp != null)
+            {
+                var f = new TextField("右目ボーンパス") { name = ExpressionRowGazeRightBonePathName };
+                f.BindProperty(rightBonePathProp);
+                boneSection.Add(f);
+            }
+            if (rightInitRotProp != null)
+            {
+                var f = new Vector3Field("右目 初期回転 (Euler)") { name = ExpressionRowGazeRightInitRotName };
+                f.BindProperty(rightInitRotProp);
+                boneSection.Add(f);
+            }
+            row.Add(boneSection);
+
+            // ----- BlendShape 制御 (オプション) -----
+            var blendSection = new Foldout
+            {
+                text = "目線 BlendShape (オプション)",
+                value = false,
+            };
+            blendSection.style.marginTop = 4;
+            blendSection.Add(MakeHelpBox(
+                "BlendShape ベースで目線を表現するモデル向けのオプション設定です。"
+                + "x 成分が左右目の X 軸、y 成分が Y 軸の BlendShape に反映されます。"));
+            blendSection.Add(BuildGazeBlendShapeField("左目 X (横方向)", leftXProp, ExpressionRowGazeLeftXName));
+            blendSection.Add(BuildGazeBlendShapeField("左目 Y (縦方向)", leftYProp, ExpressionRowGazeLeftYName));
+            blendSection.Add(BuildGazeBlendShapeField("右目 X (横方向)", rightXProp, ExpressionRowGazeRightXName));
+            blendSection.Add(BuildGazeBlendShapeField("右目 Y (縦方向)", rightYProp, ExpressionRowGazeRightYName));
+            row.Add(blendSection);
         }
 
         private static TextField BuildGazeBlendShapeField(string label, SerializedProperty prop, string name)
@@ -1162,20 +1225,20 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 }
             }
 
-            // AnimationClip null タリー (kind=AnimationClip のみ)
+            // AnimationClip null タリー (kind=Digital のみ。Analog は AnimationClip 任意)
             int nullClipCount = 0;
             for (int i = 0; i < _expressionsProperty.arraySize; i++)
             {
                 var elem = _expressionsProperty.GetArrayElementAtIndex(i);
                 var kindP = elem.FindPropertyRelative("kind");
                 int kindValue = kindP != null ? kindP.enumValueIndex : 0;
-                if (kindValue != (int)ExpressionKind.AnimationClip) continue;
+                if (kindValue != (int)ExpressionKind.Digital) continue;
                 var clipP = elem.FindPropertyRelative("animationClip");
                 if (clipP != null && clipP.objectReferenceValue == null) nullClipCount++;
             }
             if (nullClipCount > 0)
             {
-                errors.Add($"AnimationClip が未割当の表情が {nullClipCount} 件あります。");
+                errors.Add($"AnimationClip が未割当のデジタル表情が {nullClipCount} 件あります。");
             }
 
             if (_expressionsValidationHelp != null)
@@ -1239,10 +1302,10 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             var clipProp = entryProp.FindPropertyRelative("animationClip");
             var idProp = entryProp.FindPropertyRelative("id");
 
-            ExpressionKind kind = kindProp != null ? (ExpressionKind)kindProp.enumValueIndex : ExpressionKind.AnimationClip;
+            ExpressionKind kind = kindProp != null ? (ExpressionKind)kindProp.enumValueIndex : ExpressionKind.Digital;
 
             var messages = new List<string>();
-            if (kind == ExpressionKind.AnimationClip)
+            if (kind == ExpressionKind.Digital)
             {
                 if (clipProp == null || clipProp.objectReferenceValue == null)
                 {
@@ -1251,12 +1314,12 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 var mismatchMessage = BuildRendererPathMismatchMessage(clipProp != null ? clipProp.objectReferenceValue as AnimationClip : null);
                 if (!string.IsNullOrEmpty(mismatchMessage)) messages.Add(mismatchMessage);
             }
-            else if (kind == ExpressionKind.EyeLook)
+            else if (kind == ExpressionKind.Analog)
             {
                 int cfgIndex = FindGazeConfigIndexByExpressionId(idProp != null ? idProp.stringValue : string.Empty);
                 if (cfgIndex < 0)
                 {
-                    messages.Add("EyeLook 設定が見つかりません。");
+                    messages.Add("アナログ操作の設定が見つかりません。");
                 }
                 else
                 {
@@ -1266,15 +1329,21 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                     {
                         messages.Add("InputAction (Vector2) が未割り当てです。");
                     }
+                    bool anyBone = false;
+                    foreach (var fname in new[] { "leftEyeBonePath", "rightEyeBonePath" })
+                    {
+                        var p = cfgProp.FindPropertyRelative(fname);
+                        if (p != null && !string.IsNullOrWhiteSpace(p.stringValue)) { anyBone = true; break; }
+                    }
                     bool anyBs = false;
                     foreach (var fname in new[] { "leftEyeXBlendShape", "leftEyeYBlendShape", "rightEyeXBlendShape", "rightEyeYBlendShape" })
                     {
                         var p = cfgProp.FindPropertyRelative(fname);
                         if (p != null && !string.IsNullOrWhiteSpace(p.stringValue)) { anyBs = true; break; }
                     }
-                    if (!anyBs)
+                    if (!anyBone && !anyBs)
                     {
-                        messages.Add("駆動する BlendShape 名が 1 つも設定されていません。");
+                        messages.Add("目線ボーンまたは BlendShape のいずれかを 1 つ以上設定してください。");
                     }
                 }
             }

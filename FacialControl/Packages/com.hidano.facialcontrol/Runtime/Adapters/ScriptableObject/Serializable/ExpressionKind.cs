@@ -5,10 +5,10 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
     /// </summary>
     public enum ExpressionKind
     {
-        /// <summary>AnimationClip に基づくスナップショット表情（既定）。</summary>
-        AnimationClip = 0,
+        /// <summary>デジタル操作: ボタン入力で AnimationClip をトリガー。遷移時間で補間する。</summary>
+        Digital = 0,
 
-        /// <summary>Vector2 入力で連続的に駆動するアナログ表情（目線等）。</summary>
-        EyeLook = 1,
+        /// <summary>アナログ操作: 連続値入力でボーン回転や BlendShape を駆動する。</summary>
+        Analog = 1,
     }
 }

@@ -270,8 +270,9 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Input
             }
             if (bonePoseBindings.Count > 0 && _facialController != null)
             {
+                var restPoses = so.GetGazeBoneRestPoses();
                 _bonePoseProvider = new AnalogBonePoseProvider(
-                    _facialController, _activeSources, bonePoseBindings);
+                    _facialController, _activeSources, bonePoseBindings, restPoses);
             }
 
             _analogReady = true;
