@@ -15,6 +15,8 @@ namespace Hidano.FacialControl.Application.UseCases
     /// </summary>
     public class LayerUseCase : IDisposable
     {
+        private static readonly List<Expression> EmptyExpressionList = new List<Expression>(0);
+
         private FacialProfile _profile;
         private readonly ExpressionUseCase _expressionUseCase;
         private string[] _blendShapeNames;
@@ -129,10 +131,17 @@ namespace Hidano.FacialControl.Application.UseCases
                 string layerName = layerSpan[l].Name;
                 var exclusionMode = layerSpan[l].ExclusionMode;
 
-                if (expressionsByLayer.TryGetValue(layerName, out var layerExpressions) &&
-                    layerExpressions.Count > 0)
+                // active が空でも、直前まで active だったレイヤーには UpdateExpressions(空) を呼ぶ。
+                // これがないと「全表情を Deactivate した直後」に LayerExpressionSource の _targetValues
+                // が直前 active の値で凍結し、別の表情が入るまで OFF にならない (Toggle/Hold いずれも
+                // latched に見える)。一度も active になっていないレイヤーは従来通り blend 集合から除外。
+                if (expressionsByLayer.TryGetValue(layerName, out var layerExpressions))
                 {
                     _layerSources[l].UpdateExpressions(layerExpressions, exclusionMode, _blendShapeNames);
+                }
+                else if (_layerSources[l].HasBeenActive)
+                {
+                    _layerSources[l].UpdateExpressions(EmptyExpressionList, exclusionMode, _blendShapeNames);
                 }
             }
 
@@ -460,9 +469,19 @@ namespace Hidano.FacialControl.Application.UseCases
                     Array.Copy(_currentValues, _snapshotValues, _currentValues.Length);
                     ComputeTargetValues(currentExpressions, exclusionMode, blendShapeNames);
 
-                    var lastExpr = currentExpressions[currentExpressions.Count - 1];
-                    _duration = lastExpr.TransitionDuration;
-                    _curve = lastExpr.TransitionCurve;
+                    if (currentExpressions.Count > 0)
+                    {
+                        var lastExpr = currentExpressions[currentExpressions.Count - 1];
+                        _duration = lastExpr.TransitionDuration;
+                        _curve = lastExpr.TransitionCurve;
+                    }
+                    else
+                    {
+                        // active が空に遷移した場合は、直前 active だった expression の transition を
+                        // 流用してゼロ (= rest) へ補間する。Curve は直前と同じものを保つ。
+                        // Duration は直前 active の値が残っているのでそのまま再利用する
+                        // (もし 0 のままだと _isComplete が即 true になり一気にゼロへスナップする)。
+                    }
                     _elapsedTime = 0f;
                     _isComplete = false;
 
@@ -526,6 +545,12 @@ namespace Hidano.FacialControl.Application.UseCases
                 string[] blendShapeNames)
             {
                 Array.Clear(_targetValues, 0, _targetValues.Length);
+
+                // expressions が空の場合は target = ゼロのまま (= rest 状態へ補間)。
+                if (expressions.Count == 0)
+                {
+                    return;
+                }
 
                 if (exclusionMode == ExclusionMode.LastWins)
                 {

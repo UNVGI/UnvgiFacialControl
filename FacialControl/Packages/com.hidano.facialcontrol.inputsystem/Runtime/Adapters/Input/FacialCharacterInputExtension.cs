@@ -217,6 +217,30 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Input
                 }
             }
 
+            // GazeConfig の inputAction も sourceId として登録する。BlendShape sample が空の GazeConfig
+            // でも GazeBonePoseProvider が _activeSources から source を引けるようにするため必須。
+            // shape は Vector2 を既定とし、後段の expectedControlType 判定で再確定する。
+            if (so.GazeConfigs != null)
+            {
+                for (int i = 0; i < so.GazeConfigs.Count; i++)
+                {
+                    var cfg = so.GazeConfigs[i];
+                    if (cfg == null || cfg.inputAction == null || cfg.inputAction.action == null)
+                    {
+                        continue;
+                    }
+                    string gazeSourceId = cfg.inputAction.action.name;
+                    if (string.IsNullOrWhiteSpace(gazeSourceId))
+                    {
+                        continue;
+                    }
+                    if (!sourceIdToShape.ContainsKey(gazeSourceId))
+                    {
+                        sourceIdToShape[gazeSourceId] = AnalogInputShape.Vector2;
+                    }
+                }
+            }
+
             foreach (var kv in sourceIdToShape)
             {
                 if (_runtimeActionMap == null)
