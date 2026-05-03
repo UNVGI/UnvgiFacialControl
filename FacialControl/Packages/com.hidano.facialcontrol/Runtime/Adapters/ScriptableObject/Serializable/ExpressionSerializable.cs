@@ -33,6 +33,9 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
         [Tooltip("所属レイヤー名 (Layers セクションの name と一致させる)。")]
         public string layer;
 
+        [Tooltip("表情の駆動方式。AnimationClip または EyeLook (Vector2 アナログ駆動)。")]
+        public ExpressionKind kind = ExpressionKind.AnimationClip;
+
         [Tooltip("[Phase 5.1] 表情の AnimationClip。時刻 0 の BlendShape / Bone 値および AnimationEvent メタデータから snapshot をベイクする (Req 1.1, 2.1, 2.4)。")]
         public AnimationClip animationClip;
 

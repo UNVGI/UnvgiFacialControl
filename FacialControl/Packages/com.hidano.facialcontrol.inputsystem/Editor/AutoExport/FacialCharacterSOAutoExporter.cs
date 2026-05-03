@@ -426,12 +426,19 @@ namespace Hidano.FacialControl.InputSystem.Editor.AutoExport
                     var src = so.Expressions[i];
                     if (src == null) continue;
 
+                    // LayerOverrideMask は所属 Layer から取得する。Layer 側が空なら従来の
+                    // Expression 自体の mask（後方互換）を採用する。
+                    var layerMask = FacialCharacterProfileConverter.ResolveLayerMask(so.Layers, src.layer);
+                    var resolvedMask = (layerMask != null && layerMask.Count > 0)
+                        ? CopyStringList(new List<string>(layerMask))
+                        : CopyStringList(src.layerOverrideMask);
+
                     var exprDto = new ExpressionDto
                     {
                         id = src.id ?? string.Empty,
                         name = src.name ?? string.Empty,
                         layer = src.layer ?? string.Empty,
-                        layerOverrideMask = CopyStringList(src.layerOverrideMask),
+                        layerOverrideMask = resolvedMask,
                         snapshot = src.cachedSnapshot ?? CreateDefaultSnapshotDto(),
                     };
 

@@ -25,9 +25,30 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
                 : schemaVersion;
             var layerArr = ConvertLayers(layers);
             var inputSourceArr = ConvertLayerInputSources(layers);
-            var expressionArr = ConvertExpressions(expressions);
+            var expressionArr = ConvertExpressions(expressions, layers);
             var rendererArr = ConvertStrings(rendererPaths);
             return new FacialProfile(version, layerArr, expressionArr, rendererArr, inputSourceArr);
+        }
+
+        /// <summary>
+        /// 指定 Layer 名に対応する Layer 定義の <c>layerOverrideMask</c> を返す。
+        /// Layer 側に mask が定義されていれば最優先、空であれば呼出側の Expression mask に委ねる。
+        /// </summary>
+        public static IReadOnlyList<string> ResolveLayerMask(
+            IReadOnlyList<LayerDefinitionSerializable> layers,
+            string layerName)
+        {
+            if (layers == null || string.IsNullOrEmpty(layerName)) return null;
+            for (int i = 0; i < layers.Count; i++)
+            {
+                var l = layers[i];
+                if (l == null) continue;
+                if (string.Equals(l.name, layerName, StringComparison.Ordinal))
+                {
+                    return l.layerOverrideMask;
+                }
+            }
+            return null;
         }
 
         public static AnalogInputBindingProfile ToAnalogProfile(
@@ -89,7 +110,9 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             return result.ToArray();
         }
 
-        private static Expression[] ConvertExpressions(IReadOnlyList<ExpressionSerializable> expressions)
+        private static Expression[] ConvertExpressions(
+            IReadOnlyList<ExpressionSerializable> expressions,
+            IReadOnlyList<LayerDefinitionSerializable> _layers)
         {
             if (expressions == null || expressions.Count == 0) return Array.Empty<Expression>();
             var result = new List<Expression>(expressions.Count);

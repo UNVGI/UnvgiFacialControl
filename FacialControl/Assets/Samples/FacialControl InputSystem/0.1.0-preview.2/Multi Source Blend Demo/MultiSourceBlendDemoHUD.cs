@@ -8,17 +8,12 @@ namespace Hidano.FacialControl.Samples
     /// <summary>
     /// 同一レイヤーに複数の <c>ExpressionTrigger</c> 入力源 (controller-expr / keyboard-expr) を並置し、
     /// それぞれのウェイト比と独立トリガーで BlendShape 加重和がどう見えるかを目視検証するための
-    /// PlayMode 専用 HUD。さらにアナログバインディング (左スティック → LeftEye/RightEye Euler、
-    /// ARKit/OSC float → mouth-open BlendShape) の現在値も同 HUD で観測する。
+    /// PlayMode 専用 HUD。EyeLook 表情 (Vector2 入力 → 両目 BlendShape) の現在値も同 HUD で観測する。
     /// </summary>
     /// <remarks>
     /// 詳しい使い方は本サンプル同梱の README.md 参照。
-    /// 本 HUD は FacialController の既存公開 API
-    /// (<c>SetInputSourceWeight</c> / <c>TryGetExpressionTriggerSourceById</c> /
-    /// <c>GetInputSourceWeightsSnapshot</c>) のみを利用し、書込はしないオブザーバ。
-    /// 表情データの読込は新統合 SO (<c>FacialCharacterSO</c>) 経由で
-    /// <c>FacialController.OnEnable</c> が StreamingAssets/FacialControl/{SO 名}/profile.json を
-    /// 自動探索して行う想定 (3-B モデル)。アナログバインディングは SO の Inspector で編集する。
+    /// 本 HUD は FacialController の既存公開 API のみを利用し、書込はしないオブザーバ。
+    /// EyeLook 表情の InputAction や BlendShape 名は SO の Inspector で編集する。
     /// </remarks>
     [DefaultExecutionOrder(-100)]
     [AddComponentMenu("FacialControl/Samples/Multi Source Blend Demo HUD")]
@@ -56,9 +51,9 @@ namespace Hidano.FacialControl.Samples
         [SerializeField]
         private string _mouthOpenBlendShapeName = "jawOpen";
 
-        [Tooltip("HUD で表示するアナログソース ID (informational)。")]
+        [Tooltip("HUD で表示するアナログ入力 (Vector2) のアクション名 (表示専用)。")]
         [SerializeField]
-        private string[] _displayedSourceIds = { "left_stick", "arkit_jaw_open" };
+        private string[] _displayedSourceIds = { "Look" };
 
         private static readonly string[] s_expressionIds = { "smile", "anger", "surprise", "lipsync_a" };
 

@@ -16,48 +16,39 @@ using Hidano.FacialControl.InputSystem.Editor.AutoExport;
 namespace Hidano.FacialControl.InputSystem.Editor.Inspector
 {
     /// <summary>
-    /// <see cref="FacialCharacterSO"/> 用の UI Toolkit カスタム Inspector（Phase 5.1 全面改修版）。
-    /// AnimationClip を Source of Truth とする新 UX を提供する。
+    /// <see cref="FacialCharacterSO"/> 用の UI Toolkit カスタム Inspector。
     /// </summary>
     /// <remarks>
-    /// <para>Phase 5.1 (inspector-and-data-model-redesign) における主な変更点:</para>
-    /// <list type="bullet">
-    ///   <item>旧 BonePose / RendererPath 手入力 UI を物理削除（Req 4.1, 5.1）</item>
-    ///   <item>旧 ExpressionBindingEntry.Category UI を物理削除（Req 7.1）</item>
-    ///   <item>Expression 行に AnimationClip ObjectField を追加（Req 1.1）</item>
-    ///   <item>Layer DropdownField + LayerOverrideMask MaskField を追加（Req 1.4, 3.3）</item>
-    ///   <item>read-only RendererPath summary view を AnimationClip から派生（Req 4.3, 4.5）</item>
-    ///   <item>validation エラー時の HelpBox + Save ボタン disabled（Req 1.6, 1.7, 3.5）</item>
-    ///   <item>新規 Expression 作成時に GUID で Id を自動採番（Req 1.3）</item>
-    ///   <item>AnimationClip 名から Name を派生（Req 1.2）</item>
-    /// </list>
+    /// Layer-Expression ネスト + EyeLook 表情 + 自動保存対応。
     /// </remarks>
     [CustomEditor(typeof(FacialCharacterSO))]
     public sealed class FacialCharacterSOInspector : UnityEditor.Editor
     {
         // ====================================================================
-        // VisualElement の name 定数 (テストの Q<>() と一致させる)
+        // VisualElement の name 定数
         // ====================================================================
 
         public const string InputFoldoutName = "facial-character-input-foldout";
         public const string ExpressionBindingsFoldoutName = "facial-character-expression-bindings-foldout";
-        public const string AnalogBindingsFoldoutName = "facial-character-analog-bindings-foldout";
         public const string LayersFoldoutName = "facial-character-layers-foldout";
-        public const string ExpressionsFoldoutName = "facial-character-expressions-foldout";
         public const string DebugFoldoutName = "facial-character-debug-foldout";
 
         public const string SaveButtonName = "facial-character-save-button";
+        public const string SaveStatusLabelName = "facial-character-save-status";
         public const string ExpressionsValidationHelpName = "facial-character-expressions-validation";
 
-        // Expression 行の内部要素名（テストの Q<>() で参照可能）
         public const string ExpressionRowIdLabelName = "expression-row-id-label";
         public const string ExpressionRowNameFieldName = "expression-row-name-field";
+        public const string ExpressionRowKindDropdownName = "expression-row-kind-dropdown";
         public const string ExpressionRowClipFieldName = "expression-row-clip-field";
-        public const string ExpressionRowLayerDropdownName = "expression-row-layer-dropdown";
-        public const string ExpressionRowMaskFieldName = "expression-row-mask-field";
         public const string ExpressionRowRendererSummaryName = "expression-row-renderer-summary";
         public const string ExpressionRowValidationHelpName = "expression-row-validation-help";
         public const string ExpressionRowTransitionDurationFieldName = "expression-row-transition-duration-field";
+        public const string ExpressionRowGazeActionFieldName = "expression-row-gaze-action-field";
+        public const string ExpressionRowGazeLeftXName = "expression-row-gaze-left-x";
+        public const string ExpressionRowGazeLeftYName = "expression-row-gaze-left-y";
+        public const string ExpressionRowGazeRightXName = "expression-row-gaze-right-x";
+        public const string ExpressionRowGazeRightYName = "expression-row-gaze-right-y";
 
         // ====================================================================
         // SerializedProperty
@@ -66,9 +57,9 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         private SerializedProperty _inputActionAssetProperty;
         private SerializedProperty _actionMapNameProperty;
         private SerializedProperty _expressionBindingsProperty;
-        private SerializedProperty _analogBindingsProperty;
         private SerializedProperty _layersProperty;
         private SerializedProperty _expressionsProperty;
+        private SerializedProperty _gazeConfigsProperty;
         private SerializedProperty _schemaVersionProperty;
 
 #if UNITY_EDITOR
@@ -85,8 +76,8 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         private Label _debugExpressionCountLabel;
         private Label _debugJsonPathLabel;
         private HelpBox _expressionsValidationHelp;
-        private Button _saveButton;
-        private VisualElement _expressionRowsContainer;
+        private Label _saveStatusLabel;
+        private VisualElement _layersContainer;
         private ListView _expressionBindingsListView;
 
         // ====================================================================
@@ -96,17 +87,20 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         private readonly List<string> _actionNameChoices = new List<string>();
         private readonly List<string> _layerNameChoices = new List<string>();
 
-        // AnimationClip のサンプラ（Phase 2.1 の interface を利用）
         private IExpressionAnimationClipSampler _sampler;
+        private bool _autoSavePending;
+
+        // ====================================================================
+        // 共通スタイル定数
+        // ====================================================================
+
+        private const int HelpBoxFontSize = 12;
+        private const int SectionFoldoutFontSize = 13;
 
         // ====================================================================
         // Editor lifecycle
         // ====================================================================
 
-        /// <summary>
-        /// アクティブな Inspector インスタンス一覧。AssetPostprocessor 経由で
-        /// InputActionAsset 編集時に Action 名候補を再読込するために使用する。
-        /// </summary>
         private static readonly List<FacialCharacterSOInspector> _activeInspectors =
             new List<FacialCharacterSOInspector>();
 
@@ -123,68 +117,17 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             _activeInspectors.Remove(this);
         }
 
-        /// <summary>
-        /// 現在 SO に割り当てられている InputActionAsset のアセットパスを返す。
-        /// AssetPostprocessor からの一致判定に使用する。
-        /// </summary>
         private string GetCurrentInputActionAssetPath()
         {
-            if (_inputActionAssetProperty == null)
-            {
-                return null;
-            }
+            if (_inputActionAssetProperty == null) return null;
             var asset = _inputActionAssetProperty.objectReferenceValue;
-            if (asset == null)
-            {
-                return null;
-            }
-            return AssetDatabase.GetAssetPath(asset);
-        }
-
-        /// <summary>
-        /// 指定 InputActionAsset の編集に追従して Action 名候補と各行 DropdownField を再読込する。
-        /// </summary>
-        private void RefreshActionChoicesFromExternalEdit()
-        {
-            // SerializedObject 自体を Update することで、InputActionAsset 内部編集の
-            // 反映漏れがあれば最新化する。
-            try
-            {
-                serializedObject.Update();
-            }
-            catch (Exception)
-            {
-                // SerializedObject が破棄済みのケースは無視。
-                return;
-            }
-
-            RefreshActionMapChoices();
-            RefreshActionNameChoices();
-
-            // 既存 ListView の各 DropdownField の choices を最新化するため、
-            // ExpressionBindings セクションをまとめてリビルドする。
-            RebuildExpressionBindingsListView();
-        }
-
-        /// <summary>
-        /// ExpressionBindings ListView を再構築する。各行の choices を最新の _actionNameChoices で
-        /// 再描画させるための最小手段として bindItem を再走させる。
-        /// </summary>
-        private void RebuildExpressionBindingsListView()
-        {
-            if (_expressionBindingsListView == null)
-            {
-                return;
-            }
-            _expressionBindingsListView.Rebuild();
+            return asset == null ? null : AssetDatabase.GetAssetPath(asset);
         }
 
         public override VisualElement CreateInspectorGUI()
         {
             ResolveSerializedProperties();
             _sampler = new AnimationClipExpressionSampler();
-
-            // 既存 Expression のうち Id が空のエントリは GUID で自動採番（Req 1.3）
 
             var root = new VisualElement();
 
@@ -194,12 +137,11 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 root.styleSheets.Add(styleSheet);
             }
 
-            BuildSaveButton(root);
+            BuildSaveStatusBar(root);
             BuildInputSection(root);
             BuildExpressionBindingsSection(root);
-            BuildAnalogBindingsSection(root);
             BuildLayersSection(root);
-            BuildExpressionsSection(root);
+            BuildReferenceModelSection(root);
             BuildDebugSection(root);
 
             RefreshLayerNameChoices();
@@ -207,6 +149,9 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             RefreshActionNameChoices();
             UpdateValidation();
             UpdateDebugLabels();
+
+            // 自動保存: SerializedObject の変更を監視
+            root.TrackSerializedObjectValue(serializedObject, _ => OnSerializedObjectChanged());
 
             return root;
         }
@@ -216,11 +161,9 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             _inputActionAssetProperty = serializedObject.FindProperty("_inputActionAsset");
             _actionMapNameProperty = serializedObject.FindProperty("_actionMapName");
             _expressionBindingsProperty = serializedObject.FindProperty("_expressionBindings");
-            _analogBindingsProperty = serializedObject.FindProperty("_analogBindings");
-
-            // 抽象基底 FacialCharacterProfileSO 由来 (protected)
             _layersProperty = serializedObject.FindProperty("_layers");
             _expressionsProperty = serializedObject.FindProperty("_expressions");
+            _gazeConfigsProperty = serializedObject.FindProperty("_gazeConfigs");
             _schemaVersionProperty = serializedObject.FindProperty("_schemaVersion");
 
 #if UNITY_EDITOR
@@ -229,73 +172,131 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         }
 
         // ====================================================================
-        // Save ボタン（validation エラー時に disabled）
+        // 自動保存
         // ====================================================================
 
-        private void BuildSaveButton(VisualElement root)
+        private void BuildSaveStatusBar(VisualElement root)
         {
-            _saveButton = new Button(SaveAsset)
+            var bar = new VisualElement();
+            bar.style.flexDirection = FlexDirection.Row;
+            bar.style.alignItems = Align.Center;
+            bar.style.marginBottom = 6;
+
+            _saveStatusLabel = new Label("変更は自動的に保存されます")
+            {
+                name = SaveStatusLabelName,
+            };
+            _saveStatusLabel.style.flexGrow = 1f;
+            _saveStatusLabel.style.unityFontStyleAndWeight = FontStyle.Italic;
+            _saveStatusLabel.style.color = new StyleColor(new Color(0.55f, 0.55f, 0.55f));
+            bar.Add(_saveStatusLabel);
+
+            var forceExportButton = new Button(ForceSave)
             {
                 name = SaveButtonName,
-                text = "保存 (Save)",
-                tooltip = "FacialCharacterSO の編集内容を保存し、StreamingAssets/{name}/profile.json を更新します。",
+                text = "今すぐ書き出し",
+                tooltip = "現在の設定を StreamingAssets/{SO名}/profile.json に即時エクスポートする。",
             };
-            _saveButton.AddToClassList(FacialControlStyles.ActionButton);
-            _saveButton.style.marginBottom = 6;
-            root.Add(_saveButton);
+            forceExportButton.AddToClassList(FacialControlStyles.ActionButton);
+            bar.Add(forceExportButton);
+
+            root.Add(bar);
         }
 
-        private void SaveAsset()
+        private void OnSerializedObjectChanged()
         {
-            if (target == null)
+            if (target == null) return;
+
+            EditorUtility.SetDirty(target);
+            UpdateValidation();
+            UpdateDebugLabels();
+            RefreshLayerNameChoices();
+
+            if (!_autoSavePending)
             {
-                return;
+                _autoSavePending = true;
+                EditorApplication.delayCall += FlushAutoSave;
+                if (_saveStatusLabel != null)
+                {
+                    _saveStatusLabel.text = "保存中…";
+                }
             }
+        }
 
-            // フォーカス中の TextField 等の未確定値を反映する
-            serializedObject.ApplyModifiedProperties();
+        private void FlushAutoSave()
+        {
+            _autoSavePending = false;
+            if (target == null) return;
 
-            // OnWillSaveAssets 経路が発火しない環境でも JSON が更新されるよう、明示的に実行する
-            if (target is FacialCharacterProfileSO profileSO)
+            try
             {
-                try
+                if (target is FacialCharacterProfileSO profileSO)
                 {
                     FacialCharacterSOAutoExporter.SampleAnimationClipsIntoCachedSnapshots(
                         profileSO, _sampler ?? new AnimationClipExpressionSampler());
+                    FacialCharacterSOAutoExporter.ExportToStreamingAssets(profileSO);
                 }
-                catch (Exception ex)
+                AssetDatabase.SaveAssetIfDirty(target);
+
+                if (_saveStatusLabel != null)
                 {
-                    Debug.LogError(
-                        $"FacialCharacterSOInspector: AnimationClip サンプリングに失敗したため保存を中止します: {ex}");
-                    return;
+                    _saveStatusLabel.text = $"保存しました ({DateTime.Now:HH:mm:ss})";
                 }
-
-                FacialCharacterSOAutoExporter.ExportToStreamingAssets(profileSO);
             }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"FacialCharacterSOInspector: 自動保存に失敗しました: {ex.Message}");
+                if (_saveStatusLabel != null)
+                {
+                    _saveStatusLabel.text = "保存エラー(コンソール参照)";
+                }
+            }
+        }
 
-            EditorUtility.SetDirty(target);
-            AssetDatabase.SaveAssetIfDirty(target);
+        private void ForceSave()
+        {
+            serializedObject.ApplyModifiedProperties();
+            FlushAutoSave();
             AssetDatabase.Refresh();
         }
 
         // ====================================================================
-        // Section 1: 入力 (Input)
+        // 共通ヘルパー: HelpBox / Foldout の見栄え調整
+        // ====================================================================
+
+        private static HelpBox MakeHelpBox(string text, HelpBoxMessageType messageType = HelpBoxMessageType.Info)
+        {
+            var box = new HelpBox(text, messageType);
+            box.style.fontSize = HelpBoxFontSize;
+            box.style.marginTop = 2;
+            box.style.marginBottom = 4;
+            return box;
+        }
+
+        private static Foldout MakeSectionFoldout(string name, string text, bool open)
+        {
+            var foldout = new Foldout
+            {
+                name = name,
+                text = text,
+                value = open,
+            };
+            foldout.style.unityFontStyleAndWeight = FontStyle.Bold;
+            foldout.style.fontSize = SectionFoldoutFontSize;
+            return foldout;
+        }
+
+        // ====================================================================
+        // Section: 入力
         // ====================================================================
 
         private void BuildInputSection(VisualElement root)
         {
-            var foldout = new Foldout
-            {
-                name = InputFoldoutName,
-                text = "入力 (Input)",
-                value = true,
-            };
+            var foldout = MakeSectionFoldout(InputFoldoutName, "入力", open: true);
 
-            var help = new HelpBox(
-                "ここに割り当てた .inputactions の Action 名を Expression にバインドします。"
-                + " InputActionAsset と ActionMap 名を設定すると、下のキーバインディング欄で Action 名をドロップダウン選択できるようになります。",
-                HelpBoxMessageType.Info);
-            foldout.Add(help);
+            foldout.Add(MakeHelpBox(
+                "ここに割り当てた .inputactions の Action 名を、表情のキー操作にバインドします。"
+                + "InputActionAsset を変更すると、下のキーバインディング欄の候補が即時更新されます。"));
 
             if (_inputActionAssetProperty != null)
             {
@@ -303,61 +304,46 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 {
                     objectType = typeof(InputActionAsset),
                     allowSceneObjects = false,
-                    tooltip = "Project ウィンドウで作成した .inputactions をここに割り当てる。",
                 };
                 assetField.BindProperty(_inputActionAssetProperty);
                 assetField.RegisterValueChangedCallback(_ =>
                 {
                     RefreshActionMapChoices();
                     RefreshActionNameChoices();
+                    RebuildExpressionBindingsListView();
                 });
                 foldout.Add(assetField);
             }
 
             if (_actionMapNameProperty != null)
             {
-                _actionMapDropdown = new DropdownField("ActionMap 名")
-                {
-                    tooltip = "対象 ActionMap の名前。既定は \"Expression\"。",
-                };
+                _actionMapDropdown = new DropdownField("ActionMap 名");
                 _actionMapDropdown.RegisterValueChangedCallback(evt =>
                 {
-                    if (_actionMapNameProperty == null)
-                    {
-                        return;
-                    }
+                    if (_actionMapNameProperty == null) return;
                     serializedObject.Update();
                     _actionMapNameProperty.stringValue = evt.newValue ?? string.Empty;
                     serializedObject.ApplyModifiedProperties();
                     RefreshActionNameChoices();
+                    RebuildExpressionBindingsListView();
                 });
                 foldout.Add(_actionMapDropdown);
-
-                var rawField = new PropertyField(_actionMapNameProperty, "ActionMap 名 (手入力)");
-                foldout.Add(rawField);
             }
 
             root.Add(foldout);
         }
 
         // ====================================================================
-        // Section 2: キーバインディング (Action ↔ Expression)
+        // Section: キーバインディング
         // ====================================================================
 
         private void BuildExpressionBindingsSection(VisualElement root)
         {
-            var foldout = new Foldout
-            {
-                name = ExpressionBindingsFoldoutName,
-                text = "キーバインディング (Action ↔ Expression)",
-                value = true,
-            };
+            var foldout = MakeSectionFoldout(ExpressionBindingsFoldoutName, "キーバインディング", open: true);
 
-            var help = new HelpBox(
-                "InputAction 名と Expression ID を 1 対 1 で結びます。"
-                + " Keyboard / Controller の振分けは Action の binding path から自動推定されます (Req 7.1)。",
-                HelpBoxMessageType.Info);
-            foldout.Add(help);
+            foldout.Add(MakeHelpBox(
+                "Action 名と表情 ID を 1 対 1 で結びつけます。"
+                + "Keyboard / Controller の振分けは Action の binding path から自動推定されます。"));
 
             if (_expressionBindingsProperty != null)
             {
@@ -381,14 +367,12 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             var actionDropdown = new DropdownField("Action 名")
             {
                 name = "actionDropdown",
-                tooltip = "InputActionAsset の対象 ActionMap 配下の Action 名。",
             };
             container.Add(actionDropdown);
 
-            var expressionDropdown = new DropdownField("Expression ID")
+            var expressionDropdown = new DropdownField("表情 ID")
             {
                 name = "expressionDropdown",
-                tooltip = "発火対象の Expression ID。",
             };
             container.Add(expressionDropdown);
 
@@ -450,234 +434,460 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         }
 
         // ====================================================================
-        // Section 3: アナログバインディング
-        // ====================================================================
-
-        private void BuildAnalogBindingsSection(VisualElement root)
-        {
-            var foldout = new Foldout
-            {
-                name = AnalogBindingsFoldoutName,
-                text = "アナログバインディング (連続値 → BlendShape)",
-                value = false,
-            };
-
-            var help = new HelpBox(
-                "連続値 InputAction を BlendShape ウェイトへ写像します。"
-                + " Phase 4.7 で 3 フィールドに簡素化済 (inputActionRef + targetIdentifier + targetAxis)。"
-                + " deadzone / scale / offset / curve 等の値変換は InputActionAsset 側 processor チェーンで行います。",
-                HelpBoxMessageType.Info);
-            foldout.Add(help);
-
-            if (_analogBindingsProperty != null)
-            {
-                var listView = BuildArrayListView(
-                    _analogBindingsProperty,
-                    itemHeight: 92f,
-                    makeItem: () => CreateAnalogBindingRow(),
-                    bindItem: (element, index) => BindAnalogBindingRow(element, index));
-                foldout.Add(listView);
-            }
-
-            root.Add(foldout);
-        }
-
-        private VisualElement CreateAnalogBindingRow()
-        {
-            var container = new VisualElement();
-            container.style.flexDirection = FlexDirection.Column;
-            container.style.marginBottom = 4;
-
-            var inputActionRefField = new TextField("inputActionRef")
-            {
-                name = "inputActionRefField",
-                tooltip = "対象 InputAction の参照識別子 (action 名または GUID)。",
-            };
-            container.Add(inputActionRefField);
-
-            var targetIdentifierField = new TextField("targetIdentifier")
-            {
-                name = "targetIdentifierField",
-                tooltip = "ターゲット BlendShape 名。",
-            };
-            container.Add(targetIdentifierField);
-
-            var targetAxisField = new EnumField("targetAxis", AnalogTargetAxis.X)
-            {
-                name = "targetAxisField",
-                tooltip = "ターゲットの軸 (BlendShape は X 既定)。",
-            };
-            container.Add(targetAxisField);
-
-            return container;
-        }
-
-        private void BindAnalogBindingRow(VisualElement element, int index)
-        {
-            if (_analogBindingsProperty == null
-                || index < 0
-                || index >= _analogBindingsProperty.arraySize)
-            {
-                return;
-            }
-
-            serializedObject.Update();
-            var entryProp = _analogBindingsProperty.GetArrayElementAtIndex(index);
-            var inputActionRefProp = entryProp.FindPropertyRelative("inputActionRef");
-            var targetIdentifierProp = entryProp.FindPropertyRelative("targetIdentifier");
-            var targetAxisProp = entryProp.FindPropertyRelative("targetAxis");
-
-            var inputActionRefField = element.Q<TextField>("inputActionRefField");
-            if (inputActionRefField != null && inputActionRefProp != null)
-            {
-                inputActionRefField.BindProperty(inputActionRefProp);
-            }
-
-            var targetIdentifierField = element.Q<TextField>("targetIdentifierField");
-            if (targetIdentifierField != null && targetIdentifierProp != null)
-            {
-                targetIdentifierField.BindProperty(targetIdentifierProp);
-            }
-
-            var targetAxisField = element.Q<EnumField>("targetAxisField");
-            if (targetAxisField != null && targetAxisProp != null)
-            {
-                targetAxisField.SetValueWithoutNotify((AnalogTargetAxis)targetAxisProp.enumValueIndex);
-                targetAxisField.RegisterValueChangedCallback(evt =>
-                {
-                    serializedObject.Update();
-                    var prop = _analogBindingsProperty.GetArrayElementAtIndex(index)
-                        .FindPropertyRelative("targetAxis");
-                    if (prop != null)
-                    {
-                        prop.enumValueIndex = (int)(AnalogTargetAxis)evt.newValue;
-                        serializedObject.ApplyModifiedProperties();
-                    }
-                });
-            }
-        }
-
-        // ====================================================================
-        // Section 4: レイヤー (Layers)
+        // Section: レイヤー (Layers + その配下の Expressions)
         // ====================================================================
 
         private void BuildLayersSection(VisualElement root)
         {
-            var foldout = new Foldout
-            {
-                name = LayersFoldoutName,
-                text = "レイヤー (Layers)",
-                value = false,
-            };
+            var foldout = MakeSectionFoldout(LayersFoldoutName, "レイヤーと表情", open: true);
 
-            var help = new HelpBox(
+            foldout.Add(MakeHelpBox(
                 "表情を重ねる優先順位レイヤーを定義します。"
-                + " name はレイヤー識別子、priority は値が大きいほど後段で適用、exclusionMode は LastWins / Blend を選択。",
-                HelpBoxMessageType.Info);
-            foldout.Add(help);
-
-            if (_layersProperty != null)
-            {
-                var layersField = new PropertyField(_layersProperty, "Layers");
-                layersField.RegisterCallback<SerializedPropertyChangeEvent>(_ =>
-                {
-                    RefreshLayerNameChoices();
-                    UpdateValidation();
-                    RebuildExpressionListView();
-                });
-                foldout.Add(layersField);
-            }
-
-            root.Add(foldout);
-        }
-
-        // ====================================================================
-        // Section 5: Expression
-        // ====================================================================
-
-        private void BuildExpressionsSection(VisualElement root)
-        {
-            var foldout = new Foldout
-            {
-                name = ExpressionsFoldoutName,
-                text = "Expression",
-                value = true,
-            };
-
-            var help = new HelpBox(
-                "AnimationClip を割り当てると、時刻 0 の BlendShape / Bone 値および AnimationEvent 経由の遷移メタデータが自動的に snapshot 化されます。"
-                + " Id は新規追加時に GUID で自動採番されます。",
-                HelpBoxMessageType.Info);
-            foldout.Add(help);
-
-#if UNITY_EDITOR
-            if (_referenceModelProperty != null)
-            {
-                var refModelField = new PropertyField(_referenceModelProperty, "参照モデル (Editor 専用)");
-                refModelField.tooltip = "BlendShape 名 / bone 名取得用の参照モデル。";
-                foldout.Add(refModelField);
-            }
-#endif
+                + "各レイヤーには所属する表情を登録し、レイヤー全体で他レイヤーへの上書き範囲を指定します。"));
 
             _expressionsValidationHelp = new HelpBox(string.Empty, HelpBoxMessageType.Error)
             {
                 name = ExpressionsValidationHelpName,
             };
+            _expressionsValidationHelp.style.fontSize = HelpBoxFontSize;
             _expressionsValidationHelp.style.display = DisplayStyle.None;
             foldout.Add(_expressionsValidationHelp);
 
-            if (_expressionsProperty != null)
+            _layersContainer = new VisualElement();
+            _layersContainer.style.flexDirection = FlexDirection.Column;
+            foldout.Add(_layersContainer);
+
+            var addLayerButton = new Button(AddLayer)
             {
-                _expressionRowsContainer = new VisualElement();
-                _expressionRowsContainer.style.flexDirection = FlexDirection.Column;
-                foldout.Add(_expressionRowsContainer);
+                text = "+ レイヤーを追加",
+            };
+            addLayerButton.style.alignSelf = Align.FlexStart;
+            addLayerButton.style.marginTop = 4;
+            foldout.Add(addLayerButton);
 
-                var footer = new VisualElement();
-                footer.style.flexDirection = FlexDirection.Row;
-                footer.style.marginTop = 4;
-
-                var addButton = new Button(() =>
-                {
-                    serializedObject.Update();
-                    int newIndex = _expressionsProperty.arraySize;
-                    _expressionsProperty.InsertArrayElementAtIndex(newIndex);
-                    AssignDefaultsForNewExpression(newIndex);
-                    serializedObject.ApplyModifiedProperties();
-                    RebuildExpressionListView();
-                    UpdateValidation();
-                })
-                {
-                    text = "+ Expression を追加",
-                };
-                footer.Add(addButton);
-                foldout.Add(footer);
-
-                RebuildExpressionListView();
-            }
+            RebuildLayersUI();
 
             root.Add(foldout);
         }
 
-        private VisualElement CreateExpressionRow()
+        private void AddLayer()
         {
-            var container = new VisualElement();
-            container.style.flexDirection = FlexDirection.Column;
-            container.style.marginBottom = 6;
+            serializedObject.Update();
+            int newIndex = _layersProperty.arraySize;
+            _layersProperty.InsertArrayElementAtIndex(newIndex);
+            var layerProp = _layersProperty.GetArrayElementAtIndex(newIndex);
+            var nameProp = layerProp.FindPropertyRelative("name");
+            if (nameProp != null && string.IsNullOrEmpty(nameProp.stringValue))
+            {
+                nameProp.stringValue = "new-layer";
+            }
+            var priorityProp = layerProp.FindPropertyRelative("priority");
+            if (priorityProp != null) priorityProp.intValue = newIndex;
+            serializedObject.ApplyModifiedProperties();
+            RefreshLayerNameChoices();
+            RebuildLayersUI();
+            UpdateValidation();
+        }
 
+        private void RebuildLayersUI()
+        {
+            if (_layersContainer == null || _layersProperty == null) return;
+            _layersContainer.Clear();
+
+            serializedObject.Update();
+            int layerCount = _layersProperty.arraySize;
+            for (int i = 0; i < layerCount; i++)
+            {
+                int layerIndex = i;
+                var layerCard = BuildLayerCard(layerIndex);
+                _layersContainer.Add(layerCard);
+            }
+        }
+
+        private VisualElement BuildLayerCard(int layerIndex)
+        {
+            var layerProp = _layersProperty.GetArrayElementAtIndex(layerIndex);
+            var nameProp = layerProp.FindPropertyRelative("name");
+            var priorityProp = layerProp.FindPropertyRelative("priority");
+            var exclusionModeProp = layerProp.FindPropertyRelative("exclusionMode");
+            var inputSourcesProp = layerProp.FindPropertyRelative("inputSources");
+
+            string layerName = nameProp != null ? nameProp.stringValue : $"layer{layerIndex}";
+
+            var card = new Foldout
+            {
+                text = string.IsNullOrEmpty(layerName) ? $"レイヤー [{layerIndex}]" : layerName,
+                value = true,
+            };
+            card.style.borderLeftColor = new StyleColor(new Color(0.4f, 0.6f, 0.9f));
+            card.style.borderLeftWidth = 3;
+            card.style.paddingLeft = 6;
+            card.style.marginBottom = 8;
+
+            // 名前
+            if (nameProp != null)
+            {
+                var nameField = new TextField("名前");
+                nameField.SetValueWithoutNotify(nameProp.stringValue ?? string.Empty);
+                nameField.RegisterValueChangedCallback(evt =>
+                {
+                    serializedObject.Update();
+                    var p = _layersProperty.GetArrayElementAtIndex(layerIndex).FindPropertyRelative("name");
+                    if (p != null)
+                    {
+                        p.stringValue = evt.newValue ?? string.Empty;
+                        serializedObject.ApplyModifiedProperties();
+                        // レイヤー名は他レイヤーの「上書き対象」候補にも影響するため全体を再構築する
+                        RefreshLayerNameChoices();
+                        RebuildLayersUI();
+                    }
+                });
+                card.Add(nameField);
+            }
+
+            if (priorityProp != null)
+            {
+                var priorityField = new IntegerField("優先度");
+                priorityField.SetValueWithoutNotify(priorityProp.intValue);
+                priorityField.RegisterValueChangedCallback(evt =>
+                {
+                    serializedObject.Update();
+                    var p = _layersProperty.GetArrayElementAtIndex(layerIndex).FindPropertyRelative("priority");
+                    if (p != null) { p.intValue = evt.newValue; serializedObject.ApplyModifiedProperties(); }
+                });
+                card.Add(priorityField);
+            }
+
+            if (exclusionModeProp != null)
+            {
+                var modeField = new EnumField("排他モード", (ExclusionMode)exclusionModeProp.enumValueIndex);
+                modeField.RegisterValueChangedCallback(evt =>
+                {
+                    serializedObject.Update();
+                    var p = _layersProperty.GetArrayElementAtIndex(layerIndex).FindPropertyRelative("exclusionMode");
+                    if (p != null) { p.enumValueIndex = (int)(ExclusionMode)evt.newValue; serializedObject.ApplyModifiedProperties(); }
+                });
+                card.Add(modeField);
+            }
+
+            if (inputSourcesProp != null)
+            {
+                var inputSourcesField = new PropertyField(inputSourcesProp, "入力源");
+                inputSourcesField.Bind(serializedObject);
+                card.Add(inputSourcesField);
+            }
+
+            // LayerOverrideMask: このレイヤーがアクティブな間に上書きする他レイヤー
+            var maskHelp = MakeHelpBox(
+                "このレイヤーがアクティブな間、合成時に上書き対象とするレイヤーを選択します。"
+                + "通常は自レイヤーを必ず含めます。");
+            card.Add(maskHelp);
+
+            var maskContainer = new VisualElement { name = $"layer-mask-container-{layerIndex}" };
+            card.Add(maskContainer);
+            RebuildLayerOverrideMaskFieldInto(maskContainer, layerIndex);
+
+            // 表情リスト
+            var expressionHeader = new Label("表情");
+            expressionHeader.style.unityFontStyleAndWeight = FontStyle.Bold;
+            expressionHeader.style.marginTop = 8;
+            card.Add(expressionHeader);
+
+            var expressionsContainer = new VisualElement { name = $"layer-expressions-{layerIndex}" };
+            card.Add(expressionsContainer);
+            RebuildExpressionRowsForLayer(expressionsContainer, layerName);
+
+            var expressionAddRow = new VisualElement();
+            expressionAddRow.style.flexDirection = FlexDirection.Row;
+            expressionAddRow.style.marginTop = 4;
+
+            var addExpressionButton = new Button(() => AddExpressionForLayer(layerName, ExpressionKind.AnimationClip))
+            {
+                text = "+ 表情を追加",
+            };
+            expressionAddRow.Add(addExpressionButton);
+
+            var addEyeLookButton = new Button(() => AddExpressionForLayer(layerName, ExpressionKind.EyeLook))
+            {
+                text = "+ EyeLook 表情を追加",
+            };
+            expressionAddRow.Add(addEyeLookButton);
+
+            card.Add(expressionAddRow);
+
+            // レイヤー削除
+            var removeLayerButton = new Button(() => RemoveLayer(layerIndex))
+            {
+                text = "このレイヤーを削除",
+            };
+            removeLayerButton.style.alignSelf = Align.FlexEnd;
+            removeLayerButton.style.marginTop = 8;
+            card.Add(removeLayerButton);
+
+            return card;
+        }
+
+        private void RebuildLayerOverrideMaskFieldInto(VisualElement container, int layerIndex)
+        {
+            var layerProp = _layersProperty.GetArrayElementAtIndex(layerIndex);
+            var maskProp = layerProp.FindPropertyRelative("layerOverrideMask");
+            if (maskProp == null) return;
+
+            var maskField = new MaskField("上書きするレイヤー");
+            var orderedNames = new List<string>(_layerNameChoices);
+            maskField.choices = orderedNames;
+            int maskValue = ReadMaskValueFromSerializedList(maskProp, orderedNames);
+            maskField.SetValueWithoutNotify(maskValue);
+            maskField.RegisterValueChangedCallback(evt =>
+            {
+                serializedObject.Update();
+                var p = _layersProperty.GetArrayElementAtIndex(layerIndex).FindPropertyRelative("layerOverrideMask");
+                if (p != null)
+                {
+                    WriteMaskValueToSerializedList(p, evt.newValue, orderedNames);
+                    serializedObject.ApplyModifiedProperties();
+                    UpdateValidation();
+                }
+            });
+            container.Add(maskField);
+        }
+
+        private void RemoveLayer(int layerIndex)
+        {
+            if (!EditorUtility.DisplayDialog(
+                "レイヤーを削除", "このレイヤーと、所属する全表情を削除します。よろしいですか？", "削除", "キャンセル"))
+            {
+                return;
+            }
+
+            serializedObject.Update();
+            string layerName = string.Empty;
+            var layerProp = _layersProperty.GetArrayElementAtIndex(layerIndex);
+            var nameProp = layerProp.FindPropertyRelative("name");
+            if (nameProp != null) layerName = nameProp.stringValue ?? string.Empty;
+
+            // 所属する表情を削除
+            for (int i = _expressionsProperty.arraySize - 1; i >= 0; i--)
+            {
+                var exprElem = _expressionsProperty.GetArrayElementAtIndex(i);
+                var exprLayerProp = exprElem.FindPropertyRelative("layer");
+                if (exprLayerProp != null
+                    && string.Equals(exprLayerProp.stringValue, layerName, StringComparison.Ordinal))
+                {
+                    var idProp = exprElem.FindPropertyRelative("id");
+                    if (idProp != null) RemoveGazeConfigByExpressionId(idProp.stringValue);
+                    _expressionsProperty.DeleteArrayElementAtIndex(i);
+                }
+            }
+
+            _layersProperty.DeleteArrayElementAtIndex(layerIndex);
+            serializedObject.ApplyModifiedProperties();
+
+            RefreshLayerNameChoices();
+            RebuildLayersUI();
+            UpdateValidation();
+        }
+
+        private void AddExpressionForLayer(string layerName, ExpressionKind kind)
+        {
+            serializedObject.Update();
+            int newIndex = _expressionsProperty.arraySize;
+            _expressionsProperty.InsertArrayElementAtIndex(newIndex);
+            var entryProp = _expressionsProperty.GetArrayElementAtIndex(newIndex);
+
+            var idProp = entryProp.FindPropertyRelative("id");
+            var nameProp = entryProp.FindPropertyRelative("name");
+            var layerProp = entryProp.FindPropertyRelative("layer");
+            var kindProp = entryProp.FindPropertyRelative("kind");
+
+            string newId = Guid.NewGuid().ToString("N");
+            if (idProp != null) idProp.stringValue = newId;
+            if (nameProp != null) nameProp.stringValue = kind == ExpressionKind.EyeLook ? "EyeLook" : "新規表情";
+            if (layerProp != null) layerProp.stringValue = layerName ?? string.Empty;
+            if (kindProp != null) kindProp.enumValueIndex = (int)kind;
+
+            // EyeLook なら GazeExpressionConfig も自動追加
+            if (kind == ExpressionKind.EyeLook)
+            {
+                int newCfgIndex = _gazeConfigsProperty.arraySize;
+                _gazeConfigsProperty.InsertArrayElementAtIndex(newCfgIndex);
+                var cfgProp = _gazeConfigsProperty.GetArrayElementAtIndex(newCfgIndex);
+                var cfgExprIdProp = cfgProp.FindPropertyRelative("expressionId");
+                if (cfgExprIdProp != null) cfgExprIdProp.stringValue = newId;
+            }
+
+            serializedObject.ApplyModifiedProperties();
+
+            RebuildLayersUI();
+            UpdateValidation();
+        }
+
+        private void RebuildExpressionRowsForLayer(VisualElement container, string layerName)
+        {
+            container.Clear();
+            if (_expressionsProperty == null) return;
+
+            for (int i = 0; i < _expressionsProperty.arraySize; i++)
+            {
+                int exprIndex = i;
+                var exprProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
+                var lp = exprProp.FindPropertyRelative("layer");
+                if (lp == null) continue;
+                if (!string.Equals(lp.stringValue, layerName, StringComparison.Ordinal)) continue;
+
+                var row = BuildExpressionRow(exprIndex);
+                container.Add(row);
+            }
+        }
+
+        // ====================================================================
+        // Expression 行
+        // ====================================================================
+
+        private VisualElement BuildExpressionRow(int exprIndex)
+        {
+            var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
+            var idProp = entryProp.FindPropertyRelative("id");
+            var nameProp = entryProp.FindPropertyRelative("name");
+            var kindProp = entryProp.FindPropertyRelative("kind");
+            var transitionDurationProp = entryProp.FindPropertyRelative("transitionDuration");
+
+            // Id 自動採番
+            if (idProp != null && string.IsNullOrEmpty(idProp.stringValue))
+            {
+                idProp.stringValue = Guid.NewGuid().ToString("N");
+                serializedObject.ApplyModifiedProperties();
+                serializedObject.Update();
+            }
+
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Column;
+            row.style.marginBottom = 8;
+            row.style.paddingLeft = 6;
+            row.style.borderLeftColor = new StyleColor(new Color(0.7f, 0.7f, 0.7f));
+            row.style.borderLeftWidth = 2;
+
+            // ヘッダー行: kind dropdown + 削除ボタン
+            var headerRow = new VisualElement();
+            headerRow.style.flexDirection = FlexDirection.Row;
+            headerRow.style.alignItems = Align.Center;
+
+            ExpressionKind currentKind = ExpressionKind.AnimationClip;
+            if (kindProp != null)
+            {
+                currentKind = (ExpressionKind)kindProp.enumValueIndex;
+            }
+
+            var kindDropdown = new EnumField("種別", currentKind)
+            {
+                name = ExpressionRowKindDropdownName,
+            };
+            kindDropdown.style.flexGrow = 1f;
+            kindDropdown.RegisterValueChangedCallback(evt =>
+            {
+                serializedObject.Update();
+                var p = _expressionsProperty.GetArrayElementAtIndex(exprIndex).FindPropertyRelative("kind");
+                if (p != null)
+                {
+                    var newKind = (ExpressionKind)evt.newValue;
+                    p.enumValueIndex = (int)newKind;
+                    serializedObject.ApplyModifiedProperties();
+
+                    var idForCfg = idProp != null ? idProp.stringValue : string.Empty;
+                    if (newKind == ExpressionKind.EyeLook && !HasGazeConfigForExpression(idForCfg))
+                    {
+                        AppendGazeConfigForExpression(idForCfg);
+                    }
+                    else if (newKind == ExpressionKind.AnimationClip)
+                    {
+                        RemoveGazeConfigByExpressionId(idForCfg);
+                    }
+                    RebuildLayersUI();
+                }
+            });
+            headerRow.Add(kindDropdown);
+
+            var removeButton = new Button(() => RemoveExpression(exprIndex))
+            {
+                text = "削除",
+            };
+            removeButton.style.marginLeft = 6;
+            headerRow.Add(removeButton);
+
+            row.Add(headerRow);
+
+            // ID label
             var idLabel = new Label
             {
                 name = ExpressionRowIdLabelName,
-                tooltip = "Expression Id (GUID)。新規追加時に自動採番されます。",
+                text = $"ID: {(idProp != null ? idProp.stringValue : string.Empty)}",
             };
             idLabel.AddToClassList(FacialControlStyles.InfoLabel);
-            container.Add(idLabel);
+            idLabel.style.fontSize = 10;
+            idLabel.style.color = new StyleColor(new Color(0.5f, 0.5f, 0.5f));
+            row.Add(idLabel);
 
-            var nameField = new TextField("Name")
+            // 名前
+            var nameField = new TextField("名前")
             {
                 name = ExpressionRowNameFieldName,
-                tooltip = "表情名。AnimationClip を割り当てるとファイル名 (拡張子なし) で自動入力されます。",
             };
-            container.Add(nameField);
+            if (nameProp != null)
+            {
+                nameField.SetValueWithoutNotify(nameProp.stringValue ?? string.Empty);
+                nameField.RegisterValueChangedCallback(evt =>
+                {
+                    serializedObject.Update();
+                    var p = _expressionsProperty.GetArrayElementAtIndex(exprIndex).FindPropertyRelative("name");
+                    if (p != null)
+                    {
+                        p.stringValue = evt.newValue ?? string.Empty;
+                        serializedObject.ApplyModifiedProperties();
+                    }
+                });
+            }
+            row.Add(nameField);
+
+            // 遷移時間
+            var transitionDurationField = new Slider("遷移時間 (秒)", 0f, 1f)
+            {
+                name = ExpressionRowTransitionDurationFieldName,
+                showInputField = true,
+            };
+            if (transitionDurationProp != null)
+            {
+                transitionDurationField.BindProperty(transitionDurationProp);
+            }
+            row.Add(transitionDurationField);
+
+            // kind 別の専用 UI
+            if (currentKind == ExpressionKind.AnimationClip)
+            {
+                BuildAnimationClipFields(row, exprIndex);
+            }
+            else
+            {
+                BuildEyeLookFields(row, exprIndex, idProp != null ? idProp.stringValue : string.Empty);
+            }
+
+            // Validation
+            var validationHelp = new HelpBox(string.Empty, HelpBoxMessageType.Warning)
+            {
+                name = ExpressionRowValidationHelpName,
+            };
+            validationHelp.style.fontSize = HelpBoxFontSize;
+            validationHelp.style.display = DisplayStyle.None;
+            row.Add(validationHelp);
+
+            UpdateRowValidation(row, exprIndex);
+
+            return row;
+        }
+
+        private void BuildAnimationClipFields(VisualElement row, int exprIndex)
+        {
+            var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
+            var clipProp = entryProp.FindPropertyRelative("animationClip");
 
             var clipField = new ExpressionClipObjectField
             {
@@ -685,32 +895,21 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 label = "AnimationClip",
                 objectType = typeof(AnimationClip),
                 allowSceneObjects = false,
-                tooltip = "時刻 0 の BlendShape / Bone 値と AnimationEvent メタデータをサンプリングするソース AnimationClip。",
             };
-            container.Add(clipField);
-
-            // ON/OFF 切替時の遷移時間（秒）。Domain.Models.Expression.TransitionDuration へ写像される。
-            var transitionDurationField = new Slider("遷移時間 (秒)", 0f, 1f)
+            if (clipProp != null)
             {
-                name = ExpressionRowTransitionDurationFieldName,
-                showInputField = true,
-                tooltip = "ON/OFF 切替時の遷移時間（秒、0〜1）。バインディング駆動の表情変更時に補間時間として使用される。",
-            };
-            container.Add(transitionDurationField);
-
-            var layerDropdown = new DropdownField("Layer")
-            {
-                name = ExpressionRowLayerDropdownName,
-                tooltip = "所属レイヤー名 (上の Layers セクションから選択)。",
-            };
-            container.Add(layerDropdown);
-
-            var maskField = new MaskField("LayerOverrideMask")
-            {
-                name = ExpressionRowMaskFieldName,
-                tooltip = "他レイヤーへのオーバーライド対象を multi-select で指定 (Req 3.3)。",
-            };
-            container.Add(maskField);
+                clipField.BindProperty(clipProp);
+                clipField.RegisterCallback<ChangeEvent<UnityEngine.Object>>(evt =>
+                {
+                    OnClipChanged(exprIndex, evt.newValue as AnimationClip, row);
+                });
+                clipField.OnValueAssigned = newValue =>
+                {
+                    OnClipChanged(exprIndex, newValue as AnimationClip, row);
+                };
+                clipField.RefreshDisplayLabel();
+            }
+            row.Add(clipField);
 
             var rendererSummary = new ListView
             {
@@ -720,337 +919,156 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 selectionType = SelectionType.None,
                 showAddRemoveFooter = false,
                 showFoldoutHeader = true,
-                headerTitle = "RendererPaths (read-only)",
+                headerTitle = "影響する SkinnedMeshRenderer",
                 reorderable = false,
             };
             rendererSummary.SetEnabled(false);
             rendererSummary.style.minHeight = 60f;
-            container.Add(rendererSummary);
+            row.Add(rendererSummary);
 
-            var validationHelp = new HelpBox(string.Empty, HelpBoxMessageType.Warning)
-            {
-                name = ExpressionRowValidationHelpName,
-            };
-            validationHelp.style.display = DisplayStyle.None;
-            container.Add(validationHelp);
-
-            return container;
+            RefreshRendererSummary(row, clipProp != null ? clipProp.objectReferenceValue as AnimationClip : null);
         }
 
-        private void BindExpressionRow(VisualElement element, int index)
+        private void BuildEyeLookFields(VisualElement row, int exprIndex, string expressionId)
         {
-            if (_expressionsProperty == null
-                || index < 0
-                || index >= _expressionsProperty.arraySize)
+            row.Add(MakeHelpBox(
+                "Vector2 入力 (左スティック等) で両目を同時駆動します。"
+                + "x 成分が左右目の X 軸 BlendShape、y 成分が左右目の Y 軸 BlendShape に反映されます。"));
+
+            int cfgIndex = FindGazeConfigIndexByExpressionId(expressionId);
+            if (cfgIndex < 0)
             {
-                return;
+                AppendGazeConfigForExpression(expressionId);
+                cfgIndex = FindGazeConfigIndexByExpressionId(expressionId);
+            }
+            if (cfgIndex < 0) return;
+
+            var cfgProp = _gazeConfigsProperty.GetArrayElementAtIndex(cfgIndex);
+            var actionProp = cfgProp.FindPropertyRelative("inputAction");
+            var leftXProp = cfgProp.FindPropertyRelative("leftEyeXBlendShape");
+            var leftYProp = cfgProp.FindPropertyRelative("leftEyeYBlendShape");
+            var rightXProp = cfgProp.FindPropertyRelative("rightEyeXBlendShape");
+            var rightYProp = cfgProp.FindPropertyRelative("rightEyeYBlendShape");
+
+            if (actionProp != null)
+            {
+                var actionField = new ObjectField("InputAction (Vector2)")
+                {
+                    name = ExpressionRowGazeActionFieldName,
+                    objectType = typeof(InputActionReference),
+                    allowSceneObjects = false,
+                };
+                actionField.BindProperty(actionProp);
+                row.Add(actionField);
             }
 
+            row.Add(BuildGazeBlendShapeField("左目 X (横方向)", leftXProp, ExpressionRowGazeLeftXName));
+            row.Add(BuildGazeBlendShapeField("左目 Y (縦方向)", leftYProp, ExpressionRowGazeLeftYName));
+            row.Add(BuildGazeBlendShapeField("右目 X (横方向)", rightXProp, ExpressionRowGazeRightXName));
+            row.Add(BuildGazeBlendShapeField("右目 Y (縦方向)", rightYProp, ExpressionRowGazeRightYName));
+        }
+
+        private static TextField BuildGazeBlendShapeField(string label, SerializedProperty prop, string name)
+        {
+            var field = new TextField(label) { name = name };
+            if (prop != null) field.BindProperty(prop);
+            return field;
+        }
+
+        private void RemoveExpression(int exprIndex)
+        {
             serializedObject.Update();
-            var entryProp = _expressionsProperty.GetArrayElementAtIndex(index);
+            if (exprIndex < 0 || exprIndex >= _expressionsProperty.arraySize) return;
+
+            var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
             var idProp = entryProp.FindPropertyRelative("id");
-            var nameProp = entryProp.FindPropertyRelative("name");
-            var layerProp = entryProp.FindPropertyRelative("layer");
-            var clipProp = entryProp.FindPropertyRelative("animationClip");
-            var maskProp = entryProp.FindPropertyRelative("layerOverrideMask");
-            var transitionDurationProp = entryProp.FindPropertyRelative("transitionDuration");
+            string id = idProp != null ? idProp.stringValue : string.Empty;
 
-            // Id label (read-only). 空なら自動採番。
-            if (idProp != null && string.IsNullOrEmpty(idProp.stringValue))
-            {
-                idProp.stringValue = Guid.NewGuid().ToString("N");
-                serializedObject.ApplyModifiedProperties();
-                serializedObject.Update();
-            }
-
-            var idLabel = element.Q<Label>(ExpressionRowIdLabelName);
-            if (idLabel != null)
-            {
-                idLabel.text = $"Id: {(idProp != null ? idProp.stringValue : string.Empty)}";
-            }
-
-            var nameField = element.Q<TextField>(ExpressionRowNameFieldName);
-            if (nameField != null && nameProp != null)
-            {
-                nameField.SetValueWithoutNotify(nameProp.stringValue ?? string.Empty);
-                nameField.RegisterValueChangedCallback(evt =>
-                {
-                    serializedObject.Update();
-                    var prop = _expressionsProperty.GetArrayElementAtIndex(index)
-                        .FindPropertyRelative("name");
-                    if (prop != null)
-                    {
-                        prop.stringValue = evt.newValue ?? string.Empty;
-                        serializedObject.ApplyModifiedProperties();
-                        UpdateValidation();
-                    }
-                });
-            }
-
-            var clipField = element.Q<ExpressionClipObjectField>(ExpressionRowClipFieldName);
-            if (clipField != null && clipProp != null)
-            {
-                // 既存ハンドラを一旦切り離してから値を反映し、再度バインドする。
-                clipField.OnValueAssigned = null;
-
-                // BindProperty を使うと UI Toolkit が内部ラベルを最新の AnimationClip 名で
-                // 再描画してくれる。SetValueWithoutNotify 単独だと表示名が古いまま残る
-                // ケースがあったため、こちらに統一する（Phase 5.x の表示更新バグ修正）。
-                clipField.Unbind();
-                clipField.BindProperty(clipProp);
-
-                // BindProperty 後に ChangeEvent ハンドラを再登録する。同じ index に対する
-                // 重複登録を避けるため、専用の userData フィールドにハンドラを退避し、
-                // 既存があれば事前に外す。
-                if (clipField.userData is EventCallback<ChangeEvent<UnityEngine.Object>> previousCallback)
-                {
-                    clipField.UnregisterCallback(previousCallback);
-                }
-                EventCallback<ChangeEvent<UnityEngine.Object>> changedCallback = evt =>
-                {
-                    OnClipChanged(index, evt.newValue as AnimationClip, element);
-                };
-                clipField.RegisterCallback(changedCallback);
-                clipField.userData = changedCallback;
-
-                // テスト・パネル未付与環境向けに OnValueAssigned パスも併設する。
-                // BindProperty が値を伝搬する Editor 実機ではこちらは発火せず二重呼び出しは起きない。
-                clipField.OnValueAssigned = newValue =>
-                {
-                    OnClipChanged(index, newValue as AnimationClip, element);
-                };
-
-                RefreshRendererSummary(element, clipProp.objectReferenceValue as AnimationClip);
-            }
-
-            var layerDropdown = element.Q<DropdownField>(ExpressionRowLayerDropdownName);
-            if (layerDropdown != null && layerProp != null)
-            {
-                var choices = BuildSafeChoices(_layerNameChoices, layerProp.stringValue);
-                layerDropdown.choices = choices;
-                layerDropdown.SetValueWithoutNotify(layerProp.stringValue ?? string.Empty);
-                layerDropdown.RegisterValueChangedCallback(evt =>
-                {
-                    serializedObject.Update();
-                    var prop = _expressionsProperty.GetArrayElementAtIndex(index)
-                        .FindPropertyRelative("layer");
-                    if (prop != null)
-                    {
-                        prop.stringValue = evt.newValue ?? string.Empty;
-                        serializedObject.ApplyModifiedProperties();
-                        UpdateValidation();
-                    }
-                });
-            }
-
-            var maskField = element.Q<MaskField>(ExpressionRowMaskFieldName);
-            if (maskField != null && maskProp != null)
-            {
-                var maskChoices = new List<string>(_layerNameChoices.Count);
-                for (int i = 0; i < _layerNameChoices.Count; i++)
-                {
-                    maskChoices.Add(_layerNameChoices[i]);
-                }
-                maskField.choices = maskChoices;
-                int maskValue = ReadMaskValueFromSerializedList(maskProp, _layerNameChoices);
-                maskField.SetValueWithoutNotify(maskValue);
-                maskField.RegisterValueChangedCallback(evt =>
-                {
-                    serializedObject.Update();
-                    var prop = _expressionsProperty.GetArrayElementAtIndex(index)
-                        .FindPropertyRelative("layerOverrideMask");
-                    if (prop != null)
-                    {
-                        WriteMaskValueToSerializedList(prop, evt.newValue, _layerNameChoices);
-                        serializedObject.ApplyModifiedProperties();
-                        UpdateValidation();
-                    }
-                });
-            }
-
-            // 遷移時間スライダー (transitionDuration)。BindProperty で SerializedProperty と双方向バインド。
-            var transitionDurationField = element.Q<Slider>(ExpressionRowTransitionDurationFieldName);
-            if (transitionDurationField != null && transitionDurationProp != null)
-            {
-                transitionDurationField.Unbind();
-                transitionDurationField.BindProperty(transitionDurationProp);
-            }
-
-            UpdateRowValidation(element, clipProp != null ? clipProp.objectReferenceValue as AnimationClip : null,
-                maskProp);
-        }
-
-        private void OnClipChanged(int index, AnimationClip newClip, VisualElement rowElement)
-        {
-            if (_expressionsProperty == null
-                || index < 0
-                || index >= _expressionsProperty.arraySize)
-            {
-                return;
-            }
-
-            serializedObject.Update();
-            var entryProp = _expressionsProperty.GetArrayElementAtIndex(index);
-            var clipProp = entryProp.FindPropertyRelative("animationClip");
-            var nameProp = entryProp.FindPropertyRelative("name");
-
-            if (clipProp != null)
-            {
-                clipProp.objectReferenceValue = newClip;
-            }
-
-            // AnimationClip 名から Name を派生（Req 1.2）
-            if (newClip != null && nameProp != null && string.IsNullOrEmpty(nameProp.stringValue))
-            {
-                nameProp.stringValue = Path.GetFileNameWithoutExtension(newClip.name);
-            }
-
+            RemoveGazeConfigByExpressionId(id);
+            _expressionsProperty.DeleteArrayElementAtIndex(exprIndex);
             serializedObject.ApplyModifiedProperties();
 
-            // RendererPath summary を refresh（Req 4.5）
-            RefreshRendererSummary(rowElement, newClip);
-
-            // Inspector 全体を再描画して name field 等にも反映
-            if (rowElement != null)
-            {
-                var nameField = rowElement.Q<TextField>(ExpressionRowNameFieldName);
-                if (nameField != null && nameProp != null)
-                {
-                    nameField.SetValueWithoutNotify(nameProp.stringValue ?? string.Empty);
-                }
-            }
-
+            RebuildLayersUI();
             UpdateValidation();
         }
 
-        private void RefreshRendererSummary(VisualElement rowElement, AnimationClip clip)
+        // ====================================================================
+        // GazeConfig ヘルパー
+        // ====================================================================
+
+        private int FindGazeConfigIndexByExpressionId(string expressionId)
         {
-            if (rowElement == null)
+            if (_gazeConfigsProperty == null || string.IsNullOrEmpty(expressionId)) return -1;
+            for (int i = 0; i < _gazeConfigsProperty.arraySize; i++)
             {
-                return;
-            }
-            var summary = rowElement.Q<ListView>(ExpressionRowRendererSummaryName);
-            if (summary == null)
-            {
-                return;
-            }
-
-            List<string> rendererPaths = new List<string>();
-            if (clip != null && _sampler != null)
-            {
-                try
+                var cfg = _gazeConfigsProperty.GetArrayElementAtIndex(i);
+                var idP = cfg.FindPropertyRelative("expressionId");
+                if (idP != null && string.Equals(idP.stringValue, expressionId, StringComparison.Ordinal))
                 {
-                    var clipSummary = _sampler.SampleSummary(clip);
-                    if (clipSummary.RendererPaths != null)
-                    {
-                        for (int i = 0; i < clipSummary.RendererPaths.Count; i++)
-                        {
-                            rendererPaths.Add(clipSummary.RendererPaths[i]);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"FacialCharacterSOInspector: SampleSummary に失敗しました: {ex.Message}");
+                    return i;
                 }
             }
-            summary.itemsSource = rendererPaths;
-            summary.makeItem = () => new Label();
-            summary.bindItem = (el, i) =>
-            {
-                if (el is Label label && i >= 0 && i < rendererPaths.Count)
-                {
-                    label.text = rendererPaths[i];
-                }
-            };
-            summary.Rebuild();
-
-            if (clip == null)
-            {
-                summary.headerTitle = "RendererPaths (read-only) - AnimationClip 未割り当て";
-            }
-            else
-            {
-                summary.headerTitle = $"RendererPaths (read-only) - {rendererPaths.Count} 件";
-            }
+            return -1;
         }
 
-        private void AssignDefaultsForNewExpression(int index)
+        private bool HasGazeConfigForExpression(string expressionId)
         {
-            var entryProp = _expressionsProperty.GetArrayElementAtIndex(index);
-            var idProp = entryProp.FindPropertyRelative("id");
-            var nameProp = entryProp.FindPropertyRelative("name");
-            var layerProp = entryProp.FindPropertyRelative("layer");
-
-            if (idProp != null && string.IsNullOrEmpty(idProp.stringValue))
-            {
-                idProp.stringValue = Guid.NewGuid().ToString("N");
-            }
-            if (nameProp != null && string.IsNullOrEmpty(nameProp.stringValue))
-            {
-                nameProp.stringValue = "NewExpression";
-            }
-            if (layerProp != null && string.IsNullOrEmpty(layerProp.stringValue) && _layerNameChoices.Count > 0)
-            {
-                layerProp.stringValue = _layerNameChoices[0];
-            }
+            return FindGazeConfigIndexByExpressionId(expressionId) >= 0;
         }
 
-        private void RebuildExpressionListView()
+        private void AppendGazeConfigForExpression(string expressionId)
         {
-            if (_expressionRowsContainer == null || _expressionsProperty == null)
-            {
-                return;
-            }
-            _expressionRowsContainer.Clear();
-
+            if (_gazeConfigsProperty == null) return;
             serializedObject.Update();
-            int count = _expressionsProperty.arraySize;
-            for (int i = 0; i < count; i++)
+            int newIndex = _gazeConfigsProperty.arraySize;
+            _gazeConfigsProperty.InsertArrayElementAtIndex(newIndex);
+            var cfg = _gazeConfigsProperty.GetArrayElementAtIndex(newIndex);
+            var idP = cfg.FindPropertyRelative("expressionId");
+            if (idP != null) idP.stringValue = expressionId ?? string.Empty;
+            serializedObject.ApplyModifiedProperties();
+        }
+
+        private void RemoveGazeConfigByExpressionId(string expressionId)
+        {
+            if (_gazeConfigsProperty == null || string.IsNullOrEmpty(expressionId)) return;
+            serializedObject.Update();
+            for (int i = _gazeConfigsProperty.arraySize - 1; i >= 0; i--)
             {
-                int capturedIndex = i;
-                var row = CreateExpressionRow();
-
-                var removeButton = new Button(() =>
+                var cfg = _gazeConfigsProperty.GetArrayElementAtIndex(i);
+                var idP = cfg.FindPropertyRelative("expressionId");
+                if (idP != null && string.Equals(idP.stringValue, expressionId, StringComparison.Ordinal))
                 {
-                    serializedObject.Update();
-                    if (capturedIndex >= 0 && capturedIndex < _expressionsProperty.arraySize)
-                    {
-                        _expressionsProperty.DeleteArrayElementAtIndex(capturedIndex);
-                        serializedObject.ApplyModifiedProperties();
-                        RebuildExpressionListView();
-                        UpdateValidation();
-                    }
-                })
-                {
-                    text = "削除",
-                };
-                removeButton.style.alignSelf = Align.FlexEnd;
-                row.Add(removeButton);
-
-                BindExpressionRow(row, capturedIndex);
-                _expressionRowsContainer.Add(row);
+                    _gazeConfigsProperty.DeleteArrayElementAtIndex(i);
+                }
             }
+            serializedObject.ApplyModifiedProperties();
         }
 
         // ====================================================================
-        // Section 6: デバッグ情報 (Debug)
+        // Section: 参照モデル
+        // ====================================================================
+
+        private void BuildReferenceModelSection(VisualElement root)
+        {
+#if UNITY_EDITOR
+            if (_referenceModelProperty == null) return;
+            var foldout = MakeSectionFoldout("facial-character-reference-model-foldout", "参照モデル", open: false);
+            foldout.Add(MakeHelpBox(
+                "BlendShape 名やボーン名の取得元となるモデルを指定します。"
+                + "AnimationClip の RendererPath 検証にも利用されます。"));
+            var refModelField = new PropertyField(_referenceModelProperty, "参照モデル");
+            foldout.Add(refModelField);
+            root.Add(foldout);
+#endif
+        }
+
+        // ====================================================================
+        // Section: デバッグ情報
         // ====================================================================
 
         private void BuildDebugSection(VisualElement root)
         {
-            var foldout = new Foldout
-            {
-                name = DebugFoldoutName,
-                text = "デバッグ情報 (Debug)",
-                value = false,
-            };
-
-            var help = new HelpBox(
-                "現在 SO に保持されているサマリ情報 (読み取り専用)。"
-                + " JSON の自動エクスポート先は StreamingAssets 配下の規約パスです。",
-                HelpBoxMessageType.None);
-            foldout.Add(help);
+            var foldout = MakeSectionFoldout(DebugFoldoutName, "状態", open: false);
 
             _debugSchemaVersionLabel = new Label();
             _debugSchemaVersionLabel.AddToClassList(FacialControlStyles.InfoLabel);
@@ -1075,14 +1093,11 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         private void UpdateDebugLabels()
         {
             var so = target as FacialCharacterSO;
-            if (so == null)
-            {
-                return;
-            }
+            if (so == null) return;
 
             if (_debugSchemaVersionLabel != null)
             {
-                _debugSchemaVersionLabel.text = $"schemaVersion: {(string.IsNullOrEmpty(so.SchemaVersion) ? "(未設定)" : so.SchemaVersion)}";
+                _debugSchemaVersionLabel.text = $"スキーマバージョン: {(string.IsNullOrEmpty(so.SchemaVersion) ? "(未設定)" : so.SchemaVersion)}";
             }
             if (_debugLayerCountLabel != null)
             {
@@ -1090,7 +1105,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             }
             if (_debugExpressionCountLabel != null)
             {
-                _debugExpressionCountLabel.text = $"Expression 数: {(so.Expressions != null ? so.Expressions.Count : 0)}";
+                _debugExpressionCountLabel.text = $"表情数: {(so.Expressions != null ? so.Expressions.Count : 0)}";
             }
             if (_debugJsonPathLabel != null)
             {
@@ -1102,7 +1117,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                         FacialCharacterProfileSO.StreamingAssetsRootFolder,
                         assetName,
                         FacialCharacterProfileSO.ProfileJsonFileName);
-                _debugJsonPathLabel.text = $"自動エクスポート先: {path}";
+                _debugJsonPathLabel.text = $"JSON 出力先: {path}";
             }
         }
 
@@ -1112,56 +1127,55 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
 
         private void UpdateValidation()
         {
-            if (_expressionsProperty == null)
-            {
-                return;
-            }
-
+            if (_expressionsProperty == null) return;
             serializedObject.Update();
 
             var errors = new List<string>();
 
-            // 重複 Id 検出（Req 1.7）
+            // 重複 Id 検出
             var seenIds = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < _expressionsProperty.arraySize; i++)
             {
                 var elem = _expressionsProperty.GetArrayElementAtIndex(i);
                 var idProp = elem.FindPropertyRelative("id");
                 var id = idProp != null ? idProp.stringValue : string.Empty;
-                if (string.IsNullOrEmpty(id))
-                {
-                    continue;
-                }
+                if (string.IsNullOrEmpty(id)) continue;
                 if (!seenIds.Add(id))
                 {
-                    errors.Add($"Expression Id '{id}' が重複しています (Req 1.7)。");
+                    errors.Add($"表情 ID '{id}' が重複しています。");
                 }
             }
 
-            // AnimationClip null + zero LayerOverrideMask 検出
+            // 各 Layer のマスク空チェック
+            if (_layersProperty != null)
+            {
+                for (int i = 0; i < _layersProperty.arraySize; i++)
+                {
+                    var l = _layersProperty.GetArrayElementAtIndex(i);
+                    var maskP = l.FindPropertyRelative("layerOverrideMask");
+                    if (maskP != null && maskP.isArray && maskP.arraySize == 0)
+                    {
+                        var nameP = l.FindPropertyRelative("name");
+                        var lname = nameP != null ? nameP.stringValue : $"layer{i}";
+                        errors.Add($"レイヤー '{lname}' の上書き対象が未設定です。");
+                    }
+                }
+            }
+
+            // AnimationClip null タリー (kind=AnimationClip のみ)
             int nullClipCount = 0;
-            int zeroMaskCount = 0;
             for (int i = 0; i < _expressionsProperty.arraySize; i++)
             {
                 var elem = _expressionsProperty.GetArrayElementAtIndex(i);
-                var clipProp = elem.FindPropertyRelative("animationClip");
-                var maskProp = elem.FindPropertyRelative("layerOverrideMask");
-                if (clipProp != null && clipProp.objectReferenceValue == null)
-                {
-                    nullClipCount++;
-                }
-                if (maskProp != null && maskProp.isArray && maskProp.arraySize == 0)
-                {
-                    zeroMaskCount++;
-                }
+                var kindP = elem.FindPropertyRelative("kind");
+                int kindValue = kindP != null ? kindP.enumValueIndex : 0;
+                if (kindValue != (int)ExpressionKind.AnimationClip) continue;
+                var clipP = elem.FindPropertyRelative("animationClip");
+                if (clipP != null && clipP.objectReferenceValue == null) nullClipCount++;
             }
             if (nullClipCount > 0)
             {
-                errors.Add($"AnimationClip が未割当の Expression が {nullClipCount} 件あります (Req 1.6)。");
-            }
-            if (zeroMaskCount > 0)
-            {
-                errors.Add($"LayerOverrideMask が空 (zero) の Expression が {zeroMaskCount} 件あります (Req 3.5)。");
+                errors.Add($"AnimationClip が未割当の表情が {nullClipCount} 件あります。");
             }
 
             if (_expressionsValidationHelp != null)
@@ -1178,55 +1192,91 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 }
             }
 
-            if (_saveButton != null)
+            // 各行 validation
+            if (_layersContainer != null)
             {
-                _saveButton.SetEnabled(errors.Count == 0);
+                UpdateAllRowValidations();
             }
+        }
 
-            // 各行の HelpBox 状態を更新
-            if (_expressionRowsContainer != null)
+        private void UpdateAllRowValidations()
+        {
+            for (int i = 0; i < _layersProperty.arraySize; i++)
             {
-                for (int i = 0; i < _expressionRowsContainer.childCount && i < _expressionsProperty.arraySize; i++)
+                var lp = _layersProperty.GetArrayElementAtIndex(i);
+                var nameP = lp.FindPropertyRelative("name");
+                if (nameP == null) continue;
+                var layerName = nameP.stringValue ?? string.Empty;
+
+                var container = _layersContainer.Q<VisualElement>($"layer-expressions-{i}");
+                if (container == null) continue;
+
+                int rowIdx = 0;
+                for (int j = 0; j < _expressionsProperty.arraySize; j++)
                 {
-                    var rowElem = _expressionRowsContainer[i];
-                    var entryProp = _expressionsProperty.GetArrayElementAtIndex(i);
-                    var clipProp = entryProp.FindPropertyRelative("animationClip");
-                    var maskProp = entryProp.FindPropertyRelative("layerOverrideMask");
-                    UpdateRowValidation(rowElem,
-                        clipProp != null ? clipProp.objectReferenceValue as AnimationClip : null,
-                        maskProp);
+                    var ep = _expressionsProperty.GetArrayElementAtIndex(j);
+                    var lP = ep.FindPropertyRelative("layer");
+                    if (lP == null) continue;
+                    if (!string.Equals(lP.stringValue, layerName, StringComparison.Ordinal)) continue;
+
+                    if (rowIdx < container.childCount)
+                    {
+                        UpdateRowValidation(container[rowIdx], j);
+                    }
+                    rowIdx++;
                 }
             }
         }
 
-        private void UpdateRowValidation(VisualElement rowElement, AnimationClip clip, SerializedProperty maskProp)
+        private void UpdateRowValidation(VisualElement rowElement, int exprIndex)
         {
-            if (rowElement == null)
-            {
-                return;
-            }
+            if (rowElement == null) return;
             var help = rowElement.Q<HelpBox>(ExpressionRowValidationHelpName);
-            if (help == null)
-            {
-                return;
-            }
-            var messages = new List<string>();
-            if (clip == null)
-            {
-                messages.Add("AnimationClip が未割り当てです (Req 1.6)。");
-            }
-            bool maskIsZero = maskProp != null && maskProp.isArray && maskProp.arraySize == 0;
-            if (maskIsZero)
-            {
-                messages.Add("LayerOverrideMask が空です (Req 3.5)。少なくとも 1 つのレイヤーを選択してください。");
-            }
+            if (help == null) return;
 
-            // 参照モデルが設定されている場合、AnimationClip の rendererPath が
-            // モデル内の SkinnedMeshRenderer 階層と一致するか検証する（path mismatch の早期検出）
-            var mismatchMessage = BuildRendererPathMismatchMessage(clip);
-            if (!string.IsNullOrEmpty(mismatchMessage))
+            var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
+            var kindProp = entryProp.FindPropertyRelative("kind");
+            var clipProp = entryProp.FindPropertyRelative("animationClip");
+            var idProp = entryProp.FindPropertyRelative("id");
+
+            ExpressionKind kind = kindProp != null ? (ExpressionKind)kindProp.enumValueIndex : ExpressionKind.AnimationClip;
+
+            var messages = new List<string>();
+            if (kind == ExpressionKind.AnimationClip)
             {
-                messages.Add(mismatchMessage);
+                if (clipProp == null || clipProp.objectReferenceValue == null)
+                {
+                    messages.Add("AnimationClip が未割り当てです。");
+                }
+                var mismatchMessage = BuildRendererPathMismatchMessage(clipProp != null ? clipProp.objectReferenceValue as AnimationClip : null);
+                if (!string.IsNullOrEmpty(mismatchMessage)) messages.Add(mismatchMessage);
+            }
+            else if (kind == ExpressionKind.EyeLook)
+            {
+                int cfgIndex = FindGazeConfigIndexByExpressionId(idProp != null ? idProp.stringValue : string.Empty);
+                if (cfgIndex < 0)
+                {
+                    messages.Add("EyeLook 設定が見つかりません。");
+                }
+                else
+                {
+                    var cfgProp = _gazeConfigsProperty.GetArrayElementAtIndex(cfgIndex);
+                    var actionProp = cfgProp.FindPropertyRelative("inputAction");
+                    if (actionProp == null || actionProp.objectReferenceValue == null)
+                    {
+                        messages.Add("InputAction (Vector2) が未割り当てです。");
+                    }
+                    bool anyBs = false;
+                    foreach (var fname in new[] { "leftEyeXBlendShape", "leftEyeYBlendShape", "rightEyeXBlendShape", "rightEyeYBlendShape" })
+                    {
+                        var p = cfgProp.FindPropertyRelative(fname);
+                        if (p != null && !string.IsNullOrWhiteSpace(p.stringValue)) { anyBs = true; break; }
+                    }
+                    if (!anyBs)
+                    {
+                        messages.Add("駆動する BlendShape 名が 1 つも設定されていません。");
+                    }
+                }
             }
 
             if (messages.Count == 0)
@@ -1241,6 +1291,100 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             }
         }
 
+        private void OnClipChanged(int index, AnimationClip newClip, VisualElement rowElement)
+        {
+            if (_expressionsProperty == null
+                || index < 0
+                || index >= _expressionsProperty.arraySize)
+            {
+                return;
+            }
+
+            serializedObject.Update();
+            var entryProp = _expressionsProperty.GetArrayElementAtIndex(index);
+            var clipProp = entryProp.FindPropertyRelative("animationClip");
+            var nameProp = entryProp.FindPropertyRelative("name");
+
+            if (clipProp != null) clipProp.objectReferenceValue = newClip;
+
+            if (newClip != null && nameProp != null && string.IsNullOrEmpty(nameProp.stringValue))
+            {
+                nameProp.stringValue = ResolveAnimationClipFileName(newClip);
+            }
+            serializedObject.ApplyModifiedProperties();
+
+            RefreshRendererSummary(rowElement, newClip);
+            if (rowElement != null)
+            {
+                var nameField = rowElement.Q<TextField>(ExpressionRowNameFieldName);
+                if (nameField != null && nameProp != null)
+                {
+                    nameField.SetValueWithoutNotify(nameProp.stringValue ?? string.Empty);
+                }
+                var clipField = rowElement.Q<ExpressionClipObjectField>(ExpressionRowClipFieldName);
+                if (clipField != null) clipField.RefreshDisplayLabel();
+
+                UpdateRowValidation(rowElement, index);
+            }
+        }
+
+        private static string ResolveAnimationClipFileName(AnimationClip clip)
+        {
+            if (clip == null) return string.Empty;
+            var path = AssetDatabase.GetAssetPath(clip);
+            if (!string.IsNullOrEmpty(path))
+            {
+                return Path.GetFileNameWithoutExtension(path);
+            }
+            return clip.name;
+        }
+
+        private void RefreshRendererSummary(VisualElement rowElement, AnimationClip clip)
+        {
+            if (rowElement == null) return;
+            var summary = rowElement.Q<ListView>(ExpressionRowRendererSummaryName);
+            if (summary == null) return;
+
+            List<string> rendererPaths = new List<string>();
+            if (clip != null && _sampler != null)
+            {
+                try
+                {
+                    var clipSummary = _sampler.SampleSummary(clip);
+                    if (clipSummary.RendererPaths != null)
+                    {
+                        for (int i = 0; i < clipSummary.RendererPaths.Count; i++)
+                        {
+                            rendererPaths.Add(clipSummary.RendererPaths[i]);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"FacialCharacterSOInspector: SampleSummary に失敗: {ex.Message}");
+                }
+            }
+            summary.itemsSource = rendererPaths;
+            summary.makeItem = () => new Label();
+            summary.bindItem = (el, i) =>
+            {
+                if (el is Label label && i >= 0 && i < rendererPaths.Count)
+                {
+                    label.text = rendererPaths[i];
+                }
+            };
+            summary.Rebuild();
+
+            if (clip == null)
+            {
+                summary.headerTitle = "影響する SkinnedMeshRenderer (AnimationClip 未割当)";
+            }
+            else
+            {
+                summary.headerTitle = $"影響する SkinnedMeshRenderer ({rendererPaths.Count} 件)";
+            }
+        }
+
         // ====================================================================
         // 共通 ListView ビルダ
         // ====================================================================
@@ -1252,10 +1396,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             Action<VisualElement, int> bindItem)
         {
             var indexProxy = new List<int>();
-            for (int i = 0; i < arrayProperty.arraySize; i++)
-            {
-                indexProxy.Add(i);
-            }
+            for (int i = 0; i < arrayProperty.arraySize; i++) indexProxy.Add(i);
 
             var listView = new ListView
             {
@@ -1277,16 +1418,12 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             {
                 serializedObject.Update();
                 int addCount = 0;
-                foreach (var _ in indices)
-                {
-                    addCount++;
-                }
+                foreach (var _ in indices) addCount++;
                 arrayProperty.arraySize += addCount;
                 serializedObject.ApplyModifiedProperties();
                 RebuildIndexProxy(indexProxy, arrayProperty);
                 listView.Rebuild();
             };
-
             listView.itemsRemoved += indices =>
             {
                 serializedObject.Update();
@@ -1311,10 +1448,12 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         private static void RebuildIndexProxy(List<int> indexProxy, SerializedProperty arrayProperty)
         {
             indexProxy.Clear();
-            for (int i = 0; i < arrayProperty.arraySize; i++)
-            {
-                indexProxy.Add(i);
-            }
+            for (int i = 0; i < arrayProperty.arraySize; i++) indexProxy.Add(i);
+        }
+
+        private void RebuildExpressionBindingsListView()
+        {
+            _expressionBindingsListView?.Rebuild();
         }
 
         // ====================================================================
@@ -1324,38 +1463,26 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         private void RefreshLayerNameChoices()
         {
             _layerNameChoices.Clear();
-            if (_layersProperty == null)
-            {
-                return;
-            }
+            if (_layersProperty == null) return;
             for (int i = 0; i < _layersProperty.arraySize; i++)
             {
                 var elem = _layersProperty.GetArrayElementAtIndex(i);
                 var nameProp = elem.FindPropertyRelative("name");
                 var name = nameProp != null ? nameProp.stringValue : null;
-                if (!string.IsNullOrEmpty(name))
-                {
-                    _layerNameChoices.Add(name);
-                }
+                if (!string.IsNullOrEmpty(name)) _layerNameChoices.Add(name);
             }
         }
 
         private void RefreshActionMapChoices()
         {
-            if (_actionMapDropdown == null || _inputActionAssetProperty == null)
-            {
-                return;
-            }
+            if (_actionMapDropdown == null || _inputActionAssetProperty == null) return;
             var asset = _inputActionAssetProperty.objectReferenceValue as InputActionAsset;
             var choices = new List<string>();
             if (asset != null)
             {
                 foreach (var map in asset.actionMaps)
                 {
-                    if (!string.IsNullOrEmpty(map.name))
-                    {
-                        choices.Add(map.name);
-                    }
+                    if (!string.IsNullOrEmpty(map.name)) choices.Add(map.name);
                 }
             }
             _actionMapDropdown.choices = choices;
@@ -1378,41 +1505,23 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         private void RefreshActionNameChoices()
         {
             _actionNameChoices.Clear();
-            if (_inputActionAssetProperty == null || _actionMapNameProperty == null)
-            {
-                return;
-            }
+            if (_inputActionAssetProperty == null || _actionMapNameProperty == null) return;
             var asset = _inputActionAssetProperty.objectReferenceValue as InputActionAsset;
-            if (asset == null)
-            {
-                return;
-            }
+            if (asset == null) return;
             var mapName = _actionMapNameProperty.stringValue;
-            if (string.IsNullOrEmpty(mapName))
-            {
-                return;
-            }
+            if (string.IsNullOrEmpty(mapName)) return;
             var map = asset.FindActionMap(mapName);
-            if (map == null)
-            {
-                return;
-            }
+            if (map == null) return;
             foreach (var action in map.actions)
             {
-                if (!string.IsNullOrEmpty(action.name))
-                {
-                    _actionNameChoices.Add(action.name);
-                }
+                if (!string.IsNullOrEmpty(action.name)) _actionNameChoices.Add(action.name);
             }
         }
 
         private List<string> CollectExpressionIds()
         {
             var ids = new List<string>();
-            if (_expressionsProperty == null)
-            {
-                return ids;
-            }
+            if (_expressionsProperty == null) return ids;
             for (int i = 0; i < _expressionsProperty.arraySize; i++)
             {
                 var elem = _expressionsProperty.GetArrayElementAtIndex(i);
@@ -1431,10 +1540,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             result.Add(string.Empty);
             for (int i = 0; i < baseChoices.Count; i++)
             {
-                if (!result.Contains(baseChoices[i]))
-                {
-                    result.Add(baseChoices[i]);
-                }
+                if (!result.Contains(baseChoices[i])) result.Add(baseChoices[i]);
             }
             if (!string.IsNullOrEmpty(currentValue) && !result.Contains(currentValue))
             {
@@ -1447,26 +1553,16 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         // Mask <-> List<string> 変換
         // ====================================================================
 
-        /// <summary>
-        /// LayerOverrideMask の永続化形式 (List&lt;string&gt; layerOverrideMask) から MaskField 値を読み取る。
-        /// Layers の宣言順を bit position として用いる。
-        /// </summary>
         private static int ReadMaskValueFromSerializedList(SerializedProperty listProp, IReadOnlyList<string> orderedLayerNames)
         {
-            if (listProp == null || !listProp.isArray || orderedLayerNames == null || orderedLayerNames.Count == 0)
-            {
-                return 0;
-            }
+            if (listProp == null || !listProp.isArray || orderedLayerNames == null || orderedLayerNames.Count == 0) return 0;
             int result = 0;
             int maxBits = orderedLayerNames.Count > 32 ? 32 : orderedLayerNames.Count;
             for (int i = 0; i < listProp.arraySize; i++)
             {
                 var elem = listProp.GetArrayElementAtIndex(i);
                 var name = elem.stringValue;
-                if (string.IsNullOrEmpty(name))
-                {
-                    continue;
-                }
+                if (string.IsNullOrEmpty(name)) continue;
                 for (int b = 0; b < maxBits; b++)
                 {
                     if (string.Equals(orderedLayerNames[b], name, StringComparison.Ordinal))
@@ -1479,50 +1575,11 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             return result;
         }
 
-        /// <summary>
-        /// パネル未付与の Inspector でも値変更を検知できる ObjectField サブクラス。
-        /// <see cref="UnityEngine.UIElements.BaseField{TValueType}.value"/> setter は panel が無いと
-        /// ChangeEvent を dispatch しないため、<c>RegisterValueChangedCallback</c> は発火しない。
-        /// 本サブクラスは <see cref="SetValueWithoutNotify"/> 経路で
-        /// <see cref="OnValueAssigned"/> を呼出し、テスト・Editor 双方で動作するようにする。
-        /// <para>
-        /// Phase 5.x: AnimationClip 差し替え後にラベル表示が古い名前のまま残る問題を修正するため、
-        /// 値が変化した際に <see cref="VisualElement.MarkDirtyRepaint"/> を明示的に呼び出して
-        /// 内部ラベルの再描画を強制する。
-        /// </para>
-        /// </summary>
-        private sealed class ExpressionClipObjectField : ObjectField
-        {
-            public Action<UnityEngine.Object> OnValueAssigned;
-
-            public override void SetValueWithoutNotify(UnityEngine.Object newValue)
-            {
-                var previous = value;
-                base.SetValueWithoutNotify(newValue);
-                if (!ReferenceEquals(previous, newValue))
-                {
-                    // ObjectField の内部ラベル（"clipName (AnimationClip)"）が古いキャッシュを
-                    // 表示し続けるケースがあるため、明示的に再描画をスケジュールする。
-                    MarkDirtyRepaint();
-                    OnValueAssigned?.Invoke(newValue);
-                }
-            }
-        }
-
-        /// <summary>
-        /// MaskField 値 (int) を LayerOverrideMask 永続化形式 (List&lt;string&gt;) に書き戻す。
-        /// </summary>
         private static void WriteMaskValueToSerializedList(SerializedProperty listProp, int maskValue, IReadOnlyList<string> orderedLayerNames)
         {
-            if (listProp == null || !listProp.isArray)
-            {
-                return;
-            }
+            if (listProp == null || !listProp.isArray) return;
             listProp.ClearArray();
-            if (orderedLayerNames == null || orderedLayerNames.Count == 0 || maskValue == 0)
-            {
-                return;
-            }
+            if (orderedLayerNames == null || orderedLayerNames.Count == 0 || maskValue == 0) return;
             int maxBits = orderedLayerNames.Count > 32 ? 32 : orderedLayerNames.Count;
             for (int b = 0; b < maxBits; b++)
             {
@@ -1535,85 +1592,54 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             }
         }
 
-        /// <summary>
-        /// AnimationClip の rendererPath を参照モデル (<see cref="FacialCharacterProfileSO.ReferenceModel"/>) 内の
-        /// SkinnedMeshRenderer 階層と照合し、不一致があれば警告メッセージを返す。
-        /// 参照モデル未設定 / clip 未割当 / 完全一致のときは <c>null</c>。
-        /// </summary>
+        // ====================================================================
+        // RendererPath mismatch 判定 (AnimationClip)
+        // ====================================================================
+
         private string BuildRendererPathMismatchMessage(AnimationClip clip)
         {
-            if (clip == null || _sampler == null)
-            {
-                return null;
-            }
+            if (clip == null || _sampler == null) return null;
             var profileSO = target as FacialCharacterProfileSO;
             var referenceModel = profileSO != null ? profileSO.ReferenceModel : null;
-            if (referenceModel == null)
-            {
-                return null;
-            }
+            if (referenceModel == null) return null;
 
             HashSet<string> modelPaths;
-            try
-            {
-                modelPaths = CollectReferenceModelRendererPaths(referenceModel);
-            }
-            catch (Exception)
-            {
-                return null;
-            }
+            try { modelPaths = CollectReferenceModelRendererPaths(referenceModel); }
+            catch (Exception) { return null; }
             if (modelPaths.Count == 0)
             {
-                return $"参照モデル '{referenceModel.name}' に SkinnedMeshRenderer が見つかりません。BlendShape 入りメッシュを含むモデルを割り当ててください。";
+                return $"参照モデル '{referenceModel.name}' に SkinnedMeshRenderer が見つかりません。";
             }
 
             List<string> rendererPaths;
             try
             {
                 var summary = _sampler.SampleSummary(clip);
-                rendererPaths = summary.RendererPaths != null
-                    ? new List<string>(summary.RendererPaths)
-                    : new List<string>();
+                rendererPaths = summary.RendererPaths != null ? new List<string>(summary.RendererPaths) : new List<string>();
             }
-            catch (Exception)
-            {
-                return null;
-            }
+            catch (Exception) { return null; }
 
             var invalid = new List<string>();
             for (int i = 0; i < rendererPaths.Count; i++)
             {
                 var path = rendererPaths[i] ?? string.Empty;
-                if (!modelPaths.Contains(path))
-                {
-                    invalid.Add(string.IsNullOrEmpty(path) ? "(ルート)" : path);
-                }
+                if (!modelPaths.Contains(path)) invalid.Add(string.IsNullOrEmpty(path) ? "(ルート)" : path);
             }
-            if (invalid.Count == 0)
-            {
-                return null;
-            }
+            if (invalid.Count == 0) return null;
 
-            return $"AnimationClip の RendererPath [{string.Join(", ", invalid)}] が参照モデル '{referenceModel.name}' 内の SkinnedMeshRenderer と一致しません。"
-                + $" 参照モデル内の候補: [{string.Join(", ", modelPaths)}]。"
-                + " 'FacialControl > Expression 作成' ウィンドウに参照モデルを割り当てて AnimationClip を再ベイクしてください。";
+            return $"AnimationClip の RendererPath [{string.Join(", ", invalid)}] が参照モデル内の SkinnedMeshRenderer と一致しません。"
+                + $" 参照モデル候補: [{string.Join(", ", modelPaths)}]";
         }
 
         private static HashSet<string> CollectReferenceModelRendererPaths(GameObject model)
         {
             var result = new HashSet<string>(StringComparer.Ordinal);
-            if (model == null)
-            {
-                return result;
-            }
+            if (model == null) return result;
             var renderers = model.GetComponentsInChildren<SkinnedMeshRenderer>(includeInactive: true);
             for (int i = 0; i < renderers.Length; i++)
             {
                 var smr = renderers[i];
-                if (smr == null || smr.sharedMesh == null || smr.sharedMesh.blendShapeCount == 0)
-                {
-                    continue;
-                }
+                if (smr == null || smr.sharedMesh == null || smr.sharedMesh.blendShapeCount == 0) continue;
                 var path = AnimationUtility.CalculateTransformPath(smr.transform, model.transform) ?? string.Empty;
                 result.Add(path);
             }
@@ -1621,14 +1647,65 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         }
 
         // ====================================================================
-        // AssetPostprocessor: InputActionAsset 編集追従
+        // AnimationClip 表示用 ObjectField
         // ====================================================================
 
         /// <summary>
-        /// .inputactions アセットの再 import を検知して、開いている FacialCharacterSOInspector の
-        /// Action 名候補リストを再読込する。Inspector を閉じずに Action / ActionMap を編集しても
-        /// ドロップダウンが古いまま残る問題（Phase 5.x）への対応。
+        /// AnimationClip 名ではなく、プロジェクトのファイル名（拡張子なし）を表示するカスタム ObjectField。
+        /// AnimationClip を複製・編集した場合に object 名がファイル名と一致しなくなる Unity の挙動を回避する。
         /// </summary>
+        private sealed class ExpressionClipObjectField : ObjectField
+        {
+            public Action<UnityEngine.Object> OnValueAssigned;
+
+            public override void SetValueWithoutNotify(UnityEngine.Object newValue)
+            {
+                var previous = value;
+                base.SetValueWithoutNotify(newValue);
+                if (!ReferenceEquals(previous, newValue))
+                {
+                    MarkDirtyRepaint();
+                    OnValueAssigned?.Invoke(newValue);
+                }
+                RefreshDisplayLabel();
+            }
+
+            public void RefreshDisplayLabel()
+            {
+                var clip = value as AnimationClip;
+                var labelToSet = ResolveDisplayLabel(clip);
+                if (string.IsNullOrEmpty(labelToSet)) return;
+
+                // ObjectField 内部の表示テキスト要素を ".unity-object-field-display__label" で取得して上書き
+                var displayLabel = this.Q<Label>(className: "unity-object-field-display__label");
+                if (displayLabel != null)
+                {
+                    displayLabel.text = labelToSet;
+                }
+            }
+
+            private static string ResolveDisplayLabel(AnimationClip clip)
+            {
+                if (clip == null) return string.Empty;
+                var path = AssetDatabase.GetAssetPath(clip);
+                if (string.IsNullOrEmpty(path)) return clip.name;
+                var fileName = Path.GetFileNameWithoutExtension(path);
+                return string.IsNullOrEmpty(fileName) ? clip.name : fileName;
+            }
+        }
+
+        // ====================================================================
+        // AssetPostprocessor: InputActionAsset 編集追従
+        // ====================================================================
+
+        private void RefreshActionChoicesFromExternalEdit()
+        {
+            try { serializedObject.Update(); } catch (Exception) { return; }
+            RefreshActionMapChoices();
+            RefreshActionNameChoices();
+            RebuildExpressionBindingsListView();
+        }
+
         private sealed class InputActionAssetChangeWatcher : AssetPostprocessor
         {
             private static void OnPostprocessAllAssets(
@@ -1637,50 +1714,28 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 string[] movedAssets,
                 string[] movedFromAssetPaths)
             {
-                if (_activeInspectors.Count == 0)
-                {
-                    return;
-                }
-                if (importedAssets == null || importedAssets.Length == 0)
-                {
-                    return;
-                }
+                if (_activeInspectors.Count == 0) return;
+                if (importedAssets == null || importedAssets.Length == 0) return;
 
-                // imported に .inputactions が含まれるか走査。
                 var importedInputActionPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 for (int i = 0; i < importedAssets.Length; i++)
                 {
                     var path = importedAssets[i];
-                    if (string.IsNullOrEmpty(path))
-                    {
-                        continue;
-                    }
+                    if (string.IsNullOrEmpty(path)) continue;
                     if (path.EndsWith(".inputactions", StringComparison.OrdinalIgnoreCase))
                     {
                         importedInputActionPaths.Add(path);
                     }
                 }
-                if (importedInputActionPaths.Count == 0)
-                {
-                    return;
-                }
+                if (importedInputActionPaths.Count == 0) return;
 
-                // 各アクティブ Inspector を走査し、参照中の InputActionAsset が更新対象に
-                // 含まれていれば Refresh をかける。リスト走査中の collection mutation を避けるため
-                // スナップショットを取る。
                 var snapshot = new List<FacialCharacterSOInspector>(_activeInspectors);
                 for (int i = 0; i < snapshot.Count; i++)
                 {
                     var inspector = snapshot[i];
-                    if (inspector == null)
-                    {
-                        continue;
-                    }
+                    if (inspector == null) continue;
                     var currentPath = inspector.GetCurrentInputActionAssetPath();
-                    if (string.IsNullOrEmpty(currentPath))
-                    {
-                        continue;
-                    }
+                    if (string.IsNullOrEmpty(currentPath)) continue;
                     if (importedInputActionPaths.Contains(currentPath))
                     {
                         inspector.RefreshActionChoicesFromExternalEdit();

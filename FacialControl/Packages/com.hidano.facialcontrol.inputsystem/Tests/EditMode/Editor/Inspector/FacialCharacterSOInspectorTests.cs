@@ -110,7 +110,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Editor.Inspector
             return clip;
         }
 
-        private void EnsureLayerExists(string layerName)
+        private void EnsureLayerExists(string layerName, params string[] overrideLayers)
         {
             var so = new SerializedObject(_so);
             var layersProp = so.FindProperty("_layers");
@@ -120,10 +120,24 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Editor.Inspector
             if (nameProp != null) nameProp.stringValue = layerName;
             var priorityProp = elem.FindPropertyRelative("priority");
             if (priorityProp != null) priorityProp.intValue = 0;
+
+            var maskProp = elem.FindPropertyRelative("layerOverrideMask");
+            if (maskProp != null)
+            {
+                maskProp.ClearArray();
+                if (overrideLayers != null)
+                {
+                    for (int i = 0; i < overrideLayers.Length; i++)
+                    {
+                        maskProp.InsertArrayElementAtIndex(i);
+                        maskProp.GetArrayElementAtIndex(i).stringValue = overrideLayers[i];
+                    }
+                }
+            }
             so.ApplyModifiedProperties();
         }
 
-        private void AddExpression(string id, AnimationClip clip, string layer, params string[] overrideLayers)
+        private void AddExpression(string id, AnimationClip clip, string layer)
         {
             var so = new SerializedObject(_so);
             var expressions = so.FindProperty("_expressions");
@@ -133,17 +147,6 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Editor.Inspector
             elem.FindPropertyRelative("name").stringValue = clip != null ? clip.name : string.Empty;
             elem.FindPropertyRelative("layer").stringValue = layer ?? string.Empty;
             elem.FindPropertyRelative("animationClip").objectReferenceValue = clip;
-
-            var maskProp = elem.FindPropertyRelative("layerOverrideMask");
-            maskProp.ClearArray();
-            if (overrideLayers != null)
-            {
-                for (int i = 0; i < overrideLayers.Length; i++)
-                {
-                    maskProp.InsertArrayElementAtIndex(i);
-                    maskProp.GetArrayElementAtIndex(i).stringValue = overrideLayers[i];
-                }
-            }
             so.ApplyModifiedProperties();
         }
 
@@ -177,9 +180,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Editor.Inspector
             {
                 "facial-character-input-foldout",
                 "facial-character-expression-bindings-foldout",
-                "facial-character-analog-bindings-foldout",
                 "facial-character-layers-foldout",
-                "facial-character-expressions-foldout",
                 "facial-character-debug-foldout",
             };
             foreach (var name in expectedFoldoutNames)
@@ -194,11 +195,11 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Editor.Inspector
         // ----------------------------------------------------------------
 
         [Test]
-        public void AnimationClipNull_DisplaysValidationError_AndDisablesSave()
+        public void AnimationClipNull_DisplaysValidationError()
         {
-            EnsureLayerExists("emotion");
-            // AnimationClip を null のままで Expression を追加（mask は埋めて他のエラーを排除）
-            AddExpression("expr-id-A", clip: null, layer: "emotion", overrideLayers: new[] { "emotion" });
+            EnsureLayerExists("emotion", overrideLayers: new[] { "emotion" });
+            // AnimationClip を null のままで Expression を追加
+            AddExpression("expr-id-A", clip: null, layer: "emotion");
 
             var root = CreateInspectorGuiAndReturnRoot();
 
@@ -206,10 +207,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Editor.Inspector
             Assert.IsNotNull(helpBox, "Expression セクションに validation HelpBox が必要です。");
             Assert.AreEqual(DisplayStyle.Flex, helpBox.style.display.value,
                 "AnimationClip が null の Expression があるとき HelpBox は表示されるべきです。");
-
-            var saveButton = root.Q<Button>(name: "facial-character-save-button");
-            Assert.IsNotNull(saveButton, "Save ボタンが見つかりません。");
-            Assert.IsFalse(saveButton.enabledSelf, "validation エラー時は Save ボタンが disabled であるべきです。");
+            StringAssert.Contains("AnimationClip", helpBox.text);
         }
 
         // ----------------------------------------------------------------
@@ -217,14 +215,14 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Editor.Inspector
         // ----------------------------------------------------------------
 
         [Test]
-        public void DuplicateId_DisplaysValidationError_AndDisablesSave()
+        public void DuplicateId_DisplaysValidationError()
         {
-            EnsureLayerExists("emotion");
+            EnsureLayerExists("emotion", overrideLayers: new[] { "emotion" });
             var clipA = CreateBlendShapeAnimationClip("ClipA", string.Empty, "Smile", 0.5f);
             var clipB = CreateBlendShapeAnimationClip("ClipB", string.Empty, "Smile", 0.7f);
 
-            AddExpression("dup-id", clipA, "emotion", "emotion");
-            AddExpression("dup-id", clipB, "emotion", "emotion");
+            AddExpression("dup-id", clipA, "emotion");
+            AddExpression("dup-id", clipB, "emotion");
 
             var root = CreateInspectorGuiAndReturnRoot();
 
@@ -233,36 +231,28 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Editor.Inspector
             Assert.AreEqual(DisplayStyle.Flex, helpBox.style.display.value,
                 "Id が重複しているとき HelpBox は表示されるべきです。");
             StringAssert.Contains("dup-id", helpBox.text);
-
-            var saveButton = root.Q<Button>(name: "facial-character-save-button");
-            Assert.IsNotNull(saveButton);
-            Assert.IsFalse(saveButton.enabledSelf,
-                "validation エラー時は Save ボタンが disabled であるべきです。");
         }
 
         // ----------------------------------------------------------------
-        // 3. Zero LayerOverrideMask → validation エラー
+        // 3. レイヤーの上書き対象が空 → validation エラー
         // ----------------------------------------------------------------
 
         [Test]
         public void ZeroLayerOverrideMask_DisplaysValidationError()
         {
-            EnsureLayerExists("emotion");
+            // mask 未設定でレイヤーを追加
+            EnsureLayerExists("emotion", overrideLayers: new string[0]);
             var clip = CreateBlendShapeAnimationClip("ClipZero", string.Empty, "Smile", 0.5f);
 
-            // overrideLayers を空にする → zero LayerOverrideMask
-            AddExpression("expr-zero", clip, "emotion", new string[0]);
+            AddExpression("expr-zero", clip, "emotion");
 
             var root = CreateInspectorGuiAndReturnRoot();
 
             var helpBox = root.Q<HelpBox>(name: "facial-character-expressions-validation");
             Assert.IsNotNull(helpBox);
             Assert.AreEqual(DisplayStyle.Flex, helpBox.style.display.value,
-                "LayerOverrideMask が空の Expression があるとき HelpBox は表示されるべきです。");
-
-            var saveButton = root.Q<Button>(name: "facial-character-save-button");
-            Assert.IsNotNull(saveButton);
-            Assert.IsFalse(saveButton.enabledSelf);
+                "Layer の layerOverrideMask が空のとき HelpBox は表示されるべきです。");
+            StringAssert.Contains("emotion", helpBox.text);
         }
 
         // ----------------------------------------------------------------
@@ -272,9 +262,9 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Editor.Inspector
         [Test]
         public void NewExpression_GeneratesGuidId()
         {
-            EnsureLayerExists("emotion");
+            EnsureLayerExists("emotion", overrideLayers: new[] { "emotion" });
             // Id を空文字で Expression を追加
-            AddExpression(string.Empty, clip: null, layer: "emotion", overrideLayers: new[] { "emotion" });
+            AddExpression(string.Empty, clip: null, layer: "emotion");
 
             var root = CreateInspectorGuiAndReturnRoot();
 
@@ -299,10 +289,10 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Editor.Inspector
         [Test]
         public void AnimationClipChanged_RefreshesRendererPathSummary()
         {
-            EnsureLayerExists("emotion");
+            EnsureLayerExists("emotion", overrideLayers: new[] { "emotion" });
             var clip1 = CreateBlendShapeAnimationClip("ClipR1", "Body/Face", "Smile", 0.5f);
 
-            AddExpression("expr-r", clip1, "emotion", "emotion");
+            AddExpression("expr-r", clip1, "emotion");
 
             var root = CreateInspectorGuiAndReturnRoot();
 
@@ -322,9 +312,9 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Editor.Inspector
         [Test]
         public void AnimationClipAssigned_PopulatesNameFromFileName()
         {
-            EnsureLayerExists("emotion");
+            EnsureLayerExists("emotion", overrideLayers: new[] { "emotion" });
             // Name を空にして Expression を追加し、AnimationClip を割り当てる
-            AddExpression("expr-name", clip: null, layer: "emotion", overrideLayers: new[] { "emotion" });
+            AddExpression("expr-name", clip: null, layer: "emotion");
             var so = new SerializedObject(_so);
             var nameProp = so.FindProperty("_expressions").GetArrayElementAtIndex(0).FindPropertyRelative("name");
             nameProp.stringValue = string.Empty;

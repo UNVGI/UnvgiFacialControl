@@ -96,47 +96,11 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Trigger11",
+                    "name": "Look",
                     "type": "Value",
-                    "id": "f0e1d2c3-b4a5-6789-0abc-def123456791",
-                    "expectedControlType": "Axis",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
-                },
-                {
-                    "name": "Trigger12",
-                    "type": "Value",
-                    "id": "f0e1d2c3-b4a5-6789-0abc-def123456792",
-                    "expectedControlType": "Axis",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
-                },
-                {
-                    "name": "LeftStickX",
-                    "type": "Value",
-                    "id": "aaaa1111-bbbb-2222-cccc-3333dddd4444",
-                    "expectedControlType": "Axis",
-                    "processors": "analogDeadZone(min=0.1,max=1),analogScale(factor=45),analogClamp(min=-45,max=45)",
-                    "interactions": "",
-                    "initialStateCheck": true
-                },
-                {
-                    "name": "LeftStickY",
-                    "type": "Value",
-                    "id": "aaaa1111-bbbb-2222-cccc-3333dddd5555",
-                    "expectedControlType": "Axis",
-                    "processors": "analogDeadZone(min=0.1,max=1),analogInvert,analogScale(factor=30),analogClamp(min=-30,max=30)",
-                    "interactions": "",
-                    "initialStateCheck": true
-                },
-                {
-                    "name": "ArkitJawOpen",
-                    "type": "Value",
-                    "id": "aaaa1111-bbbb-2222-cccc-3333dddd6666",
-                    "expectedControlType": "Axis",
-                    "processors": "analogScale(factor=100),analogClamp(min=0,max=100)",
+                    "id": "aaaa1111-bbbb-2222-cccc-3333dddd9999",
+                    "expectedControlType": "Vector2",
+                    "processors": "stickDeadzone(min=0.1,max=1)",
                     "interactions": "",
                     "initialStateCheck": true
                 }
@@ -364,58 +328,69 @@
                 },
                 {
                     "name": "",
-                    "id": "b0a1c2d3-e4f5-6789-0abc-def123456721",
-                    "path": "<Gamepad>/leftTrigger",
+                    "id": "bbbb1111-cccc-2222-dddd-3333eeee9999",
+                    "path": "<Gamepad>/leftStick",
                     "interactions": "",
                     "processors": "",
                     "groups": "Gamepad",
-                    "action": "Trigger11",
+                    "action": "Look",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
                 {
-                    "name": "",
-                    "id": "b0a1c2d3-e4f5-6789-0abc-def123456722",
-                    "path": "<Gamepad>/rightTrigger",
+                    "name": "WASD",
+                    "id": "bbbb1111-cccc-2222-dddd-3333eeeeaaaa",
+                    "path": "2DVector",
                     "interactions": "",
                     "processors": "",
-                    "groups": "Gamepad",
-                    "action": "Trigger12",
-                    "isComposite": false,
+                    "groups": "Keyboard",
+                    "action": "Look",
+                    "isComposite": true,
                     "isPartOfComposite": false
                 },
                 {
-                    "name": "",
-                    "id": "bbbb1111-cccc-2222-dddd-3333eeee4444",
-                    "path": "<Gamepad>/leftStick/x",
+                    "name": "up",
+                    "id": "bbbb1111-cccc-2222-dddd-3333eeeebbb1",
+                    "path": "<Keyboard>/w",
                     "interactions": "",
                     "processors": "",
-                    "groups": "Gamepad",
-                    "action": "LeftStickX",
+                    "groups": "Keyboard",
+                    "action": "Look",
                     "isComposite": false,
-                    "isPartOfComposite": false
+                    "isPartOfComposite": true
                 },
                 {
-                    "name": "",
-                    "id": "bbbb1111-cccc-2222-dddd-3333eeee5555",
-                    "path": "<Gamepad>/leftStick/y",
+                    "name": "down",
+                    "id": "bbbb1111-cccc-2222-dddd-3333eeeebbb2",
+                    "path": "<Keyboard>/s",
                     "interactions": "",
                     "processors": "",
-                    "groups": "Gamepad",
-                    "action": "LeftStickY",
+                    "groups": "Keyboard",
+                    "action": "Look",
                     "isComposite": false,
-                    "isPartOfComposite": false
+                    "isPartOfComposite": true
                 },
                 {
-                    "name": "",
-                    "id": "bbbb1111-cccc-2222-dddd-3333eeee6666",
-                    "path": "",
+                    "name": "left",
+                    "id": "bbbb1111-cccc-2222-dddd-3333eeeebbb3",
+                    "path": "<Keyboard>/a",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
-                    "action": "ArkitJawOpen",
+                    "groups": "Keyboard",
+                    "action": "Look",
                     "isComposite": false,
-                    "isPartOfComposite": false
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "right",
+                    "id": "bbbb1111-cccc-2222-dddd-3333eeeebbb4",
+                    "path": "<Keyboard>/d",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard",
+                    "action": "Look",
+                    "isComposite": false,
+                    "isPartOfComposite": true
                 }
             ]
         }
