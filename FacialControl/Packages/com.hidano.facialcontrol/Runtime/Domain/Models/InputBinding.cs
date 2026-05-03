@@ -4,13 +4,20 @@ namespace Hidano.FacialControl.Domain.Models
 {
     /// <summary>
     /// InputAction 名と Expression ID を紐付けるイミュータブル値型。
+    /// 押下時の動作モード (<see cref="TriggerMode"/>) も保持する。
     /// </summary>
     public readonly struct InputBinding : IEquatable<InputBinding>
     {
         public string ActionName { get; }
         public string ExpressionId { get; }
+        public TriggerMode TriggerMode { get; }
 
         public InputBinding(string actionName, string expressionId)
+            : this(actionName, expressionId, TriggerMode.Hold)
+        {
+        }
+
+        public InputBinding(string actionName, string expressionId, TriggerMode triggerMode)
         {
             if (string.IsNullOrWhiteSpace(actionName))
             {
@@ -24,12 +31,14 @@ namespace Hidano.FacialControl.Domain.Models
 
             ActionName = actionName;
             ExpressionId = expressionId;
+            TriggerMode = triggerMode;
         }
 
         public bool Equals(InputBinding other)
         {
             return string.Equals(ActionName, other.ActionName, StringComparison.Ordinal)
-                && string.Equals(ExpressionId, other.ExpressionId, StringComparison.Ordinal);
+                && string.Equals(ExpressionId, other.ExpressionId, StringComparison.Ordinal)
+                && TriggerMode == other.TriggerMode;
         }
 
         public override bool Equals(object obj)
@@ -44,6 +53,7 @@ namespace Hidano.FacialControl.Domain.Models
                 var hash = 17;
                 hash = hash * 31 + (ActionName != null ? ActionName.GetHashCode() : 0);
                 hash = hash * 31 + (ExpressionId != null ? ExpressionId.GetHashCode() : 0);
+                hash = hash * 31 + (int)TriggerMode;
                 return hash;
             }
         }

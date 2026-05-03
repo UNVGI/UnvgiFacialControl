@@ -6,6 +6,8 @@
 
 ### Added
 
+- `Hidano.FacialControl.Domain.Models.TriggerMode` enum (`Hold=0 / Toggle=1`) — ボタン入力で表情をトリガーする際の動作モード。`Hold` (押下中のみ ON) を新規バインディングの既定値とする。
+- `Hidano.FacialControl.Domain.Models.InputBinding` に `TriggerMode` フィールドを追加。既存の 2-arg コンストラクタは `TriggerMode.Hold` を初期値として呼び出す 3-arg コンストラクタに委譲する後方互換ラッパー。
 - `Hidano.FacialControl.Domain.Models.AnalogBindingDirection` enum (`Bipolar=0 / Positive=1 / Negative=2`) — gaze 4 系統 (LookLeft / LookRight / LookUp / LookDown) のように 1 軸入力を符号で振り分けて複数 BlendShape clip に流すための input filter。
 - `AnalogBindingEntry.Scale: float` (default `1f`) — clip 由来 binding で keyframe weight を保持して runtime で `raw * Scale` を加算するためのフィールド。
 - `AnalogBindingEntry.Direction: AnalogBindingDirection` (default `Bipolar`) — 上記 input filter。

@@ -9,16 +9,23 @@ namespace Hidano.FacialControl.Adapters.Input
 {
     /// <summary>
     /// InputSystem と FacialController を連携するアダプター。
-    /// InputAction の Button 型（トグル）と Value 型（アナログ強度）の両方に対応する。
-    /// Button 型: ボタン押下で Expression をアクティブ/非アクティブにトグル切り替え。
-    /// Value 型: 0 より大きい値でアクティブ化、0 で非アクティブ化。
+    /// InputAction の Button 型と Value 型の両方に対応する。
     /// </summary>
     /// <remarks>
-    /// Phase 4.7 (inspector-and-data-model-redesign) で <see cref="BindExpression"/> の入口に
-    /// <see cref="InputDeviceCategorizer.Categorize"/> 経路を追加した。バインディング毎に
-    /// <see cref="DeviceCategory"/> が決定され、<see cref="TryGetDeviceCategory"/> で参照できる。
+    /// <para>
+    /// Button 型は <see cref="TriggerMode"/> によって挙動が変わる。
+    /// <list type="bullet">
+    ///   <item><see cref="TriggerMode.Hold"/>: 押下中のみアクティブ (started で ON、canceled で OFF)。</item>
+    ///   <item><see cref="TriggerMode.Toggle"/>: 押すたびにアクティブ/非アクティブが切替わる (performed でトグル)。</item>
+    /// </list>
+    /// Value 型は <see cref="TriggerMode"/> を無視し、値が 0 より大きいときアクティブ、
+    /// 0 のとき非アクティブとなる (アナログ強度はそのまま反映される)。
+    /// </para>
+    /// <para>
+    /// バインディング毎に <see cref="DeviceCategory"/> が決定され、<see cref="TryGetDeviceCategory"/> で参照できる。
     /// 未認識 device は <see cref="DeviceCategory.Controller"/> に fallback し、本インスタンスで
-    /// 1 回のみ <see cref="Debug.LogWarning(object)"/> を出力する（Req 7.5）。
+    /// 1 回のみ <see cref="Debug.LogWarning(object)"/> を出力する。
+    /// </para>
     /// </remarks>
     public class InputSystemAdapter : IDisposable
     {
@@ -46,12 +53,26 @@ namespace Hidano.FacialControl.Adapters.Input
         }
 
         /// <summary>
-        /// InputAction と Expression のバインディングを登録する。
-        /// Button 型ではトグル動作、Value 型ではアナログ強度に基づくアクティブ制御を行う。
+        /// InputAction と Expression のバインディングを登録する (旧 API、Toggle 動作)。
         /// </summary>
-        /// <param name="action">バインドする InputAction</param>
-        /// <param name="expression">トリガー対象の Expression</param>
+        /// <remarks>
+        /// 後方互換のためデフォルトは <see cref="TriggerMode.Toggle"/>。
+        /// 新規呼出側は <see cref="BindExpression(InputAction, Expression, TriggerMode)"/> でモードを明示すること。
+        /// </remarks>
         public void BindExpression(InputAction action, Expression expression)
+        {
+            BindExpression(action, expression, TriggerMode.Toggle);
+        }
+
+        /// <summary>
+        /// InputAction と Expression のバインディングを登録する。
+        /// Button 型では <paramref name="triggerMode"/> に従ってトグル/Hold を選択し、
+        /// Value 型ではアナログ強度に基づくアクティブ制御を行う (mode は無視される)。
+        /// </summary>
+        /// <param name="action">バインドする InputAction。</param>
+        /// <param name="expression">トリガー対象の Expression。</param>
+        /// <param name="triggerMode">押下時の動作モード (Button 型のみ参照)。</param>
+        public void BindExpression(InputAction action, Expression expression, TriggerMode triggerMode)
         {
             if (action == null)
                 throw new ArgumentNullException(nameof(action));
@@ -60,12 +81,20 @@ namespace Hidano.FacialControl.Adapters.Input
 
             DeviceCategory category = ClassifyAction(action);
 
-            var entry = new BindingEntry(expression, action, category);
+            var entry = new BindingEntry(expression, action, category, triggerMode);
             _bindings[action] = entry;
 
             if (action.type == InputActionType.Button)
             {
-                action.performed += entry.OnButtonPerformed;
+                if (triggerMode == TriggerMode.Hold)
+                {
+                    action.started += entry.OnButtonStarted;
+                    action.canceled += entry.OnButtonCanceled;
+                }
+                else
+                {
+                    action.performed += entry.OnButtonPerformed;
+                }
             }
             else
             {
@@ -129,7 +158,15 @@ namespace Hidano.FacialControl.Adapters.Input
             {
                 if (action.type == InputActionType.Button)
                 {
-                    action.performed -= entry.OnButtonPerformed;
+                    if (entry.TriggerMode == TriggerMode.Hold)
+                    {
+                        action.started -= entry.OnButtonStarted;
+                        action.canceled -= entry.OnButtonCanceled;
+                    }
+                    else
+                    {
+                        action.performed -= entry.OnButtonPerformed;
+                    }
                 }
                 else
                 {
@@ -181,6 +218,32 @@ namespace Hidano.FacialControl.Adapters.Input
             }
         }
 
+        private void HandleButtonHoldOn(BindingEntry entry)
+        {
+            if (_facialController == null || !_facialController.IsInitialized)
+                return;
+
+            if (entry.IsActive)
+            {
+                return;
+            }
+            entry.IsActive = true;
+            _facialController.Activate(entry.Expression);
+        }
+
+        private void HandleButtonHoldOff(BindingEntry entry)
+        {
+            if (_facialController == null || !_facialController.IsInitialized)
+                return;
+
+            if (!entry.IsActive)
+            {
+                return;
+            }
+            entry.IsActive = false;
+            _facialController.Deactivate(entry.Expression);
+        }
+
         private void HandleValueChange(BindingEntry entry, float value)
         {
             if (_facialController == null || !_facialController.IsInitialized)
@@ -206,20 +269,32 @@ namespace Hidano.FacialControl.Adapters.Input
             public Expression Expression { get; }
             public InputAction Action { get; }
             public DeviceCategory Category { get; }
+            public TriggerMode TriggerMode { get; }
             public bool IsActive { get; set; }
             public InputSystemAdapter Adapter { get; set; }
 
-            public BindingEntry(Expression expression, InputAction action, DeviceCategory category)
+            public BindingEntry(Expression expression, InputAction action, DeviceCategory category, TriggerMode triggerMode)
             {
                 Expression = expression;
                 Action = action;
                 Category = category;
+                TriggerMode = triggerMode;
                 IsActive = false;
             }
 
             public void OnButtonPerformed(InputAction.CallbackContext context)
             {
                 Adapter?.HandleButtonToggle(this);
+            }
+
+            public void OnButtonStarted(InputAction.CallbackContext context)
+            {
+                Adapter?.HandleButtonHoldOn(this);
+            }
+
+            public void OnButtonCanceled(InputAction.CallbackContext context)
+            {
+                Adapter?.HandleButtonHoldOff(this);
             }
 
             public void OnValuePerformed(InputAction.CallbackContext context)
