@@ -8,7 +8,8 @@ namespace Hidano.FacialControl.Samples
     /// <summary>
     /// 同一レイヤーに複数の <c>ExpressionTrigger</c> 入力源 (controller-expr / keyboard-expr) を並置し、
     /// それぞれのウェイト比と独立トリガーで BlendShape 加重和がどう見えるかを目視検証するための
-    /// PlayMode 専用 HUD。
+    /// PlayMode 専用 HUD。さらにアナログバインディング (左スティック → LeftEye/RightEye Euler、
+    /// ARKit/OSC float → mouth-open BlendShape) の現在値も同 HUD で観測する。
     /// </summary>
     /// <remarks>
     /// 詳しい使い方は本サンプル同梱の README.md 参照。
@@ -17,7 +18,7 @@ namespace Hidano.FacialControl.Samples
     /// <c>GetInputSourceWeightsSnapshot</c>) のみを利用し、書込はしないオブザーバ。
     /// 表情データの読込は新統合 SO (<c>FacialCharacterSO</c>) 経由で
     /// <c>FacialController.OnEnable</c> が StreamingAssets/FacialControl/{SO 名}/profile.json を
-    /// 自動探索して行う想定 (3-B モデル)。
+    /// 自動探索して行う想定 (3-B モデル)。アナログバインディングは SO の Inspector で編集する。
     /// </remarks>
     [DefaultExecutionOrder(-100)]
     [AddComponentMenu("FacialControl/Samples/Multi Source Blend Demo HUD")]
@@ -38,6 +39,26 @@ namespace Hidano.FacialControl.Samples
         [Tooltip("Keyboard 入力源の source index (1 始まり)。")]
         [SerializeField]
         private int _keyboardSourceIndex = 2;
+
+        [Tooltip("HUD で観測する LeftEye Transform (BonePose ターゲット)。アナログ機能未使用時は未割当で OK。")]
+        [SerializeField]
+        private Transform _leftEye;
+
+        [Tooltip("HUD で観測する RightEye Transform (BonePose ターゲット)。アナログ機能未使用時は未割当で OK。")]
+        [SerializeField]
+        private Transform _rightEye;
+
+        [Tooltip("観測対象の SkinnedMeshRenderer。未割当時は FacialController から探索する。")]
+        [SerializeField]
+        private SkinnedMeshRenderer _meshRenderer;
+
+        [Tooltip("HUD に表示する mouth-open BlendShape 名 (デフォルト: jawOpen)。")]
+        [SerializeField]
+        private string _mouthOpenBlendShapeName = "jawOpen";
+
+        [Tooltip("HUD で表示するアナログソース ID (informational)。")]
+        [SerializeField]
+        private string[] _displayedSourceIds = { "left_stick", "arkit_jaw_open" };
 
         private static readonly string[] s_expressionIds = { "smile", "anger", "surprise", "lipsync_a" };
 
@@ -141,8 +162,84 @@ namespace Hidano.FacialControl.Samples
                     $"  layer={entry.LayerIdx} source={entry.SourceId} weight={entry.Weight:0.00} saturated={entry.Saturated}");
             }
 
+            GUILayout.Space(10);
+            DrawBoneSection();
+            GUILayout.Space(8);
+            DrawBlendShapeSection();
+            GUILayout.Space(8);
+            DrawSourceIdSection();
+
             GUILayout.EndScrollView();
             GUILayout.EndArea();
+        }
+
+        private void DrawBoneSection()
+        {
+            GUILayout.Label("<b>BonePose 出力 (Eye Euler)</b>", RichStyle());
+            DrawBone("  LeftEye", _leftEye);
+            DrawBone("  RightEye", _rightEye);
+        }
+
+        private static void DrawBone(string label, Transform t)
+        {
+            if (t == null)
+            {
+                GUILayout.Label($"{label}: (未割当)");
+                return;
+            }
+            var euler = t.localRotation.eulerAngles;
+            GUILayout.Label(
+                $"{label}: ({euler.x:0.0}, {euler.y:0.0}, {euler.z:0.0})");
+        }
+
+        private void DrawBlendShapeSection()
+        {
+            GUILayout.Label("<b>BlendShape 出力 (mouth-open)</b>", RichStyle());
+
+            var renderer = ResolveRenderer();
+            if (renderer == null)
+            {
+                GUILayout.Label("  (SkinnedMeshRenderer 未解決)");
+                return;
+            }
+
+            var mesh = renderer.sharedMesh;
+            if (mesh == null)
+            {
+                GUILayout.Label("  (sharedMesh 未割当)");
+                return;
+            }
+
+            int idx = mesh.GetBlendShapeIndex(_mouthOpenBlendShapeName);
+            if (idx < 0)
+            {
+                GUILayout.Label($"  '{_mouthOpenBlendShapeName}' BlendShape が見つかりません");
+                return;
+            }
+
+            float weight = renderer.GetBlendShapeWeight(idx);
+            GUILayout.Label($"  {_mouthOpenBlendShapeName}: {weight:0.00}");
+        }
+
+        private void DrawSourceIdSection()
+        {
+            GUILayout.Label("<b>定義済みアナログ source ID (参考)</b>", RichStyle());
+            if (_displayedSourceIds == null || _displayedSourceIds.Length == 0)
+            {
+                GUILayout.Label("  (未設定)");
+                return;
+            }
+            for (int i = 0; i < _displayedSourceIds.Length; i++)
+            {
+                GUILayout.Label($"  - {_displayedSourceIds[i]}");
+            }
+        }
+
+        private SkinnedMeshRenderer ResolveRenderer()
+        {
+            if (_meshRenderer != null) return _meshRenderer;
+            if (_facialController == null) return null;
+            return _facialController.GetComponentInChildren<SkinnedMeshRenderer>();
         }
 
         private void DrawWeightSlider(string label, ref float weight, int sourceIndex)

@@ -284,6 +284,13 @@ MonoBehaviour:
   _layerIndex: 0
   _controllerSourceIndex: 1
   _keyboardSourceIndex: 2
+  _leftEye: {fileID: 0}
+  _rightEye: {fileID: 0}
+  _meshRenderer: {fileID: 0}
+  _mouthOpenBlendShapeName: jawOpen
+  _displayedSourceIds:
+  - left_stick
+  - arkit_jaw_open
 --- !u!114 &345471961
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -421,7 +428,7 @@ Camera:
     height: 1
   near clip plane: 0.3
   far clip plane: 1000
-  field of view: 60
+  field of view: 20
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
@@ -447,13 +454,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2031058186}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.043619387, y: 0, z: 0, w: 0.99904823}
-  m_LocalPosition: {x: 0, y: 1.4, z: -2.5}
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
+  m_LocalPosition: {x: 0, y: 1.4, z: 2.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
