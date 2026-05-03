@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -10,8 +11,15 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
     /// (kind=Analog) に対して expressionId で紐づく。
     /// </summary>
     /// <remarks>
-    /// 入力 Vector2 の x 成分が両目の左右回転 (バインディング側で軸を選択)、y 成分が上下回転にマップされる。
+    /// <para>
+    /// 入力 Vector2 の x 成分が左右方向、y 成分が上下方向の目線回転を駆動する。
     /// 多くのモデルでは目線はボーン操作だが、BlendShape ベースのモデルもあるため両方を任意に併用できる。
+    /// </para>
+    /// <para>
+    /// BlendShape 経路は 4 系統 (LookLeft / LookRight / LookUp / LookDown) の AnimationClip で指定する。
+    /// Vector2 の +X / -X / +Y / -Y がそれぞれ LookRight / LookLeft / LookUp / LookDown clip に対応し、
+    /// clip 内の各 BlendShape curve の time=0 における値を keyframe weight として線形駆動する。
+    /// </para>
     /// </remarks>
     [Serializable]
     public sealed class GazeExpressionConfig
@@ -24,30 +32,47 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
 
         // ----------------- ボーン制御 (主) -----------------
 
-        [Tooltip("左目ボーンの GameObject 階層パス (Animator のルートからの相対パス、例: Armature/.../LeftEye)。空なら無効。")]
+        [Tooltip("左目ボーンの Transform 名 (参照モデル配下から名前一致で解決)。空なら無効。")]
         public string leftEyeBonePath;
 
         [Tooltip("左目ボーンの初期回転 (Euler 度)。アナログ入力 0 のときに保つ姿勢。アナログ入力はこの値に加算される。")]
         public Vector3 leftEyeInitialRotation;
 
-        [Tooltip("右目ボーンの GameObject 階層パス。空なら無効。")]
+        [Tooltip("右目ボーンの Transform 名。空なら無効。")]
         public string rightEyeBonePath;
 
         [Tooltip("右目ボーンの初期回転 (Euler 度)。")]
         public Vector3 rightEyeInitialRotation;
 
-        // ----------------- BlendShape 制御 (オプション) -----------------
+        // ----------------- BlendShape 制御 (オプション、4 系統 clip) -----------------
 
-        [Tooltip("入力 x 成分が反映される左目の BlendShape 名。空なら無効。")]
-        public string leftEyeXBlendShape;
+        [Tooltip("input.x < 0 (左方向) の状態を表現する AnimationClip。clip 内 BlendShape curve の time=0 における値を |input.x| で線形駆動する。空なら無効。")]
+        public AnimationClip lookLeftClip;
 
-        [Tooltip("入力 y 成分が反映される左目の BlendShape 名。空なら無効。")]
-        public string leftEyeYBlendShape;
+        [Tooltip("input.x > 0 (右方向) の状態を表現する AnimationClip。空なら無効。")]
+        public AnimationClip lookRightClip;
 
-        [Tooltip("入力 x 成分が反映される右目の BlendShape 名。空なら無効。")]
-        public string rightEyeXBlendShape;
+        [Tooltip("input.y > 0 (上方向) の状態を表現する AnimationClip。空なら無効。")]
+        public AnimationClip lookUpClip;
 
-        [Tooltip("入力 y 成分が反映される右目の BlendShape 名。空なら無効。")]
-        public string rightEyeYBlendShape;
+        [Tooltip("input.y < 0 (下方向) の状態を表現する AnimationClip。空なら無効。")]
+        public AnimationClip lookDownClip;
+
+        // ----------------- Editor で焼き付けた BlendShape weight キャッシュ -----------------
+        // AnimationClip の curve は runtime API で列挙できないため、Editor (AutoExporter) で
+        // GazeClipBlendShapeSampler を介してサンプルし、本配列に永続化する。
+        // runtime の BuildAnalogProfile は本キャッシュから AnalogBindingEntry を構築する。
+
+        [HideInInspector]
+        public List<GazeBlendShapeSampleEntry> lookLeftSamples = new List<GazeBlendShapeSampleEntry>();
+
+        [HideInInspector]
+        public List<GazeBlendShapeSampleEntry> lookRightSamples = new List<GazeBlendShapeSampleEntry>();
+
+        [HideInInspector]
+        public List<GazeBlendShapeSampleEntry> lookUpSamples = new List<GazeBlendShapeSampleEntry>();
+
+        [HideInInspector]
+        public List<GazeBlendShapeSampleEntry> lookDownSamples = new List<GazeBlendShapeSampleEntry>();
     }
 }

@@ -134,6 +134,16 @@ namespace Hidano.FacialControl.Adapters.Json
                 return false;
             }
 
+            // scale / direction は旧スキーマ JSON では欠落するので default に fallback する。
+            // JsonUtility は欠落 float に 0 を入れるため、0 は「未設定」とみなして 1f に補正する。
+            float scale = dto.scale == 0f ? 1f : dto.scale;
+            if (!TryParseDirection(dto.direction, out var direction))
+            {
+                Debug.LogWarning(
+                    $"AnalogInputBindingJsonLoader: bindings[{index}] の direction '{dto.direction}' が未知のため Bipolar として扱います。");
+                direction = AnalogBindingDirection.Bipolar;
+            }
+
             try
             {
                 entry = new AnalogBindingEntry(
@@ -141,7 +151,9 @@ namespace Hidano.FacialControl.Adapters.Json
                     sourceAxis: dto.sourceAxis,
                     targetKind: targetKind,
                     targetIdentifier: dto.targetIdentifier,
-                    targetAxis: targetAxis);
+                    targetAxis: targetAxis,
+                    scale: scale,
+                    direction: direction);
                 return true;
             }
             catch (Exception ex)
@@ -149,6 +161,32 @@ namespace Hidano.FacialControl.Adapters.Json
                 Debug.LogWarning(
                     $"AnalogInputBindingJsonLoader: bindings[{index}] の構築に失敗したため skip します: {ex.Message}");
                 return false;
+            }
+        }
+
+        private static bool TryParseDirection(string value, out AnalogBindingDirection result)
+        {
+            // 空・null は Bipolar 既定（旧スキーマ互換）。
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                result = AnalogBindingDirection.Bipolar;
+                return true;
+            }
+
+            switch (value.ToLowerInvariant())
+            {
+                case "bipolar":
+                    result = AnalogBindingDirection.Bipolar;
+                    return true;
+                case "positive":
+                    result = AnalogBindingDirection.Positive;
+                    return true;
+                case "negative":
+                    result = AnalogBindingDirection.Negative;
+                    return true;
+                default:
+                    result = AnalogBindingDirection.Bipolar;
+                    return false;
             }
         }
 
@@ -208,7 +246,20 @@ namespace Hidano.FacialControl.Adapters.Json
                 sourceAxis = entry.SourceAxis,
                 targetKind = SerializeTargetKind(entry.TargetKind),
                 targetIdentifier = entry.TargetIdentifier,
-                targetAxis = SerializeTargetAxis(entry.TargetAxis)
+                targetAxis = SerializeTargetAxis(entry.TargetAxis),
+                scale = entry.Scale,
+                direction = SerializeDirection(entry.Direction),
+            };
+        }
+
+        private static string SerializeDirection(AnalogBindingDirection direction)
+        {
+            return direction switch
+            {
+                AnalogBindingDirection.Bipolar => "bipolar",
+                AnalogBindingDirection.Positive => "positive",
+                AnalogBindingDirection.Negative => "negative",
+                _ => "bipolar"
             };
         }
 

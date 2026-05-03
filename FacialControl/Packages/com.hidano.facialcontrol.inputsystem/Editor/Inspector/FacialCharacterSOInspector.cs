@@ -49,10 +49,10 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         public const string ExpressionRowGazeLeftInitRotName = "expression-row-gaze-left-init-rot";
         public const string ExpressionRowGazeRightBonePathName = "expression-row-gaze-right-bone-path";
         public const string ExpressionRowGazeRightInitRotName = "expression-row-gaze-right-init-rot";
-        public const string ExpressionRowGazeLeftXName = "expression-row-gaze-left-x";
-        public const string ExpressionRowGazeLeftYName = "expression-row-gaze-left-y";
-        public const string ExpressionRowGazeRightXName = "expression-row-gaze-right-x";
-        public const string ExpressionRowGazeRightYName = "expression-row-gaze-right-y";
+        public const string ExpressionRowGazeLookLeftClipName = "expression-row-gaze-look-left-clip";
+        public const string ExpressionRowGazeLookRightClipName = "expression-row-gaze-look-right-clip";
+        public const string ExpressionRowGazeLookUpClipName = "expression-row-gaze-look-up-clip";
+        public const string ExpressionRowGazeLookDownClipName = "expression-row-gaze-look-down-clip";
         public const string ExpressionRowGazeAutoAssignButtonName = "expression-row-gaze-auto-assign-button";
 
         // ====================================================================
@@ -961,10 +961,10 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             var leftInitRotProp = cfgProp.FindPropertyRelative("leftEyeInitialRotation");
             var rightBonePathProp = cfgProp.FindPropertyRelative("rightEyeBonePath");
             var rightInitRotProp = cfgProp.FindPropertyRelative("rightEyeInitialRotation");
-            var leftXProp = cfgProp.FindPropertyRelative("leftEyeXBlendShape");
-            var leftYProp = cfgProp.FindPropertyRelative("leftEyeYBlendShape");
-            var rightXProp = cfgProp.FindPropertyRelative("rightEyeXBlendShape");
-            var rightYProp = cfgProp.FindPropertyRelative("rightEyeYBlendShape");
+            var lookLeftClipProp = cfgProp.FindPropertyRelative("lookLeftClip");
+            var lookRightClipProp = cfgProp.FindPropertyRelative("lookRightClip");
+            var lookUpClipProp = cfgProp.FindPropertyRelative("lookUpClip");
+            var lookDownClipProp = cfgProp.FindPropertyRelative("lookDownClip");
 
             if (actionProp != null)
             {
@@ -1027,7 +1027,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
 
             row.Add(boneSection);
 
-            // ----- BlendShape 制御 (オプション) -----
+            // ----- BlendShape 制御 (オプション、4 系統 clip) -----
             var blendSection = new Foldout
             {
                 text = "目線 BlendShape (オプション)",
@@ -1036,17 +1036,24 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             blendSection.style.marginTop = 4;
             blendSection.Add(MakeHelpBox(
                 "BlendShape ベースで目線を表現するモデル向けのオプション設定です。"
-                + "x 成分が左右目の X 軸、y 成分が Y 軸の BlendShape に反映されます。"));
-            blendSection.Add(BuildGazeBlendShapeField("左目 X (横方向)", leftXProp, ExpressionRowGazeLeftXName));
-            blendSection.Add(BuildGazeBlendShapeField("左目 Y (縦方向)", leftYProp, ExpressionRowGazeLeftYName));
-            blendSection.Add(BuildGazeBlendShapeField("右目 X (横方向)", rightXProp, ExpressionRowGazeRightXName));
-            blendSection.Add(BuildGazeBlendShapeField("右目 Y (縦方向)", rightYProp, ExpressionRowGazeRightYName));
+                + " 4 系統 (LookLeft / LookRight / LookUp / LookDown) の AnimationClip を指定し、"
+                + " Vector2 入力の +X / -X / +Y / -Y 方向に対応する BlendShape 状態を表現します。"
+                + " clip 内の BlendShape curve の time=0 における値を keyframe weight として線形駆動します。"));
+            blendSection.Add(BuildGazeClipField("LookLeft Clip (input.x < 0)", lookLeftClipProp, ExpressionRowGazeLookLeftClipName));
+            blendSection.Add(BuildGazeClipField("LookRight Clip (input.x > 0)", lookRightClipProp, ExpressionRowGazeLookRightClipName));
+            blendSection.Add(BuildGazeClipField("LookUp Clip (input.y > 0)", lookUpClipProp, ExpressionRowGazeLookUpClipName));
+            blendSection.Add(BuildGazeClipField("LookDown Clip (input.y < 0)", lookDownClipProp, ExpressionRowGazeLookDownClipName));
             row.Add(blendSection);
         }
 
-        private static TextField BuildGazeBlendShapeField(string label, SerializedProperty prop, string name)
+        private static ObjectField BuildGazeClipField(string label, SerializedProperty prop, string name)
         {
-            var field = new TextField(label) { name = name };
+            var field = new ObjectField(label)
+            {
+                name = name,
+                objectType = typeof(AnimationClip),
+                allowSceneObjects = false,
+            };
             if (prop != null) field.BindProperty(prop);
             return field;
         }
@@ -1465,10 +1472,10 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                         if (p != null && !string.IsNullOrWhiteSpace(p.stringValue)) { anyBone = true; break; }
                     }
                     bool anyBs = false;
-                    foreach (var fname in new[] { "leftEyeXBlendShape", "leftEyeYBlendShape", "rightEyeXBlendShape", "rightEyeYBlendShape" })
+                    foreach (var fname in new[] { "lookLeftClip", "lookRightClip", "lookUpClip", "lookDownClip" })
                     {
                         var p = cfgProp.FindPropertyRelative(fname);
-                        if (p != null && !string.IsNullOrWhiteSpace(p.stringValue)) { anyBs = true; break; }
+                        if (p != null && p.objectReferenceValue != null) { anyBs = true; break; }
                     }
                     if (!anyBone && !anyBs)
                     {

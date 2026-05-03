@@ -2,7 +2,21 @@
 
 すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
 
-## [0.1.0-preview.2] - 2026-05-01
+## [Unreleased]
+
+### Added
+
+- `Hidano.FacialControl.Domain.Models.AnalogBindingDirection` enum (`Bipolar=0 / Positive=1 / Negative=2`) — gaze 4 系統 (LookLeft / LookRight / LookUp / LookDown) のように 1 軸入力を符号で振り分けて複数 BlendShape clip に流すための input filter。
+- `AnalogBindingEntry.Scale: float` (default `1f`) — clip 由来 binding で keyframe weight を保持して runtime で `raw * Scale` を加算するためのフィールド。
+- `AnalogBindingEntry.Direction: AnalogBindingDirection` (default `Bipolar`) — 上記 input filter。
+- `AnalogBindingEntry` に Scale / Direction を明示する 7 引数 ctor を追加（既存 5 引数 ctor は default 値で互換維持）。
+- `AnalogBlendShapeInputSource` で direction filter と scale 倍率を適用（Bipolar 既定で従来挙動と完全一致）。
+
+### Changed
+
+- `Adapters.Json.Dto.AnalogBindingEntryDto` に `scale: float` / `direction: string` を追加。旧スキーマ JSON は欠落フィールドを default 値 (`scale=1`, `direction="bipolar"`) で fallback する。
+- `Adapters.Json.AnalogInputBindingJsonLoader` で scale / direction の parse / serialize を追加。不正 direction 文字列は warning + Bipolar 扱い。
+
 
 ### ⚠ BREAKING CHANGES
 

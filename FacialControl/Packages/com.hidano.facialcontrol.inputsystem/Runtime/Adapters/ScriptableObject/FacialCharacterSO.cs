@@ -139,11 +139,13 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
                 AppendBoneBinding(entries, sourceId, sourceAxis: 0, cfg.rightEyeBonePath, AnalogTargetAxis.Y);
                 AppendBoneBinding(entries, sourceId, sourceAxis: 1, cfg.rightEyeBonePath, AnalogTargetAxis.X);
 
-                // BlendShape 制御 (オプション)。
-                AppendBlendShapeBinding(entries, sourceId, sourceAxis: 0, cfg.leftEyeXBlendShape);
-                AppendBlendShapeBinding(entries, sourceId, sourceAxis: 1, cfg.leftEyeYBlendShape);
-                AppendBlendShapeBinding(entries, sourceId, sourceAxis: 0, cfg.rightEyeXBlendShape);
-                AppendBlendShapeBinding(entries, sourceId, sourceAxis: 1, cfg.rightEyeYBlendShape);
+                // BlendShape 制御 (オプション、4 系統 clip): Editor で焼き付けた sample 配列から
+                // 1 BS = 1 entry を Direction + Scale 付きで emit する。AnimationClip の curve は
+                // runtime API で列挙できないため、AutoExporter による Editor 時 sampling が前提。
+                AppendClipBlendShapeBindings(entries, sourceId, sourceAxis: 0, cfg.lookRightSamples, AnalogBindingDirection.Positive);
+                AppendClipBlendShapeBindings(entries, sourceId, sourceAxis: 0, cfg.lookLeftSamples, AnalogBindingDirection.Negative);
+                AppendClipBlendShapeBindings(entries, sourceId, sourceAxis: 1, cfg.lookUpSamples, AnalogBindingDirection.Positive);
+                AppendClipBlendShapeBindings(entries, sourceId, sourceAxis: 1, cfg.lookDownSamples, AnalogBindingDirection.Negative);
             }
             return new AnalogInputBindingProfile(_schemaVersion, entries.ToArray());
         }
@@ -202,25 +204,44 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
             }
         }
 
-        private static void AppendBlendShapeBinding(
-            List<AnalogBindingEntry> sink, string sourceId, int sourceAxis, string blendShapeName)
+        private static void AppendClipBlendShapeBindings(
+            List<AnalogBindingEntry> sink,
+            string sourceId,
+            int sourceAxis,
+            List<GazeBlendShapeSampleEntry> samples,
+            AnalogBindingDirection direction)
         {
-            if (string.IsNullOrWhiteSpace(blendShapeName))
+            if (samples == null || samples.Count == 0)
             {
                 return;
             }
-            try
+            for (int i = 0; i < samples.Count; i++)
             {
-                sink.Add(new AnalogBindingEntry(
-                    sourceId,
-                    sourceAxis,
-                    AnalogBindingTargetKind.BlendShape,
-                    blendShapeName,
-                    AnalogTargetAxis.X));
-            }
-            catch (ArgumentException)
-            {
-                // targetIdentifier が空など。スキップ。
+                var s = samples[i];
+                if (s == null || string.IsNullOrWhiteSpace(s.blendShapeName))
+                {
+                    continue;
+                }
+                // weight が 0 のキーは BS に何も寄与しないため skip（無駄 entry の削減）。
+                if (s.weight == 0f)
+                {
+                    continue;
+                }
+                try
+                {
+                    sink.Add(new AnalogBindingEntry(
+                        sourceId,
+                        sourceAxis,
+                        AnalogBindingTargetKind.BlendShape,
+                        s.blendShapeName,
+                        AnalogTargetAxis.X,
+                        s.weight,
+                        direction));
+                }
+                catch (ArgumentException)
+                {
+                    // targetIdentifier が空など。スキップ。
+                }
             }
         }
     }

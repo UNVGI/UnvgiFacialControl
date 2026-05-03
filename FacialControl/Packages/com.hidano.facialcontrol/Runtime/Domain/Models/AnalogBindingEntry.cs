@@ -14,10 +14,17 @@ namespace Hidano.FacialControl.Domain.Models
     /// <see cref="AnalogBindingTargetKind.BlendShape"/> では無視される。
     /// </para>
     /// <para>
-    /// Phase 3.5 で <c>Mapping</c> field を撤去し、Domain 側は 5 値（SourceId / SourceAxis / TargetKind /
-    /// TargetIdentifier / TargetAxis）のみ保持する（Req 6.3）。dead-zone / scale / offset / curve /
-    /// invert / clamp の値変換は Adapters 側 InputProcessor 経路（<c>InputActionReference</c>）で扱う
-    /// （Decision 4 / Req 13.3）。OSC 互換は別 spec で扱う（design.md 参照）。
+    /// <see cref="Scale"/> と <see cref="Direction"/> は「1 軸入力で複数 BlendShape を異なる weight ・符号で
+    /// 駆動する」用途のために導入した（gaze の 4 系統 LookLeft/Right/Up/Down 等）。
+    /// 現状の従来呼出側は default 値（Scale=1, Direction=Bipolar）で従来挙動と完全互換になる。
+    /// BonePose ターゲットでは原則 Bipolar / Scale=1 で使う想定。
+    /// </para>
+    /// <para>
+    /// Phase 3.5 で <c>Mapping</c> field を撤去し、5 値（SourceId / SourceAxis / TargetKind /
+    /// TargetIdentifier / TargetAxis）構成だった。今回 BlendShape clip 駆動の必要性により
+    /// Scale / Direction を追加した（gaze-blendshape-clip 系）。
+    /// dead-zone / scale (axis 全体) / offset / curve / invert / clamp の値変換は
+    /// Adapters 側 InputProcessor 経路（<c>InputActionReference</c>）で扱う（Decision 4 / Req 13.3）。
     /// </para>
     /// </remarks>
     public readonly struct AnalogBindingEntry
@@ -38,7 +45,16 @@ namespace Hidano.FacialControl.Domain.Models
         public AnalogTargetAxis TargetAxis { get; }
 
         /// <summary>
-        /// バインディングエントリを構築する。
+        /// ターゲットに反映する倍率（既定 1.0）。BlendShape clip 由来の binding では
+        /// keyframe weight (例: clip 内で 0.8) を保持して runtime で <c>raw * Scale</c> を加算する。
+        /// </summary>
+        public float Scale { get; }
+
+        /// <summary>入力 raw 値の符号フィルタ。既定 <see cref="AnalogBindingDirection.Bipolar"/>。</summary>
+        public AnalogBindingDirection Direction { get; }
+
+        /// <summary>
+        /// バインディングエントリを構築する（Scale=1, Direction=Bipolar の互換 ctor）。
         /// </summary>
         /// <param name="sourceId">入力源識別子（呼出側で <see cref="InputSourceId"/> 規約に従っていることを保証）。</param>
         /// <param name="sourceAxis">入力源軸 (&gt;= 0)。</param>
@@ -53,6 +69,22 @@ namespace Hidano.FacialControl.Domain.Models
             AnalogBindingTargetKind targetKind,
             string targetIdentifier,
             AnalogTargetAxis targetAxis)
+            : this(sourceId, sourceAxis, targetKind, targetIdentifier, targetAxis,
+                   scale: 1f, direction: AnalogBindingDirection.Bipolar)
+        {
+        }
+
+        /// <summary>
+        /// バインディングエントリを構築する（Scale / Direction を明示する完全 ctor）。
+        /// </summary>
+        public AnalogBindingEntry(
+            string sourceId,
+            int sourceAxis,
+            AnalogBindingTargetKind targetKind,
+            string targetIdentifier,
+            AnalogTargetAxis targetAxis,
+            float scale,
+            AnalogBindingDirection direction)
         {
             if (sourceAxis < 0)
             {
@@ -74,6 +106,8 @@ namespace Hidano.FacialControl.Domain.Models
             TargetKind = targetKind;
             TargetIdentifier = targetIdentifier;
             TargetAxis = targetAxis;
+            Scale = scale;
+            Direction = direction;
         }
     }
 }

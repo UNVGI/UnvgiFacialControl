@@ -2,6 +2,31 @@
 
 すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
 
+## [Unreleased]
+
+### ⚠ BREAKING CHANGES
+
+- `GazeExpressionConfig` の BlendShape 経路を 4 string field (`leftEyeXBlendShape` / `leftEyeYBlendShape` / `rightEyeXBlendShape` / `rightEyeYBlendShape`) から 4 AnimationClip 参照 (`lookLeftClip` / `lookRightClip` / `lookUpClip` / `lookDownClip`) に置換。Vector2 入力の +X / -X / +Y / -Y がそれぞれ LookRight / LookLeft / LookUp / LookDown clip に対応する。既存 SO の旧 BS string 値はロード時に黙って無視される。
+
+### Added
+
+- `GazeExpressionConfig` に 4 系統 AnimationClip フィールドと、Editor で焼き付けた sample 配列 `lookLeftSamples` / `lookRightSamples` / `lookUpSamples` / `lookDownSamples` (`List<GazeBlendShapeSampleEntry>`) を追加。runtime はこの sample 配列から `AnalogBindingEntry` を構築する。
+- `GazeBlendShapeSampleEntry` 型 (`blendShapeName: string` / `weight: float`) を新設。
+- `Hidano.FacialControl.InputSystem.Editor.Sampling.GazeClipBlendShapeSampler` (Editor 専用) — 4 系統 clip の time=0 における BlendShape weight を抽出する `AnimationUtility` ベースのヘルパ。
+- `FacialCharacterSOAutoExporter.SampleGazeClipsIntoConfigs` — SO 保存時に 4 系統 clip を sample して上記 sample 配列に永続化する経路を追加。
+- `FacialCharacterSOInspector` の Gaze BS セクションを 4 ObjectField (AnimationClip) に置換。同セクションの `BuildGazeClipField` ヘルパと、UIElements name 定数 (`ExpressionRowGazeLookLeftClipName` 等) を新設。
+- `FacialCharacterSOInspector` の目線ボーン foldout に「参照モデルから自動設定」ボタンを追加。`_referenceModel` の Animator から Humanoid Avatar マッピング優先 (LeftEye / RightEye)、不在時は名前検索 (`*eye*`) で目ボーンを解決し、`Transform.name` と現在の `localEulerAngles` を初期回転として書き込む。
+
+### Changed
+
+- `FacialCharacterSO.BuildAnalogProfileFromGazeConfigs` を 4 sample list 経路に変更し、各 BS の keyframe weight を `AnalogBindingEntry.Scale` に、+X/-X/+Y/-Y 振り分けを `AnalogBindingDirection` (Positive / Negative) に設定して emit する。
+- `Adapters.Json.Dto.AnalogBindingEntryDto` の scale / direction 追加に伴い JSON round-trip も更新（core パッケージ側）。
+
+### Removed
+
+- `FacialCharacterSOInspector.BuildGazeBlendShapeField` (TextField 版) を削除。
+- 旧定数 `ExpressionRowGazeLeftXName` / `ExpressionRowGazeLeftYName` / `ExpressionRowGazeRightXName` / `ExpressionRowGazeRightYName` を削除。
+
 ## [0.1.0-preview.2] - 2026-05-01
 
 ### ⚠ BREAKING CHANGES

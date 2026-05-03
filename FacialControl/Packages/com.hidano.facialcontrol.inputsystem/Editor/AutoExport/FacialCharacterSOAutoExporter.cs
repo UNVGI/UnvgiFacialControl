@@ -8,6 +8,7 @@ using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.Sampling;
 using Hidano.FacialControl.InputSystem.Adapters.ScriptableObject;
+using Hidano.FacialControl.InputSystem.Editor.Sampling;
 using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
@@ -109,6 +110,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AutoExport
                     try
                     {
                         SampleAnimationClipsIntoCachedSnapshots(so, sampler);
+                        SampleGazeClipsIntoConfigs(so);
                     }
                     catch (Exception ex)
                     {
@@ -216,6 +218,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AutoExport
                     try
                     {
                         SampleAnimationClipsIntoCachedSnapshots(so, sampler);
+                        SampleGazeClipsIntoConfigs(so);
                         sampleOk = true;
                     }
                     catch (Exception ex)
@@ -356,6 +359,51 @@ namespace Hidano.FacialControl.InputSystem.Editor.AutoExport
                 var snapshot = sampler.SampleSnapshot(snapshotId, expr.animationClip);
                 expr.cachedSnapshot = ConvertSnapshotToDto(snapshot);
             }
+        }
+
+        /// <summary>
+        /// <see cref="FacialCharacterSO"/> の <see cref="FacialCharacterSO.GazeConfigs"/> 各エントリについて、
+        /// 4 系統 (LookLeft / LookRight / LookUp / LookDown) の AnimationClip を <see cref="GazeClipBlendShapeSampler"/> で
+        /// 時刻 0 サンプリングし、結果を <see cref="GazeExpressionConfig"/> 内の sample 配列に書き戻す。
+        /// AnimationClip が null の系統は対応 sample 配列を空に設定する。
+        /// 引数が <see cref="FacialCharacterSO"/> でない場合は no-op。
+        /// </summary>
+        public static void SampleGazeClipsIntoConfigs(FacialCharacterProfileSO so)
+        {
+            if (so is not FacialCharacterSO inputSO) return;
+            var configs = inputSO.GazeConfigs;
+            if (configs == null) return;
+
+            for (int i = 0; i < configs.Count; i++)
+            {
+                var cfg = configs[i];
+                if (cfg == null) continue;
+
+                cfg.lookLeftSamples = ConvertSamples(GazeClipBlendShapeSampler.Sample(cfg.lookLeftClip));
+                cfg.lookRightSamples = ConvertSamples(GazeClipBlendShapeSampler.Sample(cfg.lookRightClip));
+                cfg.lookUpSamples = ConvertSamples(GazeClipBlendShapeSampler.Sample(cfg.lookUpClip));
+                cfg.lookDownSamples = ConvertSamples(GazeClipBlendShapeSampler.Sample(cfg.lookDownClip));
+            }
+        }
+
+        private static List<GazeBlendShapeSampleEntry> ConvertSamples(
+            IReadOnlyList<GazeClipBlendShapeSampler.BlendShapeSample> source)
+        {
+            if (source == null || source.Count == 0)
+            {
+                return new List<GazeBlendShapeSampleEntry>();
+            }
+            var result = new List<GazeBlendShapeSampleEntry>(source.Count);
+            for (int i = 0; i < source.Count; i++)
+            {
+                var s = source[i];
+                result.Add(new GazeBlendShapeSampleEntry
+                {
+                    blendShapeName = s.BlendShapeName ?? string.Empty,
+                    weight = s.Weight,
+                });
+            }
+            return result;
         }
 
         /// <summary>
