@@ -75,26 +75,6 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance
         }
 
         [Test]
-        public void TryResolve_100Frames_ZeroGCAllocation_GetTotalMemory()
-        {
-            // ウォームアップ（JIT 等を排除）
-            bool warmup = _resolver.TryResolve(_snapshotId, _blendShapeBuffer, _boneBuffer);
-            Assert.IsTrue(warmup, "Warmup の TryResolve は成功すべき");
-
-            long allocBefore = GC.GetTotalMemory(false);
-            for (int frame = 0; frame < FrameCount; frame++)
-            {
-                bool ok = _resolver.TryResolve(_snapshotId, _blendShapeBuffer, _boneBuffer);
-                Assert.IsTrue(ok);
-            }
-            long allocAfter = GC.GetTotalMemory(false);
-
-            long allocated = allocAfter - allocBefore;
-            Assert.LessOrEqual(allocated, 0,
-                $"ExpressionResolver.TryResolve で GC アロケーションが検出されました: {allocated} bytes");
-        }
-
-        [Test]
         public void TryResolve_100Frames_ZeroGCAllocation_ProfilerRecorder()
         {
             // ウォームアップ

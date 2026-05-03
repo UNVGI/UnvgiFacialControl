@@ -135,16 +135,18 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance
             // ウォームアップ
             _adapter.Tick(0.016f);
 
-            long allocBefore = GC.GetTotalMemory(false);
+            using var recorder = ProfilerRecorder.StartNew(
+                ProfilerCategory.Memory, "GC.Alloc");
+
             for (int frame = 0; frame < DispatchCount; frame++)
             {
                 _adapter.Tick(0.016f);
             }
-            long allocAfter = GC.GetTotalMemory(false);
 
-            long allocated = allocAfter - allocBefore;
-            Assert.LessOrEqual(allocated, 0,
-                $"adapter.Tick で GC アロケーションが検出されました: {allocated} bytes (100 frames)");
+            long gcAlloc = recorder.LastValue;
+
+            Assert.AreEqual(0, gcAlloc,
+                $"adapter.Tick で GC アロケーションが検出されました: {gcAlloc} bytes (100 frames)");
         }
 
         [Test]
@@ -152,28 +154,49 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance
         {
             CreateAdapter();
 
-            // ウォームアップ: bind → unbind を 1 回行い、内部 Dictionary の容量確保等を済ませる
-            using var warmupAction = new InputAction("Warmup", InputActionType.Button, "<Keyboard>/1");
-            _adapter.BindExpression(warmupAction, "smile");
-            _adapter.UnbindExpression(warmupAction);
-
-            long allocBefore = GC.GetTotalMemory(false);
-
+            // 計測対象は adapter の BindExpression / UnbindExpression の純粋な確保のみに絞るため、
+            // InputAction の new / Dispose を計測区間の外で済ませる (InputSystem 内部の確保は本テストの責務外)。
+            var actions = new InputAction[DispatchCount];
             for (int i = 0; i < DispatchCount; i++)
             {
-                using var action = new InputAction("Bind" + (i % 2), InputActionType.Button, "<Keyboard>/1");
-                _adapter.BindExpression(action, "smile");
-                _adapter.UnbindExpression(action);
+                actions[i] = new InputAction("Bind" + i, InputActionType.Button, "<Keyboard>/1");
             }
 
-            long allocAfter = GC.GetTotalMemory(false);
+            try
+            {
+                // ウォームアップ: bind → unbind を 1 回行い、内部 Dictionary の容量確保等を済ませる
+                _adapter.BindExpression(actions[0], "smile");
+                _adapter.UnbindExpression(actions[0]);
 
-            // InputAction の生成 / Dispose 自体は InputSystem 内部でアロケーションが発生し得るため、
-            // adapter 自体の bind/unbind が「秤量できるほどの」漏洩を起こしていないことを確認する
-            // 緩い境界条件で検証する（アクション生成は InputSystem 側の責務）。
-            long allocated = allocAfter - allocBefore;
-            Assert.That(allocated, Is.LessThan(64 * 1024),
-                $"BindExpression / UnbindExpression で予想外の GC アロケーションが検出されました: {allocated} bytes");
+                using var recorder = ProfilerRecorder.StartNew(
+                    ProfilerCategory.Memory, "GC.Alloc");
+
+                for (int i = 0; i < DispatchCount; i++)
+                {
+                    _adapter.BindExpression(actions[i], "smile");
+                    _adapter.UnbindExpression(actions[i]);
+                }
+
+                long gcAlloc = recorder.LastValue;
+
+                // BindingEntry (1) + delegate (2) を毎回生成するため per-iter ~200 bytes は許容する。
+                // 100 iter × ~256 bytes = 25KB を上限とした緩めの上界で予期せぬ追加確保を検出する。
+                long upperBound = DispatchCount * 256L;
+                Assert.That(gcAlloc, Is.LessThanOrEqualTo(upperBound),
+                    $"BindExpression / UnbindExpression で予想外の GC アロケーションが検出されました: " +
+                    $"{gcAlloc} bytes (upper bound: {upperBound} bytes)");
+
+                // adapter 内部の bindings 辞書がリークしていないことも確認する。
+                Assert.AreEqual(0, _adapter.BindingCount,
+                    "BindExpression / UnbindExpression のペアで adapter 内部辞書にリークが発生しています。");
+            }
+            finally
+            {
+                for (int i = 0; i < DispatchCount; i++)
+                {
+                    actions[i]?.Dispose();
+                }
+            }
         }
 
         // ============================================================

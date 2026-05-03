@@ -19,11 +19,9 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance
     /// 0-alloc であることが期待される（design.md Topic 3）。
     /// </para>
     /// <para>
-    /// 計測手段:
-    /// <list type="bullet">
-    ///   <item><see cref="ProfilerRecorder"/>(<c>"GC.Alloc"</c>) で fine-grained に計測。</item>
-    ///   <item><see cref="GC.GetTotalMemory(bool)"/> delta で crude にも検証（CI 環境差異を吸収）。</item>
-    /// </list>
+    /// 計測手段は <see cref="ProfilerRecorder"/>(<c>"GC.Alloc"</c>) で fine-grained に計測する。
+    /// <c>GC.GetTotalMemory</c> による heap delta 計測は Editor のバックグラウンド処理
+    /// (アセット再インポート / Profiler サンプラ等) のヒープ活動を拾い flaky になるため採用しない。
     /// </para>
     /// </remarks>
     [TestFixture]
@@ -47,31 +45,6 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance
             _offset = new AnalogOffsetProcessor { offset = 0.1f };
             _curve = new AnalogCurveProcessor { preset = 3 };
             _clamp = new AnalogClampProcessor { min = -1f, max = 1f };
-        }
-
-        [Test]
-        public void Chain_PerProcess_ZeroGCAllocation_GetTotalMemory()
-        {
-            float input = 0.6f;
-
-            // ウォームアップ（JIT 等を排除）
-            float warmup = ProcessChain(input);
-            Assert.That(warmup, Is.Not.NaN);
-
-            long allocBefore = GC.GetTotalMemory(false);
-            float result = 0f;
-            for (int i = 0; i < IterationCount; i++)
-            {
-                result = ProcessChain(input);
-            }
-            long allocAfter = GC.GetTotalMemory(false);
-
-            // 計算結果は破棄されないよう参照する（最適化抑止）。
-            Assert.That(result, Is.Not.NaN);
-
-            long allocated = allocAfter - allocBefore;
-            Assert.LessOrEqual(allocated, 0,
-                $"6 種 processor 連結 Process で GC アロケーションが検出されました: {allocated} bytes");
         }
 
         [Test]
