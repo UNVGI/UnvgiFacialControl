@@ -87,6 +87,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         private HelpBox _expressionsValidationHelp;
         private Button _saveButton;
         private VisualElement _expressionRowsContainer;
+        private ListView _expressionBindingsListView;
 
         // ====================================================================
         // 候補リスト
@@ -101,6 +102,82 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         // ====================================================================
         // Editor lifecycle
         // ====================================================================
+
+        /// <summary>
+        /// アクティブな Inspector インスタンス一覧。AssetPostprocessor 経由で
+        /// InputActionAsset 編集時に Action 名候補を再読込するために使用する。
+        /// </summary>
+        private static readonly List<FacialCharacterSOInspector> _activeInspectors =
+            new List<FacialCharacterSOInspector>();
+
+        private void OnEnable()
+        {
+            if (!_activeInspectors.Contains(this))
+            {
+                _activeInspectors.Add(this);
+            }
+        }
+
+        private void OnDisable()
+        {
+            _activeInspectors.Remove(this);
+        }
+
+        /// <summary>
+        /// 現在 SO に割り当てられている InputActionAsset のアセットパスを返す。
+        /// AssetPostprocessor からの一致判定に使用する。
+        /// </summary>
+        private string GetCurrentInputActionAssetPath()
+        {
+            if (_inputActionAssetProperty == null)
+            {
+                return null;
+            }
+            var asset = _inputActionAssetProperty.objectReferenceValue;
+            if (asset == null)
+            {
+                return null;
+            }
+            return AssetDatabase.GetAssetPath(asset);
+        }
+
+        /// <summary>
+        /// 指定 InputActionAsset の編集に追従して Action 名候補と各行 DropdownField を再読込する。
+        /// </summary>
+        private void RefreshActionChoicesFromExternalEdit()
+        {
+            // SerializedObject 自体を Update することで、InputActionAsset 内部編集の
+            // 反映漏れがあれば最新化する。
+            try
+            {
+                serializedObject.Update();
+            }
+            catch (Exception)
+            {
+                // SerializedObject が破棄済みのケースは無視。
+                return;
+            }
+
+            RefreshActionMapChoices();
+            RefreshActionNameChoices();
+
+            // 既存 ListView の各 DropdownField の choices を最新化するため、
+            // ExpressionBindings セクションをまとめてリビルドする。
+            RebuildExpressionBindingsListView();
+        }
+
+        /// <summary>
+        /// ExpressionBindings ListView を再構築する。各行の choices を最新の _actionNameChoices で
+        /// 再描画させるための最小手段として bindItem を再走させる。
+        /// </summary>
+        private void RebuildExpressionBindingsListView()
+        {
+            if (_expressionBindingsListView == null)
+            {
+                return;
+            }
+            _expressionBindingsListView.Rebuild();
+        }
 
         public override VisualElement CreateInspectorGUI()
         {
@@ -284,12 +361,12 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
 
             if (_expressionBindingsProperty != null)
             {
-                var listView = BuildArrayListView(
+                _expressionBindingsListView = BuildArrayListView(
                     _expressionBindingsProperty,
                     itemHeight: 56f,
                     makeItem: () => CreateExpressionBindingRow(),
                     bindItem: (element, index) => BindExpressionBindingRow(element, index));
-                foldout.Add(listView);
+                foldout.Add(_expressionBindingsListView);
             }
 
             root.Add(foldout);
@@ -789,6 +866,14 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                         UpdateValidation();
                     }
                 });
+            }
+
+            // 遷移時間スライダー (transitionDuration)。BindProperty で SerializedProperty と双方向バインド。
+            var transitionDurationField = element.Q<Slider>(ExpressionRowTransitionDurationFieldName);
+            if (transitionDurationField != null && transitionDurationProp != null)
+            {
+                transitionDurationField.Unbind();
+                transitionDurationField.BindProperty(transitionDurationProp);
             }
 
             UpdateRowValidation(element, clipProp != null ? clipProp.objectReferenceValue as AnimationClip : null,
@@ -1533,6 +1618,75 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 result.Add(path);
             }
             return result;
+        }
+
+        // ====================================================================
+        // AssetPostprocessor: InputActionAsset 編集追従
+        // ====================================================================
+
+        /// <summary>
+        /// .inputactions アセットの再 import を検知して、開いている FacialCharacterSOInspector の
+        /// Action 名候補リストを再読込する。Inspector を閉じずに Action / ActionMap を編集しても
+        /// ドロップダウンが古いまま残る問題（Phase 5.x）への対応。
+        /// </summary>
+        private sealed class InputActionAssetChangeWatcher : AssetPostprocessor
+        {
+            private static void OnPostprocessAllAssets(
+                string[] importedAssets,
+                string[] deletedAssets,
+                string[] movedAssets,
+                string[] movedFromAssetPaths)
+            {
+                if (_activeInspectors.Count == 0)
+                {
+                    return;
+                }
+                if (importedAssets == null || importedAssets.Length == 0)
+                {
+                    return;
+                }
+
+                // imported に .inputactions が含まれるか走査。
+                var importedInputActionPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < importedAssets.Length; i++)
+                {
+                    var path = importedAssets[i];
+                    if (string.IsNullOrEmpty(path))
+                    {
+                        continue;
+                    }
+                    if (path.EndsWith(".inputactions", StringComparison.OrdinalIgnoreCase))
+                    {
+                        importedInputActionPaths.Add(path);
+                    }
+                }
+                if (importedInputActionPaths.Count == 0)
+                {
+                    return;
+                }
+
+                // 各アクティブ Inspector を走査し、参照中の InputActionAsset が更新対象に
+                // 含まれていれば Refresh をかける。リスト走査中の collection mutation を避けるため
+                // スナップショットを取る。
+                var snapshot = new List<FacialCharacterSOInspector>(_activeInspectors);
+                for (int i = 0; i < snapshot.Count; i++)
+                {
+                    var inspector = snapshot[i];
+                    if (inspector == null)
+                    {
+                        continue;
+                    }
+                    var currentPath = inspector.GetCurrentInputActionAssetPath();
+                    if (string.IsNullOrEmpty(currentPath))
+                    {
+                        continue;
+                    }
+                    if (importedInputActionPaths.Contains(currentPath))
+                    {
+                        inspector.RefreshActionChoicesFromExternalEdit();
+                    }
+                }
+            }
         }
     }
 }
