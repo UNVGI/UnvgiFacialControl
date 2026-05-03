@@ -11,8 +11,8 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 66b402a1dc2b31045843ee6bec45348a, type: 3}
   m_Name: MultiSourceBlendDemoCharacter
-  m_EditorClassIdentifier: 
-  _schemaVersion: 2.0
+  m_EditorClassIdentifier:
+  _schemaVersion: "2.0"
   _layers:
   - name: emotion
     priority: 0
@@ -43,10 +43,10 @@ MonoBehaviour:
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
-        name: "\u7B11\u3044"
+        name: 笑い
         value: 100
       - rendererPath: Body
-        name: "\u53E3\u89D2\u4E0A\u3052"
+        name: 口角上げ
         value: 60
       bones: []
       rendererPaths:
@@ -67,13 +67,13 @@ MonoBehaviour:
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
-        name: "\u6012\u308A"
+        name: 怒り
         value: 100
       - rendererPath: Body
-        name: "\u5DE6\u7709\u4E0B\u3052"
+        name: 左眉下げ
         value: 50
       - rendererPath: Body
-        name: "\u53F3\u7709\u4E0B\u3052"
+        name: 右眉下げ
         value: 50
       bones: []
       rendererPaths:
@@ -94,10 +94,10 @@ MonoBehaviour:
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
-        name: "\u3073\u3063\u304F\u308A"
+        name: びっくり
         value: 100
       - rendererPath: Body
-        name: "\u25B2"
+        name: ▲
         value: 80
       bones: []
       rendererPaths:
@@ -118,13 +118,13 @@ MonoBehaviour:
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
-        name: "\u3042"
+        name: あ
         value: 100
       bones: []
       rendererPaths:
       - Body
   - id: eye_look
-    name: "\u76EE\u7DDA"
+    name: 目線
     layer: emotion
     kind: 1
     animationClip: {fileID: 0}
@@ -142,7 +142,7 @@ MonoBehaviour:
       rendererPaths: []
   _rendererPaths:
   - Body
-  _referenceModel: {fileID: 8198287467416625081, guid: 5588fb1befbdc5344a5457a74467ca94, type: 3}
+  _referenceModel: {fileID: 0}
   _inputActionAsset: {fileID: -944628639613478452, guid: 5e2f7a9c1b3d4e6f8a0b2c4d5e6f7a8b, type: 3}
   _actionMapName: Expression
   _expressionBindings:
@@ -156,13 +156,13 @@ MonoBehaviour:
     expressionId: lipsync_a
   _gazeConfigs:
   - expressionId: eye_look
-    inputAction: {fileID: -3932401352079162673, guid: 5e2f7a9c1b3d4e6f8a0b2c4d5e6f7a8b, type: 3}
-    leftEyeBonePath: 
+    inputAction: {fileID: 0}
+    leftEyeBonePath:
     leftEyeInitialRotation: {x: 0, y: 0, z: 0}
-    rightEyeBonePath: 
+    rightEyeBonePath:
     rightEyeInitialRotation: {x: 0, y: 0, z: 0}
-    leftEyeXBlendShape: 
-    leftEyeYBlendShape: 
-    rightEyeXBlendShape: 
-    rightEyeYBlendShape: 
+    leftEyeXBlendShape:
+    leftEyeYBlendShape:
+    rightEyeXBlendShape:
+    rightEyeYBlendShape:
   _analogBindings: []
