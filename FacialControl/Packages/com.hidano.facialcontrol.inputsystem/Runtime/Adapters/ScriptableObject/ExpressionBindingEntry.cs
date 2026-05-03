@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using Hidano.FacialControl.Domain.Models;
 
 namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
 {
@@ -11,6 +12,8 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
     /// device 種別 (Keyboard / Controller) は <c>ExpressionInputSourceAdapter</c> が
     /// <see cref="UnityEngine.InputSystem.InputAction.bindings"/> から自動推定するため、
     /// 旧 <c>category</c> field は撤去された (Req 7.1, tasks.md 4.6)。
+    /// 押下時の挙動 (<see cref="triggerMode"/>) はバインディング毎に設定可能で、
+    /// 既定は押下中のみ ON となる Hold モード。
     /// </remarks>
     [Serializable]
     public sealed class ExpressionBindingEntry
@@ -20,5 +23,11 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
 
         [Tooltip("発火対象の Expression の ID (FacialCharacterSO.Expressions[].id と一致させる)。")]
         public string expressionId;
+
+        [Tooltip(
+            "押下時の動作モード。"
+            + " Hold: 押している間だけ ON、ボタンを離すと OFF。"
+            + " Toggle: 押すたびに ON/OFF が切替わる。")]
+        public TriggerMode triggerMode = TriggerMode.Hold;
     }
 }

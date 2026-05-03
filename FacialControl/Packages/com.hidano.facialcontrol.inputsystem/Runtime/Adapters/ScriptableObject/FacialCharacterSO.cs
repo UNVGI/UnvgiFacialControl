@@ -98,7 +98,7 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
                 {
                     continue;
                 }
-                result.Add(new DomainInputBinding(entry.actionName, entry.expressionId));
+                result.Add(new DomainInputBinding(entry.actionName, entry.expressionId, entry.triggerMode));
             }
             return result;
         }
@@ -133,11 +133,8 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
                     continue;
                 }
 
-                // ボーン制御 (主): 入力 x → bone Y 軸 (yaw)、入力 y → bone X 軸 (pitch)。
-                AppendBoneBinding(entries, sourceId, sourceAxis: 0, cfg.leftEyeBonePath, AnalogTargetAxis.Y);
-                AppendBoneBinding(entries, sourceId, sourceAxis: 1, cfg.leftEyeBonePath, AnalogTargetAxis.X);
-                AppendBoneBinding(entries, sourceId, sourceAxis: 0, cfg.rightEyeBonePath, AnalogTargetAxis.Y);
-                AppendBoneBinding(entries, sourceId, sourceAxis: 1, cfg.rightEyeBonePath, AnalogTargetAxis.X);
+                // ボーン制御は GazeBonePoseProvider 側で扱うため、ここでは BonePose の AnalogBindingEntry は
+                // 生成しない (GazeConfig が保持する yaw/pitch 軸・可動範囲を使うため Euler 加算では不正確)。
 
                 // BlendShape 制御 (オプション、4 系統 clip): Editor で焼き付けた sample 配列から
                 // 1 BS = 1 entry を Direction + Scale 付きで emit する。AnimationClip の curve は
@@ -179,29 +176,6 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
                 }
             }
             return dict;
-        }
-
-        private static void AppendBoneBinding(
-            List<AnalogBindingEntry> sink, string sourceId, int sourceAxis,
-            string bonePath, AnalogTargetAxis targetAxis)
-        {
-            if (string.IsNullOrWhiteSpace(bonePath))
-            {
-                return;
-            }
-            try
-            {
-                sink.Add(new AnalogBindingEntry(
-                    sourceId,
-                    sourceAxis,
-                    AnalogBindingTargetKind.BonePose,
-                    bonePath,
-                    targetAxis));
-            }
-            catch (ArgumentException)
-            {
-                // targetIdentifier が空など。スキップ。
-            }
         }
 
         private static void AppendClipBlendShapeBindings(

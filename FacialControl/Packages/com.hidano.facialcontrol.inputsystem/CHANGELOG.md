@@ -7,23 +7,34 @@
 ### ⚠ BREAKING CHANGES
 
 - `GazeExpressionConfig` の BlendShape 経路を 4 string field (`leftEyeXBlendShape` / `leftEyeYBlendShape` / `rightEyeXBlendShape` / `rightEyeYBlendShape`) から 4 AnimationClip 参照 (`lookLeftClip` / `lookRightClip` / `lookUpClip` / `lookDownClip`) に置換。Vector2 入力の +X / -X / +Y / -Y がそれぞれ LookRight / LookLeft / LookUp / LookDown clip に対応する。既存 SO の旧 BS string 値はロード時に黙って無視される。
+- 目線ボーンの runtime 反映経路を `AnalogBonePoseProvider` (Euler 加算) から専用 `GazeBonePoseProvider` (quaternion 合成 + 可動範囲制限) に切替えた。`FacialCharacterSO.BuildAnalogProfileFromGazeConfigs` は `BonePose` の `AnalogBindingEntry` を生成しなくなり、目線ボーンの軸変換と角度クランプは `GazeBonePoseProvider` が担う。**既存 SO は 目線ボーン foldout の「参照モデルから自動設定」を再実行**して新しい yaw/pitch 軸と可動角を再構築する必要がある。
+- `ExpressionBindingEntry` の既定動作モードが `Toggle` から `Hold` に変更。`triggerMode` field を追加し、未指定時は押している間だけ表情が ON、リリースで OFF になる。**既存 SO の挙動が変化する**ため、これまで通りトグル動作を維持したいバインディングは Inspector で動作モードを `Toggle` に戻す。
 
 ### Added
 
+- `Hidano.FacialControl.Domain.Models.TriggerMode` (`Hold` / `Toggle`) と `Hidano.FacialControl.Domain.Models.InputBinding.TriggerMode` フィールドを新設し、ボタン押下時の挙動を選択可能にした。
+- `ExpressionBindingEntry` に `triggerMode` フィールドを追加し、`FacialCharacterSOInspector` のキーバインディング行に動作モード選択 UI (EnumField) を追加した。
+- `GazeExpressionConfig` に左右目それぞれの yaw/pitch local 軸 (`leftEyeYawAxisLocal` / `leftEyePitchAxisLocal` / `rightEyeYawAxisLocal` / `rightEyePitchAxisLocal`) と、可動範囲制限フィールド (`lookUpAngle` / `lookDownAngle` / `outerYawAngle` / `innerYawAngle`) を追加した。
+- `Hidano.FacialControl.InputSystem.Adapters.Bone.GazeBonePoseProvider` を新設し、quaternion 合成で世界の上下/左右軸基準に目線ボーン rotation を計算するようにした。`FacialCharacterInputExtension` が GazeConfig から構築・Tick 駆動する。
 - `GazeExpressionConfig` に 4 系統 AnimationClip フィールドと、Editor で焼き付けた sample 配列 `lookLeftSamples` / `lookRightSamples` / `lookUpSamples` / `lookDownSamples` (`List<GazeBlendShapeSampleEntry>`) を追加。runtime はこの sample 配列から `AnalogBindingEntry` を構築する。
 - `GazeBlendShapeSampleEntry` 型 (`blendShapeName: string` / `weight: float`) を新設。
 - `Hidano.FacialControl.InputSystem.Editor.Sampling.GazeClipBlendShapeSampler` (Editor 専用) — 4 系統 clip の time=0 における BlendShape weight を抽出する `AnimationUtility` ベースのヘルパ。
 - `FacialCharacterSOAutoExporter.SampleGazeClipsIntoConfigs` — SO 保存時に 4 系統 clip を sample して上記 sample 配列に永続化する経路を追加。
 - `FacialCharacterSOInspector` の Gaze BS セクションを 4 ObjectField (AnimationClip) に置換。同セクションの `BuildGazeClipField` ヘルパと、UIElements name 定数 (`ExpressionRowGazeLookLeftClipName` 等) を新設。
-- `FacialCharacterSOInspector` の目線ボーン foldout に「参照モデルから自動設定」ボタンを追加。`_referenceModel` の Animator から Humanoid Avatar マッピング優先 (LeftEye / RightEye)、不在時は名前検索 (`*eye*`) で目ボーンを解決し、`Transform.name` と現在の `localEulerAngles` を初期回転として書き込む。
+- `FacialCharacterSOInspector` の目線ボーン foldout に「参照モデルから自動設定」ボタンを追加。`_referenceModel` の Animator から Humanoid Avatar マッピング優先 (LeftEye / RightEye)、不在時は名前検索 (`*eye*`) で目ボーンを解決し、`Transform.name` と現在の `localEulerAngles` を初期回転として書き込む。同ボタンは新たに、参照モデル時点の親 Transform を介して「世界の上下/左右軸が当該目ボーンの local 空間でどの方向に対応するか」を算出し yaw/pitch 軸として保存する。
+- `FacialCharacterSOInspector` のアナログ表情行に「可動範囲 (角度制限)」 foldout を追加。上方向/下方向/外側 (yaw)/内側 (yaw) の 4 角度を Slider で編集できる。
 
 ### Changed
 
-- `FacialCharacterSO.BuildAnalogProfileFromGazeConfigs` を 4 sample list 経路に変更し、各 BS の keyframe weight を `AnalogBindingEntry.Scale` に、+X/-X/+Y/-Y 振り分けを `AnalogBindingDirection` (Positive / Negative) に設定して emit する。
+- `Adapters.Input.InputSystemAdapter.BindExpression` に `TriggerMode` を受ける overload を追加し、Hold モードでは `started` / `canceled`、Toggle モードでは `performed` を購読する分岐を実装。既存の 2-arg overload は後方互換のため `Toggle` で固定。
+- `FacialCharacterInputExtension.BindAllExpressions` がバインディングごとの `TriggerMode` を `InputSystemAdapter` に伝播するようになった。
+- `FacialCharacterInputExtension` が GazeConfig がある場合に `GazeBonePoseProvider` を構築・LateUpdate で Apply / Teardown 時に Dispose するようになった。`AnalogBonePoseProvider` は引き続き非目線ボーンや legacy `_analogBindings` 経路で使用される。
+- `FacialCharacterSO.BuildAnalogProfileFromGazeConfigs` を 4 sample list 経路に変更し、各 BS の keyframe weight を `AnalogBindingEntry.Scale` に、+X/-X/+Y/-Y 振り分けを `AnalogBindingDirection` (Positive / Negative) に設定して emit する。目線ボーン制御は `GazeBonePoseProvider` に移管したため `BonePose` 系の entry は emit しなくなった。
 - `Adapters.Json.Dto.AnalogBindingEntryDto` の scale / direction 追加に伴い JSON round-trip も更新（core パッケージ側）。
 
 ### Removed
 
+- `FacialCharacterSO.AppendBoneBinding` private ヘルパを撤去 (目線ボーンは `GazeBonePoseProvider` で扱うため)。
 - `FacialCharacterSOInspector.BuildGazeBlendShapeField` (TextField 版) を削除。
 - 旧定数 `ExpressionRowGazeLeftXName` / `ExpressionRowGazeLeftYName` / `ExpressionRowGazeRightXName` / `ExpressionRowGazeRightYName` を削除。
 

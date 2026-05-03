@@ -354,7 +354,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             {
                 _expressionBindingsListView = BuildArrayListView(
                     _expressionBindingsProperty,
-                    itemHeight: 56f,
+                    itemHeight: 84f,
                     makeItem: () => CreateExpressionBindingRow(),
                     bindItem: (element, index) => BindExpressionBindingRow(element, index));
                 foldout.Add(_expressionBindingsListView);
@@ -381,6 +381,13 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             };
             container.Add(expressionDropdown);
 
+            var triggerModeField = new EnumField("動作モード", TriggerMode.Hold)
+            {
+                name = "triggerModeField",
+                tooltip = "Hold: 押している間だけ ON。Toggle: 押すたびに ON/OFF が切替わる。",
+            };
+            container.Add(triggerModeField);
+
             return container;
         }
 
@@ -397,6 +404,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             var entryProp = _expressionBindingsProperty.GetArrayElementAtIndex(index);
             var actionNameProp = entryProp.FindPropertyRelative("actionName");
             var expressionIdProp = entryProp.FindPropertyRelative("expressionId");
+            var triggerModeProp = entryProp.FindPropertyRelative("triggerMode");
 
             var actionDropdown = element.Q<DropdownField>("actionDropdown");
             if (actionDropdown != null && actionNameProp != null)
@@ -432,6 +440,28 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                     if (prop != null)
                     {
                         prop.stringValue = evt.newValue ?? string.Empty;
+                        serializedObject.ApplyModifiedProperties();
+                    }
+                });
+            }
+
+            var triggerModeField = element.Q<EnumField>("triggerModeField");
+            if (triggerModeField != null && triggerModeProp != null)
+            {
+                var current = (TriggerMode)triggerModeProp.enumValueIndex;
+                triggerModeField.SetValueWithoutNotify(current);
+                triggerModeField.RegisterValueChangedCallback(evt =>
+                {
+                    if (!(evt.newValue is TriggerMode mode))
+                    {
+                        return;
+                    }
+                    serializedObject.Update();
+                    var prop = _expressionBindingsProperty.GetArrayElementAtIndex(index)
+                        .FindPropertyRelative("triggerMode");
+                    if (prop != null)
+                    {
+                        prop.enumValueIndex = (int)mode;
                         serializedObject.ApplyModifiedProperties();
                     }
                 });
@@ -1014,18 +1044,68 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 boneSection.Add(f);
             }
 
+            var leftYawAxisProp = cfgProp.FindPropertyRelative("leftEyeYawAxisLocal");
+            var leftPitchAxisProp = cfgProp.FindPropertyRelative("leftEyePitchAxisLocal");
+            var rightYawAxisProp = cfgProp.FindPropertyRelative("rightEyeYawAxisLocal");
+            var rightPitchAxisProp = cfgProp.FindPropertyRelative("rightEyePitchAxisLocal");
+            var outerYawProp = cfgProp.FindPropertyRelative("outerYawAngle");
+            var innerYawProp = cfgProp.FindPropertyRelative("innerYawAngle");
+            var lookUpAngleProp = cfgProp.FindPropertyRelative("lookUpAngle");
+            var lookDownAngleProp = cfgProp.FindPropertyRelative("lookDownAngle");
+
             var autoAssignButton = new Button(() => AutoAssignGazeBonesFromReferenceModel(
-                leftBonePathProp, leftInitRotProp, rightBonePathProp, rightInitRotProp))
+                leftBonePathProp, leftInitRotProp,
+                rightBonePathProp, rightInitRotProp,
+                leftYawAxisProp, leftPitchAxisProp,
+                rightYawAxisProp, rightPitchAxisProp))
             {
                 name = ExpressionRowGazeAutoAssignButtonName,
                 text = "参照モデルから自動設定",
                 tooltip = "参照モデルの Animator から左右目ボーンを解決し、ボーン名と現在の localEulerAngles を初期回転として書き込みます。"
+                    + " さらに、世界の上下/左右軸が各目ボーンの local 空間でどの方向に対応するかを算出し、yaw/pitch 軸として保存します。"
                     + " Humanoid Avatar が設定されている場合は LeftEye / RightEye マッピングを優先し、不在時は名前検索 (LeftEye / RightEye / *eye*) でフォールバックします。",
             };
             autoAssignButton.style.marginTop = 4;
             boneSection.Add(autoAssignButton);
 
             row.Add(boneSection);
+
+            // ----- 可動範囲 (角度制限) -----
+            var rangeSection = new Foldout
+            {
+                text = "可動範囲 (角度制限)",
+                value = true,
+            };
+            rangeSection.style.marginTop = 4;
+            rangeSection.Add(MakeHelpBox(
+                "左右目共通の上下角度と、左右目それぞれの「外側 (鼻から離れる側)」「内側 (鼻に近づく側)」"
+                + " の最大角度を指定します。例: 向かって左に視線を送るとき、向かって左の眼は外側、"
+                + " 向かって右の眼は内側の値で動きます。"));
+            if (lookUpAngleProp != null)
+            {
+                var f = new Slider("上方向の最大角度 (度)", 0f, 90f) { showInputField = true };
+                f.BindProperty(lookUpAngleProp);
+                rangeSection.Add(f);
+            }
+            if (lookDownAngleProp != null)
+            {
+                var f = new Slider("下方向の最大角度 (度)", 0f, 90f) { showInputField = true };
+                f.BindProperty(lookDownAngleProp);
+                rangeSection.Add(f);
+            }
+            if (outerYawProp != null)
+            {
+                var f = new Slider("外側 (左右) の最大角度 (度)", 0f, 90f) { showInputField = true };
+                f.BindProperty(outerYawProp);
+                rangeSection.Add(f);
+            }
+            if (innerYawProp != null)
+            {
+                var f = new Slider("内側 (左右) の最大角度 (度)", 0f, 90f) { showInputField = true };
+                f.BindProperty(innerYawProp);
+                rangeSection.Add(f);
+            }
+            row.Add(rangeSection);
 
             // ----- BlendShape 制御 (オプション、4 系統 clip) -----
             var blendSection = new Foldout
@@ -1140,7 +1220,11 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             SerializedProperty leftBonePathProp,
             SerializedProperty leftInitRotProp,
             SerializedProperty rightBonePathProp,
-            SerializedProperty rightInitRotProp)
+            SerializedProperty rightInitRotProp,
+            SerializedProperty leftYawAxisProp,
+            SerializedProperty leftPitchAxisProp,
+            SerializedProperty rightYawAxisProp,
+            SerializedProperty rightPitchAxisProp)
         {
             if (_referenceModelProperty == null)
             {
@@ -1178,6 +1262,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             {
                 if (leftBonePathProp != null) leftBonePathProp.stringValue = leftEye.name;
                 if (leftInitRotProp != null) leftInitRotProp.vector3Value = leftEye.localEulerAngles;
+                AssignParentLocalAxes(leftEye, leftYawAxisProp, leftPitchAxisProp);
                 assigned++;
             }
             else
@@ -1189,6 +1274,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             {
                 if (rightBonePathProp != null) rightBonePathProp.stringValue = rightEye.name;
                 if (rightInitRotProp != null) rightInitRotProp.vector3Value = rightEye.localEulerAngles;
+                AssignParentLocalAxes(rightEye, rightYawAxisProp, rightPitchAxisProp);
                 assigned++;
             }
             else
@@ -1203,6 +1289,35 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                     $"[FacialCharacterSOInspector] 参照モデル '{referenceModel.name}' から目ボーンを自動設定しました"
                     + $" (Left: {(leftEye != null ? leftEye.name : "(skip)")}, Right: {(rightEye != null ? rightEye.name : "(skip)")}).");
             }
+        }
+
+        /// <summary>
+        /// 参照モデル上の目ボーン Transform から、世界の上方向 (Vector3.up) と右方向 (Vector3.right) が
+        /// その目ボーンの「親の local 空間」でそれぞれどの方向ベクトルに対応するかを算出して保存する。
+        /// 親が存在しない場合は世界軸そのものを保存する (動作環境ではあまり起きない)。
+        /// </summary>
+        private static void AssignParentLocalAxes(
+            Transform eyeBone,
+            SerializedProperty yawAxisProp,
+            SerializedProperty pitchAxisProp)
+        {
+            if (eyeBone == null) return;
+
+            Vector3 yawAxisLocal = Vector3.up;
+            Vector3 pitchAxisLocal = Vector3.right;
+
+            var parent = eyeBone.parent;
+            if (parent != null)
+            {
+                yawAxisLocal = parent.InverseTransformDirection(Vector3.up);
+                pitchAxisLocal = parent.InverseTransformDirection(Vector3.right);
+            }
+
+            if (yawAxisLocal.sqrMagnitude > 1e-8f) yawAxisLocal = yawAxisLocal.normalized;
+            if (pitchAxisLocal.sqrMagnitude > 1e-8f) pitchAxisLocal = pitchAxisLocal.normalized;
+
+            if (yawAxisProp != null) yawAxisProp.vector3Value = yawAxisLocal;
+            if (pitchAxisProp != null) pitchAxisProp.vector3Value = pitchAxisLocal;
         }
 
         /// <summary>

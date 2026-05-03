@@ -9,6 +9,7 @@ using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.InputSystem.Adapters.Bone;
 using Hidano.FacialControl.InputSystem.Adapters.ScriptableObject;
 using DomainInputBinding = Hidano.FacialControl.Domain.Models.InputBinding;
 using AdapterInputSystemAdapter = Hidano.FacialControl.Adapters.Input.InputSystemAdapter;
@@ -59,6 +60,7 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Input
         private List<IAnalogInputSource> _ownedSources;
         private Dictionary<string, IAnalogInputSource> _activeSources;
         private AnalogBonePoseProvider _bonePoseProvider;
+        private GazeBonePoseProvider _gazeBoneProvider;
         private AdapterInputSystemAdapter _adapter;
         private bool _inputBound;
         private bool _analogReady;
@@ -150,6 +152,7 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Input
             }
 
             _bonePoseProvider?.BuildAndPush();
+            _gazeBoneProvider?.Apply();
         }
 
         // ================================================================
@@ -275,6 +278,14 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Input
                     _facialController, _activeSources, bonePoseBindings, restPoses);
             }
 
+            // 目線ボーン専用 provider: GazeConfig 単位で yaw/pitch 軸と可動範囲を反映。
+            if (so.GazeConfigs != null && so.GazeConfigs.Count > 0 && _facialController != null)
+            {
+                var gazeResolver = new BoneTransformResolver(_facialController.transform);
+                _gazeBoneProvider = new GazeBonePoseProvider(
+                    gazeResolver, _activeSources, so.GazeConfigs);
+            }
+
             _analogReady = true;
         }
 
@@ -386,7 +397,7 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Input
                     continue;
                 }
 
-                _adapter.BindExpression(action, expression.Value);
+                _adapter.BindExpression(action, expression.Value, binding.TriggerMode);
             }
         }
 
@@ -474,6 +485,12 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Input
             {
                 _bonePoseProvider.Dispose();
                 _bonePoseProvider = null;
+            }
+
+            if (_gazeBoneProvider != null)
+            {
+                _gazeBoneProvider.Dispose();
+                _gazeBoneProvider = null;
             }
 
             if (_ownedSources != null)
