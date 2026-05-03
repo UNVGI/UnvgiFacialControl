@@ -75,6 +75,19 @@
                 "bones": [],
                 "rendererPaths": ["Body"]
             }
+        },
+        {
+            "id": "eye_look",
+            "name": "目線",
+            "layer": "emotion",
+            "layerOverrideMask": ["emotion"],
+            "snapshot": {
+                "transitionDuration": 0,
+                "transitionCurvePreset": "Linear",
+                "blendShapes": [],
+                "bones": [],
+                "rendererPaths": []
+            }
         }
     ],
     "rendererPaths": ["Body"]

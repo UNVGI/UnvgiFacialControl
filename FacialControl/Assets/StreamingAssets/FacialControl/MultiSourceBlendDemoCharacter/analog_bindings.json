@@ -1,40 +1,4 @@
-{
+﻿{
     "version": "2.0",
-    "bindings": [
-        {
-            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd4444",
-            "sourceAxis": 0,
-            "targetKind": "blendshape",
-            "targetIdentifier": "LeftEye",
-            "targetAxis": "Y"
-        },
-        {
-            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd5555",
-            "sourceAxis": 0,
-            "targetKind": "blendshape",
-            "targetIdentifier": "LeftEye",
-            "targetAxis": "X"
-        },
-        {
-            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd4444",
-            "sourceAxis": 0,
-            "targetKind": "blendshape",
-            "targetIdentifier": "RightEye",
-            "targetAxis": "Y"
-        },
-        {
-            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd5555",
-            "sourceAxis": 0,
-            "targetKind": "blendshape",
-            "targetIdentifier": "RightEye",
-            "targetAxis": "X"
-        },
-        {
-            "sourceId": "aaaa1111-bbbb-2222-cccc-3333dddd6666",
-            "sourceAxis": 0,
-            "targetKind": "blendshape",
-            "targetIdentifier": "jawOpen",
-            "targetAxis": "X"
-        }
-    ]
+    "bindings": []
 }

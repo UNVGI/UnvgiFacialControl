@@ -9,6 +9,11 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
     /// <see cref="targetAxis"/> は文字列で永続化（"X" / "Y" / "Z"、BlendShape ターゲット時は無視）。
     /// 不正値はローダ側で <c>Debug.LogWarning</c> + skip 扱い（Req 6.5）。
     /// </para>
+    /// <para>
+    /// <see cref="scale"/> と <see cref="direction"/> は BlendShape clip 由来 binding 用の追加属性。
+    /// 旧スキーマ JSON では欠落しているため、欠落・空・不正値は default 値（scale=1, direction=Bipolar）で
+    /// fallback する。BonePose ターゲットは原則 scale=1 / direction=Bipolar で使う。
+    /// </para>
     /// </remarks>
     [System.Serializable]
     public sealed class AnalogBindingEntryDto
@@ -27,5 +32,16 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
 
         /// <summary>BonePose ターゲットの Euler 軸文字列（"X"/"Y"/"Z"、大小無視）。BlendShape では無視。</summary>
         public string targetAxis;
+
+        /// <summary>
+        /// 反映倍率。clip 由来 binding では keyframe weight が入る。
+        /// JsonUtility が欠落フィールドに 0 を入れてしまうため、ローダ側で 0 は default（1f）扱いする。
+        /// </summary>
+        public float scale;
+
+        /// <summary>
+        /// 入力符号フィルタ ("bipolar" / "positive" / "negative"、大小無視)。空・不正は Bipolar 扱い。
+        /// </summary>
+        public string direction;
     }
 }

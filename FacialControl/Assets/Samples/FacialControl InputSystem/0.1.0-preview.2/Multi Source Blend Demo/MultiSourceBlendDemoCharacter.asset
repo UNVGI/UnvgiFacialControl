@@ -11,8 +11,8 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 66b402a1dc2b31045843ee6bec45348a, type: 3}
   m_Name: MultiSourceBlendDemoCharacter
-  m_EditorClassIdentifier:
-  _schemaVersion: "2.0"
+  m_EditorClassIdentifier: 
+  _schemaVersion: 2.0
   _layers:
   - name: emotion
     priority: 0
@@ -24,27 +24,29 @@ MonoBehaviour:
     - id: keyboard-expr
       weight: 0.5
       optionsJson: '{"maxStackDepth":4}'
+    layerOverrideMask:
+    - emotion
   _expressions:
   - id: smile
     name: Smile
     layer: emotion
+    kind: 0
     animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e801, type: 2}
     transitionDuration: 0.25
     transitionCurve:
       type: 0
       keys: []
     blendShapeValues: []
-    layerOverrideMask:
-    - emotion
+    layerOverrideMask: []
     cachedSnapshot:
       transitionDuration: 0.25
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
-        name: 笑い
+        name: "\u7B11\u3044"
         value: 100
       - rendererPath: Body
-        name: 口角上げ
+        name: "\u53E3\u89D2\u4E0A\u3052"
         value: 60
       bones: []
       rendererPaths:
@@ -52,26 +54,26 @@ MonoBehaviour:
   - id: anger
     name: Anger
     layer: emotion
+    kind: 0
     animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e802, type: 2}
     transitionDuration: 0.25
     transitionCurve:
       type: 0
       keys: []
     blendShapeValues: []
-    layerOverrideMask:
-    - emotion
+    layerOverrideMask: []
     cachedSnapshot:
       transitionDuration: 0.25
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
-        name: 怒り
+        name: "\u6012\u308A"
         value: 100
       - rendererPath: Body
-        name: 左眉下げ
+        name: "\u5DE6\u7709\u4E0B\u3052"
         value: 50
       - rendererPath: Body
-        name: 右眉下げ
+        name: "\u53F3\u7709\u4E0B\u3052"
         value: 50
       bones: []
       rendererPaths:
@@ -79,23 +81,23 @@ MonoBehaviour:
   - id: surprise
     name: Surprise
     layer: emotion
+    kind: 0
     animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e803, type: 2}
     transitionDuration: 0.2
     transitionCurve:
       type: 0
       keys: []
     blendShapeValues: []
-    layerOverrideMask:
-    - emotion
+    layerOverrideMask: []
     cachedSnapshot:
       transitionDuration: 0.2
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
-        name: びっくり
+        name: "\u3073\u3063\u304F\u308A"
         value: 100
       - rendererPath: Body
-        name: ▲
+        name: "\u25B2"
         value: 80
       bones: []
       rendererPaths:
@@ -103,27 +105,44 @@ MonoBehaviour:
   - id: lipsync_a
     name: Lipsync_A
     layer: emotion
+    kind: 0
     animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e804, type: 2}
     transitionDuration: 0.1
     transitionCurve:
       type: 0
       keys: []
     blendShapeValues: []
-    layerOverrideMask:
-    - emotion
+    layerOverrideMask: []
     cachedSnapshot:
       transitionDuration: 0.1
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
-        name: あ
+        name: "\u3042"
         value: 100
       bones: []
       rendererPaths:
       - Body
+  - id: eye_look
+    name: "\u76EE\u7DDA"
+    layer: emotion
+    kind: 1
+    animationClip: {fileID: 0}
+    transitionDuration: 0
+    transitionCurve:
+      type: 0
+      keys: []
+    blendShapeValues: []
+    layerOverrideMask: []
+    cachedSnapshot:
+      transitionDuration: 0
+      transitionCurvePreset: Linear
+      blendShapes: []
+      bones: []
+      rendererPaths: []
   _rendererPaths:
   - Body
-  _referenceModel: {fileID: 0}
+  _referenceModel: {fileID: 8198287467416625081, guid: 5588fb1befbdc5344a5457a74467ca94, type: 3}
   _inputActionAsset: {fileID: -944628639613478452, guid: 5e2f7a9c1b3d4e6f8a0b2c4d5e6f7a8b, type: 3}
   _actionMapName: Expression
   _expressionBindings:
@@ -135,19 +154,15 @@ MonoBehaviour:
     expressionId: surprise
   - actionName: Trigger4
     expressionId: lipsync_a
-  _analogBindings:
-  - inputActionRef: aaaa1111-bbbb-2222-cccc-3333dddd4444
-    targetIdentifier: LeftEye
-    targetAxis: 1
-  - inputActionRef: aaaa1111-bbbb-2222-cccc-3333dddd5555
-    targetIdentifier: LeftEye
-    targetAxis: 0
-  - inputActionRef: aaaa1111-bbbb-2222-cccc-3333dddd4444
-    targetIdentifier: RightEye
-    targetAxis: 1
-  - inputActionRef: aaaa1111-bbbb-2222-cccc-3333dddd5555
-    targetIdentifier: RightEye
-    targetAxis: 0
-  - inputActionRef: aaaa1111-bbbb-2222-cccc-3333dddd6666
-    targetIdentifier: jawOpen
-    targetAxis: 0
+  _gazeConfigs:
+  - expressionId: eye_look
+    inputAction: {fileID: 0}
+    leftEyeBonePath: 
+    leftEyeInitialRotation: {x: 0, y: 0, z: 0}
+    rightEyeBonePath: 
+    rightEyeInitialRotation: {x: 0, y: 0, z: 0}
+    leftEyeXBlendShape: 
+    leftEyeYBlendShape: 
+    rightEyeXBlendShape: 
+    rightEyeYBlendShape: 
+  _analogBindings: []

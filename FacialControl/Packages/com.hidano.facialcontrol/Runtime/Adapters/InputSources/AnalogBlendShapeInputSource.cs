@@ -112,7 +112,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
                     continue;
                 }
 
-                resolvedList.Add(new ResolvedBinding(source, entry.SourceAxis, bsIndex));
+                resolvedList.Add(new ResolvedBinding(source, entry.SourceAxis, bsIndex, entry.Scale, entry.Direction));
             }
 
             _resolvedBindings = resolvedList.Count == 0
@@ -153,8 +153,25 @@ namespace Hidano.FacialControl.Adapters.InputSources
                     continue;
                 }
 
+                // 入力符号フィルタを適用してから scale 倍率で BS index に加算する（gaze 4 系統等の用途）。
+                // Bipolar 既定では従来挙動と完全互換（raw * 1f）。
+                float effective;
+                switch (rb.Direction)
+                {
+                    case AnalogBindingDirection.Positive:
+                        effective = raw > 0f ? raw : 0f;
+                        break;
+                    case AnalogBindingDirection.Negative:
+                        effective = raw < 0f ? -raw : 0f;
+                        break;
+                    case AnalogBindingDirection.Bipolar:
+                    default:
+                        effective = raw;
+                        break;
+                }
+
                 anyValid = true;
-                cache[rb.BlendShapeIndex] += raw;
+                cache[rb.BlendShapeIndex] += effective * rb.Scale;
             }
 
             if (!anyValid)
@@ -216,15 +233,21 @@ namespace Hidano.FacialControl.Adapters.InputSources
             public readonly IAnalogInputSource Source;
             public readonly int SourceAxis;
             public readonly int BlendShapeIndex;
+            public readonly float Scale;
+            public readonly AnalogBindingDirection Direction;
 
             public ResolvedBinding(
                 IAnalogInputSource source,
                 int sourceAxis,
-                int blendShapeIndex)
+                int blendShapeIndex,
+                float scale,
+                AnalogBindingDirection direction)
             {
                 Source = source;
                 SourceAxis = sourceAxis;
                 BlendShapeIndex = blendShapeIndex;
+                Scale = scale;
+                Direction = direction;
             }
         }
     }

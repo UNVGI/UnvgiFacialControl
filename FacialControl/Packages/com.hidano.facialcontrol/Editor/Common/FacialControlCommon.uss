@@ -37,4 +37,11 @@
 .unity-help-box .unity-label,
 .unity-help-box .unity-text-element {
     white-space: normal;
+    -unity-font-style: normal;
+}
+
+/* FacialControl Inspector: Foldout のラベルを太字にしない */
+.unity-foldout__text,
+.unity-foldout > .unity-toggle__text {
+    -unity-font-style: normal;
 }

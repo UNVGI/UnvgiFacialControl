@@ -1,97 +1,82 @@
 # HANDOVER
 
-## ◯ 今回やったこと
+## 今回やったこと
 
-- 設定ファイル統合リファクタを完遂 (9 タスク、preview.1 完成形)
-- Task 1-3 を自分で実装、Task 4-8 を agent 並列で委譲、Task 9 を自分で実装
-- 旧 3 SO + 文字列パス構成 → 新統合 `FacialCharacterSO` 1 個 + InputActionAsset 1 個に集約
-- JSON は人間に意識させず、`StreamingAssets/FacialControl/{SO 名}/profile.json` + `analog_bindings.json` で自動探索 + 自動エクスポート
-- UI Toolkit Inspector を 7 Foldout (Input / Bindings / Analog / Layers / Expression / BonePose / Debug) で構成、HelpBox + Tooltip で長文 README 不要に
-- 旧 SO / 旧 MonoBehaviour / 旧 Inspector / 旧テスト 16 件を削除、新 EditMode/PlayMode テスト追加
-- 全 README + quickstart + json-schema を新形式に簡略化
-- OSC パッケージは旧 SO 非依存だったため影響なし、README を 1 段落のみ追加更新
-- 最終: EditMode 1302/1303 (pre-existing 1 件のみ failed)、PlayMode 387/387
+- MultiSourceBlendDemo の不具合 6 件を 2 並行サブエージェント体制で修正
+  - Task 1: Camera を背面 → 正面に反転、FoV 60 → 20
+  - Task 2: Inspector の AnimationClip 名表示が更新されない問題
+  - Task 3: InputActionAsset 経由のデバイス入力で ON/OFF が効かない問題
+  - Task 4: Action 名ドロップダウンの InputActionAsset 編集後の自動再読込
+  - Task 5: ON/OFF 表情の遷移時間設定 UI 露出
+  - Task 6: AnalogBindingDemo を MultiSourceBlendDemo に統合（サンプル一本化）
 
-## ◯ 決定事項
+## 決定事項
 
-- **データソース**: 3-B モデル (起動時は常に StreamingAssets JSON、SO 編集時に Editor が裏で自動エクスポート)
-- **構成**: 「InputActionAsset 1 個 + キャラ別 SO 1 個」の 1 対。FacialController の SerializeField は CharacterSO + SkinnedMeshRenderers のみ
-- **アナログ統合**: AnalogBinding は新統合 SO に同梱 (旧 AnalogInputBindingProfileSO 廃止)
-- **MonoBehaviour**: FacialCharacterInputExtension 1 個に統合 (旧 FacialInputBinder + FacialAnalogInputBinder 廃止)
-- **マイグレーション**: preview 段階で破壊的変更 OK、互換レイヤー一切持たない
-- **namespace 配置**:
-  - 抽象基底 + Serializable: `Hidano.FacialControl.Adapters.ScriptableObject.Serializable`
-  - 具象 SO + Input Extension: `Hidano.FacialControl.InputSystem.Adapters.ScriptableObject` / `.Input`
-- **規約パス**: `UnityEngine.Application.streamingAssetsPath/FacialControl/{SO 名}/profile.json` + `analog_bindings.json`
-- **AutoExporter**: `AssetModificationProcessor.OnWillSaveAssets` で発火、`EditorApplication.delayCall` で `AssetDatabase.Refresh()` を遅延実行
-- **InputBinding 型**: Domain assembly (コアパッケージ) に存在すべき。InputSystem 配下のコピーは Task 8 で削除済み
+- Camera: `pos (0, 1.4, 2.5)`, `Euler (0, 180, 0)`, `FoV 20`（旧 AnalogBindingDemo の正常パターンに揃えた）
+- Sample は `Multi Source Blend Demo` 1 本のみ。AnalogBindingDemo は完全削除
+- 統合 inputactions (`MultiSourceBlendDemoActions.inputactions`) の Action ID は AnalogBindingDemoActions / FacialControlDefaultActions と一致させ流用 → SO 側の参照書き換え不要
+- 統合 inputactions の guid は新規 `5e2f7a9c1b3d4e6f8a0b2c4d5e6f7a8b`
+- TransitionDuration は既存 `ExpressionSerializable.transitionDuration` (`[Range(0, 1)]`) を Slider で Inspector に露出
+- Inspector で `BindProperty(SerializedProperty)` ベースに切替え、UI Toolkit に再描画を委譲する方針
+- `AssetPostprocessor` は独立ファイルにせず `FacialCharacterSOInspector` の nested class として配置
+- FacialController に "Profile ready" イベントは追加せず、`FacialCharacterInputExtension.LateUpdate` で `!_inputBound` 時のみ再試行する単純解
+- Sample 二重管理（`Samples~/` + `Assets/Samples/`）は維持。両方を同時更新
 
-## ◯ 捨てた選択肢と理由
+## 捨てた選択肢と理由
 
-- **JSON 完全廃止 (SO のみ運用)**: ビルド後差し替え機能を失うためユーザー拒否
-- **SO がマスター + JSON はオプショナル上書き (3-A)**: 既存の JSON-first ロード経路 (SystemTextJsonParser / FileProfileRepository) を流用したいユーザー意向で 3-B 選択
-- **旧 SO 互換レイヤーを残す**: ユーザー明示で「破壊的変更で書き直し」指示
-- **`using NameAlias = ...` で BonePoseSerializable 衝突回避**: C# は同名前空間内の types を using alias より先に解決するため alias が無効。`.Serializable` サブ namespace に隔離する形で解決
-- **BonePoseSerializable をリネーム (CharacterBonePose 等)**: Unity Asset YAML が namespace + class FullName を保持しシリアライズ破壊リスクあるため、旧型を維持しつつ新型を別 namespace に配置
-- **ExpressionCreatorWindow を Inspector に完全埋め込み**: 工数大のため preview.1 では「Expression Creator を開く」ボタン経由で旧 Window 起動の方式を採用、preview.2 で再評価
-- **Inspector のレイヤー → inputSources を専用ドロップダウン化**: preview.1 では Unity 標準 PropertyField で手入力、ID 候補化は preview.2 で
-- **namespace `.Serializable` を旧 `.ScriptableObject` に戻す**: Task 8 完了後に可能になったが Asset YAML 影響リスク評価が要るため preview.2 に持ち越し
-- **OSC パッケージへの新 SO 連携サンプル追加**: 既存 Multi Source Blend Demo に OSC を 1 行足せば動くため preview.1 では不要
+- worktree isolation で並行 agent → ブランチ分割とマージ管理が複雑化。同一 branch で編集ファイル領域を分離して並行運用に
+- FacialController に Profile ready イベントを追加 → 修正範囲が広い。LateUpdate リトライで十分
+- 統合 inputactions の Action ID を新規生成 → SO の `_analogBindings.inputActionRef` / `_expressionBindings.actionName` の書き換えが連鎖。既存 ID 流用が安全
+- バインディング側に `transitionDuration` 上書き field を新設 → 既存 `Expression.TransitionDuration` が ON/OFF 駆動でも適用されるため不要
+- `SetValueWithoutNotify` を維持して ChangeEvent を手動 dispatch → `BindProperty` で UI Toolkit に委譲する方が短く確実
 
-## ◯ ハマりどころ
+## ハマりどころ
 
-- **C# 名前解決規則**: 同名前空間内の types は using alias より先に resolve される。FacialCharacterProfileSO.cs を `.ScriptableObject` namespace に置いて alias で衝突回避を試みたが失敗 → `.Serializable` 配下に移動して解決
-- **`Application` 衝突**: `Hidano.FacialControl.Application` namespace と `UnityEngine.Application` が衝突。`UnityEngine.Application.streamingAssetsPath` で完全修飾必須
-- **`ArgumentException` catch 順**: `ArgumentOutOfRangeException` は派生型なので先に書かないと CS0160 (unreachable catch)
-- **InputBinding 二重定義**: `Hidano.FacialControl.Domain.Models.InputBinding` がコア Domain と InputSystem 両方に同名存在し InputSystem 側が優先 resolve されてテストが失敗していた (pre-existing)。Task 8 でコア Domain に統合
-- **AssetModificationProcessor.OnWillSaveAssets**: 保存「直前」に発火するため、書き出した JSON は当該保存に含まれない。`EditorApplication.delayCall` で `AssetDatabase.Refresh()` を次フレーム以降にずらす必要あり
-- **Sample import の StreamingAssets**: Unity の Sample import は `Samples~/<sample>/StreamingAssets/...` を `Assets/StreamingAssets/` に自動コピーしない。ユーザーが手動コピーする必要があり各 Sample README に手順記載
+- **Task 3 の核心バグ**: `FacialCharacterInputExtension.OnEnable` 時点で `FacialController.CurrentProfile` が StreamingAssets の非同期ロード待ちで `null`。`BindAllExpressions` 内 `ResolveExpression` が全 binding に対して null を返し silently skip、しかも `_inputBound = true` で確定するため後続復旧不能。**AnalogBindingDemo は `_expressionBindings` が空だったので問題が露呈せず、MultiSourceBlend で初顕在化**
+- MultiSourceBlendDemoCharacter.asset には `_inputActionAsset` が既に設定済み + シーンに FacialCharacterInputExtension も attach 済みで、表面上は wire 済みに見えた → タイミング依存の silent failure
+- 1 回目の調査エージェントが Bash の `find` / `grep` / `cat` を使い deny rule 違反 (SECURITY WARNING)。実装エージェントへの prompt で明示禁止
+- UI Toolkit の `SetValueWithoutNotify` は ChangeEvent を発火しないため、ObjectField の派生表示（ラベル等）が更新されないケースがある
 
-## ◯ 学び
+## 学び
 
-- Unity Serializable Asset YAML は namespace + class FullName を保持するため、リファクタ中の namespace 変更は破壊的になりうる。型の物理移動より「新しい場所に新しい型を作り、旧型は維持して段階削除」が安全
-- `IFacialControllerExtension` パターン (ConfigureFactory フック) と MonoBehaviour ライフサイクル (OnEnable/OnDisable) の併用は、入力源登録 + ランタイム結線の責務を綺麗に分離できる
-- 大規模リファクタでもファイル単位で並列化できる作業は agent 3 並列で 15-20 分で消化可能。Task 4-6 を並列で投げて context 節約に成功
-- Inspector の HelpBox + Tooltip は長文 README より UX が良い。「フィールドにホバーすれば分かる」状態を作れば README は付録程度で済む
+- 非同期 SO 初期化を伴う MonoBehaviour Extension で `bool _initialized = true` ガードを使う際、初回成功条件が満たされなければ true を立てない（または再試行ループを置く）
+- `BindProperty(SerializedProperty)` を使えば UI Toolkit が自動で再描画を担当するので、`SetValueWithoutNotify` 系の表示更新バグは大体回避できる
+- FoV 20 + 距離 2.5m は望遠寄りで頭部クローズアップ専用。上半身を見せるなら距離 4〜5m
+- agent 調査結果は仮説段階で止まることがあり、実コード読みで決定的原因の特定が必要なケースあり
 
-## ◯ 次にやること
+## 次にやること
 
-優先度の高い順:
+優先度 **高** — Unity Editor 実機確認:
+- Play モードでキーボード `1〜4` / Gamepad dpad で表情切替（Task 3 検証）
+- Inspector で AnimationClip 差し替え時の表示名即時更新（Task 2）
+- InputActionAsset の Action 追加直後にドロップダウン自動更新（Task 4）
+- 各 Expression 行の「遷移時間 (秒)」スライダー → `profile.json` 反映（Task 5）
+- 左スティック → Eye Euler / ARKit jaw → mouth-open BlendShape（Task 6 動作）
 
-1. **(高)** `InputSourceFactoryTests.TryCreate_OscIdWithoutOscDependencies_ReturnsNull` を解消。`InputSourceFactoryTests.CreateFactory()` ヘルパーが OSC を強制登録する設計を見直す。pre-existing failure として唯一残存
-2. **(中)** Inspector の **レイヤー** セクションで `inputSources.id` を予約 ID + `x-*` ドロップダウン候補化 (現状は手入力)。`FacialCharacterSOInspector.cs` 拡張
-3. **(中)** ExpressionCreatorWindow を新 SO 用に Inspector へ完全埋め込み (現状はボタンで別 Window 起動)
-4. **(中)** Sample import 後の StreamingAssets 自動橋渡し Editor 拡張 (両 Sample README で手動コピーを案内している現状を改善)
-5. **(低)** 旧 Editor ツール (`ARKitEditorService` / `ARKitDetectorWindow` / `ProfileCreationDialog`) の整理 / 廃止検討。新 SO ベースに API 書き換えはしたが UX 整合は preview.2 で
-6. **(低)** namespace `.Serializable` を `.ScriptableObject` に戻すか再評価 (旧 SO 削除済みなので可能、Asset YAML 影響要検証)
+優先度 **中**:
+- Camera FoV 20 + 距離 2.5m が望遠すぎないか確認、必要なら距離調整
 
-現リファクタは preview.1 として完了状態。コミットは Hooks で自動済み。
+優先度 **低**:
+- `ExpressionSerializable.transitionDuration` は `[Bridge]` 表記で Phase 3.6 で snapshot 経路へ移行予定 → 移行時に Inspector の Slider バインド先を `cachedSnapshot.transitionDuration` に切り替える
 
-## ◯ 関連ファイル
+## 関連ファイル
 
-### 新規作成 (主要)
-- `Packages/com.hidano.facialcontrol/Runtime/Adapters/ScriptableObject/IFacialCharacterProfile.cs`
-- `Packages/com.hidano.facialcontrol/Runtime/Adapters/ScriptableObject/FacialCharacterProfileSO.cs` (抽象基底)
-- `Packages/com.hidano.facialcontrol/Runtime/Adapters/ScriptableObject/Serializable/*.cs` (10 ファイル: LayerDefinitionSerializable / ExpressionSerializable / BonePoseSerializable / AnalogBindingEntrySerializable / FacialCharacterProfileConverter ほか)
-- `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/ScriptableObject/FacialCharacterSO.cs` (具象 SO)
-- `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/ScriptableObject/ExpressionBindingEntry.cs`
-- `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/ScriptableObject/InputSourceCategory.cs`
-- `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/Input/FacialCharacterInputExtension.cs`
-- `Packages/com.hidano.facialcontrol.inputsystem/Editor/Inspector/FacialCharacterSOInspector.cs` (UI Toolkit, 7 Foldout)
-- `Packages/com.hidano.facialcontrol.inputsystem/Editor/AutoExport/FacialCharacterSOAutoExporter.cs`
-- 対応する EditMode/PlayMode テスト群 (FacialCharacterProfileSOTests / FacialCharacterSOTests / FacialCharacterInputExtensionTests / FacialCharacterSOInspectorTests / FacialCharacterSOAutoExporterTests / FacialControllerCharacterSOTests / FacialCharacterProfileConverterTests)
+修正:
+- `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/Input/FacialCharacterInputExtension.cs`
+- `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Editor/Inspector/FacialCharacterSOInspector.cs`
+- `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/package.json`
 
-### 主要編集
-- `Packages/com.hidano.facialcontrol/Runtime/Adapters/Playable/FacialController.cs` (`_characterSO` SerializeField + `LoadCharacter` API、旧 `_profileSO` 完全削除)
-- `Packages/com.hidano.facialcontrol/Runtime/Domain/Models/InputBinding.cs` (InputSystem から Domain へ移動)
-- `Packages/com.hidano.facialcontrol/Editor/Inspector/FacialControllerEditor.cs` / `Tools/ARKitEditorService.cs` / `Tools/ExpressionCreatorWindow.cs` / `Windows/ARKitDetectorWindow.cs` / `Windows/ProfileCreationDialog.cs` (新 SO 型に書き換え)
-- 各パッケージ README.md + `Documentation~/quickstart.md` + `Documentation~/json-schema.md`
-- `Samples~/MultiSourceBlendDemo/`, `Samples~/AnalogBindingDemo/` および `Assets/Samples/` 配下の dev コピー全体
+シーン (Camera + HUD):
+- `FacialControl/Assets/Samples/FacialControl InputSystem/0.1.0-preview.2/Multi Source Blend Demo/MultiSourceBlendDemo.unity`
+- `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Samples~/MultiSourceBlendDemo/MultiSourceBlendDemo.unity`
 
-### 削除
-- `FacialProfileSO.cs` / `FacialProfileMapper.cs` / `InputBindingProfileSO.cs` / `AnalogInputBindingProfileSO.cs`
-- `FacialInputBinder.cs` / `FacialAnalogInputBinder.cs` / `AnalogBlendShapeRegistration.cs`
-- 旧 Inspector 5 ファイル + 旧テスト 15 ファイル
+Sample 一式 (Assets/Samples 側 + Samples~ 側で同期):
+- `MultiSourceBlendDemoActions.inputactions` (新規)
+- `MultiSourceBlendDemoCharacter.asset` (`_analogBindings` 5 件追加 / `_inputActionAsset` 切替)
+- `MultiSourceBlendDemoHUD.cs` (BonePose / BlendShape / source ID セクション追加)
+- `StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/analog_bindings.json`
+- `README.md`
 
-### 計画書
-- `C:\Users\Hidano\.claude\plans\inputactionasset-action-so-1-readme-so-immutable-quokka.md`
+削除 (Samples~ + Assets/Samples + StreamingAssets):
+- `AnalogBindingDemo/` フォルダ一式
+- `AnalogBindingDemoCharacter/` フォルダ一式
