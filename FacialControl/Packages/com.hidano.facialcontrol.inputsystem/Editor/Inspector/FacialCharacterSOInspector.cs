@@ -57,6 +57,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         public const string ExpressionRowMaskFieldName = "expression-row-mask-field";
         public const string ExpressionRowRendererSummaryName = "expression-row-renderer-summary";
         public const string ExpressionRowValidationHelpName = "expression-row-validation-help";
+        public const string ExpressionRowTransitionDurationFieldName = "expression-row-transition-duration-field";
 
         // ====================================================================
         // SerializedProperty
@@ -611,6 +612,15 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             };
             container.Add(clipField);
 
+            // ON/OFF 切替時の遷移時間（秒）。Domain.Models.Expression.TransitionDuration へ写像される。
+            var transitionDurationField = new Slider("遷移時間 (秒)", 0f, 1f)
+            {
+                name = ExpressionRowTransitionDurationFieldName,
+                showInputField = true,
+                tooltip = "ON/OFF 切替時の遷移時間（秒、0〜1）。バインディング駆動の表情変更時に補間時間として使用される。",
+            };
+            container.Add(transitionDurationField);
+
             var layerDropdown = new DropdownField("Layer")
             {
                 name = ExpressionRowLayerDropdownName,
@@ -666,6 +676,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             var layerProp = entryProp.FindPropertyRelative("layer");
             var clipProp = entryProp.FindPropertyRelative("animationClip");
             var maskProp = entryProp.FindPropertyRelative("layerOverrideMask");
+            var transitionDurationProp = entryProp.FindPropertyRelative("transitionDuration");
 
             // Id label (read-only). 空なら自動採番。
             if (idProp != null && string.IsNullOrEmpty(idProp.stringValue))
@@ -702,12 +713,36 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             var clipField = element.Q<ExpressionClipObjectField>(ExpressionRowClipFieldName);
             if (clipField != null && clipProp != null)
             {
+                // 既存ハンドラを一旦切り離してから値を反映し、再度バインドする。
                 clipField.OnValueAssigned = null;
-                clipField.SetValueWithoutNotify(clipProp.objectReferenceValue);
+
+                // BindProperty を使うと UI Toolkit が内部ラベルを最新の AnimationClip 名で
+                // 再描画してくれる。SetValueWithoutNotify 単独だと表示名が古いまま残る
+                // ケースがあったため、こちらに統一する（Phase 5.x の表示更新バグ修正）。
+                clipField.Unbind();
+                clipField.BindProperty(clipProp);
+
+                // BindProperty 後に ChangeEvent ハンドラを再登録する。同じ index に対する
+                // 重複登録を避けるため、専用の userData フィールドにハンドラを退避し、
+                // 既存があれば事前に外す。
+                if (clipField.userData is EventCallback<ChangeEvent<UnityEngine.Object>> previousCallback)
+                {
+                    clipField.UnregisterCallback(previousCallback);
+                }
+                EventCallback<ChangeEvent<UnityEngine.Object>> changedCallback = evt =>
+                {
+                    OnClipChanged(index, evt.newValue as AnimationClip, element);
+                };
+                clipField.RegisterCallback(changedCallback);
+                clipField.userData = changedCallback;
+
+                // テスト・パネル未付与環境向けに OnValueAssigned パスも併設する。
+                // BindProperty が値を伝搬する Editor 実機ではこちらは発火せず二重呼び出しは起きない。
                 clipField.OnValueAssigned = newValue =>
                 {
                     OnClipChanged(index, newValue as AnimationClip, element);
                 };
+
                 RefreshRendererSummary(element, clipProp.objectReferenceValue as AnimationClip);
             }
 
@@ -1365,6 +1400,11 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         /// ChangeEvent を dispatch しないため、<c>RegisterValueChangedCallback</c> は発火しない。
         /// 本サブクラスは <see cref="SetValueWithoutNotify"/> 経路で
         /// <see cref="OnValueAssigned"/> を呼出し、テスト・Editor 双方で動作するようにする。
+        /// <para>
+        /// Phase 5.x: AnimationClip 差し替え後にラベル表示が古い名前のまま残る問題を修正するため、
+        /// 値が変化した際に <see cref="VisualElement.MarkDirtyRepaint"/> を明示的に呼び出して
+        /// 内部ラベルの再描画を強制する。
+        /// </para>
         /// </summary>
         private sealed class ExpressionClipObjectField : ObjectField
         {
@@ -1376,6 +1416,9 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 base.SetValueWithoutNotify(newValue);
                 if (!ReferenceEquals(previous, newValue))
                 {
+                    // ObjectField の内部ラベル（"clipName (AnimationClip)"）が古いキャッシュを
+                    // 表示し続けるケースがあるため、明示的に再描画をスケジュールする。
+                    MarkDirtyRepaint();
                     OnValueAssigned?.Invoke(newValue);
                 }
             }

@@ -123,6 +123,18 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Input
 
         private void LateUpdate()
         {
+            // FacialController.Initialize が profile.json を非同期にロードするため、
+            // OnEnable 時点では CurrentProfile が未確定で BindAllExpressions が silently
+            // 全 skip されることがある。Profile が ready になるまで毎 LateUpdate で結線を再試行する。
+            if (!_inputBound)
+            {
+                EnsureExpressionBound();
+                if (_inputBound)
+                {
+                    _isActive = true;
+                }
+            }
+
             if (!_isActive)
             {
                 return;
@@ -326,7 +338,19 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Input
                 return;
             }
 
-            _adapter = new AdapterInputSystemAdapter(_facialController);
+            // FacialController.Initialize は profile.json を非同期にロードする。Profile 未確定
+            // の間に BindAllExpressions を呼ぶと ResolveExpression が常に null を返し、全 binding
+            // が silent skip された状態で _inputBound = true に固定されてしまう。Profile が
+            // ready になるまで結線を保留し、LateUpdate のリトライに任せる。
+            if (!_facialController.CurrentProfile.HasValue)
+            {
+                return;
+            }
+
+            if (_adapter == null)
+            {
+                _adapter = new AdapterInputSystemAdapter(_facialController);
+            }
 
             // device 種別 (Keyboard / Controller) は ExpressionInputSourceAdapter が
             // InputAction.bindings から自動推定するため、ここでは category 別に分岐せず
