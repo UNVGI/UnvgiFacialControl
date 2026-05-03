@@ -53,6 +53,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
         public const string ExpressionRowGazeLeftYName = "expression-row-gaze-left-y";
         public const string ExpressionRowGazeRightXName = "expression-row-gaze-right-x";
         public const string ExpressionRowGazeRightYName = "expression-row-gaze-right-y";
+        public const string ExpressionRowGazeAutoAssignButtonName = "expression-row-gaze-auto-assign-button";
 
         // ====================================================================
         // SerializedProperty
@@ -1012,6 +1013,18 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 f.BindProperty(rightInitRotProp);
                 boneSection.Add(f);
             }
+
+            var autoAssignButton = new Button(() => AutoAssignGazeBonesFromReferenceModel(
+                leftBonePathProp, leftInitRotProp, rightBonePathProp, rightInitRotProp))
+            {
+                name = ExpressionRowGazeAutoAssignButtonName,
+                text = "参照モデルから自動設定",
+                tooltip = "参照モデルの Animator から左右目ボーンを解決し、ボーン名と現在の localEulerAngles を初期回転として書き込みます。"
+                    + " Humanoid Avatar が設定されている場合は LeftEye / RightEye マッピングを優先し、不在時は名前検索 (LeftEye / RightEye / *eye*) でフォールバックします。",
+            };
+            autoAssignButton.style.marginTop = 4;
+            boneSection.Add(autoAssignButton);
+
             row.Add(boneSection);
 
             // ----- BlendShape 制御 (オプション) -----
@@ -1105,6 +1118,122 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
                 }
             }
             serializedObject.ApplyModifiedProperties();
+        }
+
+        // ====================================================================
+        // 目線ボーン: 参照モデルからの自動設定
+        // ====================================================================
+
+        /// <summary>
+        /// 参照モデル (<c>_referenceModel</c>) の Animator から左右目ボーンを解決し、
+        /// 対応する SerializedProperty にボーン名と現在の localEulerAngles を書き込む。
+        /// Humanoid Avatar 優先、不在時は名前検索でフォールバック。
+        /// </summary>
+        private void AutoAssignGazeBonesFromReferenceModel(
+            SerializedProperty leftBonePathProp,
+            SerializedProperty leftInitRotProp,
+            SerializedProperty rightBonePathProp,
+            SerializedProperty rightInitRotProp)
+        {
+            if (_referenceModelProperty == null)
+            {
+                Debug.LogWarning("[FacialCharacterSOInspector] 参照モデル property が解決できません。");
+                return;
+            }
+
+            var referenceModel = _referenceModelProperty.objectReferenceValue as GameObject;
+            if (referenceModel == null)
+            {
+                Debug.LogWarning(
+                    "[FacialCharacterSOInspector] 参照モデルが未割り当てです。"
+                    + " Inspector の「参照モデル」セクションで GameObject を割り当ててから再実行してください。");
+                return;
+            }
+
+            var animator = referenceModel.GetComponentInChildren<Animator>(includeInactive: true);
+
+            Transform leftEye = null;
+            Transform rightEye = null;
+
+            if (animator != null && animator.avatar != null && animator.avatar.isHuman)
+            {
+                leftEye = animator.GetBoneTransform(HumanBodyBones.LeftEye);
+                rightEye = animator.GetBoneTransform(HumanBodyBones.RightEye);
+            }
+
+            if (leftEye == null) leftEye = FindEyeTransformByName(referenceModel.transform, isLeft: true);
+            if (rightEye == null) rightEye = FindEyeTransformByName(referenceModel.transform, isLeft: false);
+
+            serializedObject.Update();
+
+            int assigned = 0;
+            if (leftEye != null)
+            {
+                if (leftBonePathProp != null) leftBonePathProp.stringValue = leftEye.name;
+                if (leftInitRotProp != null) leftInitRotProp.vector3Value = leftEye.localEulerAngles;
+                assigned++;
+            }
+            else
+            {
+                Debug.LogWarning("[FacialCharacterSOInspector] 左目ボーンを参照モデルから解決できませんでした。Humanoid マッピング・命名規則を確認してください。");
+            }
+
+            if (rightEye != null)
+            {
+                if (rightBonePathProp != null) rightBonePathProp.stringValue = rightEye.name;
+                if (rightInitRotProp != null) rightInitRotProp.vector3Value = rightEye.localEulerAngles;
+                assigned++;
+            }
+            else
+            {
+                Debug.LogWarning("[FacialCharacterSOInspector] 右目ボーンを参照モデルから解決できませんでした。Humanoid マッピング・命名規則を確認してください。");
+            }
+
+            if (assigned > 0)
+            {
+                serializedObject.ApplyModifiedProperties();
+                Debug.Log(
+                    $"[FacialCharacterSOInspector] 参照モデル '{referenceModel.name}' から目ボーンを自動設定しました"
+                    + $" (Left: {(leftEye != null ? leftEye.name : "(skip)")}, Right: {(rightEye != null ? rightEye.name : "(skip)")}).");
+            }
+        }
+
+        /// <summary>
+        /// Humanoid マッピング不在時に名前で目ボーン Transform を検索する。
+        /// 優先順: 完全一致 (LeftEye / RightEye) → side prefix (L_*Eye* / R_*Eye*) → side keyword (left*eye* / right*eye*)。
+        /// 大小文字無視。
+        /// </summary>
+        private static Transform FindEyeTransformByName(Transform root, bool isLeft)
+        {
+            if (root == null) return null;
+            var transforms = root.GetComponentsInChildren<Transform>(includeInactive: true);
+
+            string exact = isLeft ? "LeftEye" : "RightEye";
+            string sidePrefix = isLeft ? "l_" : "r_";
+            string sideKeyword = isLeft ? "left" : "right";
+
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                var t = transforms[i];
+                if (t == null || string.IsNullOrEmpty(t.name)) continue;
+                if (string.Equals(t.name, exact, StringComparison.OrdinalIgnoreCase)) return t;
+            }
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                var t = transforms[i];
+                if (t == null || string.IsNullOrEmpty(t.name)) continue;
+                if (t.name.StartsWith(sidePrefix, StringComparison.OrdinalIgnoreCase)
+                    && t.name.IndexOf("eye", StringComparison.OrdinalIgnoreCase) >= 0) return t;
+            }
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                var t = transforms[i];
+                if (t == null || string.IsNullOrEmpty(t.name)) continue;
+                var n = t.name;
+                if (n.IndexOf(sideKeyword, StringComparison.OrdinalIgnoreCase) >= 0
+                    && n.IndexOf("eye", StringComparison.OrdinalIgnoreCase) >= 0) return t;
+            }
+            return null;
         }
 
         // ====================================================================
