@@ -121,19 +121,20 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
                 var src = expressions[i];
                 if (src == null || string.IsNullOrWhiteSpace(src.id) || string.IsNullOrWhiteSpace(src.name) || string.IsNullOrWhiteSpace(src.layer)) continue;
 
-                float duration;
+                // 遷移時間は Inspector スライダー (src.transitionDuration) を常に正とする。
+                // Why: cachedSnapshot.transitionDuration は AnimationEvent 由来のベイク値で、
+                // Inspector で編集した値が反映されない問題があった (Inspector 操作が silent に無視される)。
+                float duration = src.transitionDuration;
                 TransitionCurve curve;
                 BlendShapeMapping[] blendShapes;
 
                 if (src.cachedSnapshot != null)
                 {
-                    duration = src.cachedSnapshot.transitionDuration;
                     curve = ConvertTransitionCurvePreset(src.cachedSnapshot.transitionCurvePreset);
                     blendShapes = ConvertSnapshotBlendShapes(src.cachedSnapshot.blendShapes);
                 }
                 else
                 {
-                    duration = src.transitionDuration;
                     curve = ConvertTransitionCurve(src.transitionCurve);
                     blendShapes = ConvertBlendShapes(src.blendShapeValues);
                 }

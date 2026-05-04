@@ -357,7 +357,11 @@ namespace Hidano.FacialControl.InputSystem.Editor.AutoExport
                 }
                 var snapshotId = string.IsNullOrEmpty(expr.id) ? string.Empty : expr.id;
                 var snapshot = sampler.SampleSnapshot(snapshotId, expr.animationClip);
-                expr.cachedSnapshot = ConvertSnapshotToDto(snapshot);
+                var dto = ConvertSnapshotToDto(snapshot);
+                // Inspector スライダー (expr.transitionDuration) を cachedSnapshot 側にも反映し、
+                // 後続の JSON 出力経路と SO 直読み経路で値を一致させる。
+                dto.transitionDuration = expr.transitionDuration;
+                expr.cachedSnapshot = dto;
             }
         }
 
@@ -489,6 +493,14 @@ namespace Hidano.FacialControl.InputSystem.Editor.AutoExport
                         layerOverrideMask = resolvedMask,
                         snapshot = src.cachedSnapshot ?? CreateDefaultSnapshotDto(),
                     };
+
+                    // Inspector スライダーの transitionDuration を JSON 出力にも反映する。
+                    // cachedSnapshot 側がベイク時の旧値を保持していても、Inspector で編集された
+                    // 最新値が runtime (StreamingAssets JSON 経路) でも採用されるように上書きする。
+                    if (exprDto.snapshot != null)
+                    {
+                        exprDto.snapshot.transitionDuration = src.transitionDuration;
+                    }
 
                     // Expression snapshot の rendererPaths を top-level set にマージ
                     if (exprDto.snapshot != null && exprDto.snapshot.rendererPaths != null)
