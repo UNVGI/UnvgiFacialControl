@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using Hidano.FacialControl.Adapters.Json;
-using Hidano.FacialControl.Adapters.Json.Dto;
+using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Editor.AutoExport;
 using Hidano.FacialControl.Editor.Sampling;
 using Hidano.FacialControl.InputSystem.Adapters.ScriptableObject;
-using Hidano.FacialControl.InputSystem.Editor.Sampling;
 using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
@@ -16,18 +16,18 @@ using Debug = UnityEngine.Debug;
 namespace Hidano.FacialControl.InputSystem.Editor.AutoExport
 {
     /// <summary>
-    /// <see cref="FacialCharacterProfileSO"/> 系アセットの保存 (Save) を検出し、
-    /// <see cref="IExpressionAnimationClipSampler"/> 経由で各 Expression の AnimationClip をサンプリングして
-    /// <see cref="ExpressionSerializable.cachedSnapshot"/> を更新したうえで、規約パス
-    /// <c>StreamingAssets/FacialControl/{SO 名}/profile.json</c> (schema v2.0) および
+    /// <see cref="FacialCharacterSO"/> 用の保存検出・自動エクスポート パイプライン。
+    /// AnimationClip サンプリング → cachedSnapshot 反映 + Gaze 4 系統 clip サンプリングに加え、
+    /// 規約パス <c>StreamingAssets/FacialControl/{SO 名}/profile.json</c> (schema v2.0) と
     /// <c>analog_bindings.json</c> へ JSON を自動エクスポートする
     /// <see cref="UnityEditor.AssetModificationProcessor"/> 派生クラス。
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Phase 5.3 (inspector-and-data-model-redesign): AnimationClip サンプラ経路に改修。
-    /// 進捗表示 (<see cref="EditorUtility.DisplayProgressBar"/>) と
-    /// abort 経路（OnWillSaveAssets paths からの除外）を提供する（Req 9.1, 9.5, 9.6）。
+    /// profile.json と AnimationClip サンプリングの汎用部分は core の
+    /// <see cref="FacialCharacterProfileExporter"/> に委譲する。本クラスは
+    /// <see cref="FacialCharacterSO"/> 固有の追加処理 (Gaze clip サンプリング・
+    /// analog_bindings.json 出力) と、保存検出・進捗・abort パイプラインを担う。
     /// </para>
     /// </remarks>
     public static class FacialCharacterSOAutoExporter
@@ -109,7 +109,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AutoExport
                 {
                     try
                     {
-                        SampleAnimationClipsIntoCachedSnapshots(so, sampler);
+                        FacialCharacterProfileExporter.SampleAnimationClipsIntoCachedSnapshots(so, sampler);
                         SampleGazeClipsIntoConfigs(so);
                     }
                     catch (Exception ex)
@@ -217,7 +217,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AutoExport
                     bool sampleOk;
                     try
                     {
-                        SampleAnimationClipsIntoCachedSnapshots(so, sampler);
+                        FacialCharacterProfileExporter.SampleAnimationClipsIntoCachedSnapshots(so, sampler);
                         SampleGazeClipsIntoConfigs(so);
                         sampleOk = true;
                     }
@@ -284,28 +284,10 @@ namespace Hidano.FacialControl.InputSystem.Editor.AutoExport
                 return false;
             }
 
-            bool exportedAny = false;
+            // profile.json は core 側に委譲する。
+            bool exportedAny = FacialCharacterProfileExporter.ExportProfileJson(so);
 
-            // --- profile.json (schema v2.0) ---
-            try
-            {
-                string profilePath = FacialCharacterProfileSO.GetStreamingAssetsProfilePath(assetName);
-                if (!string.IsNullOrEmpty(profilePath))
-                {
-                    EnsureParentDirectory(profilePath);
-                    var dto = BuildProfileSnapshotDto(so);
-                    var json = new SystemTextJsonParser().SerializeProfileSnapshot(dto);
-                    File.WriteAllText(profilePath, json, System.Text.Encoding.UTF8);
-                    exportedAny = true;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning(
-                    $"FacialCharacterSOAutoExporter: '{assetName}' の profile.json エクスポートに失敗しました: {ex.Message}");
-            }
-
-            // --- analog_bindings.json (具象が FacialCharacterSO の場合のみ) ---
+            // analog_bindings.json は FacialCharacterSO 固有の追加出力。
             if (so is FacialCharacterSO inputSO)
             {
                 try
@@ -313,7 +295,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AutoExport
                     string analogPath = GetStreamingAssetsAnalogBindingsPath(assetName);
                     if (!string.IsNullOrEmpty(analogPath))
                     {
-                        EnsureParentDirectory(analogPath);
+                        FacialCharacterProfileExporter.EnsureParentDirectory(analogPath);
                         AnalogInputBindingProfile analogProfile = inputSO.BuildAnalogProfile();
                         string analogJson = AnalogInputBindingJsonLoader.Save(analogProfile);
                         File.WriteAllText(analogPath, analogJson, System.Text.Encoding.UTF8);
@@ -336,39 +318,23 @@ namespace Hidano.FacialControl.InputSystem.Editor.AutoExport
         /// AnimationClip が null の Expression はスキップする。
         /// 1 件でも例外を発生させた場合は呼出側へ伝播し、SO 全体の save を abort させる責務を委ねる（Req 9.6）。
         /// </summary>
+        /// <remarks>
+        /// 互換のため残すラッパ。実装は core の
+        /// <see cref="FacialCharacterProfileExporter.SampleAnimationClipsIntoCachedSnapshots"/> に委譲する。
+        /// </remarks>
         /// <param name="so">対象 SO。null は no-op。</param>
         /// <param name="sampler">注入された sampler 実装。</param>
         public static void SampleAnimationClipsIntoCachedSnapshots(
             FacialCharacterProfileSO so,
             IExpressionAnimationClipSampler sampler)
         {
-            if (so == null) return;
-            if (sampler == null) throw new ArgumentNullException(nameof(sampler));
-
-            var expressions = so.Expressions;
-            if (expressions == null) return;
-
-            for (int i = 0; i < expressions.Count; i++)
-            {
-                var expr = expressions[i];
-                if (expr == null || expr.animationClip == null)
-                {
-                    continue;
-                }
-                var snapshotId = string.IsNullOrEmpty(expr.id) ? string.Empty : expr.id;
-                var snapshot = sampler.SampleSnapshot(snapshotId, expr.animationClip);
-                var dto = ConvertSnapshotToDto(snapshot);
-                // Inspector スライダー (expr.transitionDuration) を cachedSnapshot 側にも反映し、
-                // 後続の JSON 出力経路と SO 直読み経路で値を一致させる。
-                dto.transitionDuration = expr.transitionDuration;
-                expr.cachedSnapshot = dto;
-            }
+            FacialCharacterProfileExporter.SampleAnimationClipsIntoCachedSnapshots(so, sampler);
         }
 
         /// <summary>
         /// <see cref="FacialCharacterSO"/> の <see cref="FacialCharacterSO.GazeConfigs"/> 各エントリについて、
         /// 4 系統 (LookLeft / LookRight / LookUp / LookDown) の AnimationClip を <see cref="GazeClipBlendShapeSampler"/> で
-        /// 時刻 0 サンプリングし、結果を <see cref="GazeExpressionConfig"/> 内の sample 配列に書き戻す。
+        /// 時刻 0 サンプリングし、結果を <see cref="GazeBindingConfig"/> 内の sample 配列に書き戻す。
         /// AnimationClip が null の系統は対応 sample 配列を空に設定する。
         /// 引数が <see cref="FacialCharacterSO"/> でない場合は no-op。
         /// </summary>
@@ -426,195 +392,6 @@ namespace Hidano.FacialControl.InputSystem.Editor.AutoExport
                 FacialCharacterProfileSO.StreamingAssetsRootFolder,
                 assetName,
                 AnalogBindingsJsonFileName);
-        }
-
-        // ============================================================
-        // 内部ヘルパー: snapshot ↔ DTO 変換
-        // ============================================================
-
-        internal static ProfileSnapshotDto BuildProfileSnapshotDto(FacialCharacterProfileSO so)
-        {
-            var dto = new ProfileSnapshotDto
-            {
-                schemaVersion = string.IsNullOrEmpty(so.SchemaVersion) ? SystemTextJsonParser.SchemaVersionV2 : so.SchemaVersion,
-                layers = new List<LayerDefinitionDto>(),
-                expressions = new List<ExpressionDto>(),
-                rendererPaths = new List<string>(),
-            };
-
-            // top-level rendererPaths: Inspector 入力 + 各 Expression snapshot からの統合
-            var rendererPathSet = new HashSet<string>(StringComparer.Ordinal);
-            if (so.RendererPaths != null)
-            {
-                for (int i = 0; i < so.RendererPaths.Count; i++)
-                {
-                    var p = so.RendererPaths[i] ?? string.Empty;
-                    if (rendererPathSet.Add(p)) dto.rendererPaths.Add(p);
-                }
-            }
-
-            // layers
-            if (so.Layers != null)
-            {
-                for (int i = 0; i < so.Layers.Count; i++)
-                {
-                    var src = so.Layers[i];
-                    if (src == null) continue;
-                    dto.layers.Add(new LayerDefinitionDto
-                    {
-                        name = src.name ?? string.Empty,
-                        priority = src.priority,
-                        exclusionMode = SerializeExclusionMode(src.exclusionMode),
-                        inputSources = BuildInputSourceDtoList(src.inputSources),
-                    });
-                }
-            }
-
-            // expressions: cachedSnapshot を優先採用
-            if (so.Expressions != null)
-            {
-                for (int i = 0; i < so.Expressions.Count; i++)
-                {
-                    var src = so.Expressions[i];
-                    if (src == null) continue;
-
-                    // LayerOverrideMask は所属 Layer から取得する。Layer 側が空なら従来の
-                    // Expression 自体の mask（後方互換）を採用する。
-                    var layerMask = FacialCharacterProfileConverter.ResolveLayerMask(so.Layers, src.layer);
-                    var resolvedMask = (layerMask != null && layerMask.Count > 0)
-                        ? CopyStringList(new List<string>(layerMask))
-                        : CopyStringList(src.layerOverrideMask);
-
-                    var exprDto = new ExpressionDto
-                    {
-                        id = src.id ?? string.Empty,
-                        name = src.name ?? string.Empty,
-                        layer = src.layer ?? string.Empty,
-                        layerOverrideMask = resolvedMask,
-                        snapshot = src.cachedSnapshot ?? CreateDefaultSnapshotDto(),
-                    };
-
-                    // Inspector スライダーの transitionDuration を JSON 出力にも反映する。
-                    // cachedSnapshot 側がベイク時の旧値を保持していても、Inspector で編集された
-                    // 最新値が runtime (StreamingAssets JSON 経路) でも採用されるように上書きする。
-                    if (exprDto.snapshot != null)
-                    {
-                        exprDto.snapshot.transitionDuration = src.transitionDuration;
-                    }
-
-                    // Expression snapshot の rendererPaths を top-level set にマージ
-                    if (exprDto.snapshot != null && exprDto.snapshot.rendererPaths != null)
-                    {
-                        for (int j = 0; j < exprDto.snapshot.rendererPaths.Count; j++)
-                        {
-                            var p = exprDto.snapshot.rendererPaths[j] ?? string.Empty;
-                            if (rendererPathSet.Add(p)) dto.rendererPaths.Add(p);
-                        }
-                    }
-
-                    dto.expressions.Add(exprDto);
-                }
-            }
-
-            return dto;
-        }
-
-        private static ExpressionSnapshotDto ConvertSnapshotToDto(ExpressionSnapshot snapshot)
-        {
-            var dto = new ExpressionSnapshotDto
-            {
-                transitionDuration = snapshot.TransitionDuration,
-                transitionCurvePreset = snapshot.TransitionCurvePreset.ToString(),
-                blendShapes = new List<BlendShapeSnapshotDto>(snapshot.BlendShapes.Length),
-                bones = new List<BoneSnapshotDto>(snapshot.Bones.Length),
-                rendererPaths = new List<string>(snapshot.RendererPaths.Length),
-            };
-
-            var bsSpan = snapshot.BlendShapes.Span;
-            for (int i = 0; i < bsSpan.Length; i++)
-            {
-                dto.blendShapes.Add(new BlendShapeSnapshotDto
-                {
-                    rendererPath = bsSpan[i].RendererPath ?? string.Empty,
-                    name = bsSpan[i].Name ?? string.Empty,
-                    value = bsSpan[i].Value,
-                });
-            }
-
-            var boneSpan = snapshot.Bones.Span;
-            for (int i = 0; i < boneSpan.Length; i++)
-            {
-                var b = boneSpan[i];
-                dto.bones.Add(new BoneSnapshotDto
-                {
-                    bonePath = b.BonePath ?? string.Empty,
-                    position = new Vector3(b.PositionX, b.PositionY, b.PositionZ),
-                    rotationEuler = new Vector3(b.EulerX, b.EulerY, b.EulerZ),
-                    scale = new Vector3(b.ScaleX, b.ScaleY, b.ScaleZ),
-                });
-            }
-
-            var rpSpan = snapshot.RendererPaths.Span;
-            for (int i = 0; i < rpSpan.Length; i++)
-            {
-                dto.rendererPaths.Add(rpSpan[i] ?? string.Empty);
-            }
-
-            return dto;
-        }
-
-        private static ExpressionSnapshotDto CreateDefaultSnapshotDto()
-        {
-            return new ExpressionSnapshotDto
-            {
-                transitionDuration = 0.25f,
-                transitionCurvePreset = "Linear",
-                blendShapes = new List<BlendShapeSnapshotDto>(),
-                bones = new List<BoneSnapshotDto>(),
-                rendererPaths = new List<string>(),
-            };
-        }
-
-        private static List<InputSourceDto> BuildInputSourceDtoList(List<InputSourceDeclarationSerializable> sources)
-        {
-            if (sources == null || sources.Count == 0)
-            {
-                return new List<InputSourceDto>
-                {
-                    new InputSourceDto { id = "controller-expr", weight = 1.0f }
-                };
-            }
-            var list = new List<InputSourceDto>(sources.Count);
-            for (int i = 0; i < sources.Count; i++)
-            {
-                var s = sources[i];
-                if (s == null) continue;
-                list.Add(new InputSourceDto
-                {
-                    id = s.id ?? string.Empty,
-                    weight = s.weight,
-                    optionsJson = string.IsNullOrEmpty(s.optionsJson) ? null : s.optionsJson,
-                });
-            }
-            return list;
-        }
-
-        private static string SerializeExclusionMode(ExclusionMode mode)
-        {
-            return mode switch
-            {
-                ExclusionMode.LastWins => "lastWins",
-                ExclusionMode.Blend => "blend",
-                _ => "lastWins"
-            };
-        }
-
-        private static List<string> CopyStringList(List<string> src)
-        {
-            if (src == null) return new List<string>();
-            var copy = new List<string>(src.Count);
-            for (int i = 0; i < src.Count; i++) copy.Add(src[i] ?? string.Empty);
-            return copy;
         }
 
         // ============================================================
@@ -679,15 +456,6 @@ namespace Hidano.FacialControl.InputSystem.Editor.AutoExport
                 "FacialControl AutoExporter",
                 $"Sampling AnimationClips for '{assetName}'...",
                 progress);
-        }
-
-        private static void EnsureParentDirectory(string filePath)
-        {
-            var directory = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
         }
 
         private static void SafeRefreshAssetDatabase()

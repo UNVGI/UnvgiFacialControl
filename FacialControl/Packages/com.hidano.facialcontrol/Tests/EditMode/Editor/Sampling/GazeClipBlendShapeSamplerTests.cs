@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using Hidano.FacialControl.InputSystem.Editor.Sampling;
+using Hidano.FacialControl.Editor.Sampling;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 
-namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Editor.Sampling
+namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
 {
     /// <summary>
     /// <see cref="GazeClipBlendShapeSampler"/> の EditMode 契約テスト。

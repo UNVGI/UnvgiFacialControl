@@ -6,6 +6,13 @@
 
 ### Added
 
+- `Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig` — Vector2 アナログ入力で両目を同時駆動するアナログ表情の汎用 `[Serializable]` 基底クラス。両目ボーン path / 初期回転 / yaw・pitch local 軸 / 可動範囲 (上下＋左右内外) / Look 4 系統 AnimationClip / 焼き付け sample 配列を保持。InputSystem 連携の `GazeExpressionConfig` はこのクラスを継承し `InputActionReference` だけ追加する形に再構成された (inputsystem 側参照)。
+- `Hidano.FacialControl.Adapters.ScriptableObject.GazeBlendShapeSampleEntry` (旧 inputsystem 側から移管) — Look clip の time=0 サンプル結果 1 件 (`blendShapeName` / `weight`)。
+- `Hidano.FacialControl.Adapters.Bone.GazeBonePoseProvider` (旧 inputsystem 側から移管) — `GazeBindingConfig` を毎フレーム評価して左右目ボーンに `localRotation` を直接書込む目線ボーン専用 provider。入力方式に依存しない。
+- `Hidano.FacialControl.Adapters.Bone.GazeBoneBinding` (新設) — `GazeBindingConfig` と `IAnalogInputSource` のペアを保持する readonly struct。`GazeBonePoseProvider` のコンストラクタが受け取る形にし、入力源解決の責務を呼出側に閉じ込めた。
+- `Hidano.FacialControl.Editor.Sampling.GazeClipBlendShapeSampler` (旧 inputsystem 側から移管) — 4 系統 Look clip の time=0 における BlendShape weight を抽出する `AnimationUtility` ベースの Editor ヘルパ。
+- `Hidano.FacialControl.Editor.AutoExport.FacialCharacterProfileExporter` — profile.json 出力 + AnimationClip の time=0 サンプリング → `cachedSnapshot` 反映を担う汎用 Editor exporter。InputSystem 連携の `FacialCharacterSOAutoExporter` は本クラスへ delegate する形に再構成された (inputsystem 側参照)。
+- `Hidano.FacialControl.Editor.Inspector.FacialCharacterProfileSOInspector` — `[CustomEditor(typeof(FacialCharacterProfileSO), editorForChildClasses: true)]` の汎用 UI Toolkit 基底 inspector。Layers / Expressions / Gaze (bone+clip) / Reference Model / Debug / Validation / 自動保存 (profile.json) を提供。派生クラス用 virtual hook (`OnResolveDerivedSerializedProperties` / `OnBuildPreLayersSections` / `OnBuildAnalogExpressionInputSourceFields` / `FindGazeConfigsProperty` / `ResolveAnalogSourceIdChoices` / `FlushAutoExport` / `ValidateAnalogExpression`) を提供し、入力方式固有 UI（InputActionAsset 選択、ExpressionBindings、`InputActionReference` フィールド、analog_bindings.json 出力）の重ね合わせを許容する。
 - `Hidano.FacialControl.Domain.Models.TriggerMode` enum (`Hold=0 / Toggle=1`) — ボタン入力で表情をトリガーする際の動作モード。`Hold` (押下中のみ ON) を新規バインディングの既定値とする。
 - `Hidano.FacialControl.Domain.Models.InputBinding` に `TriggerMode` フィールドを追加。既存の 2-arg コンストラクタは `TriggerMode.Hold` を初期値として呼び出す 3-arg コンストラクタに委譲する後方互換ラッパー。
 - `Hidano.FacialControl.Domain.Models.AnalogBindingDirection` enum (`Bipolar=0 / Positive=1 / Negative=2`) — gaze 4 系統 (LookLeft / LookRight / LookUp / LookDown) のように 1 軸入力を符号で振り分けて複数 BlendShape clip に流すための input filter。

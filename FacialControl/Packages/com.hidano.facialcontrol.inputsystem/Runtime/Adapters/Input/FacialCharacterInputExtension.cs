@@ -9,7 +9,6 @@ using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
-using Hidano.FacialControl.InputSystem.Adapters.Bone;
 using Hidano.FacialControl.InputSystem.Adapters.ScriptableObject;
 using DomainInputBinding = Hidano.FacialControl.Domain.Models.InputBinding;
 using AdapterInputSystemAdapter = Hidano.FacialControl.Adapters.Input.InputSystemAdapter;
@@ -303,11 +302,37 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Input
             }
 
             // 目線ボーン専用 provider: GazeConfig 単位で yaw/pitch 軸と可動範囲を反映。
+            // sourceId → IAnalogInputSource の解決はここで行い、GazeBonePoseProvider には
+            // 解決済みの (config, source) ペアを渡す (core 側 API は入力方式に依存しない)。
             if (so.GazeConfigs != null && so.GazeConfigs.Count > 0 && _facialController != null)
             {
                 var gazeResolver = new BoneTransformResolver(_facialController.transform);
-                _gazeBoneProvider = new GazeBonePoseProvider(
-                    gazeResolver, _activeSources, so.GazeConfigs);
+                var gazeBindings = new List<GazeBoneBinding>(so.GazeConfigs.Count);
+                for (int i = 0; i < so.GazeConfigs.Count; i++)
+                {
+                    var cfg = so.GazeConfigs[i];
+                    if (cfg == null || cfg.inputAction == null || cfg.inputAction.action == null)
+                    {
+                        continue;
+                    }
+                    string sourceId = cfg.inputAction.action.name;
+                    if (string.IsNullOrWhiteSpace(sourceId))
+                    {
+                        continue;
+                    }
+                    if (!_activeSources.TryGetValue(sourceId, out var source) || source == null)
+                    {
+                        Debug.LogWarning(
+                            $"FacialCharacterInputExtension: source '{sourceId}' が解決できないため、"
+                            + $"GazeConfig (expressionId='{cfg.expressionId}') の目線ボーン制御をスキップします。");
+                        continue;
+                    }
+                    gazeBindings.Add(new GazeBoneBinding(cfg, source));
+                }
+                if (gazeBindings.Count > 0)
+                {
+                    _gazeBoneProvider = new GazeBonePoseProvider(gazeResolver, gazeBindings);
+                }
             }
 
             _analogReady = true;
