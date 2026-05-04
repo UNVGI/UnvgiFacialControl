@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
-using Hidano.FacialControl.Adapters.Bone;
+using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Domain.Interfaces;
-using Hidano.FacialControl.InputSystem.Adapters.ScriptableObject;
 using UnityEngine;
 
-namespace Hidano.FacialControl.InputSystem.Adapters.Bone
+namespace Hidano.FacialControl.Adapters.Bone
 {
     /// <summary>
-    /// <see cref="GazeExpressionConfig"/> を毎フレーム評価し、左右目ボーンに直接 localRotation を書込む
+    /// <see cref="GazeBindingConfig"/> を毎フレーム評価し、左右目ボーンに直接 localRotation を書込む
     /// 目線ボーン専用 provider。アナログ入力 (Vector2) を yaw / pitch 角度に変換し、
     /// 設定された外側/内側/上下の角度制限と各ボーンの参照モデル時取得 local 軸を用いて
     /// <c>Quaternion.AngleAxis</c> 合成で姿勢を計算する。
@@ -31,10 +30,14 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Bone
     /// <para>
     /// <see cref="Dispose"/> 時には書込み開始前のオリジナル localRotation に各ボーンを復元する。
     /// </para>
+    /// <para>
+    /// 入力源 (<see cref="IAnalogInputSource"/>) と <see cref="GazeBindingConfig"/> のペアは
+    /// <see cref="GazeBoneBinding"/> として呼出側で解決済みの状態で渡す。これにより本クラスは
+    /// Unity InputSystem・OSC・ARKit などの具体的な入力方式に依存しない。
+    /// </para>
     /// </remarks>
     public sealed class GazeBonePoseProvider : IDisposable
     {
-        private readonly IReadOnlyDictionary<string, IAnalogInputSource> _sources;
         private readonly BoneTransformResolver _resolver;
         private readonly EyeBinding[] _bindings;
         private bool _disposed;
@@ -43,34 +46,20 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Bone
         /// <see cref="GazeBonePoseProvider"/> を構築する。
         /// </summary>
         /// <param name="resolver">ボーン名から Transform を解決するリゾルバー (FacialController と同じものを共有)。</param>
-        /// <param name="sources">sourceId → <see cref="IAnalogInputSource"/> の辞書。</param>
-        /// <param name="gazeConfigs">対象 GazeConfig のリスト。expressionId 毎に 1 件。</param>
+        /// <param name="bindings"><see cref="GazeBindingConfig"/> と入力源のペア配列。</param>
         public GazeBonePoseProvider(
             BoneTransformResolver resolver,
-            IReadOnlyDictionary<string, IAnalogInputSource> sources,
-            IReadOnlyList<GazeExpressionConfig> gazeConfigs)
+            IReadOnlyList<GazeBoneBinding> bindings)
         {
             _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
-            _sources = sources ?? throw new ArgumentNullException(nameof(sources));
-            if (gazeConfigs == null) throw new ArgumentNullException(nameof(gazeConfigs));
+            if (bindings == null) throw new ArgumentNullException(nameof(bindings));
 
-            var list = new List<EyeBinding>(gazeConfigs.Count * 2);
-            for (int i = 0; i < gazeConfigs.Count; i++)
+            var list = new List<EyeBinding>(bindings.Count * 2);
+            for (int i = 0; i < bindings.Count; i++)
             {
-                var cfg = gazeConfigs[i];
-                if (cfg == null) continue;
-                if (cfg.inputAction == null || cfg.inputAction.action == null) continue;
-
-                string sourceId = cfg.inputAction.action.name;
-                if (string.IsNullOrWhiteSpace(sourceId)) continue;
-
-                if (!_sources.TryGetValue(sourceId, out var source) || source == null)
-                {
-                    Debug.LogWarning(
-                        $"[GazeBonePoseProvider] source '{sourceId}' が解決できないため、"
-                        + $"GazeConfig (expressionId='{cfg.expressionId}') の目線ボーン制御をスキップします。");
-                    continue;
-                }
+                var cfg = bindings[i].Config;
+                var source = bindings[i].Source;
+                if (cfg == null || source == null) continue;
 
                 if (!string.IsNullOrWhiteSpace(cfg.leftEyeBonePath))
                 {
@@ -106,7 +95,7 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Bone
         }
 
         /// <summary>
-        /// per-frame に呼出され、各 GazeConfig の入力を読んで両目の <see cref="Transform.localRotation"/> を計算/書込みする。
+        /// per-frame に呼出され、各 GazeBindingConfig の入力を読んで両目の <see cref="Transform.localRotation"/> を計算/書込みする。
         /// </summary>
         public void Apply()
         {

@@ -1,6 +1,6 @@
 using System;
 
-namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
+namespace Hidano.FacialControl.Adapters.ScriptableObject
 {
     /// <summary>
     /// Gaze 4 系統 (LookLeft / LookRight / LookUp / LookDown) AnimationClip の time=0 サンプル結果 1 件。

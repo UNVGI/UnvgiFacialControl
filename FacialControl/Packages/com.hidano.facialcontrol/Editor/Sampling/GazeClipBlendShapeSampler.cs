@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace Hidano.FacialControl.InputSystem.Editor.Sampling
+namespace Hidano.FacialControl.Editor.Sampling
 {
     /// <summary>
     /// Gaze 用 4 系統 (LookLeft / LookRight / LookUp / LookDown) AnimationClip から
