@@ -77,11 +77,11 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
 
         [Tooltip("下方向 (input.y < 0) の最大回転角度 (度、両目共通、絶対値で指定)。0〜90 推奨。")]
         [Range(0f, 90f)]
-        public float lookDownAngle = 12f;
+        public float lookDownAngle = 9f;
 
         [Tooltip("左右方向、外側 (鼻から離れる側) の最大回転角度 (度、絶対値で指定)。0〜90 推奨。")]
         [Range(0f, 90f)]
-        public float outerYawAngle = 30f;
+        public float outerYawAngle = 15f;
 
         [Tooltip("左右方向、内側 (鼻に近づく側) の最大回転角度 (度、絶対値で指定)。"
             + " 通常は外側より小さめに設定する。0〜90 推奨。")]
