@@ -200,6 +200,61 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
         }
 
         [Test]
+        public void UpdateWeights_AfterDeactivate_TransitionsBackToZero()
+        {
+            // Regression: 直前 active だった expression を Deactivate しても LayerExpressionSource
+            // が「ゼロ (= rest) へ補間」を始めず latched ON のままになる不具合があった。
+            // 別の表情を入れない限り OFF にならない (Toggle/Hold いずれも同症状)。
+            var blendShapes = new[]
+            {
+                new BlendShapeMapping("bs_smile", 1.0f),
+                new BlendShapeMapping("bs_sad", 0.0f),
+                new BlendShapeMapping("bs_blink", 0.0f)
+            };
+            var expr = CreateExpression(
+                blendShapeValues: blendShapes,
+                transitionDuration: 0.25f);
+
+            _expressionUseCase.Activate(expr);
+            _useCase.UpdateWeights(1.0f); // 完全に遷移し終わる
+            Assert.AreEqual(1.0f, _useCase.GetBlendedOutput()[0], 0.001f, "Activate 後に target に到達していない");
+
+            _expressionUseCase.Deactivate(expr);
+            _useCase.UpdateWeights(1.0f); // Deactivate 後の遷移時間も完全に経過
+
+            var output = _useCase.GetBlendedOutput();
+            Assert.AreEqual(0f, output[0], 0.001f, "Deactivate 後にゼロへ戻っていない (latched バグ)");
+            Assert.AreEqual(0f, output[1], 0.001f);
+            Assert.AreEqual(0f, output[2], 0.001f);
+        }
+
+        [Test]
+        public void UpdateWeights_AfterDeactivate_DuringTransition_ReachesZero()
+        {
+            // Regression: Deactivate 直後の中間値からゼロへ補間できることを確認する。
+            var blendShapes = new[]
+            {
+                new BlendShapeMapping("bs_smile", 1.0f),
+                new BlendShapeMapping("bs_sad", 0.0f),
+                new BlendShapeMapping("bs_blink", 0.0f)
+            };
+            var expr = CreateExpression(
+                blendShapeValues: blendShapes,
+                transitionDuration: 0.5f);
+
+            _expressionUseCase.Activate(expr);
+            _useCase.UpdateWeights(0.25f); // 50% 遷移
+            float midValue = _useCase.GetBlendedOutput()[0];
+            Assert.Greater(midValue, 0f);
+            Assert.Less(midValue, 1f);
+
+            _expressionUseCase.Deactivate(expr);
+            _useCase.UpdateWeights(1.0f); // 十分な時間で OFF へ補間
+
+            Assert.AreEqual(0f, _useCase.GetBlendedOutput()[0], 0.001f);
+        }
+
+        [Test]
         public void UpdateWeights_MultipleDeltaTimeSteps_AccumulatesProgress()
         {
             var blendShapes = new[]

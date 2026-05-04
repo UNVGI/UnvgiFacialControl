@@ -11,6 +11,7 @@ FacialControl は、3D キャラクターの表情をリアルタイムに制御
 - **QA シート**: `docs/requirements-qa.md` — プロジェクト要件の詳細な Q&A。実装判断に迷った場合はここを参照
 - **要件定義**: `docs/requirements.md`
 - **作業手順書**: `docs/work-procedure.md` — 実装作業のフェーズ・タスク分解。「作業手順書」と呼ばれたらこのファイルを参照
+- **Backlog**: `docs/backlog.md` — 「別 PR ネタ」「preview.2 以降」「別 spec で対処」と先送りされたタスクの集約先。HANDOVER.md の優先度低項目はここへ昇格させる
 - **Copilot 指示**: `.github/copilot-instructions.md`
 
 ## 開発環境
