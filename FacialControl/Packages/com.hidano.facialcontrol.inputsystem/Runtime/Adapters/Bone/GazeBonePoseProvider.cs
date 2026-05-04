@@ -159,6 +159,13 @@ namespace Hidano.FacialControl.InputSystem.Adapters.Bone
                     ? iy * b.LookUpAngle
                     : iy * b.LookDownAngle;
 
+                // Unity の Quaternion.AngleAxis は左手系で「軸方向を見て時計回り = 正」。
+                // 参照モデルから自動取得した yawAxisLocal (+Y) / pitchAxisLocal (+X) と組み合わせると、
+                // input.x > 0 で視線が左、input.y > 0 で視線が下に振れる (上下左右とも反転)。
+                // InputActionAsset 側 Invert で毎回吸収するのは手間なのでコード側で符号反転する。
+                yawDeg = -yawDeg;
+                pitchDeg = -pitchDeg;
+
                 var yawRot = Quaternion.AngleAxis(yawDeg, b.YawAxisLocal);
                 var pitchRot = Quaternion.AngleAxis(pitchDeg, b.PitchAxisLocal);
 

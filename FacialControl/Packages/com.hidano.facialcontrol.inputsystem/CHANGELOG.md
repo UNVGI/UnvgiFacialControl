@@ -31,6 +31,11 @@
 - `FacialCharacterInputExtension` が GazeConfig がある場合に `GazeBonePoseProvider` を構築・LateUpdate で Apply / Teardown 時に Dispose するようになった。`AnalogBonePoseProvider` は引き続き非目線ボーンや legacy `_analogBindings` 経路で使用される。
 - `FacialCharacterSO.BuildAnalogProfileFromGazeConfigs` を 4 sample list 経路に変更し、各 BS の keyframe weight を `AnalogBindingEntry.Scale` に、+X/-X/+Y/-Y 振り分けを `AnalogBindingDirection` (Positive / Negative) に設定して emit する。目線ボーン制御は `GazeBonePoseProvider` に移管したため `BonePose` 系の entry は emit しなくなった。
 - `Adapters.Json.Dto.AnalogBindingEntryDto` の scale / direction 追加に伴い JSON round-trip も更新（core パッケージ側）。
+- `GazeExpressionConfig` の可動角デフォルト値を Sample 想定値に揃えた: `lookDownAngle` 12° → 9°、`outerYawAngle` 30° → 15°（`lookUpAngle` 15° / `innerYawAngle` 18° は据え置き）。既存 SO で値を明示保存していなければ次回保存時に新デフォルトが書き込まれる。
+
+### Fixed
+
+- `GazeBonePoseProvider` で目線入力 (Vector2) が上下左右とも反転して目ボーンに反映されていた問題を修正。Unity の `Quaternion.AngleAxis` 左手系規約と参照モデル自動取得の yaw/pitch 軸 (+Y / +X) の組み合わせで生じていた符号反転をコード側で吸収し、InputActionAsset の Invert processor に頼らずとも入力 +X = 視線右、+Y = 視線上 で動作するようにした。
 
 ### Removed
 
