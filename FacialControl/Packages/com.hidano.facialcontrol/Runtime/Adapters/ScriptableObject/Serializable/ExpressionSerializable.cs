@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Hidano.FacialControl.Adapters.Json.Dto;
+using Hidano.FacialControl.Domain.Models;
 using UnityEngine;
 
 namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
@@ -41,7 +42,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 
         [Tooltip("[Bridge] 遷移時間 (秒)。0〜1 範囲外は自動クランプ。Phase 3.6 で snapshot 経路へ移行予定。")]
         [Range(0f, 1f)]
-        public float transitionDuration = 0.25f;
+        public float transitionDuration = Expression.DefaultTransitionDuration;
 
         [Tooltip("[Bridge] 遷移カーブ。Phase 3.6 で snapshot 経路へ移行予定。")]
         public TransitionCurveSerializable transitionCurve = new TransitionCurveSerializable();

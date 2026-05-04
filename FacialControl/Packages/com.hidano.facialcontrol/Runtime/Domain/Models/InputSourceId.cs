@@ -9,10 +9,12 @@ namespace Hidano.FacialControl.Domain.Models
     /// </summary>
     /// <remarks>
     /// <para>
-    /// 予約 ID: <c>osc</c>, <c>lipsync</c>, <c>controller-expr</c>, <c>keyboard-expr</c>, <c>input</c>,
+    /// 予約 ID: <c>osc</c>, <c>lipsync</c>, <c>input</c>,
     /// <c>analog-blendshape</c>, <c>analog-bonepose</c>。
     /// サードパーティ拡張は <c>x-</c> プレフィックス推奨。
     /// 識別子 <c>legacy</c> は D-5 の legacy フォールバック廃止に伴い受理されない。
+    /// 旧 <c>controller-expr</c> / <c>keyboard-expr</c> は preview 段階で廃止され受理されない
+    /// （<c>input</c> 1 種に統合）。
     /// </para>
     /// <para>
     /// Invariants: 構築後の <see cref="Value"/> は常にパターンを満たし、<c>legacy</c> ではない。
@@ -30,8 +32,6 @@ namespace Hidano.FacialControl.Domain.Models
         {
             "osc",
             "lipsync",
-            "controller-expr",
-            "keyboard-expr",
             "input",
             "analog-blendshape",
             "analog-bonepose"
@@ -48,7 +48,7 @@ namespace Hidano.FacialControl.Domain.Models
         }
 
         /// <summary>
-        /// 予約 ID (<c>osc</c> / <c>lipsync</c> / <c>controller-expr</c> / <c>keyboard-expr</c> / <c>input</c> /
+        /// 予約 ID (<c>osc</c> / <c>lipsync</c> / <c>input</c> /
         /// <c>analog-blendshape</c> / <c>analog-bonepose</c>) なら true。
         /// </summary>
         public bool IsReserved => IsReservedId(Value);

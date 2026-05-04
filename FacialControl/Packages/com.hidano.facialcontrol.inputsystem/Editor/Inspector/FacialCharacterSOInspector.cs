@@ -211,8 +211,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.Inspector
             var foldout = MakeSectionFoldout(ExpressionBindingsFoldoutName, "キーバインディング", open: true);
 
             foldout.Add(MakeHelpBox(
-                "Action 名と表情 ID を 1 対 1 で結びつけます。"
-                + "Keyboard / Controller の振分けは Action の binding path から自動推定されます。"));
+                "Action 名と表情 ID を 1 対 1 で結びつけます。"));
 
             if (_expressionBindingsProperty != null)
             {

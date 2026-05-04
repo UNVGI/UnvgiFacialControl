@@ -7,14 +7,9 @@
             "exclusionMode": "lastWins",
             "inputSources": [
                 {
-                    "id": "controller-expr",
-                    "weight": 0.5,
-                    "options":{"maxStackDepth":4}
-                },
-                {
-                    "id": "keyboard-expr",
-                    "weight": 0.5,
-                    "options":{"maxStackDepth":4}
+                    "id": "input",
+                    "weight": 1.0,
+                    "options":{"maxStackDepth":8}
                 }
             ]
         }

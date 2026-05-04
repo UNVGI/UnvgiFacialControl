@@ -2,81 +2,86 @@
 
 ## 今回やったこと
 
-- MultiSourceBlendDemo の不具合 6 件を 2 並行サブエージェント体制で修正
-  - Task 1: Camera を背面 → 正面に反転、FoV 60 → 20
-  - Task 2: Inspector の AnimationClip 名表示が更新されない問題
-  - Task 3: InputActionAsset 経由のデバイス入力で ON/OFF が効かない問題
-  - Task 4: Action 名ドロップダウンの InputActionAsset 編集後の自動再読込
-  - Task 5: ON/OFF 表情の遷移時間設定 UI 露出
-  - Task 6: AnalogBindingDemo を MultiSourceBlendDemo に統合（サンプル一本化）
+- InputSystem パッケージのアーキテクチャ監査と Gaze サブシステム分割リファクタ
+- core / inputsystem 間の責務再分配を実施
+  - Gaze 関連 4 ファイルを inputsystem → core へ移動（`GazeBlendShapeSampleEntry`, `GazeBonePoseProvider`, `GazeClipBlendShapeSampler` + 派生元の `GazeBindingConfig` 新設）
+  - `GazeBonePoseProvider` のコンストラクタ API を再設計（sourceId 解決責務を呼出側へ）
+  - `FacialCharacterSOAutoExporter` の汎用部分を core の `FacialCharacterProfileExporter` に抽出
+  - `FacialCharacterSOInspector` (2067 行) を分割：core に基底 `FacialCharacterProfileSOInspector` (1803 行)、inputsystem に派生 `FacialCharacterSOInspector` (439 行、-79%)
+- テスト結果：EditMode 936/937、PlayMode 299/299 通過（残 1 件は既知 flaky GC テスト）
+- 両パッケージの CHANGELOG.md にエントリ追記
 
 ## 決定事項
 
-- Camera: `pos (0, 1.4, 2.5)`, `Euler (0, 180, 0)`, `FoV 20`（旧 AnalogBindingDemo の正常パターンに揃えた）
-- Sample は `Multi Source Blend Demo` 1 本のみ。AnalogBindingDemo は完全削除
-- 統合 inputactions (`MultiSourceBlendDemoActions.inputactions`) の Action ID は AnalogBindingDemoActions / FacialControlDefaultActions と一致させ流用 → SO 側の参照書き換え不要
-- 統合 inputactions の guid は新規 `5e2f7a9c1b3d4e6f8a0b2c4d5e6f7a8b`
-- TransitionDuration は既存 `ExpressionSerializable.transitionDuration` (`[Range(0, 1)]`) を Slider で Inspector に露出
-- Inspector で `BindProperty(SerializedProperty)` ベースに切替え、UI Toolkit に再描画を委譲する方針
-- `AssetPostprocessor` は独立ファイルにせず `FacialCharacterSOInspector` の nested class として配置
-- FacialController に "Profile ready" イベントは追加せず、`FacialCharacterInputExtension.LateUpdate` で `!_inputBound` 時のみ再試行する単純解
-- Sample 二重管理（`Samples~/` + `Assets/Samples/`）は維持。両方を同時更新
+- `GazeExpressionConfig` は **継承方式**で分割（`GazeBindingConfig` ← `GazeExpressionConfig + InputActionReference`）。既存フィールドアクセス互換のまま
+- `GazeBonePoseProvider` は `IReadOnlyList<GazeBoneBinding>` を受け取る形に変更。`GazeBoneBinding` は `(GazeBindingConfig, IAnalogInputSource)` の readonly struct
+- Inspector は `[CustomEditor(typeof(FacialCharacterProfileSO), editorForChildClasses: true)]` 基底 + `[CustomEditor(typeof(FacialCharacterSO))]` 派生で Unity の specificity 解決を利用
+- 派生 inspector の virtual hook を 6 個用意：`OnResolveDerivedSerializedProperties` / `OnBuildPreLayersSections` / `OnBuildAnalogExpressionInputSourceFields` / `FindGazeConfigsProperty` / `ResolveAnalogSourceIdChoices` / `FlushAutoExport`（+ `ValidateAnalogExpression`）
+- AutoExporter は core 側に profile.json 出力を抽出、inputsystem は analog_bindings.json と Gaze clip サンプリングのみ担当
+- `FacialCharacterSOInspectorTests` は reflection で完全修飾型名参照のため inputsystem に残置（互換維持）
+- file move 時は `.cs` と `.cs.meta` を一緒に移動して GUID を保持
 
 ## 捨てた選択肢と理由
 
-- worktree isolation で並行 agent → ブランチ分割とマージ管理が複雑化。同一 branch で編集ファイル領域を分離して並行運用に
-- FacialController に Profile ready イベントを追加 → 修正範囲が広い。LateUpdate リトライで十分
-- 統合 inputactions の Action ID を新規生成 → SO の `_analogBindings.inputActionRef` / `_expressionBindings.actionName` の書き換えが連鎖。既存 ID 流用が安全
-- バインディング側に `transitionDuration` 上書き field を新設 → 既存 `Expression.TransitionDuration` が ON/OFF 駆動でも適用されるため不要
-- `SetValueWithoutNotify` を維持して ChangeEvent を手動 dispatch → `BindProperty` で UI Toolkit に委譲する方が短く確実
+- **`GazeExpressionConfig` を core に丸ごと移す**: ボツ。`InputActionReference` フィールドが `UnityEngine.InputSystem` に依存するため、core が InputSystem に依存してしまう
+- **composition で分割（`GazeExpressionConfig { binding; inputAction }`）**: ボツ。既存フィールドアクセスが `cfg.binding.leftEyeBonePath` に変わって全 caller を破壊する。継承の方が侵襲が小さい
+- **`FacialCharacterProfileSO` に `virtual GazeConfigs` プロパティを追加**: ボツ。`List<T>` invariant のため override で型変更が困難。代わりに `protected virtual SerializedProperty FindGazeConfigsProperty()` で派生クラスが `_gazeConfigs` プロパティを返す方式を採用
+- **AutoExporter の Gaze 部分も core へ移行**: ボツ。`SampleGazeClipsIntoConfigs` は `FacialCharacterSO` キャストを要求するため inputsystem 固有のまま。core 側は `FacialCharacterProfileExporter` で profile.json + AnimationClip サンプリングのみに留める
+- **`FacialCharacterSOInspectorTests` を core 側へ分離**: ボツ。reflection で型名文字列参照しているため移動するとテストが壊れる。inputsystem の派生 inspector が core 基底を継承しているので間接的に基底もカバーされる（preview.2 以降で再考の余地）
 
 ## ハマりどころ
 
-- **Task 3 の核心バグ**: `FacialCharacterInputExtension.OnEnable` 時点で `FacialController.CurrentProfile` が StreamingAssets の非同期ロード待ちで `null`。`BindAllExpressions` 内 `ResolveExpression` が全 binding に対して null を返し silently skip、しかも `_inputBound = true` で確定するため後続復旧不能。**AnalogBindingDemo は `_expressionBindings` が空だったので問題が露呈せず、MultiSourceBlend で初顕在化**
-- MultiSourceBlendDemoCharacter.asset には `_inputActionAsset` が既に設定済み + シーンに FacialCharacterInputExtension も attach 済みで、表面上は wire 済みに見えた → タイミング依存の silent failure
-- 1 回目の調査エージェントが Bash の `find` / `grep` / `cat` を使い deny rule 違反 (SECURITY WARNING)。実装エージェントへの prompt で明示禁止
-- UI Toolkit の `SetValueWithoutNotify` は ChangeEvent を発火しないため、ObjectField の派生表示（ラベル等）が更新されないケースがある
+- GC アロケーションテスト 2 種が batchmode で flaky
+  - `OscControllerBlendingIntegrationTests.Pipeline_AggregateAndBlendLoop_AllocatesZeroManagedMemory`
+  - `LayerInputSourceAggregatorTests.TryWriteSnapshot_SteadyStateCalls_DoNotAllocate`
+  - 個別再実行で通る。リファクタ起因ではない（事実: Wave 2 で 937/937、Wave 3-A で 1 件失敗、1 件再実行で通過、Wave 5 で別の 1 件失敗）
+- inputsystem/Runtime/Adapters/Bone, Editor/Sampling, Tests/EditMode/Editor/Sampling の各ディレクトリは中身が空になったので `.meta` 込みで削除。`.meta` だけ残すと Unity warning、ディレクトリだけ残すと Unity が新 GUID を生成して Scene 参照壊れる可能性
+- `FacialCharacterSOAutoExporter` の test seam (`SamplerOverride` など public static state) はテストが直接参照しているため、core へ移管せず inputsystem 側に残置
+- 旧 inputsystem inspector は約 2067 行（subagent 計測）で、私が読んだ時点での 1500 行は表示制限。subagent 委譲で正確な分量が判明
 
 ## 学び
 
-- 非同期 SO 初期化を伴う MonoBehaviour Extension で `bool _initialized = true` ガードを使う際、初回成功条件が満たされなければ true を立てない（または再試行ループを置く）
-- `BindProperty(SerializedProperty)` を使えば UI Toolkit が自動で再描画を担当するので、`SetValueWithoutNotify` 系の表示更新バグは大体回避できる
-- FoV 20 + 距離 2.5m は望遠寄りで頭部クローズアップ専用。上半身を見せるなら距離 4〜5m
-- agent 調査結果は仮説段階で止まることがあり、実コード読みで決定的原因の特定が必要なケースあり
+- `IReadOnlyList<T>` は covariant (`out T`) なので `List<DerivedClass>` を `IReadOnlyList<BaseClass>` として渡せる。`List<T>` は invariant
+- Unity の `[Serializable]` クラス継承は非ポリモーフィック (`List<DerivedT>` の T が固定) なら inspector 表示・YAML 互換ともに問題なし
+- Unity の `[CustomEditor(BaseT, editorForChildClasses: true)]` と `[CustomEditor(DerivedT)]` を併用すると、より specific な型に対しては DerivedT の inspector が優先される
+- 大規模ファイル refactor (1500+ 行) は subagent 委譲が有効。明確な仕様 + virtual hook 設計 + テスト実行責任を渡せば、ヘッドレスで完遂できる
+- file move 時に GUID 保持で `.cs.meta` 同行移動すれば Unity 側の参照は壊れない（git からは delete+add に見えるが Unity は move として認識）
 
 ## 次にやること
 
-優先度 **高** — Unity Editor 実機確認:
-- Play モードでキーボード `1〜4` / Gamepad dpad で表情切替（Task 3 検証）
-- Inspector で AnimationClip 差し替え時の表示名即時更新（Task 2）
-- InputActionAsset の Action 追加直後にドロップダウン自動更新（Task 4）
-- 各 Expression 行の「遷移時間 (秒)」スライダー → `profile.json` 反映（Task 5）
-- 左スティック → Eye Euler / ARKit jaw → mouth-open BlendShape（Task 6 動作）
+### 優先度 高（preview.1 リリース前）
+- なし（コア refactor は完了、リリース判定可能な状態）
 
-優先度 **中**:
-- Camera FoV 20 + 距離 2.5m が望遠すぎないか確認、必要なら距離調整
+### 優先度 中（preview.2 以降）
+- core 基底 inspector (1803 行) のセクション別ファイル分割（LayersSection, ExpressionsSection 等の partial class）
+- `FacialCharacterSOInspectorTests` の汎用部分を core 側 `FacialCharacterProfileSOInspectorTests` として切り出し
+- GC flaky テストの安定化（warmup イテレーションを増やす、または個別 fixture に分離）
 
-優先度 **低**:
-- `ExpressionSerializable.transitionDuration` は `[Bridge]` 表記で Phase 3.6 で snapshot 経路へ移行予定 → 移行時に Inspector の Slider バインド先を `cachedSnapshot.transitionDuration` に切り替える
+### 優先度 低（backlog）
+- OSC / ARKit からの目線駆動実装時に `GazeBonePoseProvider` を再利用（API は既に整備済）
+- Inspector の partial class 化または別ファイル分割
 
 ## 関連ファイル
 
-修正:
-- `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/Input/FacialCharacterInputExtension.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Editor/Inspector/FacialCharacterSOInspector.cs`
-- `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/package.json`
+### 新規作成（core）
+- `Packages/com.hidano.facialcontrol/Runtime/Adapters/ScriptableObject/GazeBindingConfig.cs`
+- `Packages/com.hidano.facialcontrol/Runtime/Adapters/Bone/GazeBoneBinding.cs`
+- `Packages/com.hidano.facialcontrol/Editor/AutoExport/FacialCharacterProfileExporter.cs`
+- `Packages/com.hidano.facialcontrol/Editor/Inspector/FacialCharacterProfileSOInspector.cs`
 
-シーン (Camera + HUD):
-- `FacialControl/Assets/Samples/FacialControl InputSystem/0.1.0-preview.2/Multi Source Blend Demo/MultiSourceBlendDemo.unity`
-- `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Samples~/MultiSourceBlendDemo/MultiSourceBlendDemo.unity`
+### 移動（inputsystem → core、GUID 保持）
+- `.../Runtime/Adapters/ScriptableObject/GazeBlendShapeSampleEntry.cs`
+- `.../Runtime/Adapters/Bone/GazeBonePoseProvider.cs`
+- `.../Editor/Sampling/GazeClipBlendShapeSampler.cs`
+- `.../Tests/EditMode/Editor/Sampling/GazeClipBlendShapeSamplerTests.cs`
 
-Sample 一式 (Assets/Samples 側 + Samples~ 側で同期):
-- `MultiSourceBlendDemoActions.inputactions` (新規)
-- `MultiSourceBlendDemoCharacter.asset` (`_analogBindings` 5 件追加 / `_inputActionAsset` 切替)
-- `MultiSourceBlendDemoHUD.cs` (BonePose / BlendShape / source ID セクション追加)
-- `StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/analog_bindings.json`
-- `README.md`
+### 大幅修正
+- `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/ScriptableObject/GazeExpressionConfig.cs`（派生クラス化、5 行）
+- `Packages/com.hidano.facialcontrol.inputsystem/Editor/Inspector/FacialCharacterSOInspector.cs`（439 行）
+- `Packages/com.hidano.facialcontrol.inputsystem/Editor/AutoExport/FacialCharacterSOAutoExporter.cs`（core delegate 化）
+- `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/Input/FacialCharacterInputExtension.cs`（GazeBoneBinding 構築）
+- `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/ScriptableObject/FacialCharacterSO.cs`（using 追加）
 
-削除 (Samples~ + Assets/Samples + StreamingAssets):
-- `AnalogBindingDemo/` フォルダ一式
-- `AnalogBindingDemoCharacter/` フォルダ一式
+### CHANGELOG
+- `Packages/com.hidano.facialcontrol/CHANGELOG.md`
+- `Packages/com.hidano.facialcontrol.inputsystem/CHANGELOG.md`

@@ -20,10 +20,10 @@ namespace Hidano.FacialControl.Adapters.InputSources
     /// 警告ログを出して当該エントリを skip する (Req 3.3)。
     /// </para>
     /// <para>
-    /// コア標準のビルトイン登録は <c>lipsync</c> のみ（<see cref="LipSyncInputSource"/>）。
-    /// <c>osc</c> / <c>controller-expr</c> / <c>keyboard-expr</c> は公式サブパッケージ
-    /// (<c>com.hidano.facialcontrol.osc</c> / <c>com.hidano.facialcontrol.inputsystem</c>) が
-    /// <see cref="RegisterReserved{TOptions}"/> 経由で追加登録する。
+    /// コア標準のビルトイン登録は <c>lipsync</c> と <c>input</c>（コアフォールバック）。
+    /// <c>osc</c> は公式サブパッケージ <c>com.hidano.facialcontrol.osc</c> が、
+    /// <c>input</c> の本実装は <c>com.hidano.facialcontrol.inputsystem</c> が
+    /// <see cref="RegisterReserved{TOptions}"/> 経由で上書き登録する。
     /// サードパーティ <c>x-*</c> 拡張は <see cref="RegisterExtension{TOptions}"/>
     /// で typed DTO と creator を同時に登録する（Req 1.7, 3.7）。
     /// </para>
@@ -86,8 +86,8 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
         /// <summary>
         /// <see cref="InputSourceFactory"/> を構築する。
-        /// コア標準では <c>lipsync</c> のみビルトイン登録される。
-        /// <c>osc</c> / <c>controller-expr</c> / <c>keyboard-expr</c> は対応サブパッケージ
+        /// コア標準では <c>lipsync</c> と <c>input</c>（コアフォールバック）がビルトイン登録される。
+        /// <c>osc</c> および <c>input</c> の本実装は対応サブパッケージ
         /// (<c>com.hidano.facialcontrol.osc</c> / <c>com.hidano.facialcontrol.inputsystem</c>) の
         /// <c>Register(...)</c> ヘルパー経由で <see cref="RegisterReserved{TOptions}"/> を呼ぶこと。
         /// </summary>
@@ -106,21 +106,9 @@ namespace Hidano.FacialControl.Adapters.InputSources
                 typeof(LipSyncOptionsDto),
                 () => new LipSyncOptionsDto(),
                 (options, blendShapeCount, profile) => CreateLipSync(blendShapeCount));
-        
-            Register(
-                CoreControllerExpressionSource.ReservedId,
-                typeof(ExpressionTriggerCoreFallbackOptionsDto),
-                () => new ExpressionTriggerCoreFallbackOptionsDto(),
-                (options, blendShapeCount, profile) =>
-                {
-                    var opts = options as ExpressionTriggerCoreFallbackOptionsDto ?? new ExpressionTriggerCoreFallbackOptionsDto();
-                    int depth = opts.maxStackDepth > 0 ? opts.maxStackDepth : DefaultMaxStackDepth;
-                    var mode = GetFirstLayerExclusionMode(profile);
-                    return new CoreControllerExpressionSource(blendShapeCount, depth, mode, System.Array.Empty<string>(), profile);
-                });
 
             Register(
-                CoreKeyboardExpressionSource.ReservedId,
+                CoreInputExpressionSource.ReservedId,
                 typeof(ExpressionTriggerCoreFallbackOptionsDto),
                 () => new ExpressionTriggerCoreFallbackOptionsDto(),
                 (options, blendShapeCount, profile) =>
@@ -128,7 +116,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
                     var opts = options as ExpressionTriggerCoreFallbackOptionsDto ?? new ExpressionTriggerCoreFallbackOptionsDto();
                     int depth = opts.maxStackDepth > 0 ? opts.maxStackDepth : DefaultMaxStackDepth;
                     var mode = GetFirstLayerExclusionMode(profile);
-                    return new CoreKeyboardExpressionSource(blendShapeCount, depth, mode, System.Array.Empty<string>(), profile);
+                    return new CoreInputExpressionSource(blendShapeCount, depth, mode, System.Array.Empty<string>(), profile);
                 });
         }
 
@@ -244,8 +232,8 @@ namespace Hidano.FacialControl.Adapters.InputSources
         /// <exception cref="ArgumentNullException"><paramref name="creator"/> が <c>null</c> の場合。</exception>
         /// <remarks>
         /// <para>
-        /// 予約 id (<c>osc</c> / <c>lipsync</c> / <c>controller-expr</c> / <c>keyboard-expr</c> /
-        /// <c>input</c>) の上書きは許容せず、警告ログを出して既存のビルトイン登録を維持する。
+        /// 予約 id (<c>osc</c> / <c>lipsync</c> / <c>input</c> / <c>analog-blendshape</c> /
+        /// <c>analog-bonepose</c>) の上書きは許容せず、警告ログを出して既存のビルトイン登録を維持する。
         /// </para>
         /// <para>
         /// 同一の拡張 id を再登録した場合は後勝ち（警告なし）。開発時の差替えを容易にするための選択。
@@ -334,15 +322,15 @@ namespace Hidano.FacialControl.Adapters.InputSources
         }
 
         /// <summary>
-        /// コアパッケージ内の controller-expr コアフォールバック実装。
+        /// コアパッケージ内の <c>input</c> コアフォールバック実装。
         /// InputSystem サブパッケージが RegisterReserved で上書きしない限り、
-        /// controller-expr 宣言時にこのシンプルな実装が使用される。
+        /// <c>input</c> 宣言時にこのシンプルな実装が使用される。
         /// </summary>
-        private sealed class CoreControllerExpressionSource : ExpressionTriggerInputSourceBase
+        private sealed class CoreInputExpressionSource : ExpressionTriggerInputSourceBase
         {
-            public const string ReservedId = "controller-expr";
+            public const string ReservedId = "input";
 
-            public CoreControllerExpressionSource(
+            public CoreInputExpressionSource(
                 int blendShapeCount,
                 int maxStackDepth,
                 ExclusionMode exclusionMode,
@@ -354,27 +342,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
         }
 
         /// <summary>
-        /// コアパッケージ内の keyboard-expr コアフォールバック実装。
-        /// InputSystem サブパッケージが RegisterReserved で上書きしない限り、
-        /// keyboard-expr 宣言時にこのシンプルな実装が使用される。
-        /// </summary>
-        private sealed class CoreKeyboardExpressionSource : ExpressionTriggerInputSourceBase
-        {
-            public const string ReservedId = "keyboard-expr";
-
-            public CoreKeyboardExpressionSource(
-                int blendShapeCount,
-                int maxStackDepth,
-                ExclusionMode exclusionMode,
-                System.Collections.Generic.IReadOnlyList<string> blendShapeNames,
-                FacialProfile profile)
-                : base(InputSourceId.Parse(ReservedId), blendShapeCount, maxStackDepth, exclusionMode, blendShapeNames, profile)
-            {
-            }
-        }
-
-        /// <summary>
-        /// controller-expr / keyboard-expr のコアフォールバック登録用 DTO。
+        /// <c>input</c> のコアフォールバック登録用 DTO。
         /// maxStackDepth が 0 以下の場合は InputSourceFactory.DefaultMaxStackDepth が使用される。
         /// </summary>
         [System.Serializable]

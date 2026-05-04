@@ -71,7 +71,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             var json = @"{
                 ""schemaVersion"":""2.0"",
                 ""layers"":[
-                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]},
+                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""input"",""weight"":1.0}]},
                     {""name"":""lipsync"",""priority"":1,""exclusionMode"":""blend""}
                 ],
                 ""expressions"":[]
@@ -105,7 +105,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
-                        {""id"":""controller-expr"",""weight"":1.0}
+                        {""id"":""input"",""weight"":1.0}
                     ]}
                 ],
                 ""expressions"":[]
@@ -121,7 +121,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
-                        {""id"":""controller-expr"",""weight"":0.75}
+                        {""id"":""input"",""weight"":0.75}
                     ]}
                 ],
                 ""expressions"":[]
@@ -131,7 +131,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 
             Assert.AreEqual(1, result.Length);
             Assert.AreEqual(1, result[0].Length);
-            Assert.AreEqual("controller-expr", result[0][0].id);
+            Assert.AreEqual("input", result[0][0].id);
             Assert.AreEqual(0.75f, result[0][0].weight);
         }
 
@@ -141,7 +141,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             var json = @"{
                 ""schemaVersion"":""2.0"",
                 ""layers"":[
-                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]},
+                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""input"",""weight"":1.0}]},
                     {""name"":""lipsync"",""priority"":1,""exclusionMode"":""blend"",""inputSources"":[{""id"":""lipsync"",""weight"":1.0}]}
                 ],
                 ""expressions"":[]
@@ -150,7 +150,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             var result = _parser.ParseLayerInputSources(json);
 
             Assert.AreEqual(2, result.Length);
-            Assert.AreEqual("controller-expr", result[0][0].id);
+            Assert.AreEqual("input", result[0][0].id);
             Assert.AreEqual("lipsync", result[1][0].id);
         }
 
@@ -161,7 +161,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
-                        {""id"":""controller-expr"",""weight"":0.5},
+                        {""id"":""input"",""weight"":0.5},
                         {""id"":""osc"",""weight"":0.5}
                     ]}
                 ],
@@ -171,7 +171,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             var result = _parser.ParseLayerInputSources(json);
 
             Assert.AreEqual(2, result[0].Length);
-            Assert.AreEqual("controller-expr", result[0][0].id);
+            Assert.AreEqual("input", result[0][0].id);
             Assert.AreEqual("osc", result[0][1].id);
         }
 
@@ -261,7 +261,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
-                        {""id"":""controller-expr"",""weight"":1.0}
+                        {""id"":""input"",""weight"":1.0}
                     ]}
                 ],
                 ""expressions"":[]

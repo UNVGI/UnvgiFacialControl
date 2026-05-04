@@ -63,7 +63,7 @@ namespace Hidano.FacialControl.Application.UseCases
         /// sourceIdx は各レイヤー内で 1 から昇順に自動割当される。<c>null</c> は空列と同義。
         /// FacialController の初期化経路 (8.2) では
         /// <c>InputSourceFactory.TryCreate</c> の結果をここに渡すことで、
-        /// osc / lipsync / controller-expr / keyboard-expr などを per-layer 加重和に合流できる。
+        /// osc / lipsync / input などを per-layer 加重和に合流できる。
         /// </param>
         public LayerUseCase(
             FacialProfile profile,
@@ -157,7 +157,7 @@ namespace Hidano.FacialControl.Application.UseCases
                 // LayerExpressionSource (sourceIdx=0) の HasBeenActive に加え、
                 // プロファイル由来の追加 IInputSource を持つレイヤーも blend 対象に含める。
                 // これがないと profile.inputSources だけで駆動するレイヤー
-                // (controller-expr / keyboard-expr のみが intra-layer に居る場合など)
+                // (input のみが intra-layer に居る場合など)
                 // が LayerBlender から除外され、実機上で反映されない。
                 bool hasAdditional = _layerHasAdditionalSources != null
                     && l < _layerHasAdditionalSources.Length

@@ -14,10 +14,9 @@ namespace Hidano.FacialControl.InputSystem
     /// </summary>
     /// <remarks>
     /// tasks.md 4.6 で <c>KeyboardExpressionInputSource</c> / <c>ControllerExpressionInputSource</c> は
-    /// <see cref="ExpressionTriggerInputSource"/> 1 種に統合された。後方互換のため、JSON Layer
-    /// <c>inputSources[]</c> 宣言で従来通り両予約 id (<c>controller-expr</c> / <c>keyboard-expr</c>)
-    /// を併用できるよう、両 id を同じ <see cref="ExpressionTriggerInputSource"/> に解決する。
-    /// device 別の dispatch は <see cref="ExpressionInputSourceAdapter"/> +
+    /// <see cref="ExpressionTriggerInputSource"/> 1 種に統合された。
+    /// 旧 <c>controller-expr</c> / <c>keyboard-expr</c> の二系統分離は preview 段階で廃止され、
+    /// 単一の予約 id <c>input</c> で表現される。device 別の dispatch は <see cref="ExpressionInputSourceAdapter"/> +
     /// <see cref="Hidano.FacialControl.Adapters.Input.InputDeviceCategorizer"/> が行う。
     /// </remarks>
     public static class InputRegistration
@@ -30,7 +29,7 @@ namespace Hidano.FacialControl.InputSystem
 
         /// <summary>
         /// <paramref name="factory"/> に <see cref="ExpressionTriggerInputSource"/> 生成器を
-        /// 予約 id <c>controller-expr</c> / <c>keyboard-expr</c> の双方で登録する。
+        /// 予約 id <c>input</c> で登録する。
         /// </summary>
         /// <param name="factory">登録対象のファクトリ。</param>
         /// <param name="blendShapeNames">BlendShape 名の列（名前→インデックス解決用）。</param>
@@ -46,12 +45,7 @@ namespace Hidano.FacialControl.InputSystem
 
             RegisterReservedId(
                 factory,
-                InputSourceId.Parse(ExpressionTriggerInputSource.ControllerReservedId),
-                names,
-                defaultExclusionMode);
-            RegisterReservedId(
-                factory,
-                InputSourceId.Parse(ExpressionTriggerInputSource.KeyboardReservedId),
+                InputSourceId.Parse(ExpressionTriggerInputSource.InputReservedId),
                 names,
                 defaultExclusionMode);
         }

@@ -10,7 +10,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
     [Serializable]
     public sealed class InputSourceDeclarationSerializable
     {
-        [Tooltip("入力源 ID。予約 ID (controller-expr / keyboard-expr / lipsync / osc / input) または x- プレフィックス拡張のみ。")]
+        [Tooltip("入力源 ID。予約 ID (input / osc / lipsync / analog-blendshape / analog-bonepose) または x- プレフィックス拡張のみ。")]
         public string id;
 
         [Tooltip("ブレンドウェイト (0〜1)。レイヤー内で複数ソースを混ぜる際の比率。")]

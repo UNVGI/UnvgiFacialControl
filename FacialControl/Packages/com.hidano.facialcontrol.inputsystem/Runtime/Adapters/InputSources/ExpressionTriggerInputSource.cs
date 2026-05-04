@@ -6,7 +6,6 @@ namespace Hidano.FacialControl.Adapters.InputSources
 {
     /// <summary>
     /// Expression トリガー型入力源の汎用具象実装 (tasks.md 4.6)。
-    /// 旧 <c>KeyboardExpressionInputSource</c> / <c>ControllerExpressionInputSource</c> を統合し、
     /// device 種別に依存しない 1 個の concrete 実装として提供する (Req 7.1, 8.1, 8.2)。
     /// </summary>
     /// <remarks>
@@ -17,18 +16,15 @@ namespace Hidano.FacialControl.Adapters.InputSources
     /// が <see cref="UnityEngine.InputSystem.InputAction.bindings"/> から自動推定して dispatch する責務を負う。
     /// </para>
     /// <para>
-    /// 後方互換のため予約 id 文字列 <c>controller-expr</c> / <c>keyboard-expr</c> を
-    /// <see cref="ControllerReservedId"/> / <see cref="KeyboardReservedId"/> として公開する。
-    /// JSON Layer の <c>inputSources[]</c> 宣言で従来通り両 id を併用できる。
+    /// JSON Layer の <c>inputSources[]</c> 宣言は予約 id <c>input</c> 1 種類で表現する。
+    /// 旧 <c>controller-expr</c> / <c>keyboard-expr</c> の二系統分離は preview 段階で廃止された
+    /// （InputSystem が device 抽象化を担うため、レイヤー粒度での device 分離は不要）。
     /// </para>
     /// </remarks>
     public sealed class ExpressionTriggerInputSource : ExpressionTriggerInputSourceBase
     {
-        /// <summary>後方互換用予約 id (Controller 系)。新規実装では device 自動推定により区別不要。</summary>
-        public const string ControllerReservedId = "controller-expr";
-
-        /// <summary>後方互換用予約 id (Keyboard 系)。新規実装では device 自動推定により区別不要。</summary>
-        public const string KeyboardReservedId = "keyboard-expr";
+        /// <summary>InputSystem 経由の Expression トリガー型入力源を表す予約 id。</summary>
+        public const string InputReservedId = "input";
 
         /// <summary>
         /// <see cref="ExpressionTriggerInputSource"/> を構築する。

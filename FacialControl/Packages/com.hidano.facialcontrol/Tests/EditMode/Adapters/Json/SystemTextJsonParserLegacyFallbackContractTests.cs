@@ -128,7 +128,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             var json = @"{
                 ""schemaVersion"":""2.0"",
                 ""layers"":[
-                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]},
+                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""input"",""weight"":1.0}]},
                     {""name"":""lipsync"",""priority"":1,""exclusionMode"":""blend""}
                 ],
                 ""expressions"":[]

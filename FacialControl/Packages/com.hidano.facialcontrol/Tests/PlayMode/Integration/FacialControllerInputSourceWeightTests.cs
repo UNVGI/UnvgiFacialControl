@@ -295,7 +295,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             {
                 new InputSourceDeclaration[]
                 {
-                    new InputSourceDeclaration("controller-expr", 1.0f, null)
+                    new InputSourceDeclaration("input", 1.0f, null)
                 }
             };
             return new FacialProfile("1.0.0", layers, null, null, layerInputSources);

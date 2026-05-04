@@ -7,7 +7,7 @@ namespace Hidano.FacialControl.Domain.Models
     {
         /// <summary>
         /// Expression トリガー型。内部に専用の Expression スタックと TransitionCalculator を持つ
-        /// （例: <c>controller-expr</c>, <c>keyboard-expr</c>）。
+        /// （例: <c>input</c>）。
         /// </summary>
         ExpressionTrigger,
 

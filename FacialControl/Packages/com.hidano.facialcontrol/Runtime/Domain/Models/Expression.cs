@@ -16,6 +16,14 @@ namespace Hidano.FacialControl.Domain.Models
     public readonly struct Expression
     {
         /// <summary>
+        /// 表情遷移時間の既定値（秒）。1 / 15 秒 ≒ 0.0667 秒（Req 2.5）。
+        /// SnapshotId / Bridge ctor、<see cref="ExpressionSnapshot"/> の既定値、
+        /// <see cref="Hidano.FacialControl.Adapters.ScriptableObject.Serializable.ExpressionSerializable"/>
+        /// 等、本値を参照する全箇所で source-of-truth として用いる。
+        /// </summary>
+        public const float DefaultTransitionDuration = 1f / 15f;
+
+        /// <summary>
         /// 一意識別子（GUID）
         /// </summary>
         public string Id { get; }
@@ -98,7 +106,7 @@ namespace Hidano.FacialControl.Domain.Models
             OverrideMask = overrideMask;
             SnapshotId = snapshotId;
 
-            TransitionDuration = 0.25f;
+            TransitionDuration = DefaultTransitionDuration;
             TransitionCurve = default;
             BlendShapeValues = Array.Empty<BlendShapeMapping>();
         }
@@ -118,7 +126,7 @@ namespace Hidano.FacialControl.Domain.Models
             string id,
             string name,
             string layer,
-            float transitionDuration = 0.25f,
+            float transitionDuration = DefaultTransitionDuration,
             TransitionCurve transitionCurve = default,
             BlendShapeMapping[] blendShapeValues = null)
         {

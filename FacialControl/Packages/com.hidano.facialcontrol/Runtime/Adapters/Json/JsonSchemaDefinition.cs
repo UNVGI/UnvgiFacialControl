@@ -115,7 +115,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 /// <summary>所属レイヤー名</summary>
                 public const string Layer = "layer";
 
-                /// <summary>遷移時間（0〜1 秒、デフォルト 0.25）</summary>
+                /// <summary>遷移時間（0〜1 秒、デフォルト 1/15 ≒ 0.0667）</summary>
                 public const string TransitionDuration = "transitionDuration";
 
                 /// <summary>遷移カーブ設定</summary>
@@ -274,14 +274,14 @@ namespace Hidano.FacialControl.Adapters.Json
     ""rendererPaths"": [""Armature/Body"", ""Face""],
     ""layers"": [
         {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [
-            {""id"": ""controller-expr"", ""weight"": 0.5},
+            {""id"": ""input"", ""weight"": 0.5},
             {""id"": ""osc"", ""weight"": 0.5, ""options"": {""stalenessSeconds"": 1.0}}
         ]},
         {""name"": ""lipsync"", ""priority"": 1, ""exclusionMode"": ""blend"", ""inputSources"": [
             {""id"": ""lipsync"", ""weight"": 1.0}
         ]},
         {""name"": ""eye"", ""priority"": 2, ""exclusionMode"": ""lastWins"", ""inputSources"": [
-            {""id"": ""keyboard-expr"", ""weight"": 1.0, ""options"": {""maxStackDepth"": 4}}
+            {""id"": ""input"", ""weight"": 1.0, ""options"": {""maxStackDepth"": 4}}
         ]}
     ],
     ""expressions"": [
@@ -291,7 +291,7 @@ namespace Hidano.FacialControl.Adapters.Json
             ""layer"": ""emotion"",
             ""layerOverrideMask"": [""lipsync""],
             ""snapshot"": {
-                ""transitionDuration"": 0.25,
+                ""transitionDuration"": 0.0667,
                 ""transitionCurvePreset"": ""EaseInOut"",
                 ""blendShapes"": [
                     {""rendererPath"": """", ""name"": ""Fcl_ALL_Joy"", ""value"": 1.0},

@@ -409,7 +409,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
 
             for (int i = 0; i < expressions.Length; i++)
             {
-                Assert.AreEqual(0.25f, expressions[i].TransitionDuration, 0.0001f);
+                Assert.AreEqual(Expression.DefaultTransitionDuration, expressions[i].TransitionDuration, 0.0001f);
             }
         }
 

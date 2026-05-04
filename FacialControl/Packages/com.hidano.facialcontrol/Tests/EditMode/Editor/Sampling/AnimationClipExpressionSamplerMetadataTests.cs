@@ -54,7 +54,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
 
             var snapshot = sampler.SampleSnapshot("expr-meta-default", clip);
 
-            Assert.AreEqual(0.25f, snapshot.TransitionDuration);
+            Assert.AreEqual(Expression.DefaultTransitionDuration, snapshot.TransitionDuration);
             Assert.AreEqual(TransitionCurvePreset.Linear, snapshot.TransitionCurvePreset);
         }
 
@@ -88,8 +88,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
             var snapshot = sampler.SampleSnapshot("expr-meta-curve", clip);
 
             Assert.AreEqual(TransitionCurvePreset.EaseInOut, snapshot.TransitionCurvePreset);
-            // Duration は不在なので 0.25 のまま
-            Assert.AreEqual(0.25f, snapshot.TransitionDuration);
+            // Duration は不在なので Expression.DefaultTransitionDuration のまま
+            Assert.AreEqual(Expression.DefaultTransitionDuration, snapshot.TransitionDuration);
         }
 
         [Test]

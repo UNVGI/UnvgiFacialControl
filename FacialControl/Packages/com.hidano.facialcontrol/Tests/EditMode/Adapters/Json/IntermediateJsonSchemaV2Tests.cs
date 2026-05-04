@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.TestTools;
 using Hidano.FacialControl.Adapters.Json;
 using Hidano.FacialControl.Adapters.Json.Dto;
+using Hidano.FacialControl.Domain.Models;
 
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 {
@@ -160,7 +161,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void Parse_MissingSnapshot_ProducesEmptySnapshot()
         {
             // expressions[].snapshot 欠落 → 空 snapshot に正規化される。
-            // 既定値: transitionDuration=0.25, transitionCurvePreset="Linear", blendShapes/bones/rendererPaths は空 List。
+            // 既定値: transitionDuration=Expression.DefaultTransitionDuration (1/15), transitionCurvePreset="Linear", blendShapes/bones/rendererPaths は空 List。
             var json =
                 "{" +
                 "\"schemaVersion\":\"2.0\"," +
@@ -177,7 +178,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 
             var expr = dto.expressions[0];
             Assert.IsNotNull(expr.snapshot, "snapshot 欠落でも null ではなく空 snapshot を返すこと");
-            Assert.AreEqual(0.25f, expr.snapshot.transitionDuration);
+            Assert.AreEqual(Expression.DefaultTransitionDuration, expr.snapshot.transitionDuration);
             Assert.AreEqual("Linear", expr.snapshot.transitionCurvePreset);
             Assert.IsNotNull(expr.snapshot.blendShapes);
             Assert.AreEqual(0, expr.snapshot.blendShapes.Count);
@@ -247,7 +248,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                         exclusionMode = "lastWins",
                         inputSources = new List<InputSourceDto>
                         {
-                            new InputSourceDto { id = "controller-expr", weight = 1.0f },
+                            new InputSourceDto { id = "input", weight = 1.0f },
                         },
                     },
                     new LayerDefinitionDto
@@ -257,7 +258,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                         exclusionMode = "blend",
                         inputSources = new List<InputSourceDto>
                         {
-                            new InputSourceDto { id = "keyboard-expr", weight = 0.75f },
+                            new InputSourceDto { id = "analog-blendshape", weight = 0.75f },
                         },
                     },
                 },

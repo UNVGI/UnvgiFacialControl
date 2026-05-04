@@ -25,7 +25,7 @@
 3. 同 GameObject に `OscReceiver`（受信）／`OscSender`（送信）を追加し、ポート設定
 4. 同 GameObject に **OSC Facial Extension** (`OscFacialControllerExtension`) を追加
    - Receiver / Sender 参照は同 GameObject から自動取得される
-5. `FacialCharacterSO` Inspector の **レイヤー** セクションで対象レイヤーを開き、`inputSources` リストに 1 件追加して `id = "osc"` / `weight = 1.0` を設定すると OSC 受信値がそのレイヤーに合流する。同一レイヤーに `controller-expr` / `keyboard-expr` / `analog-blendshape` などを並置すれば加重和ブレンディングが効く
+5. `FacialCharacterSO` Inspector の **レイヤー** セクションで対象レイヤーを開き、`inputSources` リストに 1 件追加して `id = "osc"` / `weight = 1.0` を設定すると OSC 受信値がそのレイヤーに合流する。同一レイヤーに `input` (InputSystem 経由のトリガー) や `analog-blendshape` などを並置すれば加重和ブレンディングが効く
    - JSON を直接編集する上級者向けの代替手段として、`StreamingAssets/FacialControl/{SO 名}/profile.json` の `layers[*].inputSources` に `{"id": "osc", "weight": 1.0}` を追記する形でも同じ結果になる（Editor で SO を保存すると自動で書き戻されるため、通常は Inspector 経由で十分）
 
 ```csharp

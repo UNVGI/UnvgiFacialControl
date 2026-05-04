@@ -50,9 +50,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void Id_Type_BlendShapeCount_AreReadableFromContract()
         {
-            IInputSource source = new NoOpInvalidInputSource("controller-expr", InputSourceType.ExpressionTrigger, 52);
+            IInputSource source = new NoOpInvalidInputSource("input", InputSourceType.ExpressionTrigger, 52);
 
-            Assert.AreEqual("controller-expr", source.Id);
+            Assert.AreEqual("input", source.Id);
             Assert.AreEqual(InputSourceType.ExpressionTrigger, source.Type);
             Assert.AreEqual(52, source.BlendShapeCount);
         }

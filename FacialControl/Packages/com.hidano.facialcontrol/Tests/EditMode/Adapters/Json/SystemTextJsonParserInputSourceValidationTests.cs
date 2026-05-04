@@ -47,7 +47,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""invalid id with space"",""weight"":1.0},
-                        {""id"":""controller-expr"",""weight"":1.0}
+                        {""id"":""input"",""weight"":1.0}
                     ]}
                 ],
                 ""expressions"":[]
@@ -59,7 +59,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 
             Assert.AreEqual(1, result.Length);
             Assert.AreEqual(1, result[0].Length, "regex 違反エントリは skip されること");
-            Assert.AreEqual("controller-expr", result[0][0].id);
+            Assert.AreEqual("input", result[0][0].id);
         }
 
         [Test]
@@ -95,7 +95,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""" + tooLong + @""",""weight"":1.0},
-                        {""id"":""controller-expr"",""weight"":1.0}
+                        {""id"":""input"",""weight"":1.0}
                     ]}
                 ],
                 ""expressions"":[]
@@ -106,7 +106,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             var result = _parser.ParseLayerInputSources(json);
 
             Assert.AreEqual(1, result[0].Length);
-            Assert.AreEqual("controller-expr", result[0][0].id);
+            Assert.AreEqual("input", result[0][0].id);
         }
 
         // ================================================================
@@ -143,7 +143,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
-                        {""id"":""controller-expr"",""weight"":0.5},
+                        {""id"":""input"",""weight"":0.5},
                         {""id"":""x-custom-sensor"",""weight"":0.5}
                     ]}
                 ],
@@ -153,7 +153,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             var result = _parser.ParseLayerInputSources(json);
 
             Assert.AreEqual(2, result[0].Length);
-            Assert.AreEqual("controller-expr", result[0][0].id);
+            Assert.AreEqual("input", result[0][0].id);
             Assert.AreEqual("x-custom-sensor", result[0][1].id);
             LogAssert.NoUnexpectedReceived();
         }
@@ -170,7 +170,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""osc"",""weight"":0.25,""options"":{""stalenessSeconds"":1.0}},
-                        {""id"":""controller-expr"",""weight"":1.0},
+                        {""id"":""input"",""weight"":1.0},
                         {""id"":""osc"",""weight"":0.75,""options"":{""stalenessSeconds"":2.5}}
                     ]}
                 ],
@@ -200,7 +200,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                         {""id"":""osc"",""weight"":0.1},
                         {""id"":""lipsync"",""weight"":0.2},
                         {""id"":""osc"",""weight"":0.9},
-                        {""id"":""controller-expr"",""weight"":1.0}
+                        {""id"":""input"",""weight"":1.0}
                     ]}
                 ],
                 ""expressions"":[]
@@ -214,7 +214,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             Assert.AreEqual("lipsync", result[0][0].id);
             Assert.AreEqual("osc", result[0][1].id);
             Assert.AreEqual(0.9f, result[0][1].weight);
-            Assert.AreEqual("controller-expr", result[0][2].id);
+            Assert.AreEqual("input", result[0][2].id);
         }
 
         [Test]

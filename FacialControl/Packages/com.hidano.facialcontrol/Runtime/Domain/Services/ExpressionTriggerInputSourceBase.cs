@@ -14,8 +14,8 @@ namespace Hidano.FacialControl.Domain.Services
     /// <remarks>
     /// <para>
     /// 本基底は Req 1.6 / 1.8 を満たすためのインスタンス独立性を確保する。
-    /// 同レイヤーに複数の <see cref="ExpressionTriggerInputSourceBase"/> 派生 (例: controller-expr /
-    /// keyboard-expr) を配置しても、各インスタンスの Expression スタックと
+    /// 同レイヤーに複数の <see cref="ExpressionTriggerInputSourceBase"/> 派生を配置しても、
+    /// 各インスタンスの Expression スタックと
     /// 遷移状態は互いに干渉しない。
     /// </para>
     /// <para>
@@ -33,7 +33,7 @@ namespace Hidano.FacialControl.Domain.Services
     /// </remarks>
     public abstract class ExpressionTriggerInputSourceBase : IInputSource
     {
-        private const float DefaultReleaseTransitionDuration = 0.25f;
+        private const float DefaultReleaseTransitionDuration = Expression.DefaultTransitionDuration;
 
         /// <summary>入力源識別子 (生涯不変)。<see cref="IInputSource.Id"/> の実体。</summary>
         public string Id { get; }

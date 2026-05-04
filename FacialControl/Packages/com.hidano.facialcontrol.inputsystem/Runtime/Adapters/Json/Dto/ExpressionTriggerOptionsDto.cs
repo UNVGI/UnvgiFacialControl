@@ -1,7 +1,7 @@
 namespace Hidano.FacialControl.Adapters.Json.Dto
 {
     /// <summary>
-    /// 予約 ID <c>controller-expr</c> / <c>keyboard-expr</c> の入力源固有 options。
+    /// 予約 ID <c>input</c> の入力源固有 options。
     /// <see cref="maxStackDepth"/> が 0 の場合は既定値 8 を使用する（D-14）。
     /// </summary>
     [System.Serializable]

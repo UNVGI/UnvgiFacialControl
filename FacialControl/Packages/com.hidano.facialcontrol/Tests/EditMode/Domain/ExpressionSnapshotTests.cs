@@ -85,13 +85,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         }
 
         [Test]
-        public void TransitionDuration_Default_Is_PointTwoFive()
+        public void TransitionDuration_Default_Is_OneFifteenth()
         {
-            // 引数省略時のフォールバック値が 0.25 秒（Req 2.5）
+            // 引数省略時のフォールバック値が Expression.DefaultTransitionDuration (1/15 秒) （Req 2.5）
             var snapshot = ExpressionSnapshot.CreateDefault("expr-003");
 
             Assert.AreEqual("expr-003", snapshot.Id);
-            Assert.AreEqual(0.25f, snapshot.TransitionDuration);
+            Assert.AreEqual(Expression.DefaultTransitionDuration, snapshot.TransitionDuration);
             Assert.AreEqual(TransitionCurvePreset.Linear, snapshot.TransitionCurvePreset);
             Assert.IsTrue(snapshot.BlendShapes.IsEmpty);
             Assert.IsTrue(snapshot.Bones.IsEmpty);

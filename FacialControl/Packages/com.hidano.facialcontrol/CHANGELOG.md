@@ -25,6 +25,8 @@
 
 - `Adapters.Json.Dto.AnalogBindingEntryDto` に `scale: float` / `direction: string` を追加。旧スキーマ JSON は欠落フィールドを default 値 (`scale=1`, `direction="bipolar"`) で fallback する。
 - `Adapters.Json.AnalogInputBindingJsonLoader` で scale / direction の parse / serialize を追加。不正 direction 文字列は warning + Bipolar 扱い。
+- 表情遷移時間のデフォルト値を `0.25 秒` から `1/15 秒 (≒0.0667 秒)` に変更。`Domain.Models.Expression.DefaultTransitionDuration` を新設し、`Expression` / `ExpressionSnapshot` / `ExpressionSerializable` / `ExpressionSnapshotDto` / `ExpressionTriggerInputSourceBase.DefaultReleaseTransitionDuration` / `AnimationClipExpressionSampler.DefaultTransitionDuration` / `ARKitDetector` 既定生成 / `SystemTextJsonParser` snapshot 欠落フォールバック / `Templates/default_profile.json` がすべて参照する。preview 段階のため後方互換は持たない。
+- ExpressionTrigger 系 IInputSource の予約 ID を `controller-expr` / `keyboard-expr` の二系統から単一の `input` に統合。`InputSystem.Action` 名で device を抽象化する設計のため、コア側で device 種別ごとに ID を分ける必要がなくなった。`Domain.Models.InputSourceId.ReservedIds` から `controller-expr` / `keyboard-expr` を削除し、`input` を新規追加。InputSystem 連携の `ExpressionTriggerInputSource` も二系統 (Controller/Keyboard) のクラス分離を撤廃し、単一 `InputReservedId = "input"` に統一。preview 段階のため後方互換は持たない。既存プロファイル JSON / SO の `inputSources[].id` が `controller-expr` / `keyboard-expr` のままだと parse 時に warning + skip されるため、`input` (1 件) に書き換える必要がある。
 
 
 ### ⚠ BREAKING CHANGES
@@ -207,13 +209,13 @@
 
 - FacialProfile JSON の `layers[].inputSources` を**必須フィールド化**し、暗黙の `legacy` フォールバックを廃止
   - `inputSources` が欠落または空配列のレイヤーは `FormatException` でロードが失敗する
-  - 予約 ID: `osc` / `lipsync` / `controller-expr` / `keyboard-expr` / `input`。サードパーティ拡張は `x-` プレフィックスを使用
-  - 移行方法: 既存プロファイル JSON の各レイヤーに `"inputSources": [{ "id": "controller-expr", "weight": 1.0 }]` 等の配列を明示的に追記する（同梱サンプルの移行例は `docs/migration-guide.md` および `StreamingAssets/FacialControl/*_profile.json` を参照）
+  - 予約 ID: `osc` / `lipsync` / `input` / `analog-blendshape` / `analog-bonepose`。サードパーティ拡張は `x-` プレフィックスを使用
+  - 移行方法: 既存プロファイル JSON の各レイヤーに `"inputSources": [{ "id": "input", "weight": 1.0 }]` 等の配列を明示的に追記する（同梱サンプルの移行例は `docs/migration-guide.md` および `StreamingAssets/FacialControl/*_profile.json` を参照）
   - 根拠: `docs/requirements.md` FR-001（preview 段階の破壊的変更許容）、および spec `layer-input-source-blending` の D-5 / R3.2 / R7.3 / R7.4
 
 - 予約 ID `legacy` の廃止
   - 旧バージョンで `legacy` を用いて Expression パイプライン全体を 1 本の入力源として温存していた挙動は削除された
-  - 移行方法: Expression 駆動のみを行うレイヤーは `inputSources: [{ "id": "controller-expr", "weight": 1.0 }]`（および必要に応じて `keyboard-expr`）へ置き換える
+  - 移行方法: Expression 駆動のみを行うレイヤーは `inputSources: [{ "id": "input", "weight": 1.0 }]` へ置き換える
   - 根拠: spec `layer-input-source-blending` の D-1 / D-5 / D-6 / R1.7
 
 - `InputBindingProfileSO` に `InputSourceCategory` フィールドを追加、既定値は `Controller`

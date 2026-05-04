@@ -97,7 +97,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         }
 
         private static TestExpressionTriggerSource CreateSource(
-            string id = "controller-expr",
+            string id = "input",
             int maxStackDepth = 8,
             ExclusionMode exclusionMode = ExclusionMode.LastWins)
         {
@@ -113,9 +113,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void Ctor_StoresIdTypeAndBlendShapeCount()
         {
-            var source = CreateSource("controller-expr");
+            var source = CreateSource("input");
 
-            Assert.AreEqual("controller-expr", source.Id);
+            Assert.AreEqual("input", source.Id);
             Assert.AreEqual(InputSourceType.ExpressionTrigger, source.Type);
             Assert.AreEqual(BlendShapeNames.Length, source.BlendShapeCount);
         }
@@ -123,7 +123,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void Type_IsAlwaysExpressionTrigger_ViaIInputSource()
         {
-            IInputSource source = CreateSource("keyboard-expr");
+            IInputSource source = CreateSource("analog-blendshape");
 
             Assert.AreEqual(InputSourceType.ExpressionTrigger, source.Type);
         }
@@ -133,7 +133,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         {
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 new TestExpressionTriggerSource(
-                    InputSourceId.Parse("controller-expr"),
+                    InputSourceId.Parse("input"),
                     blendShapeCount: -1,
                     maxStackDepth: 1,
                     exclusionMode: ExclusionMode.LastWins,
@@ -146,7 +146,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         {
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 new TestExpressionTriggerSource(
-                    InputSourceId.Parse("controller-expr"),
+                    InputSourceId.Parse("input"),
                     blendShapeCount: 4,
                     maxStackDepth: 0,
                     exclusionMode: ExclusionMode.LastWins,
@@ -159,7 +159,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         {
             Assert.Throws<ArgumentNullException>(() =>
                 new TestExpressionTriggerSource(
-                    InputSourceId.Parse("controller-expr"),
+                    InputSourceId.Parse("input"),
                     blendShapeCount: 4,
                     maxStackDepth: 1,
                     exclusionMode: ExclusionMode.LastWins,
@@ -266,9 +266,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         public void TwoIndependentInstances_DoNotInterfereWhenBothActive()
         {
             // Controller 相当インスタンス: smile をトリガー
-            var controllerLike = CreateSource("controller-expr");
+            var controllerLike = CreateSource("input");
             // Keyboard 相当インスタンス: angry をトリガー (同じレイヤー前提)
-            var keyboardLike = CreateSource("keyboard-expr");
+            var keyboardLike = CreateSource("analog-blendshape");
 
             controllerLike.TriggerOn("smile");
             keyboardLike.TriggerOn("angry");
@@ -283,11 +283,11 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             Assert.IsTrue(controllerLike.TryWriteValues(controllerBuffer));
             Assert.IsTrue(keyboardLike.TryWriteValues(keyboardBuffer));
 
-            // controller-expr 側は smile のみが立つ
+            // input 側は smile のみが立つ
             Assert.AreEqual(1.0f, controllerBuffer[0], 1e-5f);
             Assert.AreEqual(0.0f, controllerBuffer[1], 1e-5f);
 
-            // keyboard-expr 側は angry のみが立つ
+            // analog-blendshape 側は angry のみが立つ
             Assert.AreEqual(0.0f, keyboardBuffer[0], 1e-5f);
             Assert.AreEqual(1.0f, keyboardBuffer[1], 1e-5f);
 
@@ -385,11 +385,11 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void StackDepthExceeded_EmitsWarningOncePerInstance()
         {
-            var source = CreateSource(id: "controller-expr", maxStackDepth: 2);
+            var source = CreateSource(id: "input", maxStackDepth: 2);
 
             // 最初の超過で 1 回だけ warning が出る。
             LogAssert.Expect(LogType.Warning,
-                new Regex("ExpressionTriggerInputSource.*controller-expr.*maxStackDepth=2"));
+                new Regex("ExpressionTriggerInputSource.*input.*maxStackDepth=2"));
 
             source.TriggerOn("smile");
             source.TriggerOn("angry");
@@ -403,11 +403,11 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void StackDepthExceeded_SecondOverflow_DoesNotEmitAdditionalWarning()
         {
-            var source = CreateSource(id: "controller-expr", maxStackDepth: 2);
+            var source = CreateSource(id: "input", maxStackDepth: 2);
 
             // 1 回目の超過分のみ warning を期待する。
             LogAssert.Expect(LogType.Warning,
-                new Regex("ExpressionTriggerInputSource.*controller-expr.*maxStackDepth=2"));
+                new Regex("ExpressionTriggerInputSource.*input.*maxStackDepth=2"));
 
             source.TriggerOn("smile");
             source.TriggerOn("angry");
@@ -430,13 +430,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         public void StackDepthExceeded_DifferentInstances_EachEmitWarningOnce()
         {
             // per-instance の「1 回警告」が確かにインスタンススコープであることを確認する。
-            var sourceA = CreateSource(id: "controller-expr", maxStackDepth: 1);
-            var sourceB = CreateSource(id: "keyboard-expr", maxStackDepth: 1);
+            var sourceA = CreateSource(id: "input", maxStackDepth: 1);
+            var sourceB = CreateSource(id: "analog-blendshape", maxStackDepth: 1);
 
             LogAssert.Expect(LogType.Warning,
-                new Regex("ExpressionTriggerInputSource.*controller-expr.*maxStackDepth=1"));
+                new Regex("ExpressionTriggerInputSource.*input.*maxStackDepth=1"));
             LogAssert.Expect(LogType.Warning,
-                new Regex("ExpressionTriggerInputSource.*keyboard-expr.*maxStackDepth=1"));
+                new Regex("ExpressionTriggerInputSource.*analog-blendshape.*maxStackDepth=1"));
 
             sourceA.TriggerOn("smile");
             sourceA.TriggerOn("angry"); // A で超過 → warning (A)

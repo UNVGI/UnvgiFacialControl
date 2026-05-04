@@ -44,7 +44,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             var src = new InputSourceDto
             {
-                id = "controller-expr",
+                id = "input",
                 weight = 0.75f,
                 optionsJson = "{\"maxStackDepth\":4}"
             };

@@ -14,7 +14,7 @@ namespace Hidano.FacialControl.Editor.Sampling
     /// 時刻 0 の BlendShape / Transform 値を取得する（research.md Topic 5、Decision 2）。
     /// AnimationEvent 経由のメタデータ抽出（<see cref="MetaSetFunctionName"/>）で
     /// TransitionDuration / TransitionCurvePreset を上書きする（Phase 2.2、Req 2.4-2.6）。
-    /// 不在時は TransitionDuration=0.25, TransitionCurvePreset=Linear をデフォルトとして返す。
+    /// 不在時は TransitionDuration=<see cref="Expression.DefaultTransitionDuration"/> (1/15), TransitionCurvePreset=Linear をデフォルトとして返す。
     /// </para>
     /// <para>
     /// BlendShape: <c>propertyName.StartsWith("blendShape.")</c> で判別。
@@ -35,7 +35,7 @@ namespace Hidano.FacialControl.Editor.Sampling
         private const string MetaKeyTransitionDuration = "transitionDuration";
         private const string MetaKeyTransitionCurvePreset = "transitionCurvePreset";
 
-        private const float DefaultTransitionDuration = 0.25f;
+        private const float DefaultTransitionDuration = Expression.DefaultTransitionDuration;
         private const TransitionCurvePreset DefaultTransitionCurve = TransitionCurvePreset.Linear;
 
         private const string BlendShapePropertyPrefix = "blendShape.";

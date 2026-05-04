@@ -8,9 +8,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
     {
         [TestCase("osc")]
         [TestCase("lipsync")]
-        [TestCase("controller-expr")]
-        [TestCase("keyboard-expr")]
         [TestCase("input")]
+        [TestCase("analog-blendshape")]
+        [TestCase("analog-bonepose")]
         public void TryParse_ReservedId_ReturnsTrueAndIsReservedIsTrue(string reserved)
         {
             var parsed = InputSourceId.TryParse(reserved, out var id);
@@ -122,11 +122,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         {
             Assert.IsTrue(InputSourceId.IsReservedId("osc"));
             Assert.IsTrue(InputSourceId.IsReservedId("lipsync"));
-            Assert.IsTrue(InputSourceId.IsReservedId("controller-expr"));
-            Assert.IsTrue(InputSourceId.IsReservedId("keyboard-expr"));
             Assert.IsTrue(InputSourceId.IsReservedId("input"));
+            Assert.IsTrue(InputSourceId.IsReservedId("analog-blendshape"));
+            Assert.IsTrue(InputSourceId.IsReservedId("analog-bonepose"));
 
             Assert.IsFalse(InputSourceId.IsReservedId("legacy"));
+            Assert.IsFalse(InputSourceId.IsReservedId("controller-expr"));
+            Assert.IsFalse(InputSourceId.IsReservedId("keyboard-expr"));
             Assert.IsFalse(InputSourceId.IsReservedId("x-custom"));
             Assert.IsFalse(InputSourceId.IsReservedId("unknown"));
             Assert.IsFalse(InputSourceId.IsReservedId(null));
@@ -159,9 +161,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void ToString_ReturnsUnderlyingValue()
         {
-            Assert.IsTrue(InputSourceId.TryParse("controller-expr", out var id));
+            Assert.IsTrue(InputSourceId.TryParse("input", out var id));
 
-            Assert.AreEqual("controller-expr", id.ToString());
+            Assert.AreEqual("input", id.ToString());
         }
 
         [Test]

@@ -6,9 +6,9 @@ using Hidano.FacialControl.Domain.Services;
 namespace Hidano.FacialControl.Samples
 {
     /// <summary>
-    /// 同一レイヤーに複数の <c>ExpressionTrigger</c> 入力源 (controller-expr / keyboard-expr) を並置し、
-    /// それぞれのウェイト比と独立トリガーで BlendShape 加重和がどう見えるかを目視検証するための
-    /// PlayMode 専用 HUD。アナログ操作 (Vector2 入力 → 両目ボーン / BlendShape) の現在値も同 HUD で観測する。
+    /// レイヤー上の <c>input</c> 系 ExpressionTrigger 入力源を 1 系統駆動し、ウェイトと
+    /// トリガーで BlendShape 加重和がどう見えるかを目視検証するための PlayMode 専用 HUD。
+    /// アナログ操作 (Vector2 入力 → 両目ボーン / BlendShape) の現在値も同 HUD で観測する。
     /// </summary>
     /// <remarks>
     /// 詳しい使い方は本サンプル同梱の README.md 参照。
@@ -27,13 +27,9 @@ namespace Hidano.FacialControl.Samples
         [SerializeField]
         private int _layerIndex = 0;
 
-        [Tooltip("Controller 入力源の source index (1 始まり)。")]
+        [Tooltip("Input 入力源の source index (1 始まり)。")]
         [SerializeField]
-        private int _controllerSourceIndex = 1;
-
-        [Tooltip("Keyboard 入力源の source index (1 始まり)。")]
-        [SerializeField]
-        private int _keyboardSourceIndex = 2;
+        private int _inputSourceIndex = 1;
 
         [Tooltip("HUD で観測する LeftEye Transform (BonePose ターゲット)。アナログ機能未使用時は未割当で OK。")]
         [SerializeField]
@@ -57,8 +53,7 @@ namespace Hidano.FacialControl.Samples
 
         private static readonly string[] s_expressionIds = { "smile", "anger", "surprise", "lipsync_a" };
 
-        private float _controllerWeight = 0.5f;
-        private float _keyboardWeight = 0.5f;
+        private float _inputWeight = 1.0f;
         private Vector2 _scroll;
         private bool _initialWeightsApplied;
 
@@ -87,8 +82,7 @@ namespace Hidano.FacialControl.Samples
 
         private void ApplyInitialWeights()
         {
-            _facialController.SetInputSourceWeight(_layerIndex, _controllerSourceIndex, _controllerWeight);
-            _facialController.SetInputSourceWeight(_layerIndex, _keyboardSourceIndex, _keyboardWeight);
+            _facialController.SetInputSourceWeight(_layerIndex, _inputSourceIndex, _inputWeight);
         }
 
         private void OnGUI()
@@ -109,43 +103,32 @@ namespace Hidano.FacialControl.Samples
                 return;
             }
 
-            var controllerSource = GetSource(Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.ControllerReservedId);
-            var keyboardSource = GetSource(Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.KeyboardReservedId);
+            var inputSource = GetSource(Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.InputReservedId);
 
             GUILayout.BeginArea(new Rect(10, 10, 480, Screen.height - 20), GUI.skin.box);
             _scroll = GUILayout.BeginScrollView(_scroll);
 
             GUILayout.Label("<b>Multi Source Blend Demo</b>", RichStyle());
-            GUILayout.Label($"layer {_layerIndex} の 2 ソースを加重和で合成");
+            GUILayout.Label($"layer {_layerIndex} の input 系入力源を駆動");
 
-            DrawWeightSlider("Controller weight (source=1)",
-                ref _controllerWeight, _controllerSourceIndex);
-            DrawWeightSlider("Keyboard weight (source=2)",
-                ref _keyboardWeight, _keyboardSourceIndex);
+            DrawWeightSlider($"Input weight (source={_inputSourceIndex})",
+                ref _inputWeight, _inputSourceIndex);
 
             GUILayout.Space(8);
-            GUILayout.Label("<b>Controller 入力源 (controller-expr)</b>", RichStyle());
-            DrawSourceTriggerRow(controllerSource, Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.ControllerReservedId);
-
-            GUILayout.Space(6);
-            GUILayout.Label("<b>Keyboard 入力源 (keyboard-expr)</b>", RichStyle());
-            DrawSourceTriggerRow(keyboardSource, Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.KeyboardReservedId);
+            GUILayout.Label("<b>Input 入力源 (input)</b>", RichStyle());
+            DrawSourceTriggerRow(inputSource, Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.InputReservedId);
 
             GUILayout.Space(8);
-            if (GUILayout.Button("全ソースの全 Expression を Off"))
+            if (GUILayout.Button("Input ソースの全 Expression を Off"))
             {
-                ReleaseAll(controllerSource);
-                ReleaseAll(keyboardSource);
+                ReleaseAll(inputSource);
             }
 
             GUILayout.Space(10);
             GUILayout.Label("<b>Active Expression</b>", RichStyle());
-            GUILayout.Label(controllerSource == null
-                ? "  controller: (source not registered)"
-                : $"  controller: [{string.Join(", ", controllerSource.ActiveExpressionIds)}]");
-            GUILayout.Label(keyboardSource == null
-                ? "  keyboard: (source not registered)"
-                : $"  keyboard: [{string.Join(", ", keyboardSource.ActiveExpressionIds)}]");
+            GUILayout.Label(inputSource == null
+                ? "  input: (source not registered)"
+                : $"  input: [{string.Join(", ", inputSource.ActiveExpressionIds)}]");
 
             GUILayout.Space(10);
             GUILayout.Label("<b>Weight Snapshot</b>", RichStyle());

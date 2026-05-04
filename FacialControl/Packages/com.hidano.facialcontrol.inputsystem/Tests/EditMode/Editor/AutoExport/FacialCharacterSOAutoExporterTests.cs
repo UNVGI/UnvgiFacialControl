@@ -81,7 +81,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Editor.AutoExport
                 exclusionMode = ExclusionMode.LastWins,
                 inputSources = new List<InputSourceDeclarationSerializable>
                 {
-                    new InputSourceDeclarationSerializable { id = "controller-expr", weight = 1.0f }
+                    new InputSourceDeclarationSerializable { id = "input", weight = 1.0f }
                 }
             };
             so.Layers.Add(layer);

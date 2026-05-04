@@ -121,7 +121,7 @@ namespace Hidano.FacialControl.Adapters.Playable
 
             // Aggregator パイプラインを 1 フレーム分進める。
             // sourceIdx=0 の LayerExpressionSource は ExpressionUseCase.GetActiveExpressions から駆動、
-            // sourceIdx=1+ の IInputSource (controller-expr / keyboard-expr / osc 等) は
+            // sourceIdx=1+ の IInputSource (input / osc 等) は
             // 各アダプタの TriggerOn/Off または WriteTick 経由で駆動される。
             _layerUseCase.UpdateWeights(Time.deltaTime);
 
@@ -479,7 +479,7 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         /// <summary>
         /// プロファイルの <c>inputSources</c> 宣言から生成された Expression トリガー型
-        /// 入力源 (<c>controller-expr</c> / <c>keyboard-expr</c> など) を id で検索する。
+        /// 入力源 (<c>input</c> など) を id で検索する。
         /// Samples のデモ HUD や Editor ツールから特定アダプタを掴んで
         /// <see cref="ExpressionTriggerInputSourceBase.TriggerOn"/> /
         /// <see cref="ExpressionTriggerInputSourceBase.TriggerOff"/> を直接呼びたい場合に利用する。
