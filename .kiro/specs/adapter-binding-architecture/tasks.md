@@ -383,7 +383,7 @@
   - _Requirements: 2.3, 6.6_
   - _Boundary: Tests/EditMode/Adapters/ScriptableObject_
 
-- [ ] 12.4 0-alloc perf test を 3 binding × 10 体構成で再実行する
+- [x] 12.4 0-alloc perf test を 3 binding × 10 体構成で再実行する
   - 7.2 の 3 シナリオ (a) / (b) / (c) を Phase 2 完了後の実 binding 構成（OSC + InputSystem + ARKit + Mock）で再実行する
   - 同時 10 体以上の制御で 0-alloc 目標を維持していることを assert する
   - 観測可能完了条件: 3 シナリオ全てが Phase 2 完了後も pass
