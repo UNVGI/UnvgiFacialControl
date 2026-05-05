@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Playables;
 using Hidano.FacialControl.Adapters.Bone;
+using Hidano.FacialControl.Adapters.DependencyInjection;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Application.UseCases;
@@ -49,6 +50,7 @@ namespace Hidano.FacialControl.Adapters.Playable
         private string[] _blendShapeNames;
         private bool _isInitialized;
         private BoneWriter _boneWriter;
+        private FacialControllerLifetimeScope _childLifetimeScope;
 
         // BlendShape 出力インデックス → (Renderer, Renderer 上の BS index) のマッピング
         private BlendShapeTarget[][] _blendShapeTargets;
@@ -224,11 +226,30 @@ namespace Hidano.FacialControl.Adapters.Playable
             var blendShapeNames = _blendShapeNames ?? Array.Empty<string>();
             _inputSourceFactory = new InputSourceFactory(lipSyncProvider: null);
 
+            // DD-2 衝突防御: 旧 IFacialControllerExtension コンポーネントと
+            // FacialCharacterProfileSO._adapterBindings の両経路同時検出時に warning を出力する
+            // （Phase 1 並走期は両経路ともに駆動されるが slug 衝突や挙動不整合の早期検出を狙う）。
+            bool hasLegacyExtensions = GetComponents<IFacialControllerExtension>().Length > 0;
+            bool hasAdapterBindings = _characterSO != null && _characterSO.AdapterBindings != null && _characterSO.AdapterBindings.Count > 0;
+            if (hasLegacyExtensions && hasAdapterBindings)
+            {
+                Debug.LogWarning(
+                    "[FacialControl] FacialController: 旧 IFacialControllerExtension コンポーネントと FacialCharacterProfileSO._adapterBindings の両経路が同時に検出されました。Phase 1 並走期は両経路ともに駆動されますが、slug 衝突や挙動不整合の原因となるため Phase 2 までにいずれかへ統合してください。");
+            }
+
             // 同 GameObject 上の拡張 (OSC / Input サブパッケージ等) に追加登録の機会を与える。
             ApplyExtensions(profile, blendShapeNames);
 
             // profile.LayerInputSources を Factory 経由で IInputSource 列に変換する。
             var additionalSources = BuildAdditionalInputSources(profile, _inputSourceFactory, blendShapeNames.Length);
+
+            // _adapterBindings.Count > 0 の場合のみ VContainer の per-FC child scope を build する
+            // （DD-2 並走期 empty-list ゲート、tasks.md 6.2）。各 binding の OnStart は VContainer の
+            // IStartable 経由で同期的に呼ばれ、OnLateTick / Dispose も ILateTickable / IDisposable で連動する。
+            if (hasAdapterBindings)
+            {
+                BuildAdapterBindingsChildScope(profile, blendShapeNames);
+            }
 
             // LayerUseCase に組み立て済み IInputSource 列を注入し、
             // 内部で LayerInputSourceRegistry / LayerInputSourceWeightBuffer / LayerInputSourceAggregator を再構築させる。
@@ -244,6 +265,34 @@ namespace Hidano.FacialControl.Adapters.Playable
             SetupBoneWriter(profile);
 
             _isInitialized = true;
+        }
+
+        private void BuildAdapterBindingsChildScope(FacialProfile profile, string[] blendShapeNames)
+        {
+            var appScope = FacialControlAppLifetimeScope.GetOrCreate();
+            if (appScope == null)
+            {
+                Debug.LogWarning(
+                    "[FacialControl] FacialController: FacialControlAppLifetimeScope が取得できないため _adapterBindings 経路の child scope build をスキップします。");
+                return;
+            }
+
+            try
+            {
+                _childLifetimeScope = FacialControllerLifetimeScope.Build(
+                    appScope,
+                    profile,
+                    blendShapeNames,
+                    _characterSO.AdapterBindings,
+                    gameObject,
+                    childScopeName: name);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError(
+                    $"[FacialControl] FacialController: child LifetimeScope の build に失敗しました: {ex}");
+                _childLifetimeScope = null;
+            }
         }
 
         private void SetupBoneWriter(FacialProfile profile)
@@ -697,6 +746,14 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         private void Cleanup()
         {
+            // child scope を build していた場合は最初に Dispose し、binding.Dispose を完了させる
+            // （tasks.md 6.2: child scope.Dispose() を最初に呼び host 群の Dispose を完了させてから既存 cleanup を行う）。
+            if (_childLifetimeScope != null)
+            {
+                _childLifetimeScope.Dispose();
+                _childLifetimeScope = null;
+            }
+
             if (_graphBuildResult != null)
             {
                 _graphBuildResult.Dispose();

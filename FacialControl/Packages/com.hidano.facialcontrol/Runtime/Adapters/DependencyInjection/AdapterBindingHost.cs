@@ -24,13 +24,23 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
     /// DD-3: <c>if (_skipped) return;</c> と通常 dispatch は 0-alloc fast path（Req 9.1）。
     /// 例外発生フレーム単発の <c>Debug.LogError</c> 文字列補間アロケは &lt; 1 KB の許容範囲。
     /// </para>
+    /// <para>
+    /// 同期 dispatch 保証: VContainer の <see cref="IStartable.Start"/> は
+    /// <c>PlayerLoopHelper.Dispatch(PlayerLoopTiming.Startup, ...)</c> 経由で次フレーム以降の PlayerLoop
+    /// で fire される非同期分配であり、<c>FacialControllerLifetimeScope.Build</c> から戻った直後は
+    /// 未 fire である。これを補うため <see cref="IInitializable"/> も実装し、Build 時に同期実行される
+    /// <c>EntryPointDispatcher.Dispatch</c> 経由で <see cref="AdapterBindingBase.OnStart"/> が
+    /// 同フレーム内に到達するよう保証する。<c>_started</c> フラグで Initialize / Start の二重実行を
+    /// 抑止し、binding.OnStart は 1 LifetimeScope につき 1 回までに正規化する（task 6.2）。
+    /// </para>
     /// </remarks>
     public sealed class AdapterBindingHost
-        : IStartable, ITickable, ILateTickable, IFixedTickable, IDisposable
+        : IInitializable, IStartable, ITickable, ILateTickable, IFixedTickable, IDisposable
     {
         private readonly AdapterBindingBase _binding;
         private readonly AdapterBuildContext _buildContext;
         private bool _skipped;
+        private bool _started;
 
         /// <summary>
         /// 1 host = 1 binding の対応関係を強制する。
@@ -48,11 +58,24 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
             _binding = binding;
             _buildContext = buildContext;
             _skipped = false;
+            _started = false;
+        }
+
+        void IInitializable.Initialize()
+        {
+            InvokeOnStartOnce();
         }
 
         void IStartable.Start()
         {
+            InvokeOnStartOnce();
+        }
+
+        private void InvokeOnStartOnce()
+        {
             if (_skipped) return;
+            if (_started) return;
+            _started = true;
             try
             {
                 _binding.OnStart(in _buildContext);
