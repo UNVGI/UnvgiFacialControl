@@ -20,6 +20,19 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
     {
         private sealed class StubInputSourceRegistry : IInputSourceRegistry
         {
+            // task 3.4 / 3.5 で IInputSourceRegistry に追加された API は本テスト fixture では未使用。
+            // 呼ばれた場合に検出できるよう NotImplementedException を投げる。
+            public IReadOnlyList<string> RegisteredIds =>
+                throw new NotImplementedException();
+
+            public void Register(AdapterSlug slug, IInputSource source) =>
+                throw new NotImplementedException();
+
+            public void Register(AdapterSlug slug, string sub, IInputSource source) =>
+                throw new NotImplementedException();
+
+            public bool TryResolve(string layerInputSourceId, out IInputSource source) =>
+                throw new NotImplementedException();
         }
 
         private static AdapterBuildContext CreateValidContext(
