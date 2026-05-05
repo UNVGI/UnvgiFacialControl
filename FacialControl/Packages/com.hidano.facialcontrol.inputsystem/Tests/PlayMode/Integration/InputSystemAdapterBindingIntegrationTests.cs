@@ -476,7 +476,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
         {
             var asset = ScriptableObject.CreateInstance<InputActionAsset>();
             var map = asset.AddActionMap(actionMapName);
-            var action = map.AddAction(gazeActionName, InputActionType.Value, expectedControlType: "Vector2");
+            var action = map.AddAction(gazeActionName, InputActionType.Value, expectedControlLayout: "Vector2");
             action.AddBinding("<Gamepad>/leftStick");
             return asset;
         }
