@@ -9,7 +9,6 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 {
     /// <summary>
     /// OSC 結線を 1 binding に集約した <see cref="AdapterBindingBase"/> 具象（Req 6.2, 6.9, 13.6, 13.7、design.md `## OscAdapterBinding`）。
-    /// 旧 <c>OscFacialControllerExtension</c> + <c>OscRegistration</c> の責務を統合する。
     /// </summary>
     /// <remarks>
     /// <para>
