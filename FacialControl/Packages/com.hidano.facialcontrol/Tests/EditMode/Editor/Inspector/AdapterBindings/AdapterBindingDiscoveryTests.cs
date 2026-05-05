@@ -18,15 +18,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
     // ---------------------------------------------------------------
 
     [Serializable]
-    [FacialAdapterBinding(displayName: "ZZZ_DiscoveryTest_Single_AAA")]
+    [FacialAdapterBinding(displayName: "ZZZ_DiscoveryTest_AAA_Single")]
     public sealed class MockDiscoverySingleBinding : AdapterBindingBase { }
 
     [Serializable]
-    [FacialAdapterBinding(displayName: "ZZZ_DiscoveryTest_Duplicate_BBB")]
+    [FacialAdapterBinding(displayName: "ZZZ_DiscoveryTest_BBB_Duplicate")]
     public sealed class MockDiscoveryDuplicateAlphaBinding : AdapterBindingBase { }
 
     [Serializable]
-    [FacialAdapterBinding(displayName: "ZZZ_DiscoveryTest_Duplicate_BBB")]
+    [FacialAdapterBinding(displayName: "ZZZ_DiscoveryTest_BBB_Duplicate")]
     public sealed class MockDiscoveryDuplicateBetaBinding : AdapterBindingBase { }
 
     /// <summary>
@@ -44,8 +44,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
     [TestFixture]
     public class AdapterBindingDiscoveryTests
     {
-        private const string SingleDisplayName = "ZZZ_DiscoveryTest_Single_AAA";
-        private const string DuplicateDisplayName = "ZZZ_DiscoveryTest_Duplicate_BBB";
+        private const string SingleDisplayName = "ZZZ_DiscoveryTest_AAA_Single";
+        private const string DuplicateDisplayName = "ZZZ_DiscoveryTest_BBB_Duplicate";
 
         private static readonly Type SingleType = typeof(MockDiscoverySingleBinding);
         private static readonly Type DuplicateAlphaType = typeof(MockDiscoveryDuplicateAlphaBinding);
@@ -90,7 +90,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
         [Test]
         public void GetDescriptors_SortsSingleBeforeDuplicatesByDisplayName()
         {
-            // "ZZZ_DiscoveryTest_Single_AAA" < "ZZZ_DiscoveryTest_Duplicate_BBB" で
+            // "ZZZ_DiscoveryTest_AAA_Single" < "ZZZ_DiscoveryTest_BBB_Duplicate" で
             // sort 順が安定することを確認する。
             var descriptors = AdapterBindingDiscovery.GetDescriptors();
 
@@ -113,7 +113,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
             Assert.GreaterOrEqual(singleIndex, 0, "Single Mock 型が discovery 結果に存在しない。");
             Assert.GreaterOrEqual(firstDuplicateIndex, 0, "Duplicate Mock 型が discovery 結果に存在しない。");
 
-            // 'A' (Single の displayName 末尾) < 'B' (Duplicate の displayName 末尾) なので
+            // "AAA" (Single の sort key) < "BBB" (Duplicate の sort key) なので
             // Single が必ず Duplicate ペアより前。
             Assert.Less(singleIndex, firstDuplicateIndex,
                 $"DisplayName '{SingleDisplayName}' は '{DuplicateDisplayName}' より前に並ぶべき。");
