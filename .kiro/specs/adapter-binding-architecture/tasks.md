@@ -369,7 +369,7 @@
   - _Requirements: 6.9, 13.6, 13.7, 10.3, 10.5_
   - _Boundary: Tests/PlayMode/Integration_
 
-- [ ] 12.2 (P) `InputSystemAdapterBindingIntegrationTests` を Phase 2 完了後の構成で実行する
+- [x] 12.2 (P) `InputSystemAdapterBindingIntegrationTests` を Phase 2 完了後の構成で実行する
   - InputAction 仮想 device → Trigger / Analog / Gaze の 3 経路が動作することを assert する
   - 旧 `FacialCharacterInputExtension` / `InputFacialControllerExtension` 経由のテストが repository に残っていないことを確認する
   - 観測可能完了条件: PlayMode テストが green、旧経路依存が 0 件
