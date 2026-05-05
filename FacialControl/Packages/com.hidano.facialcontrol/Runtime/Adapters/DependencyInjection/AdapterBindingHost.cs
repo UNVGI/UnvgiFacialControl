@@ -39,6 +39,11 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
     {
         private readonly AdapterBindingBase _binding;
         private readonly AdapterBuildContext _buildContext;
+        private readonly string _onStartErrorMessagePrefix;
+        private readonly string _onTickErrorMessagePrefix;
+        private readonly string _onLateTickErrorMessagePrefix;
+        private readonly string _onFixedTickErrorMessagePrefix;
+        private readonly string _disposeErrorMessagePrefix;
         private bool _skipped;
         private bool _started;
 
@@ -57,6 +62,17 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
 
             _binding = binding;
             _buildContext = buildContext;
+            string bindingTypeName = _binding.GetType().FullName;
+            _onStartErrorMessagePrefix =
+                "[FacialControl] AdapterBindingHost '" + bindingTypeName + "' failed in OnStart: ";
+            _onTickErrorMessagePrefix =
+                "[FacialControl] AdapterBindingHost '" + bindingTypeName + "' failed in OnTick: ";
+            _onLateTickErrorMessagePrefix =
+                "[FacialControl] AdapterBindingHost '" + bindingTypeName + "' failed in OnLateTick: ";
+            _onFixedTickErrorMessagePrefix =
+                "[FacialControl] AdapterBindingHost '" + bindingTypeName + "' failed in OnFixedTick: ";
+            _disposeErrorMessagePrefix =
+                "[FacialControl] AdapterBindingHost '" + bindingTypeName + "' failed in Dispose: ";
             _skipped = false;
             _started = false;
         }
@@ -83,7 +99,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
             catch (Exception ex)
             {
                 _skipped = true;
-                Debug.LogError($"[FacialControl] AdapterBindingHost '{_binding.GetType().FullName}' failed in OnStart: {ex}");
+                LogFailure(_onStartErrorMessagePrefix, ex);
             }
         }
 
@@ -97,7 +113,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
             catch (Exception ex)
             {
                 _skipped = true;
-                Debug.LogError($"[FacialControl] AdapterBindingHost '{_binding.GetType().FullName}' failed in OnTick: {ex}");
+                LogFailure(_onTickErrorMessagePrefix, ex);
             }
         }
 
@@ -111,7 +127,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
             catch (Exception ex)
             {
                 _skipped = true;
-                Debug.LogError($"[FacialControl] AdapterBindingHost '{_binding.GetType().FullName}' failed in OnLateTick: {ex}");
+                LogFailure(_onLateTickErrorMessagePrefix, ex);
             }
         }
 
@@ -125,7 +141,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
             catch (Exception ex)
             {
                 _skipped = true;
-                Debug.LogError($"[FacialControl] AdapterBindingHost '{_binding.GetType().FullName}' failed in OnFixedTick: {ex}");
+                LogFailure(_onFixedTickErrorMessagePrefix, ex);
             }
         }
 
@@ -138,8 +154,13 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
             catch (Exception ex)
             {
                 _skipped = true;
-                Debug.LogError($"[FacialControl] AdapterBindingHost '{_binding.GetType().FullName}' failed in Dispose: {ex}");
+                LogFailure(_disposeErrorMessagePrefix, ex);
             }
+        }
+
+        private static void LogFailure(string messagePrefix, Exception ex)
+        {
+            Debug.LogError(messagePrefix + ex.GetType().FullName + ": " + ex.Message);
         }
     }
 }
