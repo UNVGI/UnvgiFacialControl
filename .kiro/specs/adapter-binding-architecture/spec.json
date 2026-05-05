@@ -2,8 +2,9 @@
   "feature_name": "adapter-binding-architecture",
   "created_at": "2026-05-05T02:22:06Z",
   "updated_at": "2026-05-06T00:00:00Z",
+  "closed_at": "2026-05-06T00:00:00Z",
   "language": "ja",
-  "phase": "implementation-validated",
+  "phase": "closed",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -18,5 +19,14 @@
       "approved": true
     }
   },
-  "ready_for_implementation": true
+  "ready_for_implementation": true,
+  "completion_summary": {
+    "phase_1_tasks": "all completed (Foundation + Core 基盤 + Mock サンプル + VContainer 並走)",
+    "phase_2_tasks": "all completed (osc / inputsystem 移行 + 旧資産削除 + Documentation 整備)",
+    "validation": "EditMode 1065/1065 pass + PlayMode 328/328 pass (validate-impl on 2026-05-06)",
+    "follow_ups_in_backlog": [
+      "Sample SO (MultiSourceBlendDemoCharacter.asset) の m_Script guid を新 FacialCharacterProfileSO に再生成する hotfix",
+      "core package.json への VContainer dependency 宣言検討"
+    ]
+  }
 }
