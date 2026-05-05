@@ -486,9 +486,10 @@ flowchart TB
 
 **Responsibilities & Constraints**
 - adapter package がデータと runtime factory ロジックの両方を保持する場（D-1）。
-- Unity Engine 参照を一切持たない（`Unity.Collections` のみ許容）。`UnityEngine.Object` 派生フィールドは具象側に置く。
+- Unity Engine 参照を一切持たない（`Unity.Collections` のみ許容）。`UnityEngine.Object` 派生フィールドや `[UnityEngine.SerializeField]` 属性は具象側に置く（Req 4.2, 11.1, 11.5 と整合）。
 - VContainer interface を一切 import しない（Req 4.10、D-9、D-10）。
 - `[Serializable]` 属性付きで `[SerializeReference]` 経由のシリアライズ対象になる。具象側に `[Serializable]` も必要。
+- **Slug field の serialize 戦略（Critical Issue 1 解決、案 B 採用）**: Unity の serialization rule では `public` field は `[SerializeField]` なしで自動的にシリアライズ対象になる。これを利用して `Slug` を `public string` field として宣言することで、`UnityEngine` を一切 import せず Domain 純度を維持しつつ Req 12.1 の「serialized slug field」を満たす。`[SerializeField]` は具象側でも追加不要（base class の public field がそのまま継承シリアライズされる）。
 
 **Dependencies**
 - Outbound: `AdapterSlug` — slug 検証 (P1)
@@ -506,13 +507,9 @@ namespace Hidano.FacialControl.Domain.Adapters
     public abstract class AdapterBindingBase
     {
         // Req 12.1: slug field（Editor から auto-populate）。
-        [UnityEngine.SerializeField] private string _slug;
-
-        public string Slug
-        {
-            get => _slug;
-            set => _slug = value;
-        }
+        // Domain 純度のため public field として宣言し、Unity の自動 serialize に乗せる。
+        // [UnityEngine.SerializeField] は使わない（Domain は UnityEngine 非参照、Critical Issue 1 解決）。
+        public string Slug;
 
         // Req 13.1: lifecycle virtual no-op。具象は必要なものだけ override。
         public virtual void OnStart(in AdapterBuildContext ctx) { }
@@ -531,13 +528,14 @@ namespace Hidano.FacialControl.Domain.Adapters
   - `OnStart` 内で `ctx.InputSourceRegistry.Register(slug, source)` を呼ぶことで slug 解決対象になる（D-3）。
   - `Dispose` で `OnStart` で確保したリソース（helper MonoBehaviour、socket 等）を解放する。
 - **Invariants**:
-  - `_slug` は空 / null も許容（Editor add 時に auto-populate される）。runtime 時点では空 binding は warn 対象（Req 12.3 と同方針）。
+  - `Slug` は空 / null も許容（Editor add 時に auto-populate される）。runtime 時点では空 binding は warn 対象（Req 12.3 と同方針）。
   - virtual method は plain virtual。VContainer interface 派生にはしない（Req 4.10）。
 
 **Implementation Notes**
 - Integration: `[Serializable]` 必須。具象側にも `[Serializable]` を付けないと `[SerializeReference]` の round-trip が破綻する。
 - Validation: Slug の形式検証は `AdapterSlug.TryParse` を使う（具象 / Editor から呼ぶ）。
 - Risks: 具象が virtual method を override せずに済む設計のため、誤って lifecycle hook を忘れると silent no-op になる（テストで補う）。
+- **Public field の妥当性根拠**: Unity 公式 doc `Script Serialization` によれば public non-static field は自動的にシリアライズ対象（NotSerializable 型でない限り）。`[SerializeReference]` 属性は parent field 側（`FacialCharacterProfileSO._adapterBindings`）に付与されるため、要素型である `AdapterBindingBase` の public field はそのまま polymorphic round-trip 対象になる。public field の生エクスポーズはカプセル化観点で劣るが、Domain 純度（UnityEngine 非参照）を要件 4.2 / 11.1 に整合させる優先度を上回る。Editor 側の Inspector では `AdapterBindingsListView` が表示制御するため runtime からの直接書き換えは想定外（D-7 / Req 12.3 の SaveGuard が一次防御）。
 
 #### FacialAdapterBindingAttribute
 
@@ -871,10 +869,11 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 
 **Responsibilities & Constraints**
 - 既存 `OnEnable` / `LateUpdate` / `OnDisable` / `Initialize` / `Cleanup` の lifecycle pattern を維持。
-- `Initialize`: app scope を取得 → `FacialControllerLifetimeScope.Build(appScope, this, profile, blendShapeNames)` で child scope 生成 → 既存 `LayerUseCase` 構築（Aggregator 駆動）→ `_isInitialized = true`。
+- `Initialize`: app scope を取得 → **Phase 1 並走期は `_adapterBindings.Count > 0` の時のみ** `FacialControllerLifetimeScope.Build(appScope, this, profile, blendShapeNames)` で child scope 生成 → 既存 `LayerUseCase` 構築（Aggregator 駆動）→ `_isInitialized = true`。Phase 2 では `_adapterBindings.Count` 判定を削除し常に build する。
 - `LateUpdate`: 既存の Aggregator 駆動と BlendShape 適用を継続。**binding の `OnLateTick` は VContainer 側で呼ばれるため `LateUpdate` から触らない**（VContainer の `ILateTickable` は Unity の LateUpdate と同じ PlayerLoop bucket）。
-- `Cleanup`: child scope の `Dispose()` を最初に呼び、host 群の Dispose を完了させてから既存の resource cleanup を行う。
+- `Cleanup`: child scope を build していた場合のみ `Dispose()` を最初に呼び、host 群の Dispose を完了させてから既存の resource cleanup を行う。
 - `ApplyExtensions` / `BuildAdditionalInputSources` は **Phase 2 で削除**。Phase 1 では併存（旧経路を維持しつつ新 `_adapterBindings` 経路を追加）。
+- **Phase 1 並走期の衝突防御（Critical Issue 2 解決）**: `Initialize` の冒頭で「`GetComponents<IFacialControllerExtension>()` の戻りが非空」かつ「`_adapterBindings.Count > 0`」の両方を満たす場合、`Debug.LogWarning` で「旧 IFacialControllerExtension コンポーネントと新 AdapterBindings が同時に検出されました。Phase 1 では一方のみを使用してください（CHANGELOG の Migration ガイド参照）。」を出力。これにより slug ID 衝突や挙動の不整合を runtime で早期検出できる。
 
 **Dependencies**
 - Outbound: `FacialControllerLifetimeScope` (P0)
@@ -884,7 +883,9 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 **Implementation Notes**
 - Integration: app scope 未生成時は `FacialControlAppLifetimeScope.GetOrCreate()` で取得（auto-spawn）。
 - Validation: `_adapterBindings` の null 要素（型欠落）は warn + skip して残り binding は load する。
-- Risks: Phase 1 の並走期間中、旧 `IFacialControllerExtension` 経路と新 `AdapterBindingHost` 経路が同時に動くケースがあり得る（user が両方使うと slug 衝突する可能性）。CHANGELOG で「Phase 1 では併用しないこと」を明記する。
+- Phase 1 並走期は新経路の build を「`_adapterBindings.Count > 0` の時だけ」にゲートすることで、既存テスト群（`_adapterBindings` を一切持たない `FacialCharacterProfileSO` を使うもの）に対する影響をゼロにする（Migration Strategy 動作契約マトリクス参照）。
+- Phase 1 で旧 Extension と新 binding の両方を同時利用するユーザーには runtime warning + CHANGELOG の併用禁止記述で対応。Phase 2 の旧資産削除で本制約は自然消滅する。
+- Risks: Phase 1 並走期は warning が「false positive」になるケースが残る（例: ユーザーが意図的に両方を一時的に並べる場合）。CHANGELOG で warning の意味を明記し、抑止 API（仮: `FacialController.SuppressDualPathWarning`）は Phase 1 のみのオプトアウト用に追加検討（必要なら tasks に起票）。
 
 ### Editor Layer
 
@@ -1216,7 +1217,10 @@ classDiagram
 
 1. `AdapterBindingHostLifecycleTests` — VContainer LifetimeScope 構築 + Mock binding 3 個 register + 1 frame で `IStartable` / `ITickable` / `ILateTickable` が呼ばれることを assert（Req 4.9）。
 2. `FacialControllerVContainerLifecycleTests` — `FacialController.Initialize` → `LateUpdate` → `OnDisable` の cycle で child scope build/dispose が完了し、binding `OnStart` / `OnLateTick` / `Dispose` が順に呼ばれることを assert。
-3. `AdapterBindingHostAllocationTests`（Performance） — 3 binding × 10 体の steady-state で `GC.GetTotalMemory` delta が 0 であることを assert（Req 9.5, 10.7）。
+3. `AdapterBindingHostAllocationTests`（Performance） — Critical Issue 3 の境界条件に基づき 3 シナリオに分解（Req 9.5, 10.7）：
+   - (a) **正常系 steady-state**: 3 binding × 10 体で例外なし、60 フレーム実行して `GC.GetTotalMemory` delta が 0 byte。
+   - (b) **skip 確定後 steady-state**: 1 binding が `OnTick` で例外を投げて `_skipped = true` 確定後、後続 60 フレームで delta が 0 byte（skip fast path が 0-alloc であることを保証）。
+   - (c) **例外発生フレーム単発**: 例外を投げたフレーム単発の delta が < 1 KB（`Debug.LogError` の string interpolation を含む許容範囲、Performance & Scalability 目標値テーブル参照）。
 4. `MultiSourceBlendThreeBindingsTests` — Mock trigger + Mock analog + 既存 `LipSyncInputSource` の 3 binding 構成で MultiSourceBlend が期待値を出すことを assert（Req 5.1-5.5）。
 5. `OscAdapterBindingIntegrationTests` — 実 UDP loopback + `OscReceiverHost` AddComponent + binding `Dispose` 時の helper destroy（Phase 2、Req 6.9, 13.6, 13.7）。
 6. `InputSystemAdapterBindingIntegrationTests` — InputAction 仮想 device → ExpressionTrigger / Analog / Gaze の 3 経路が動作（Phase 2、Req 6.1）。
@@ -1243,10 +1247,36 @@ flowchart TB
     P2 -.rollback trigger.-> Rollback2[既存 OSC / InputSystem 統合テスト多数 fail -> Phase 2 PR revert + Phase 1 のみ残す]
 ```
 
+### Phase 動作契約マトリクス（Critical Issue 2 解決）
+
+Phase 1 / Phase 2 で各コンポーネントが「定義のみ」「empty-list 時 skip」「fully wired」「deleted」のどの状態にあるかを明示する。これにより tasks.md 生成時の Phase 境界判定が一意になる。
+
+| コンポーネント | Phase 1（並走期） | Phase 2（migration 完了） |
+|---------------|------------------|------------------------|
+| `AdapterBindingBase` / `FacialAdapterBindingAttribute` / `AdapterSlug` | 定義 + EditMode テスト pass | 同左 |
+| `AdapterBuildContext` / `AdapterBindingHost` / `FacialControlAppLifetimeScope` / `FacialControllerLifetimeScope` | 定義 + 単体テスト pass | 同左 |
+| `InputSourceRegistry`（旧 `InputSourceFactory` リネーム + 縮小） | 定義 + slug-keyed lookup 動作 + **既存 `RegisterReserved` API も並存（旧 `OscRegistration` / `InputRegistration` から呼ばれる）** | reserved id 関連 API 削除、slug のみ |
+| `FacialCharacterProfileSO._adapterBindings` field | 追加（`abstract` 解除）、空 list を許容 | 同左 |
+| `FacialController.Initialize` の child scope build | **`_adapterBindings.Count > 0` の時のみ build**（empty-list は skip して旧経路維持）、両経路同時検出時は `Debug.LogWarning` | 無条件 build、旧経路は削除 |
+| `FacialController.ApplyExtensions` / `BuildAdditionalInputSources`（旧経路） | fully wired（既存テスト全 green） | deleted |
+| `IFacialControllerExtension` interface | 維持 | deleted |
+| `OscFacialControllerExtension` / `FacialCharacterInputExtension` / `InputFacialControllerExtension` | 維持（ユーザーが旧 scene で利用継続可能） | deleted |
+| `FacialCharacterSO`（inputsystem 派生 SO） | 維持 | deleted |
+| `InputSourceId.ReservedIds` / `IsReserved` / `IsReservedId` | 維持（既存テストが依存） | deleted |
+| Editor: `AdapterBindingDiscovery` / `AdapterBindingsListView` / `FacialCharacterProfileAssetGuard` | fully wired（Inspector で新 list が編集可能） | 同左 |
+| `OscAdapterBinding` / `ArKitOscAdapterBinding` / `InputSystemAdapterBinding` + 各 PropertyDrawer | 未実装（または Mock 相当のみ） | fully wired |
+| core `Samples~/MultiSourceBlendBasicSample/` | 配布（Mock binding ベース、HUD なし） | 同左 |
+| inputsystem `Samples~/MultiSourceBlendDemo/` HUD | 旧 `_inputSourceIndex` 駆動を維持 | slug 駆動に書き換え（二重管理ミラー `Assets/Samples/` も同期） |
+| CHANGELOG / Documentation~/migration-guide.md | Phase 1 PR で「Phase 1 は並走期、両経路の同時利用は非推奨」を明記 | Phase 2 PR で breaking change と削除型一覧を明記 |
+
+**Phase 1 の意図**: 既存テスト群（`_adapterBindings` を持たない `FacialCharacterProfileSO` を前提とするもの）を **1 件も壊さない** ことが Phase 1 PR の到達目標。新経路は「opt-in（`_adapterBindings` に 1 つでも追加すれば駆動開始）」で機能検証可能にする。これにより VContainer 統合 / SerializeReference round-trip / Discovery / ListView の R-A 〜 R-F リスクを Phase 1 で full validate しつつ、osc / inputsystem migration は Phase 2 に分離できる。
+
 **Phase 1 検証 Checkpoints**:
 - VContainer smoke test pass（EditMode）
 - `[SerializeReference]` round-trip test pass（EditMode）
 - 既存 PlayMode テスト全 green（旧 `IFacialControllerExtension` 経路維持を保証）
+- `_adapterBindings.Count > 0` で child scope build が走り、binding `OnStart` / `OnLateTick` / `Dispose` が VContainer 経由で呼ばれる（PlayMode）
+- 旧 Extension + 新 binding 同時検出時の `Debug.LogWarning` 出力（PlayMode）
 
 **Phase 2 検証 Checkpoints**:
 - 旧 `FacialCharacterSO` / `IFacialControllerExtension` を参照する asset / scene が repository に残らない（grep 検証）
@@ -1262,10 +1292,74 @@ flowchart TB
 
 steering `tech.md` Performance Standards（毎フレームのヒープ確保ゼロ目標 / 同時 10 体以上）を遵守し、本仕様固有の追加要件を以下に明記する：
 
-- **Steady-state 0-alloc**: `AdapterBindingHost` の `Tick` / `LateTick` / `FixedTick` 内は try/catch + virtual dispatch のみで allocation を発生させない。`InputSourceRegistry.TryResolve` も Dictionary lookup の O(1) で 0-alloc。
+### Steady-state 0-alloc の境界条件（Critical Issue 3 解決）
+
+「Steady-state 0-alloc」は **以下 2 つのフレーム種別** に限定する：
+1. **正常系 steady-state**: 例外を一度も投げず、binding 集合が変化していないフレーム。
+2. **skip 確定後の steady-state**: 過去フレームで例外が起き `_skipped = true` になった host を含む binding 集合で、**skip 確定後の任意のフレーム**。
+
+「**例外発生フレーム（最初の例外を投げたフレーム）**」は 0-alloc 対象外とする。理由: `Debug.LogError` の string interpolation や VContainer 内の例外伝播経路で boxing / string allocation が不可避。実 production では極めて稀な edge case であり、最初の 1 フレームのアロケに伴う GC スパイクは許容する（後続フレームは `_skipped` フラグで stop されるため累積しない）。
+
+### `AdapterBindingHost.Tick` の擬似コード（実装ガイダンス）
+
+```csharp
+void VContainer.Unity.ITickable.Tick()
+{
+    if (_skipped) return;             // 0-alloc fast path（skip 後の steady-state）
+    try
+    {
+        _binding.OnTick(UnityEngine.Time.deltaTime);  // 0-alloc fast path（正常系 steady-state）
+    }
+    catch (System.Exception ex)
+    {
+        _skipped = true;
+        // 例外フレームのアロケは許容（< 1 KB 目安）。string interpolation は許容。
+        UnityEngine.Debug.LogError($"[FacialControl] AdapterBindingHost '{_binding.GetType().FullName}' failed in Tick: {ex}");
+    }
+}
+```
+
+`LateTick` / `FixedTick` / `Start` / `Dispose` も同形。`Dispose` は `_skipped` の値に関わらず呼ぶ（VContainer 規約）。
+
+### その他の Performance 契約
+
 - **Reflection の per-frame 排除**: `TypeCache` / `Activator.CreateInstance` は Editor / load-time のみ。Runtime 経路から触れない（Req 9.2）。
 - **per-FC LifetimeScope の build/dispose コスト**: 1 体あたり binding 数 + service 数に比例（VContainer の resolve は GC-free）。同時 10 体生成は initialize 時のみ発生し、steady-state には影響しない（research.md Topic 4）。
-- **目標値**: 3 binding × 10 体での 1 フレームあたり GC alloc は 0 byte（perf test で assert）。1 体あたりの child scope build は < 1 ms（PlayMode profiler markers で確認）。
+- **InputSourceRegistry.TryResolve**: Dictionary lookup の O(1) で 0-alloc。
+
+### 目標値
+
+| メトリクス | 目標 | 検証方法 |
+|----------|------|---------|
+| 正常系 steady-state の per-frame GC alloc（3 binding × 10 体） | **0 byte** | `AdapterBindingHostAllocationTests` シナリオ (a) |
+| skip 確定後 steady-state の per-frame GC alloc（同上、binding 1 つが skip 状態） | **0 byte** | 同テスト シナリオ (b) |
+| 例外発生フレーム単発の GC alloc | **< 1 KB**（Debug.LogError の string interpolation 含む） | 同テスト シナリオ (c) |
+| 1 体あたり child scope build 時間 | **< 1 ms** | PlayMode profiler markers |
+
+## Design Decisions（design-validation 反映）
+
+design-validation.md で指摘された 3 件の Critical Issue に対する確定判断ログ。各判断は要件・設計の整合性を保ち tasks 生成段階の曖昧さを排除する目的。
+
+### DD-1: Domain 純度と AdapterBindingBase の slug field
+
+- **Issue**: design.md が `[UnityEngine.SerializeField] private string _slug;` を Domain 配置の `AdapterBindingBase` に持たせていたが、Domain は UnityEngine 非参照（Req 4.2 / 11.1）と矛盾。
+- **Decision**: **案 B 採用**。`Slug` を `public string` field として宣言し、Unity の `[SerializeField]` を使わずに Domain 純度を維持する。Unity の Script Serialization rule は `public` non-static field を自動 serialize するため Req 12.1 「serialized slug field」も満たせる。
+- **Rationale**: 案 A（`AdapterBindingBase` を Adapters 層へ移動）は Req 1.1 / 4.2 / 11.1 の「Domain 配置」を覆す要件改修を伴い影響範囲が大きい。案 C（Domain asmdef に UnityEngine 参照追加）は steering の根本契約「Domain は Unity 非依存」を破る。案 B は **要件を一切変更せず** 矛盾を解消できる最小変更で、トレードオフは public field の生エクスポーズのみ（Editor 側 SaveGuard と ListView が一次防御のため runtime 直接書き換えは想定外）。
+- **適用箇所**: `## Components and Interfaces > Domain Layer > AdapterBindingBase` の Service Interface コードと Implementation Notes に反映済み。
+
+### DD-2: Phase 1 並走期の `_adapterBindings` 駆動条件と衝突防御
+
+- **Issue**: Phase 1 で新経路 `_adapterBindings` を実際に駆動するか否か、また旧 `IFacialControllerExtension` 経路と同時利用された場合の挙動が未定義。
+- **Decision**: 「**`_adapterBindings.Count > 0` の時のみ child scope build**」案を採用。empty list なら旧経路のみが動き既存テスト全 green を保証、>0 なら新経路 ON で early validation 可能。さらに「両経路同時検出時は `Debug.LogWarning`」を `FacialController.Initialize` に追加し、slug 衝突や挙動不整合を runtime で早期検出。
+- **Rationale**: 「Phase 1 全期間 OFF」は早期試用機会を失い R-A〜R-F リスクの validation を Phase 2 に集中させてしまう。empty-list ゲートは「opt-in で新経路を有効化」できるため preview 利用者の早期試用に対応しつつ、既存テストは零影響。runtime warning は CHANGELOG 文面のみより検出力が高い。
+- **適用箇所**: `## Components and Interfaces > Adapters Layer > FacialController（修正）` と `## Migration Strategy > Phase 動作契約マトリクス` に反映済み。
+
+### DD-3: Steady-state 0-alloc の境界条件
+
+- **Issue**: `AdapterBindingHost` の try/catch 内 `Debug.LogError($"...")` は string interpolation で必ずアロケが発生するため、「全フレーム 0-alloc」は技術的に不可能。
+- **Decision**: 「**正常系 steady-state**」と「**skip 確定後 steady-state**」の 2 種類のみを 0-alloc 対象とし、「**例外発生フレーム単発**」は < 1 KB のアロケを許容範囲とする境界条件を設ける。`AdapterBindingHostAllocationTests` を 3 シナリオ (a)/(b)/(c) に分解して契約を test で固定。
+- **Rationale**: VContainer の例外伝播経路と Unity の Debug.LogError は内部で string allocation を伴うため strict 0-alloc は実装不能。一方で例外は通常起きない edge case であり、最初の 1 フレームの GC スパイクは累積しない（`_skipped` フラグで stop）ため許容しても性能契約の本質を損なわない。シナリオ分解により実装者の判断ブレを防ぐ。
+- **適用箇所**: `## Performance & Scalability > Steady-state 0-alloc の境界条件` と `## Testing Strategy > PlayMode Tests #3` に反映済み。
 
 ## Supporting References
 
