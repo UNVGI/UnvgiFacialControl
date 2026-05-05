@@ -227,7 +227,7 @@
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 10.3_
   - _Boundary: Tests/PlayMode/Domain_
 
-- [ ] 7.4 R-C: per-FC LifetimeScope の build / dispose 線形性を Profiler markers で検証する
+- [x] 7.4 R-C: per-FC LifetimeScope の build / dispose 線形性を Profiler markers で検証する
   - `(adapterBindingCount + sourcesPerChar) × charCount` の線形スケールを Profiler markers で測定するテストを追加する
   - 1 体あたり child scope build 時間 < 1 ms（design.md `## Performance & Scalability > 目標値` テーブル）を assert する
   - 観測可能完了条件: 10 体・3 binding 構成で線形スケールが確認できる

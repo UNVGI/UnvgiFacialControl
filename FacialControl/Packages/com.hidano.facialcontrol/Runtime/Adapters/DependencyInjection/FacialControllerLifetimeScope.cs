@@ -4,6 +4,7 @@ using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Unity.Profiling;
 using UnityEngine;
 using VContainer;
 using VContainer.Unity;
@@ -26,6 +27,16 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
     /// </remarks>
     public sealed class FacialControllerLifetimeScope : IDisposable
     {
+        public const string BuildProfilerMarkerName =
+            "FacialControl.FacialControllerLifetimeScope.Build";
+        public const string DisposeProfilerMarkerName =
+            "FacialControl.FacialControllerLifetimeScope.Dispose";
+
+        private static readonly ProfilerMarker BuildProfilerMarker =
+            new ProfilerMarker(BuildProfilerMarkerName);
+        private static readonly ProfilerMarker DisposeProfilerMarker =
+            new ProfilerMarker(DisposeProfilerMarkerName);
+
         private LifetimeScope _childScope;
 
         private FacialControllerLifetimeScope(LifetimeScope childScope)
@@ -78,6 +89,8 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
                 throw new ArgumentNullException(nameof(hostGameObject));
             }
 
+            using (BuildProfilerMarker.Auto())
+            {
             FacialProfile capturedProfile = profile;
             IReadOnlyList<string> capturedBlendShapeNames = blendShapeNames;
             IReadOnlyList<AdapterBindingBase> capturedBindings = bindings;
@@ -121,6 +134,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
                 childScopeName);
 
             return new FacialControllerLifetimeScope(childScope);
+            }
         }
 
         /// <summary>
@@ -131,8 +145,11 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
         {
             if (_childScope != null)
             {
-                _childScope.Dispose();
-                _childScope = null;
+                using (DisposeProfilerMarker.Auto())
+                {
+                    _childScope.Dispose();
+                    _childScope = null;
+                }
             }
         }
     }
