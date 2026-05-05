@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Playables;
+using VContainer;
 using Hidano.FacialControl.Adapters.Bone;
 using Hidano.FacialControl.Adapters.DependencyInjection;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Application.UseCases;
+using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
@@ -45,7 +47,6 @@ namespace Hidano.FacialControl.Adapters.Playable
         private PlayableGraphBuilder.BuildResult _graphBuildResult;
         private ExpressionUseCase _expressionUseCase;
         private LayerUseCase _layerUseCase;
-        private InputSourceFactory _inputSourceFactory;
         private FacialProfile? _currentProfile;
         private string[] _blendShapeNames;
         private bool _isInitialized;
@@ -218,38 +219,15 @@ namespace Hidano.FacialControl.Adapters.Playable
             _currentProfile = profile;
             _expressionUseCase = new ExpressionUseCase(profile);
 
-            // InputSourceFactory をプロファイルごとに構築する。
-            // コアは lipsync のビルトイン登録のみ持つ。
-            // OSC / Controller / Keyboard 等は同 GameObject 上の IFacialControllerExtension が
-            // ConfigureFactory 経由で RegisterReserved を呼んで配線する。
-            // 未配線の id は TryCreate が null を返して呼出側で skip される契約。
             var blendShapeNames = _blendShapeNames ?? Array.Empty<string>();
-            _inputSourceFactory = new InputSourceFactory(lipSyncProvider: null);
 
-            // DD-2 衝突防御: 旧 IFacialControllerExtension コンポーネントと
-            // FacialCharacterProfileSO._adapterBindings の両経路同時検出時に warning を出力する
-            // （Phase 1 並走期は両経路ともに駆動されるが slug 衝突や挙動不整合の早期検出を狙う）。
-            bool hasLegacyExtensions = GetComponents<IFacialControllerExtension>().Length > 0;
-            bool hasAdapterBindings = _characterSO != null && _characterSO.AdapterBindings != null && _characterSO.AdapterBindings.Count > 0;
-            if (hasLegacyExtensions && hasAdapterBindings)
-            {
-                Debug.LogWarning(
-                    "[FacialControl] FacialController: 旧 IFacialControllerExtension コンポーネントと FacialCharacterProfileSO._adapterBindings の両経路が同時に検出されました。Phase 1 並走期は両経路ともに駆動されますが、slug 衝突や挙動不整合の原因となるため Phase 2 までにいずれかへ統合してください。");
-            }
+            // VContainer の per-FC child scope を無条件で build する（tasks.md 11.1: DD-2 並走期終了）。
+            // 各 binding の OnStart は VContainer の IInitializable 経由で同期的に呼ばれ、
+            // 自身の IInputSource を child scope の InputSourceRegistry に slug ベースで登録する。
+            BuildAdapterBindingsChildScope(profile, blendShapeNames);
 
-            // 同 GameObject 上の拡張 (OSC / Input サブパッケージ等) に追加登録の機会を与える。
-            ApplyExtensions(profile, blendShapeNames);
-
-            // profile.LayerInputSources を Factory 経由で IInputSource 列に変換する。
-            var additionalSources = BuildAdditionalInputSources(profile, _inputSourceFactory, blendShapeNames.Length);
-
-            // _adapterBindings.Count > 0 の場合のみ VContainer の per-FC child scope を build する
-            // （DD-2 並走期 empty-list ゲート、tasks.md 6.2）。各 binding の OnStart は VContainer の
-            // IStartable 経由で同期的に呼ばれ、OnLateTick / Dispose も ILateTickable / IDisposable で連動する。
-            if (hasAdapterBindings)
-            {
-                BuildAdapterBindingsChildScope(profile, blendShapeNames);
-            }
+            // profile.LayerInputSources を child scope 内 InputSourceRegistry 経由で IInputSource に解決する。
+            var additionalSources = ResolveLayerInputSourcesFromRegistry(profile);
 
             // LayerUseCase に組み立て済み IInputSource 列を注入し、
             // 内部で LayerInputSourceRegistry / LayerInputSourceWeightBuffer / LayerInputSourceAggregator を再構築させる。
@@ -273,9 +251,17 @@ namespace Hidano.FacialControl.Adapters.Playable
             if (appScope == null)
             {
                 Debug.LogWarning(
-                    "[FacialControl] FacialController: FacialControlAppLifetimeScope が取得できないため _adapterBindings 経路の child scope build をスキップします。");
+                    "[FacialControl] FacialController: FacialControlAppLifetimeScope が取得できないため child scope build をスキップします。");
                 return;
             }
+
+            // _characterSO が null または AdapterBindings が空でも child scope は build する
+            // （新 binding 経路一本化、tasks.md 11.1: 無条件 build）。
+            // bindings が無い場合は空 list を渡して InputSourceRegistry のみ container に登録される。
+            IReadOnlyList<AdapterBindingBase> bindings =
+                _characterSO != null && _characterSO.AdapterBindings != null
+                    ? _characterSO.AdapterBindings
+                    : Array.Empty<AdapterBindingBase>();
 
             try
             {
@@ -283,7 +269,7 @@ namespace Hidano.FacialControl.Adapters.Playable
                     appScope,
                     profile,
                     blendShapeNames,
-                    _characterSO.AdapterBindings,
+                    bindings,
                     gameObject,
                     childScopeName: name);
             }
@@ -293,6 +279,52 @@ namespace Hidano.FacialControl.Adapters.Playable
                     $"[FacialControl] FacialController: child LifetimeScope の build に失敗しました: {ex}");
                 _childLifetimeScope = null;
             }
+        }
+
+        private List<(int layerIdx, IInputSource source, float weight)> ResolveLayerInputSourcesFromRegistry(
+            FacialProfile profile)
+        {
+            var result = new List<(int layerIdx, IInputSource source, float weight)>();
+            if (_childLifetimeScope == null || _childLifetimeScope.Container == null)
+            {
+                return result;
+            }
+
+            if (!_childLifetimeScope.Container.TryResolve<IInputSourceRegistry>(out var registry)
+                || registry == null)
+            {
+                return result;
+            }
+
+            var layerInputSourcesSpan = profile.LayerInputSources.Span;
+            int layerCount = profile.Layers.Length;
+            int declarationLayers = layerInputSourcesSpan.Length;
+            int upper = layerCount < declarationLayers ? layerCount : declarationLayers;
+
+            for (int l = 0; l < upper; l++)
+            {
+                var declarations = layerInputSourcesSpan[l];
+                if (declarations == null || declarations.Length == 0)
+                {
+                    continue;
+                }
+
+                for (int d = 0; d < declarations.Length; d++)
+                {
+                    var decl = declarations[d];
+                    if (registry.TryResolve(decl.Id, out var source) && source != null)
+                    {
+                        result.Add((l, source, decl.Weight));
+                    }
+                    else
+                    {
+                        Debug.LogWarning(
+                            $"FacialController: inputSource id '{decl.Id ?? "<null>"}' を InputSourceRegistry で解決できないため layer {l} でスキップします。");
+                    }
+                }
+            }
+
+            return result;
         }
 
         private void SetupBoneWriter(FacialProfile profile)
@@ -319,69 +351,6 @@ namespace Hidano.FacialControl.Adapters.Playable
             // Phase 3.3 (inspector-and-data-model-redesign) 以降、初期 BoneSnapshot 列は profile から
             // 撤去されたため空で初期化する。analog-input-binding 等が後から SetActiveBoneSnapshots で流す。
             _boneWriter.Initialize(ReadOnlyMemory<BoneSnapshot>.Empty, basisBoneName);
-        }
-
-        private void ApplyExtensions(FacialProfile profile, string[] blendShapeNames)
-        {
-            var extensions = GetComponents<IFacialControllerExtension>();
-            for (int i = 0; i < extensions.Length; i++)
-            {
-                var ext = extensions[i];
-                try
-                {
-                    ext.ConfigureFactory(_inputSourceFactory, profile, blendShapeNames);
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError(
-                        $"FacialController: extension '{ext.GetType().Name}' の ConfigureFactory が失敗しました: {ex}");
-                }
-            }
-        }
-
-        private static List<(int layerIdx, IInputSource source, float weight)> BuildAdditionalInputSources(
-            FacialProfile profile,
-            InputSourceFactory factory,
-            int blendShapeCount)
-        {
-            var result = new List<(int layerIdx, IInputSource source, float weight)>();
-            var layerInputSourcesSpan = profile.LayerInputSources.Span;
-            int layerCount = profile.Layers.Length;
-            int declarationLayers = layerInputSourcesSpan.Length;
-            int upper = layerCount < declarationLayers ? layerCount : declarationLayers;
-
-            for (int l = 0; l < upper; l++)
-            {
-                var declarations = layerInputSourcesSpan[l];
-                if (declarations == null || declarations.Length == 0)
-                {
-                    continue;
-                }
-
-                for (int d = 0; d < declarations.Length; d++)
-                {
-                    var decl = declarations[d];
-                    if (!InputSourceId.TryParse(decl.Id, out var id))
-                    {
-                        Debug.LogWarning(
-                            $"FacialController: inputSource id '{decl.Id ?? "<null>"}' が識別子規約に合致しないため layer {l} でスキップします。");
-                        continue;
-                    }
-
-                    var options = factory.TryDeserializeOptions(id, decl.OptionsJson);
-                    var source = factory.TryCreate(id, options, blendShapeCount, profile);
-                    if (source == null)
-                    {
-                        Debug.LogWarning(
-                            $"FacialController: inputSource id '{decl.Id}' のアダプタ生成に失敗したため layer {l} でスキップします (未登録 id または必須依存未注入)。");
-                        continue;
-                    }
-
-                    result.Add((l, source, decl.Weight));
-                }
-            }
-
-            return result;
         }
 
         // ================================================================
@@ -775,7 +744,6 @@ namespace Hidano.FacialControl.Adapters.Playable
                 _boneWriter = null;
             }
 
-            _inputSourceFactory = null;
             _expressionUseCase = null;
             _isInitialized = false;
         }
