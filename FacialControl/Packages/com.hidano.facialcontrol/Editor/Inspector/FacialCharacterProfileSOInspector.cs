@@ -10,6 +10,7 @@ using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.AutoExport;
 using Hidano.FacialControl.Editor.Common;
+using Hidano.FacialControl.Editor.Inspector.AdapterBindings;
 using Hidano.FacialControl.Editor.Sampling;
 
 namespace Hidano.FacialControl.Editor.Inspector
@@ -38,6 +39,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         public const string LayersFoldoutName = "facial-character-layers-foldout";
         public const string DebugFoldoutName = "facial-character-debug-foldout";
+        public const string AdapterBindingsFoldoutName = "facial-character-adapter-bindings-foldout";
 
         public const string SaveButtonName = "facial-character-save-button";
         public const string SaveStatusLabelName = "facial-character-save-status";
@@ -76,6 +78,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         protected SerializedProperty _layersProperty;
         protected SerializedProperty _expressionsProperty;
         protected SerializedProperty _schemaVersionProperty;
+        protected SerializedProperty _adapterBindingsProperty;
 
 #if UNITY_EDITOR
         protected SerializedProperty _referenceModelProperty;
@@ -130,6 +133,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             BuildSaveStatusBar(root);
             OnBuildPreLayersSections(root);
+            BuildAdapterBindingsSection(root);
             BuildLayersSection(root);
             BuildReferenceModelSection(root);
             BuildDebugSection(root);
@@ -149,6 +153,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             _layersProperty = serializedObject.FindProperty("_layers");
             _expressionsProperty = serializedObject.FindProperty("_expressions");
             _schemaVersionProperty = serializedObject.FindProperty("_schemaVersion");
+            _adapterBindingsProperty = serializedObject.FindProperty("_adapterBindings");
 
 #if UNITY_EDITOR
             _referenceModelProperty = serializedObject.FindProperty("_referenceModel");
@@ -310,6 +315,26 @@ namespace Hidano.FacialControl.Editor.Inspector
             foldout.style.unityFontStyleAndWeight = FontStyle.Normal;
             foldout.style.fontSize = SectionFoldoutFontSize;
             return foldout;
+        }
+
+        // ====================================================================
+        // Section: Adapter Bindings（[SerializeReference] AdapterBindingBase list）
+        // ====================================================================
+
+        private void BuildAdapterBindingsSection(VisualElement root)
+        {
+            if (_adapterBindingsProperty == null) return;
+
+            var foldout = MakeSectionFoldout(AdapterBindingsFoldoutName, "Adapter Bindings", open: true);
+            foldout.Add(MakeHelpBox(
+                "入力源（OSC / Input System / ARKit など）の Adapter Binding を登録します。"
+                + "Add ボタンから利用可能な binding を追加し、各 binding は SO 内に直接保存されます。"));
+
+            var listView = new AdapterBindingsListView(_adapterBindingsProperty);
+            listView.Bind(serializedObject);
+            foldout.Add(listView);
+
+            root.Add(foldout);
         }
 
         // ====================================================================
