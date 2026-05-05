@@ -46,6 +46,18 @@
 - **トリガ**: preview.1 リリース前の最終レビュー
 - **影響範囲**: 動作確認のみ（コード変更なし）
 
+### S-5: Sample SO の m_Script guid 再生成 hotfix
+- **出典**: [`.kiro/specs/adapter-binding-architecture/spec.json`](../.kiro/specs/adapter-binding-architecture/spec.json) `completion_summary.follow_ups_in_backlog`
+- **内容**: `MultiSourceBlendDemoCharacter.asset` の `m_Script` guid が `66b402a1dc2b31045843ee6bec45348a`（旧 `FacialCharacterSO` 系）のまま残っている。新 `FacialCharacterProfileSO`（guid `d135770dce0e9d5479f0b6ee124b640a`）には差し替え未完。Unity Editor で sample を import すると Inspector で MissingScript 警告 → demo が動作しない可能性が高い。新 SO で再生成し、Samples~ と Assets/Samples の二重管理ミラーの両方を同期更新する。
+- **トリガ**: preview.3 リリース前の Sample 動作確認 / Inspector で MissingScript エラーが報告されたとき
+- **影響範囲**: `Packages/com.hidano.facialcontrol.inputsystem/Samples~/MultiSourceBlendDemo/MultiSourceBlendDemoCharacter.asset`, `Assets/Samples/FacialControl InputSystem/0.1.0-preview.2/Multi Source Blend Demo/MultiSourceBlendDemoCharacter.asset`, 関連 `.meta`, `StreamingAssets/.../profile.json`
+
+### S-6: core package.json への VContainer dependency 宣言検討
+- **出典**: [`.kiro/specs/adapter-binding-architecture/spec.json`](../.kiro/specs/adapter-binding-architecture/spec.json) `completion_summary.follow_ups_in_backlog`
+- **内容**: `Packages/com.hidano.facialcontrol/package.json` の `dependencies` に `jp.hadashikick.vcontainer` が宣言されていない。dev project の `manifest.json` 経由でのみ scoped registry 解決されている状態。UPM 経由で core を install するエンジニアの環境では VContainer が自動で入らないため、README / package.json のいずれかでサイドバイサイド導入手順を明示する必要がある。npmjs publish 直前にやり方を確定（package.json `dependencies` に追加 vs README の手動 OpenUPM 設定説明）する。
+- **トリガ**: npmjs.com への initial publish 直前 / UPM install して install error 報告が来たとき
+- **影響範囲**: `Packages/com.hidano.facialcontrol/package.json`, `Packages/com.hidano.facialcontrol/README.md`
+
 ---
 
 ## 中期（preview.2 以降 / 別 spec 候補）
@@ -145,3 +157,4 @@
 ## 履歴
 
 - 2026-05-04: 新設。HANDOVER.md 優先度低 #5（S-1）/ Phase 6.5 残課題（S-4）/ 各 spec の preview.2 以降宣言（M-3〜M-12）を集約。
+- 2026-05-06: spec `adapter-binding-architecture` クローズに伴い follow-up 2 件追加（S-5: Sample SO guid 再生成、S-6: VContainer dependency 宣言）。

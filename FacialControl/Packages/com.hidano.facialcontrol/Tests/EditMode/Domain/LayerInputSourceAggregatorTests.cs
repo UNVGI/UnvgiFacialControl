@@ -976,8 +976,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
 
             var l0s0 = new FixedValueSource("osc", blendShapeCount, value: 1f);
             var l0s1 = new FixedValueSource("lipsync", blendShapeCount, value: 1f);
-            var l0s2 = new FixedValueSource("controller-expr", blendShapeCount, value: 1f);
-            var l1s0 = new FixedValueSource("keyboard-expr", blendShapeCount, value: 1f);
+            var l0s2 = new FixedValueSource("input", blendShapeCount, value: 1f);
+            var l1s0 = new FixedValueSource("analog-blendshape", blendShapeCount, value: 1f);
 
             var bindings = new List<(int, int, IInputSource)>
             {
@@ -1062,7 +1062,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
 
             var l0s0 = new FixedValueSource("osc", blendShapeCount, value: 1f);
             var l0s1 = new FixedValueSource("lipsync", blendShapeCount, value: 0.5f);
-            var l1s0 = new FixedValueSource("keyboard-expr", blendShapeCount, value: 0.25f);
+            var l1s0 = new FixedValueSource("analog-blendshape", blendShapeCount, value: 0.25f);
 
             var bindings = new List<(int, int, IInputSource)>
             {
@@ -1112,7 +1112,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
 
             var l0s0 = new FixedValueSource("osc", blendShapeCount, value: 1f);
             var l0s1 = new FixedValueSource("lipsync", blendShapeCount, value: 0.5f);
-            var l1s0 = new FixedValueSource("keyboard-expr", blendShapeCount, value: 0.25f);
+            var l1s0 = new FixedValueSource("analog-blendshape", blendShapeCount, value: 0.25f);
 
             var bindings = new List<(int, int, IInputSource)>
             {

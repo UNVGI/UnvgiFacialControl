@@ -47,7 +47,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""invalid id with space"",""weight"":1.0},
-                        {""id"":""controller-expr"",""weight"":1.0}
+                        {""id"":""input"",""weight"":1.0}
                     ]}
                 ],
                 ""expressions"":[]
@@ -59,7 +59,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 
             Assert.AreEqual(1, result.Length);
             Assert.AreEqual(1, result[0].Length, "regex 違反エントリは skip されること");
-            Assert.AreEqual("controller-expr", result[0][0].id);
+            Assert.AreEqual("input", result[0][0].id);
         }
 
         [Test]
@@ -95,7 +95,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""" + tooLong + @""",""weight"":1.0},
-                        {""id"":""controller-expr"",""weight"":1.0}
+                        {""id"":""input"",""weight"":1.0}
                     ]}
                 ],
                 ""expressions"":[]
@@ -106,45 +106,27 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             var result = _parser.ParseLayerInputSources(json);
 
             Assert.AreEqual(1, result[0].Length);
-            Assert.AreEqual("controller-expr", result[0][0].id);
+            Assert.AreEqual("input", result[0][0].id);
         }
 
         // ================================================================
-        // 未知 id (Factory 未登録 = 予約でも x- でもない) → 警告 + skip (Req 3.3)
+        // 任意 slug 受理 (D-13 / Req 12.5: reserved id 体系廃止後は
+        // syntactic に valid な識別子はすべて parse 段階で受理し、
+        // 解決失敗は実行時の InputSourceRegistry.TryResolve 側で処理する)
         // ================================================================
 
         [Test]
-        public void ParseLayerInputSources_UnknownId_LogsWarningAndSkips()
+        public void ParseLayerInputSources_ArbitrarySlugIds_AreAcceptedWithoutWarning()
         {
-            // 'unknown-source' は予約 ID でも x- 拡張でもない。Factory 未登録扱い。
+            // `osc` / `my-binding` / `x-custom-sensor` のように slug 規約 (regex) を満たす
+            // 任意の識別子は parse 段階で skip されない。
             var json = @"{
                 ""schemaVersion"":""2.0"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
-                        {""id"":""unknown-source"",""weight"":1.0},
-                        {""id"":""osc"",""weight"":1.0}
-                    ]}
-                ],
-                ""expressions"":[]
-            }";
-
-            LogAssert.Expect(LogType.Warning, new Regex("inputSources.*unknown-source"));
-
-            var result = _parser.ParseLayerInputSources(json);
-
-            Assert.AreEqual(1, result[0].Length);
-            Assert.AreEqual("osc", result[0][0].id, "未知 id は skip、予約 id は通過");
-        }
-
-        [Test]
-        public void ParseLayerInputSources_ReservedAndExtensionIds_BothAccepted()
-        {
-            var json = @"{
-                ""schemaVersion"":""2.0"",
-                ""layers"":[
-                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
-                        {""id"":""controller-expr"",""weight"":0.5},
-                        {""id"":""x-custom-sensor"",""weight"":0.5}
+                        {""id"":""input"",""weight"":0.5},
+                        {""id"":""x-custom-sensor"",""weight"":0.25},
+                        {""id"":""my-binding"",""weight"":0.25}
                     ]}
                 ],
                 ""expressions"":[]
@@ -152,9 +134,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 
             var result = _parser.ParseLayerInputSources(json);
 
-            Assert.AreEqual(2, result[0].Length);
-            Assert.AreEqual("controller-expr", result[0][0].id);
+            Assert.AreEqual(3, result[0].Length);
+            Assert.AreEqual("input", result[0][0].id);
             Assert.AreEqual("x-custom-sensor", result[0][1].id);
+            Assert.AreEqual("my-binding", result[0][2].id);
             LogAssert.NoUnexpectedReceived();
         }
 
@@ -170,7 +153,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""osc"",""weight"":0.25,""options"":{""stalenessSeconds"":1.0}},
-                        {""id"":""controller-expr"",""weight"":1.0},
+                        {""id"":""input"",""weight"":1.0},
                         {""id"":""osc"",""weight"":0.75,""options"":{""stalenessSeconds"":2.5}}
                     ]}
                 ],
@@ -200,7 +183,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                         {""id"":""osc"",""weight"":0.1},
                         {""id"":""lipsync"",""weight"":0.2},
                         {""id"":""osc"",""weight"":0.9},
-                        {""id"":""controller-expr"",""weight"":1.0}
+                        {""id"":""input"",""weight"":1.0}
                     ]}
                 ],
                 ""expressions"":[]
@@ -214,7 +197,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             Assert.AreEqual("lipsync", result[0][0].id);
             Assert.AreEqual("osc", result[0][1].id);
             Assert.AreEqual(0.9f, result[0][1].weight);
-            Assert.AreEqual("controller-expr", result[0][2].id);
+            Assert.AreEqual("input", result[0][2].id);
         }
 
         [Test]
@@ -249,8 +232,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         [Test]
         public void ParseLayerInputSources_MixedInvalidEntries_DoesNotAbortLoad()
         {
-            // 1 つのレイヤーに regex 違反 / 未知 / 重複 が混在していても parse は成功し、
-            // 有効な最後の 'osc' エントリだけが残る。
+            // 1 つのレイヤーに regex 違反 / 重複 が混在していても parse は成功する。
+            // D-13 / Req 12.5 により reserved id 体系は撤廃済みのため、
+            // syntactic に valid な slug (`unknown-thing`) は skip されず保持される。
             var json = @"{
                 ""schemaVersion"":""2.0"",
                 ""layers"":[
@@ -265,7 +249,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             }";
 
             LogAssert.Expect(LogType.Warning, new Regex("bad id"));
-            LogAssert.Expect(LogType.Warning, new Regex("unknown-thing"));
             LogAssert.Expect(LogType.Warning, new Regex("osc"));
 
             InputSourceDto[][] result = null;
@@ -273,9 +256,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 
             Assert.IsNotNull(result);
             Assert.AreEqual(1, result.Length);
-            Assert.AreEqual(1, result[0].Length, "有効な最後の osc エントリのみが残る");
-            Assert.AreEqual("osc", result[0][0].id);
-            Assert.AreEqual(0.7f, result[0][0].weight);
+            Assert.AreEqual(2, result[0].Length, "regex 違反のみ skip、その他は保持される");
+            Assert.AreEqual("unknown-thing", result[0][0].id);
+            Assert.AreEqual("osc", result[0][1].id);
+            Assert.AreEqual(0.7f, result[0][1].weight);
         }
     }
 }

@@ -211,7 +211,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance
             var profile = BuildProfile();
 
             _keyboardSink = new ExpressionTriggerInputSource(
-                id: InputSourceId.Parse(ExpressionTriggerInputSource.KeyboardReservedId),
+                id: InputSourceId.Parse(ExpressionTriggerInputSource.InputReservedId),
                 blendShapeCount: BlendShapeNames.Length,
                 maxStackDepth: 8,
                 exclusionMode: ExclusionMode.LastWins,
@@ -219,7 +219,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance
                 profile: profile);
 
             _controllerSink = new ExpressionTriggerInputSource(
-                id: InputSourceId.Parse(ExpressionTriggerInputSource.ControllerReservedId),
+                id: InputSourceId.Parse(ExpressionTriggerInputSource.InputReservedId),
                 blendShapeCount: BlendShapeNames.Length,
                 maxStackDepth: 8,
                 exclusionMode: ExclusionMode.LastWins,

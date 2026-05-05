@@ -130,7 +130,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
             var result = _useCase.DetectAndGenerate(names);
 
             Assert.AreEqual(1, result.GeneratedExpressions.Length);
-            Assert.AreEqual(0.25f, result.GeneratedExpressions[0].TransitionDuration, 0.001f);
+            Assert.AreEqual(Expression.DefaultTransitionDuration, result.GeneratedExpressions[0].TransitionDuration, 0.001f);
         }
 
         [Test]

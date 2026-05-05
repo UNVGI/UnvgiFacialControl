@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Hidano.FacialControl.Domain.Models;
 
 namespace Hidano.FacialControl.Adapters.Json.Dto
 {
@@ -13,8 +14,8 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
     [System.Serializable]
     public sealed class ExpressionSnapshotDto
     {
-        /// <summary>表情遷移時間（秒）。0〜1 秒、デフォルト 0.25 秒（Req 2.5）。</summary>
-        public float transitionDuration = 0.25f;
+        /// <summary>表情遷移時間（秒）。0〜1 秒、デフォルトは <see cref="Expression.DefaultTransitionDuration"/>（1/15 秒）（Req 2.5）。</summary>
+        public float transitionDuration = Expression.DefaultTransitionDuration;
 
         /// <summary>
         /// 遷移カーブプリセット名（"Linear" / "EaseIn" / "EaseOut" / "EaseInOut"）。

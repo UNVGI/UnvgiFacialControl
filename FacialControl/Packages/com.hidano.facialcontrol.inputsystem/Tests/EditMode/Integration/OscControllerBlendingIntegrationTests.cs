@@ -81,7 +81,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
         }
 
         /// <summary>
-        /// 本テストフィクスチャ共通の構成: 1 レイヤーに controller-expr (sourceIdx 0) と
+        /// 本テストフィクスチャ共通の構成: 1 レイヤーに input (sourceIdx 0) と
         /// osc (sourceIdx 1) を登録し、<see cref="ExpressionTriggerInputSource"/> で
         /// smile をトリガー + <see cref="OscDoubleBuffer"/> に mouth_open=1.0 を書込む。
         /// </summary>
@@ -100,7 +100,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
             {
                 Profile = BuildSingleLayerProfile();
                 Controller = new ExpressionTriggerInputSource(
-                    id: InputSourceId.Parse(ExpressionTriggerInputSource.ControllerReservedId),
+                    id: InputSourceId.Parse(ExpressionTriggerInputSource.InputReservedId),
                     blendShapeCount: BlendShapeCount,
                     maxStackDepth: 4,
                     exclusionMode: ExclusionMode.LastWins,

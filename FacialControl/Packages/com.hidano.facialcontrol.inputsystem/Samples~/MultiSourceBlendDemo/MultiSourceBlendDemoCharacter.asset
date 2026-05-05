@@ -18,11 +18,8 @@ MonoBehaviour:
     priority: 0
     exclusionMode: 0
     inputSources:
-    - id: controller-expr
-      weight: 0.5
-      optionsJson: '{"maxStackDepth":4}'
-    - id: keyboard-expr
-      weight: 0.5
+    - id: input
+      weight: 1.0
       optionsJson: '{"maxStackDepth":4}'
     layerOverrideMask:
     - emotion

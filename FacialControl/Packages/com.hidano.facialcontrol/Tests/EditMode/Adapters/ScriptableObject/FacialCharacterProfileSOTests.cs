@@ -48,7 +48,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
                     name = "emotion",
                     priority = 0,
                     exclusionMode = ExclusionMode.LastWins,
-                    inputSources = { new InputSourceDeclarationSerializable { id = "controller-expr", weight = 1.0f } },
+                    inputSources = { new InputSourceDeclarationSerializable { id = "input", weight = 1.0f } },
                 });
                 so.Expressions.Add(new ExpressionSerializable
                 {

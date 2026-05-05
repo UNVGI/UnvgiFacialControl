@@ -6,12 +6,20 @@
       "scopes": [
         "com.hidano"
       ]
+    },
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "jp.hadashikick.vcontainer"
+      ]
     }
   ],
   "dependencies": {
     "com.hidano.facialcontrol": "file:com.hidano.facialcontrol",
     "com.hidano.facialcontrol.osc": "file:com.hidano.facialcontrol.osc",
     "com.hidano.facialcontrol.inputsystem": "file:com.hidano.facialcontrol.inputsystem",
+    "jp.hadashikick.vcontainer": "1.17.0",
     "com.hidano.scene-view-style-camera-controller": "1.0.0",
     "com.mikunote.hatsunemiku-sample": "git+ssh://git@github.com/NHidano/Mikunote_Models.git?path=/Mikunote_Models/Assets/HatsuneMiku_Sample",
     "com.mikunote.magica-cloth-2": "git+ssh://git@github.com/NHidano/Mikunote_Models.git?path=/Mikunote_Models/Assets/MagicaCloth2",

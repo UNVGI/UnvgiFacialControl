@@ -374,7 +374,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             {
                 (0, 0, new FakeInputSource("osc", InputSourceType.ValueProvider, 4)),
                 (0, 1, new FakeInputSource("lipsync", InputSourceType.ValueProvider, 4)),
-                (1, 0, new FakeInputSource("controller-expr", InputSourceType.ExpressionTrigger, 4)),
+                (1, 0, new FakeInputSource("input", InputSourceType.ExpressionTrigger, 4)),
             };
 
             using var registry = new LayerInputSourceRegistry(profile, blendShapeCount: 4, bindings);
@@ -414,12 +414,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             }
             Assert.IsTrue(foundAdded, "容量拡張後に GetSource が新アダプタを返すこと");
 
-            // 既存 source も同じ参照で残っていること (layer 1 の controller-expr)
+            // 既存 source も同じ参照で残っていること (layer 1 の input)
             bool foundExisting = false;
             for (int s = 0; s < registry.MaxSourcesPerLayer; s++)
             {
                 var src = registry.GetSource(1, s);
-                if (src != null && src.Id == "controller-expr")
+                if (src != null && src.Id == "input")
                 {
                     foundExisting = true;
                     break;
@@ -485,7 +485,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             var profile = BuildProfile(layerCount: 1);
             var a = new FakeInputSource("osc", InputSourceType.ValueProvider, 4);
             var b = new FakeInputSource("lipsync", InputSourceType.ValueProvider, 4);
-            var c = new FakeInputSource("controller-expr", InputSourceType.ExpressionTrigger, 4);
+            var c = new FakeInputSource("input", InputSourceType.ExpressionTrigger, 4);
             var bindings = new List<(int, int, IInputSource)>
             {
                 (0, 0, a),
@@ -509,7 +509,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
                 Assert.NotNull(src, $"compacted slot (0, {s}) は非 null であること");
                 remaining.Add(src.Id);
             }
-            CollectionAssert.AreEquivalent(new[] { "osc", "controller-expr" }, remaining);
+            CollectionAssert.AreEquivalent(new[] { "osc", "input" }, remaining);
         }
 
         [Test]

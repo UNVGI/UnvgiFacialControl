@@ -37,7 +37,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""rendererPaths"": [""Body""],
                 ""layers"": [
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
-                        {""id"":""controller-expr"",""weight"":1.0}
+                        {""id"":""input"",""weight"":1.0}
                     ]}
                 ],
                 ""expressions"": [
@@ -93,7 +93,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""schemaVersion"": ""1.0"",
                 ""layers"": [
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
-                        {""id"":""controller-expr"",""weight"":1.0}
+                        {""id"":""input"",""weight"":1.0}
                     ]}
                 ],
                 ""expressions"": []
@@ -116,7 +116,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             var json = @"{
                 ""layers"": [
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
-                        {""id"":""controller-expr"",""weight"":1.0}
+                        {""id"":""input"",""weight"":1.0}
                     ]}
                 ],
                 ""expressions"": []

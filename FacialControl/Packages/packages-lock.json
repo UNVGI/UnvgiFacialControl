@@ -266,6 +266,13 @@
         "com.unity.modules.imgui": "1.0.0"
       }
     },
+    "jp.hadashikick.vcontainer": {
+      "version": "1.17.0",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://package.openupm.com"
+    },
     "jp.lilxyzw.liltoon": {
       "version": "git+ssh://git@github.com/NHidano/Mikunote_Models.git?path=/Mikunote_Models/Packages/jp.lilxyzw.liltoon",
       "depth": 0,

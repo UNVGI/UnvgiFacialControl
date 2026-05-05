@@ -9,10 +9,10 @@
 - **マルチレイヤー表情制御** — 感情・リップシンク・目などのレイヤーで表情を同時管理。排他モード (LastWins / Blend) をレイヤー単位で設定可能
 - **スムーズな表情遷移** — 線形補間・イージング・カスタムカーブによる Expression 間の遷移。遷移割り込み時も Persistent NativeArray 再利用で追加アロケーションなし
 - **ARKit / PerfectSync 対応** — ARKit 52 ブレンドシェイプと PerfectSync の自動検出・Expression 自動生成
-- **Inspector 完結型 UX** — `FacialCharacterSO` の UI Toolkit カスタム Inspector で表情・入力・アナログ・BonePose を 1 アセット内で編集。長文 README を読まずに設定可能 (各セクションに HelpBox + Tooltip)
+- **Inspector 完結型 UX** — `FacialCharacterProfileSO` の UI Toolkit カスタム Inspector で表情・レイヤー・Renderer Paths・Adapter Bindings を 1 アセット内で編集。長文 README を読まずに設定可能 (各セクションに HelpBox + Tooltip)
 - **JSON 自動エクスポート** — Editor 編集時に `StreamingAssets/FacialControl/{SO 名}/profile.json` を自動同期。ビルド後の差し替えに対応しつつ、ユーザーが JSON のパスを書く必要はない
 - **リップシンク連携 I/F** — 外部プラグイン (uLipSync 等) からの入力を受け付ける `ILipSyncProvider` インターフェース
-- **サブパッケージ拡張点** — `IFacialControllerExtension` インターフェースと `InputSourceFactory.RegisterReserved<TOptions>(...)` で、追加の入力源 (OSC / InputSystem 等) を同 GameObject 上の MonoBehaviour 経由で組み込める
+- **Adapter Binding 拡張点** — `[FacialAdapterBinding(displayName: "...")]` 属性付きの `AdapterBindingBase` 派生を定義するだけで、core Inspector の Add ドロップダウンに自動列挙される。`OnStart(in AdapterBuildContext ctx)` 内で `ctx.InputSourceRegistry.Register(slug, source)` を呼び、binding 自身が VContainer per-FC `LifetimeScope` に配線される (scene 上に追加 MonoBehaviour 不要)
 
 ## 動作要件
 
@@ -34,11 +34,12 @@
 
 ## クイックスタート
 
-1. Project ウィンドウで **Create** → **FacialControl** → **Facial Character** から `FacialCharacterSO` を作成
-2. SO の Inspector で表情・入力・BonePose を編集 (各 Foldout セクションに使い方の HelpBox あり)
-3. キャラクターの GameObject に **FacialController** を Add Component し、`Character SO` フィールドに作成した SO を結線
-4. (InputSystem 連携時) 同 GameObject に **FacialCharacterInputExtension** も Add Component
-5. Play で動作確認
+1. Project ウィンドウで **Create** → **FacialControl** → **Facial Character Profile** から `FacialCharacterProfileSO` を作成
+2. SO の Inspector で Layers / Expressions / Renderer Paths を編集 (各 Foldout セクションに使い方の HelpBox あり)
+3. Inspector 末尾の **Adapter Bindings** セクションで **Add** ボタンから必要な binding を追加 (例: `Input System` / `OSC` / `ARKit / PerfectSync`)
+4. 各 binding の inline UI で `InputActionAsset` / endpoint / port / blendshape マッピング 等を設定
+5. キャラクターの GameObject に **FacialController** を Add Component し、SO フィールドに作成した SO を結線
+6. Play で動作確認
 
 ```csharp
 // スクリプトから Expression を切り替える場合

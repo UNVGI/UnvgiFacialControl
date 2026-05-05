@@ -4,6 +4,61 @@
 
 ## [Unreleased]
 
+### ⚠ BREAKING CHANGES — Adapter Binding アーキテクチャ移行 (spec `adapter-binding-architecture`)
+
+> 本リリースは spec `adapter-binding-architecture` に基づく Adapter 結線モデルの全面刷新を含む。**v0.1.0-preview.2 以前の `FacialCharacterSO` / `*FacialControllerExtension` MonoBehaviour 経路 / reserved id (`controller-expr` / `keyboard-expr` / `osc` / `lipsync` / `input` 等) を前提とする scene / asset / JSON はロード・動作できない**。preview 段階のため自動マイグレーションは提供しない（Req 8.1, 8.3）。移行手順は [`Documentation~/migration-guide.md`](Documentation~/migration-guide.md) を参照（Req 8.2, 8.5）。
+>
+> Phase 1 並走期（`_adapterBindings` と旧 `IFacialControllerExtension` の同時利用が runtime warning 付きで許容されていた期間）は本リリースで **終了** した。両経路の同時利用を検出する `Debug.LogWarning` および empty-list ゲートは撤去され、`FacialController.Initialize` は無条件で per-FC `LifetimeScope` を build する。
+
+#### 削除型一覧（compile error 必至）
+
+- `Hidano.FacialControl.Adapters.Playable.IFacialControllerExtension` — MonoBehaviour Extension 経路の I/F。`AdapterBindingBase` 派生 + `[FacialAdapterBinding]` 属性 + per-FC VContainer LifetimeScope に置換（Req 6.8）
+- `Hidano.FacialControl.Adapters.InputSources.InputSourceFactory` — `(id, options)` ディスパッチ + JSON deserialize + reserved id チェック。slug-keyed の `Hidano.FacialControl.Adapters.InputSources.InputSourceRegistry` に置換し、責務を `Register(slug, source)` / `TryResolve("<slug>" or "<slug>:<sub>")` に縮小（Req 6.10）
+- `Hidano.FacialControl.Domain.Models.InputSourceId.ReservedIds` / `IsReservedId` / `IsReserved` — reserved id 体系。`AdapterSlug` 値オブジェクト + `[FacialAdapterBinding(displayName: ...)]` 由来の slug 命名（kebab-case）に置換（Req 12.5, 12.6, D-13）
+- `com.hidano.facialcontrol.osc` の `OscFacialControllerExtension` / `OscRegistration` — `OscAdapterBinding` / `ArKitOscAdapterBinding` に置換（Req 6.9）
+- `com.hidano.facialcontrol.inputsystem` の `FacialCharacterSO` (派生 SO) / `FacialCharacterInputExtension` / `InputFacialControllerExtension` / `InputRegistration` / `FacialCharacterSOInspector` / `FacialCharacterSOAutoExporter` — `FacialCharacterProfileSO` の `[SerializeReference] List<AdapterBindingBase>` + `InputSystemAdapterBinding` + `InputSystemAdapterBindingDrawer` に置換（Req 6.4, 6.8）
+
+#### 追加型一覧
+
+- `Hidano.FacialControl.Domain.Adapters.AdapterBindingBase`（abstract `[Serializable]`、`Slug: public string` field、`OnStart(in AdapterBuildContext)` / `OnTick` / `OnLateTick` / `OnFixedTick` / `Dispose` の virtual no-op）
+- `Hidano.FacialControl.Domain.Adapters.FacialAdapterBindingAttribute`（`AttributeTargets.Class`、`DisplayName` プロパティ）
+- `Hidano.FacialControl.Domain.Models.AdapterSlug`（`readonly struct`、`TryParse` / `Parse` / `FromDisplayName` / `TryParseComposite`、`^[a-zA-Z0-9_.-]{1,64}$`）
+- `Hidano.FacialControl.Adapters.DependencyInjection.AdapterBuildContext`（`readonly struct`、`Profile` / `BlendShapeNames` / `InputSourceRegistry` / `TimeProvider` / `HostGameObject` / `LipSyncProvider`）
+- `Hidano.FacialControl.Adapters.DependencyInjection.AdapterBindingHost`（VContainer の `IStartable` / `ITickable` / `ILateTickable` / `IFixedTickable` / `IDisposable` を実装し binding lifecycle に委譲、例外時 `_skipped = true` で以後 no-op）
+- `Hidano.FacialControl.Adapters.DependencyInjection.FacialControlAppLifetimeScope` / `FacialControllerLifetimeScope`（VContainer 1.17.x ベース。`SubsystemRegistration` で auto-spawn する singleton + per-FC child scope）
+- `Hidano.FacialControl.Adapters.InputSources.IInputSourceRegistry` / `InputSourceRegistry`（slug-keyed の `Dictionary<string, IInputSource>`、`<slug>` / `<slug>:<sub>` 形式）
+- `Hidano.FacialControl.Editor.Inspector.AdapterBindings.AdapterBindingDiscovery`（`TypeCache.GetTypesWithAttribute<FacialAdapterBindingAttribute>()` ベースの auto-discovery、displayName 重複時 FQTN suffix）
+- `Hidano.FacialControl.Editor.Inspector.AdapterBindings.AdapterBindingsListView` / `AdapterBindingAddDropdown` / `MissingAdapterPlaceholderElement`（UI Toolkit `ListView`、Add / Remove / Reorder、null 要素 placeholder、PropertyDrawer 例外 fallback）
+- `Hidano.FacialControl.Editor.Inspector.AdapterBindings.FacialCharacterProfileAssetGuard`（`AssetModificationProcessor.OnWillSaveAssets` で slug 重複 save block）
+- core 同梱 `Samples~/MultiSourceBlendBasicSample/`（HUD なし、Mock binding 2 種 + JSON プロファイル + Runner、`Tools > FacialControl > Run MultiSourceBlend Basic Sample` から 1 click 実行）
+
+#### `FacialCharacterProfileSO` の field 追加
+
+- `_adapterBindings: List<AdapterBindingBase>` を `[SerializeReference]` で追加。空 list 許容、同型 binding 複数可（Req 2.1, 2.2, 2.4）
+- `abstract` 修飾を解除し `[CreateAssetMenu(menuName = "FacialControl/Facial Character Profile")]` を付与（Req 2.1, 6.6）
+- 公開 API: `IReadOnlyList<AdapterBindingBase> AdapterBindings`
+
+#### `FacialController` の lifecycle 改修
+
+- `Initialize` で per-FC `LifetimeScope` を build し、`AdapterBindings` 各要素を `Lifetime.Scoped` で `AdapterBindingHost` に wrap して register する
+- `LateUpdate` 内の `ApplyExtensions` / `BuildAdditionalInputSources` 経路は撤去。binding lifecycle は VContainer の `IStartable` / `ITickable` / `ILateTickable` / `IFixedTickable` / `IDisposable` 経由で駆動される
+- `Cleanup` は child scope を `Dispose()` してから既存処理を行う
+
+#### `layer.inputSources[].id` の slug 化（Req 12.7、D-13）
+
+- 旧 reserved id（`controller-expr` / `keyboard-expr` / `osc` / `lipsync` / `input` 等）は **すべて廃止**
+- 新形式は `<slug>` または `<slug>:<sub>` の 2 種類
+  - `<slug>`: binding 1 個が登録する primary `IInputSource`（slug は当該 binding の `Slug` field）
+  - `<slug>:<sub>`: binding が複数 `IInputSource` を register する場合の sub-id（例: `OscAdapterBinding` の `osc:secondary`）
+- slug は Inspector で binding を Add した瞬間に `displayName.ToLowerInvariant()` の kebab-case 自動採番（例: `"OSC"` → `"osc"`、`"Input System"` → `"input-system"`、`"ARKit / PerfectSync"` → `"arkit-perfectsync"`）。手動編集も可能
+- 同一 SO 内の slug 重複時は Inspector が error indicator + summary banner を表示し、`AssetModificationProcessor` が save をブロックする
+- 第三者拡張は `x-` プレフィックス推奨（既存 `[a-zA-Z0-9_.-]{1,64}` ルール継続）
+
+#### 新規アダプタパッケージ追加時の core への影響
+
+- core パッケージへの compile-time 参照を増やさない（Req 1.5, 1.6, 4）
+- 各アダプタは「`AdapterBindingBase` 派生 1 クラス + `[FacialAdapterBinding]` 属性 + 任意 `[CustomPropertyDrawer]`」の 3 点を当該パッケージで提供すれば、core Inspector の Add ドロップダウンに自動列挙される
+
 ### Added
 
 - `Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig` — Vector2 アナログ入力で両目を同時駆動するアナログ表情の汎用 `[Serializable]` 基底クラス。両目ボーン path / 初期回転 / yaw・pitch local 軸 / 可動範囲 (上下＋左右内外) / Look 4 系統 AnimationClip / 焼き付け sample 配列を保持。InputSystem 連携の `GazeExpressionConfig` はこのクラスを継承し `InputActionReference` だけ追加する形に再構成された (inputsystem 側参照)。
@@ -25,6 +80,8 @@
 
 - `Adapters.Json.Dto.AnalogBindingEntryDto` に `scale: float` / `direction: string` を追加。旧スキーマ JSON は欠落フィールドを default 値 (`scale=1`, `direction="bipolar"`) で fallback する。
 - `Adapters.Json.AnalogInputBindingJsonLoader` で scale / direction の parse / serialize を追加。不正 direction 文字列は warning + Bipolar 扱い。
+- 表情遷移時間のデフォルト値を `0.25 秒` から `1/15 秒 (≒0.0667 秒)` に変更。`Domain.Models.Expression.DefaultTransitionDuration` を新設し、`Expression` / `ExpressionSnapshot` / `ExpressionSerializable` / `ExpressionSnapshotDto` / `ExpressionTriggerInputSourceBase.DefaultReleaseTransitionDuration` / `AnimationClipExpressionSampler.DefaultTransitionDuration` / `ARKitDetector` 既定生成 / `SystemTextJsonParser` snapshot 欠落フォールバック / `Templates/default_profile.json` がすべて参照する。preview 段階のため後方互換は持たない。
+- ExpressionTrigger 系 IInputSource の予約 ID を `controller-expr` / `keyboard-expr` の二系統から単一の `input` に統合。`InputSystem.Action` 名で device を抽象化する設計のため、コア側で device 種別ごとに ID を分ける必要がなくなった。`Domain.Models.InputSourceId.ReservedIds` から `controller-expr` / `keyboard-expr` を削除し、`input` を新規追加。InputSystem 連携の `ExpressionTriggerInputSource` も二系統 (Controller/Keyboard) のクラス分離を撤廃し、単一 `InputReservedId = "input"` に統一。preview 段階のため後方互換は持たない。既存プロファイル JSON / SO の `inputSources[].id` が `controller-expr` / `keyboard-expr` のままだと parse 時に warning + skip されるため、`input` (1 件) に書き換える必要がある。
 
 
 ### ⚠ BREAKING CHANGES
@@ -207,13 +264,13 @@
 
 - FacialProfile JSON の `layers[].inputSources` を**必須フィールド化**し、暗黙の `legacy` フォールバックを廃止
   - `inputSources` が欠落または空配列のレイヤーは `FormatException` でロードが失敗する
-  - 予約 ID: `osc` / `lipsync` / `controller-expr` / `keyboard-expr` / `input`。サードパーティ拡張は `x-` プレフィックスを使用
-  - 移行方法: 既存プロファイル JSON の各レイヤーに `"inputSources": [{ "id": "controller-expr", "weight": 1.0 }]` 等の配列を明示的に追記する（同梱サンプルの移行例は `docs/migration-guide.md` および `StreamingAssets/FacialControl/*_profile.json` を参照）
+  - 予約 ID: `osc` / `lipsync` / `input` / `analog-blendshape` / `analog-bonepose`。サードパーティ拡張は `x-` プレフィックスを使用
+  - 移行方法: 既存プロファイル JSON の各レイヤーに `"inputSources": [{ "id": "input", "weight": 1.0 }]` 等の配列を明示的に追記する（同梱サンプルの移行例は `docs/migration-guide.md` および `StreamingAssets/FacialControl/*_profile.json` を参照）
   - 根拠: `docs/requirements.md` FR-001（preview 段階の破壊的変更許容）、および spec `layer-input-source-blending` の D-5 / R3.2 / R7.3 / R7.4
 
 - 予約 ID `legacy` の廃止
   - 旧バージョンで `legacy` を用いて Expression パイプライン全体を 1 本の入力源として温存していた挙動は削除された
-  - 移行方法: Expression 駆動のみを行うレイヤーは `inputSources: [{ "id": "controller-expr", "weight": 1.0 }]`（および必要に応じて `keyboard-expr`）へ置き換える
+  - 移行方法: Expression 駆動のみを行うレイヤーは `inputSources: [{ "id": "input", "weight": 1.0 }]` へ置き換える
   - 根拠: spec `layer-input-source-blending` の D-1 / D-5 / D-6 / R1.7
 
 - `InputBindingProfileSO` に `InputSourceCategory` フィールドを追加、既定値は `Controller`

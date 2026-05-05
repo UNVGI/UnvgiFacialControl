@@ -6,10 +6,10 @@
 
 このパッケージは FacialControl コアに OSC 入出力機能を追加します。
 
-- **OscReceiver**: uOSC サーバーをラップし、受信データを `OscDoubleBuffer`（`Interlocked.Exchange` ベースの非ブロッキングダブルバッファ）に書き込む
-- **OscSender**: uOSC クライアントをラップし、BlendShape 値を OSC アドレスに送信する
-- **OscInputSource**: 予約 id `osc` の `IInputSource` 実装。受信データを `FacialController` の入力源として接続
-- **OscFacialControllerExtension**: `FacialController` と同じ GameObject に配置するだけで OSC 入力をフックする MonoBehaviour
+- **OscAdapterBinding**: `FacialCharacterProfileSO` の `_adapterBindings` に追加するだけで OSC 受信ソケットの確保・helper MonoBehaviour の AddComponent・`InputSourceRegistry` への登録までを 1 binding で完結する `AdapterBindingBase` 具象（`displayName: "OSC"`）
+- **ArKitOscAdapterBinding**: ARKit / PerfectSync の OSC 受信を 1 binding にまとめた具象（`displayName: "ARKit / PerfectSync"`）
+- **OscReceiverHost / OscSenderHost**: binding 配下で `AddComponent` される helper MonoBehaviour。uOSC サーバー / クライアントをラップし、受信データを `OscDoubleBuffer`（`Interlocked.Exchange` ベースの非ブロッキングダブルバッファ）に書き込む
+- **OscInputSource**: OSC 受信値を `IInputSource` として供給する実装。`OscAdapterBinding` 内部で構築され、`InputSourceRegistry.Register(slug, source)` 経由で各レイヤーから参照される
 
 ## 依存パッケージ
 
@@ -21,18 +21,10 @@
 ## 使い方
 
 1. `com.hidano.facialcontrol` と本パッケージを `Packages/manifest.json` に追加
-2. キャラクターの GameObject に `FacialController` を追加し、`FacialCharacterSO` を結線
-3. 同 GameObject に `OscReceiver`（受信）／`OscSender`（送信）を追加し、ポート設定
-4. 同 GameObject に **OSC Facial Extension** (`OscFacialControllerExtension`) を追加
-   - Receiver / Sender 参照は同 GameObject から自動取得される
-5. `FacialCharacterSO` Inspector の **レイヤー** セクションで対象レイヤーを開き、`inputSources` リストに 1 件追加して `id = "osc"` / `weight = 1.0` を設定すると OSC 受信値がそのレイヤーに合流する。同一レイヤーに `controller-expr` / `keyboard-expr` / `analog-blendshape` などを並置すれば加重和ブレンディングが効く
-   - JSON を直接編集する上級者向けの代替手段として、`StreamingAssets/FacialControl/{SO 名}/profile.json` の `layers[*].inputSources` に `{"id": "osc", "weight": 1.0}` を追記する形でも同じ結果になる（Editor で SO を保存すると自動で書き戻されるため、通常は Inspector 経由で十分）
-
-```csharp
-// 手動でコード配線する場合
-var factory = new InputSourceFactory();
-OscRegistration.Register(factory, oscReceiver.Buffer, new UnityTimeProvider());
-```
+2. キャラクターの GameObject に `FacialController` を追加し、`FacialCharacterProfileSO` を結線
+3. `FacialCharacterProfileSO` Inspector の **Adapter Bindings** セクションで Add ドロップダウンから `OSC`（および必要に応じて `ARKit / PerfectSync`）を追加
+4. 各 binding の inline UI で endpoint / port / blendshape マッピングを設定する。受信ソケットと helper MonoBehaviour の確保は `OnStart` 内で binding 自身が行う
+5. レイヤー側の `inputSources` リストに `{ slug = "<binding に設定した slug>", weight = 1.0 }` を追加すると OSC 受信値がそのレイヤーに合流する。同一レイヤーに InputSystem 由来の trigger や analog などを並置すれば加重和ブレンディングが効く
 
 ## OSC アドレス形式
 

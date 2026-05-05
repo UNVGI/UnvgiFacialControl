@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Hidano.FacialControl.Adapters.Json.Dto;
+using Hidano.FacialControl.Domain.Models;
 using UnityEngine;
 
 namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
@@ -16,9 +17,9 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
     /// Phase 3.6 で snapshot 経路へ移行する bridge field である。
     /// </para>
     /// <para>
-    /// Phase 5.3: <see cref="cachedSnapshot"/> は <c>FacialCharacterSOAutoExporter</c> が
-    /// AnimationClip サンプリング結果をキャッシュするフィールド。Runtime fallback 経路から
-    /// 参照可能な永続化形式 (<see cref="ExpressionSnapshotDto"/>) で保持する (Req 9.2, 9.3)。
+    /// Phase 5.3: <see cref="cachedSnapshot"/> は AnimationClip サンプリング結果を
+    /// キャッシュするフィールド。Runtime fallback 経路から参照可能な永続化形式
+    /// (<see cref="ExpressionSnapshotDto"/>) で保持する (Req 9.2, 9.3)。
     /// </para>
     /// </summary>
     [Serializable]
@@ -41,7 +42,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 
         [Tooltip("[Bridge] 遷移時間 (秒)。0〜1 範囲外は自動クランプ。Phase 3.6 で snapshot 経路へ移行予定。")]
         [Range(0f, 1f)]
-        public float transitionDuration = 0.25f;
+        public float transitionDuration = Expression.DefaultTransitionDuration;
 
         [Tooltip("[Bridge] 遷移カーブ。Phase 3.6 で snapshot 経路へ移行予定。")]
         public TransitionCurveSerializable transitionCurve = new TransitionCurveSerializable();

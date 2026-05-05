@@ -52,7 +52,7 @@ namespace Hidano.FacialControl.Adapters.Json
         /// 中間 JSON Schema v2.0 の専用パース経路。
         /// <c>schemaVersion</c> が <see cref="SchemaVersionV2"/> 以外の場合は
         /// <see cref="Debug.LogError(object)"/> + <see cref="InvalidOperationException"/> で拒否する（Req 10.1）。
-        /// 欠落 / null の snapshot は既定値（<c>transitionDuration=0.25</c>, <c>transitionCurvePreset="Linear"</c>,
+        /// 欠落 / null の snapshot は既定値（<c>transitionDuration=1/15</c>, <c>transitionCurvePreset="Linear"</c>,
         /// 各配列空）に正規化される。
         /// </summary>
         public ProfileSnapshotDto ParseProfileSnapshotV2(string json)
@@ -123,7 +123,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 {
                     expr.snapshot = new ExpressionSnapshotDto
                     {
-                        transitionDuration = 0.25f,
+                        transitionDuration = Expression.DefaultTransitionDuration,
                         transitionCurvePreset = "Linear",
                         blendShapes = new List<BlendShapeSnapshotDto>(),
                         bones = new List<BoneSnapshotDto>(),
@@ -187,19 +187,11 @@ namespace Hidano.FacialControl.Adapters.Json
                     var src = entries[j];
                     var rawId = src.id;
 
-                    if (!InputSourceId.TryParse(rawId, out var parsedId))
+                    if (!InputSourceId.TryParse(rawId, out _))
                     {
                         Debug.LogWarning(
                             $"SystemTextJsonParser: レイヤー '{layer.name}' の inputSources[{j}] に不正な識別子 '{rawId ?? "<null>"}' が指定されました。" +
                             "識別子は [a-zA-Z0-9_.-]{1,64} を満たす必要があります (D-5 により 'legacy' は受理されません)。スキップします。");
-                        continue;
-                    }
-
-                    if (!parsedId.IsReserved && !parsedId.IsThirdPartyExtension)
-                    {
-                        Debug.LogWarning(
-                            $"SystemTextJsonParser: レイヤー '{layer.name}' の inputSources[{j}] に未登録の識別子 '{rawId}' が指定されました。" +
-                            "予約 ID (osc / lipsync / controller-expr / keyboard-expr / input) または 'x-' プレフィックス拡張のみ使用できます。スキップします。");
                         continue;
                     }
 
@@ -441,7 +433,7 @@ namespace Hidano.FacialControl.Adapters.Json
 
             return new List<InputSourceDto>
             {
-                new InputSourceDto { id = "controller-expr", weight = 1.0f }
+                new InputSourceDto { id = "input", weight = 1.0f }
             };
         }
 
@@ -665,7 +657,7 @@ namespace Hidano.FacialControl.Adapters.Json
             {
                 var d = dtos[i];
                 var snapshot = d.snapshot;
-                float duration = snapshot != null ? snapshot.transitionDuration : 0.25f;
+                float duration = snapshot != null ? snapshot.transitionDuration : Expression.DefaultTransitionDuration;
                 var curve = ConvertTransitionCurve(snapshot != null ? snapshot.transitionCurvePreset : "Linear");
                 var blendShapes = ConvertBlendShapeMappings(snapshot != null ? snapshot.blendShapes : null);
 

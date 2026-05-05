@@ -76,7 +76,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
             Assert.IsTrue(paths.Contains("Body/Head"));
 
             // Phase 2.1 の段階では metadata 抽出は行わないため fallback default
-            Assert.AreEqual(0.25f, snapshot.TransitionDuration);
+            Assert.AreEqual(Expression.DefaultTransitionDuration, snapshot.TransitionDuration);
             Assert.AreEqual(TransitionCurvePreset.Linear, snapshot.TransitionCurvePreset);
         }
 
@@ -159,7 +159,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
             Assert.IsTrue(blendShapeSet.Contains("Anger"));
             Assert.IsTrue(blendShapeSet.Contains("Surprise"));
 
-            Assert.AreEqual(0.25f, summary.TransitionDuration);
+            Assert.AreEqual(Expression.DefaultTransitionDuration, summary.TransitionDuration);
             Assert.AreEqual(TransitionCurvePreset.Linear, summary.TransitionCurve);
         }
 

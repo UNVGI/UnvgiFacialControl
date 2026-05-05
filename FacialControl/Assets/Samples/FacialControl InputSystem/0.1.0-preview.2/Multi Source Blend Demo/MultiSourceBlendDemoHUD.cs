@@ -1,19 +1,24 @@
 using UnityEngine;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.Playable;
+using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
 
 namespace Hidano.FacialControl.Samples
 {
     /// <summary>
-    /// 同一レイヤーに複数の <c>ExpressionTrigger</c> 入力源 (controller-expr / keyboard-expr) を並置し、
-    /// それぞれのウェイト比と独立トリガーで BlendShape 加重和がどう見えるかを目視検証するための
-    /// PlayMode 専用 HUD。アナログ操作 (Vector2 入力 → 両目ボーン / BlendShape) の現在値も同 HUD で観測する。
+    /// レイヤー上の Trigger 系 ExpressionTrigger 入力源を 1 系統駆動し、ウェイトと
+    /// トリガーで BlendShape 加重和がどう見えるかを目視検証するための PlayMode 専用 HUD。
+    /// アナログ操作 (Vector2 入力 → 両目ボーン / BlendShape) の現在値も同 HUD で観測する。
     /// </summary>
     /// <remarks>
     /// 詳しい使い方は本サンプル同梱の README.md 参照。
     /// 本 HUD は FacialController の既存公開 API のみを利用し、書込はしないオブザーバ。
     /// アナログ表情の InputAction やボーンパス / BlendShape 名は SO の Inspector で編集する。
+    /// 駆動対象は <c>profile.inputSources[].id</c> 形式の slug
+    /// (<c>&lt;slug&gt;</c> または <c>&lt;slug&gt;:&lt;sub&gt;</c>) で指定し、
+    /// レイヤー内の slot index は実行時に
+    /// <see cref="FacialController.GetInputSourceWeightsSnapshot"/> から解決する。
     /// </remarks>
     [DefaultExecutionOrder(-100)]
     [AddComponentMenu("FacialControl/Samples/Multi Source Blend Demo HUD")]
@@ -27,13 +32,9 @@ namespace Hidano.FacialControl.Samples
         [SerializeField]
         private int _layerIndex = 0;
 
-        [Tooltip("Controller 入力源の source index (1 始まり)。")]
+        [Tooltip("駆動対象の入力源 slug。profile.inputSources[].id 形式 (<slug> または <slug>:<sub>)。既定: input")]
         [SerializeField]
-        private int _controllerSourceIndex = 1;
-
-        [Tooltip("Keyboard 入力源の source index (1 始まり)。")]
-        [SerializeField]
-        private int _keyboardSourceIndex = 2;
+        private string _inputSourceSlug = "input";
 
         [Tooltip("HUD で観測する LeftEye Transform (BonePose ターゲット)。アナログ機能未使用時は未割当で OK。")]
         [SerializeField]
@@ -57,8 +58,7 @@ namespace Hidano.FacialControl.Samples
 
         private static readonly string[] s_expressionIds = { "smile", "anger", "surprise", "lipsync_a" };
 
-        private float _controllerWeight = 0.5f;
-        private float _keyboardWeight = 0.5f;
+        private float _inputWeight = 1.0f;
         private Vector2 _scroll;
         private bool _initialWeightsApplied;
 
@@ -87,8 +87,10 @@ namespace Hidano.FacialControl.Samples
 
         private void ApplyInitialWeights()
         {
-            _facialController.SetInputSourceWeight(_layerIndex, _controllerSourceIndex, _controllerWeight);
-            _facialController.SetInputSourceWeight(_layerIndex, _keyboardSourceIndex, _keyboardWeight);
+            if (TryResolveSourceIndex(out int sourceIdx))
+            {
+                _facialController.SetInputSourceWeight(_layerIndex, sourceIdx, _inputWeight);
+            }
         }
 
         private void OnGUI()
@@ -109,43 +111,41 @@ namespace Hidano.FacialControl.Samples
                 return;
             }
 
-            var controllerSource = GetSource(Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.ControllerReservedId);
-            var keyboardSource = GetSource(Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.KeyboardReservedId);
+            var inputSource = GetSource(_inputSourceSlug);
+            bool hasSourceIdx = TryResolveSourceIndex(out int sourceIdx);
 
             GUILayout.BeginArea(new Rect(10, 10, 480, Screen.height - 20), GUI.skin.box);
             _scroll = GUILayout.BeginScrollView(_scroll);
 
             GUILayout.Label("<b>Multi Source Blend Demo</b>", RichStyle());
-            GUILayout.Label($"layer {_layerIndex} の 2 ソースを加重和で合成");
+            GUILayout.Label($"layer {_layerIndex} の slug='{_inputSourceSlug}' 入力源を駆動");
 
-            DrawWeightSlider("Controller weight (source=1)",
-                ref _controllerWeight, _controllerSourceIndex);
-            DrawWeightSlider("Keyboard weight (source=2)",
-                ref _keyboardWeight, _keyboardSourceIndex);
-
-            GUILayout.Space(8);
-            GUILayout.Label("<b>Controller 入力源 (controller-expr)</b>", RichStyle());
-            DrawSourceTriggerRow(controllerSource, Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.ControllerReservedId);
-
-            GUILayout.Space(6);
-            GUILayout.Label("<b>Keyboard 入力源 (keyboard-expr)</b>", RichStyle());
-            DrawSourceTriggerRow(keyboardSource, Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.KeyboardReservedId);
-
-            GUILayout.Space(8);
-            if (GUILayout.Button("全ソースの全 Expression を Off"))
+            if (hasSourceIdx)
             {
-                ReleaseAll(controllerSource);
-                ReleaseAll(keyboardSource);
+                DrawWeightSlider($"Input weight (slug={_inputSourceSlug}, slot={sourceIdx})",
+                    ref _inputWeight, sourceIdx);
+            }
+            else
+            {
+                GUILayout.Label(
+                    $"  slug '{_inputSourceSlug}' は layer {_layerIndex} の inputSources に未宣言。");
+            }
+
+            GUILayout.Space(8);
+            GUILayout.Label($"<b>Trigger 入力源 (slug={_inputSourceSlug})</b>", RichStyle());
+            DrawSourceTriggerRow(inputSource, _inputSourceSlug);
+
+            GUILayout.Space(8);
+            if (GUILayout.Button("Trigger ソースの全 Expression を Off"))
+            {
+                ReleaseAll(inputSource);
             }
 
             GUILayout.Space(10);
             GUILayout.Label("<b>Active Expression</b>", RichStyle());
-            GUILayout.Label(controllerSource == null
-                ? "  controller: (source not registered)"
-                : $"  controller: [{string.Join(", ", controllerSource.ActiveExpressionIds)}]");
-            GUILayout.Label(keyboardSource == null
-                ? "  keyboard: (source not registered)"
-                : $"  keyboard: [{string.Join(", ", keyboardSource.ActiveExpressionIds)}]");
+            GUILayout.Label(inputSource == null
+                ? $"  {_inputSourceSlug}: (source not registered)"
+                : $"  {_inputSourceSlug}: [{string.Join(", ", inputSource.ActiveExpressionIds)}]");
 
             GUILayout.Space(10);
             GUILayout.Label("<b>Weight Snapshot</b>", RichStyle());
@@ -248,11 +248,11 @@ namespace Hidano.FacialControl.Samples
             }
         }
 
-        private void DrawSourceTriggerRow(ExpressionTriggerInputSourceBase source, string id)
+        private void DrawSourceTriggerRow(ExpressionTriggerInputSourceBase source, string slug)
         {
             if (source == null)
             {
-                GUILayout.Label($"  {id} は profile.inputSources に未宣言。");
+                GUILayout.Label($"  '{slug}' は profile.inputSources に未宣言。");
                 return;
             }
 
@@ -293,10 +293,57 @@ namespace Hidano.FacialControl.Samples
             }
         }
 
-        private ExpressionTriggerInputSourceBase GetSource(string id)
+        private ExpressionTriggerInputSourceBase GetSource(string slug)
         {
-            _facialController.TryGetExpressionTriggerSourceById(id, out var source);
+            if (string.IsNullOrEmpty(slug))
+            {
+                return null;
+            }
+            _facialController.TryGetExpressionTriggerSourceById(slug, out var source);
             return source;
+        }
+
+        /// <summary>
+        /// <see cref="_inputSourceSlug"/> を <see cref="_layerIndex"/> 内の slot index に解決する。
+        /// snapshot は (layer, slot) 順に走査されるため、同 layer 内の出現順を slot index として採用する。
+        /// 未初期化 / slug 未宣言 / slug 空 のいずれかに該当する場合は false を返す。
+        /// </summary>
+        private bool TryResolveSourceIndex(out int sourceIdx)
+        {
+            sourceIdx = -1;
+            if (_facialController == null || !_facialController.IsInitialized)
+            {
+                return false;
+            }
+            if (string.IsNullOrEmpty(_inputSourceSlug))
+            {
+                return false;
+            }
+
+            var snapshot = _facialController.GetInputSourceWeightsSnapshot();
+            int currentLayer = -1;
+            int slotInLayer = -1;
+            for (int i = 0; i < snapshot.Count; i++)
+            {
+                LayerSourceWeightEntry entry = snapshot[i];
+                if (entry.LayerIdx != currentLayer)
+                {
+                    currentLayer = entry.LayerIdx;
+                    slotInLayer = 0;
+                }
+                else
+                {
+                    slotInLayer++;
+                }
+
+                if (currentLayer == _layerIndex
+                    && entry.SourceId.Value == _inputSourceSlug)
+                {
+                    sourceIdx = slotInLayer;
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static GUIStyle s_richStyle;

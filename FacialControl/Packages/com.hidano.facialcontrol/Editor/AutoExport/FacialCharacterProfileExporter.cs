@@ -272,7 +272,7 @@ namespace Hidano.FacialControl.Editor.AutoExport
             {
                 return new List<InputSourceDto>
                 {
-                    new InputSourceDto { id = "controller-expr", weight = 1.0f }
+                    new InputSourceDto { id = "input", weight = 1.0f }
                 };
             }
             var list = new List<InputSourceDto>(sources.Count);

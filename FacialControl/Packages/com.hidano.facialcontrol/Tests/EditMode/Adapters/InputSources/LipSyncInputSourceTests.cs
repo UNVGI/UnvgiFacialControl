@@ -48,7 +48,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
         }
 
         [Test]
-        public void Id_IsReservedLipsync()
+        public void Id_MatchesLipSyncReservedId()
         {
             var provider = new FakeLipSyncProvider(new float[] { 0f, 0f });
             var source = new LipSyncInputSource(provider, blendShapeCount: 2);

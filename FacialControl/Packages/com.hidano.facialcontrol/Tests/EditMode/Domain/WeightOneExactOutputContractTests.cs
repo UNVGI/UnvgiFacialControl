@@ -145,7 +145,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             var selected = new PatternValueSource("osc", selectedPattern);
             var other1 = new PatternValueSource("lipsync",
                 new[] { 1f, 1f, 1f });                      // 混入すれば 1.0 になってしまう
-            var other2 = new PatternValueSource("keyboard-expr",
+            var other2 = new PatternValueSource("analog-blendshape",
                 new[] { 0.9f, 0.9f, 0.9f });                // 混入すれば 0.9 程度に寄与する
 
             var bindings = new List<(int, int, IInputSource)>
@@ -189,7 +189,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             var other1 = new PatternValueSource("osc",
                 new[] { 0.77f, 0.77f });
             var selected = new PatternValueSource("lipsync", selectedPattern);
-            var other2 = new PatternValueSource("keyboard-expr",
+            var other2 = new PatternValueSource("analog-blendshape",
                 new[] { 0.88f, 0.88f });
 
             var bindings = new List<(int, int, IInputSource)>
@@ -232,7 +232,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
                 new[] { 0.5f, 0.5f, 0.5f, 0.5f, 0.5f });
             var other2 = new PatternValueSource("lipsync",
                 new[] { 0.9f, 0.9f, 0.9f, 0.9f, 0.9f });
-            var selected = new PatternValueSource("keyboard-expr", selectedPattern);
+            var selected = new PatternValueSource("analog-blendshape", selectedPattern);
 
             var bindings = new List<(int, int, IInputSource)>
             {

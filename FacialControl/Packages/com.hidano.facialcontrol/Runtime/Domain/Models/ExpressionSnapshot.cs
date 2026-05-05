@@ -22,7 +22,7 @@ namespace Hidano.FacialControl.Domain.Models
         /// <summary>表情を一意に識別する Id（null は空文字に正規化）。</summary>
         public string Id { get; }
 
-        /// <summary>表情遷移時間（秒）。0〜1 秒、デフォルト 0.25 秒（Req 2.5）。</summary>
+        /// <summary>表情遷移時間（秒）。0〜1 秒、デフォルトは <see cref="Expression.DefaultTransitionDuration"/>（1/15 秒）（Req 2.5）。</summary>
         public float TransitionDuration { get; }
 
         /// <summary>遷移カーブプリセット（Linear / EaseIn / EaseOut / EaseInOut）。デフォルト Linear（Req 2.6）。</summary>
@@ -63,14 +63,14 @@ namespace Hidano.FacialControl.Domain.Models
         }
 
         /// <summary>
-        /// デフォルト遷移時間 0.25 秒 / Linear カーブ / 空配列で snapshot を生成する。
-        /// fallback / placeholder 用途。
+        /// デフォルト遷移時間 (<see cref="Expression.DefaultTransitionDuration"/>, 1/15 秒) / Linear カーブ /
+        /// 空配列で snapshot を生成する。fallback / placeholder 用途。
         /// </summary>
         public static ExpressionSnapshot CreateDefault(string id)
         {
             return new ExpressionSnapshot(
                 id,
-                transitionDuration: 0.25f,
+                transitionDuration: Expression.DefaultTransitionDuration,
                 transitionCurvePreset: Models.TransitionCurvePreset.Linear,
                 blendShapes: null,
                 bones: null,

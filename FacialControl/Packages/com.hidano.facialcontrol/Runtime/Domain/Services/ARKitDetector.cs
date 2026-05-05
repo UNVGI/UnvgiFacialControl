@@ -294,7 +294,7 @@ namespace Hidano.FacialControl.Domain.Services
                     id: Guid.NewGuid().ToString(),
                     name: $"ARKit_{layerGroup}",
                     layer: layerGroup,
-                    transitionDuration: 0.25f,
+                    transitionDuration: Expression.DefaultTransitionDuration,
                     transitionCurve: TransitionCurve.Linear,
                     blendShapeValues: mappings
                 );

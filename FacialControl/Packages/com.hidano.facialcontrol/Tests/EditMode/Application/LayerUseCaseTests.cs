@@ -638,7 +638,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
         [Test]
         public void TryGetExpressionTriggerSourceById_RegisteredId_ReturnsTrue()
         {
-            var fake = new FakeExpressionTriggerSource("controller-expr", 3, _profile);
+            var fake = new FakeExpressionTriggerSource("input", 3, _profile);
             var additional = new List<(int layerIdx, IInputSource source, float weight)>
             {
                 (0, fake, 1.0f),
@@ -647,7 +647,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
                 _profile, _expressionUseCase, CreateBlendShapeNames(), additional);
 
             bool found = useCase.TryGetExpressionTriggerSourceById(
-                "controller-expr", out var source);
+                "input", out var source);
 
             Assert.IsTrue(found);
             Assert.AreSame(fake, source);
@@ -657,7 +657,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
         public void TryGetExpressionTriggerSourceById_UnregisteredId_ReturnsFalse()
         {
             bool found = _useCase.TryGetExpressionTriggerSourceById(
-                "controller-expr", out var source);
+                "input", out var source);
 
             Assert.IsFalse(found);
             Assert.IsNull(source);
@@ -720,7 +720,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
 
             var controller = new global::Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource(
                 id: global::Hidano.FacialControl.Domain.Models.InputSourceId.Parse(
-                    global::Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.ControllerReservedId),
+                    global::Hidano.FacialControl.Adapters.InputSources.ExpressionTriggerInputSource.InputReservedId),
                 blendShapeCount: blendShapeNames.Length,
                 maxStackDepth: 4,
                 exclusionMode: ExclusionMode.LastWins,
@@ -734,7 +734,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
             using var useCase = new LayerUseCase(
                 profile, expressionUseCase, blendShapeNames, additional);
 
-            // ExpressionUseCase.Activate は呼ばない。sourceIdx=1 (controller-expr) だけで駆動する。
+            // ExpressionUseCase.Activate は呼ばない。sourceIdx=1 (input) だけで駆動する。
             controller.TriggerOn("smile");
             useCase.UpdateWeights(0.001f);
 

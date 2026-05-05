@@ -23,7 +23,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
         [Tooltip("排他モード。LastWins=後勝ち、Blend=同レイヤー内ブレンド。")]
         public ExclusionMode exclusionMode = ExclusionMode.LastWins;
 
-        [Tooltip("このレイヤーで動作する入力源の宣言。最低 1 件必要。空なら自動で controller-expr が補完される。")]
+        [Tooltip("このレイヤーで動作する入力源の宣言。最低 1 件必要。空なら自動で input が補完される。")]
         public List<InputSourceDeclarationSerializable> inputSources = new List<InputSourceDeclarationSerializable>();
 
         [Tooltip("このレイヤーがアクティブな間、上書きする他レイヤーの名前。同レイヤー名を含めることでレイヤー内ブレンドを担保する。")]

@@ -69,7 +69,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
     ""schemaVersion"": ""2.0"",
     ""layers"": [
         {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [
-            {""id"": ""controller-expr"", ""weight"": 0.5},
+            {""id"": ""input"", ""weight"": 0.5},
             {""id"": ""osc"", ""weight"": 0.5}
         ]}
     ],
@@ -84,9 +84,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 
             Assert.AreEqual(s1, s2);
 
-            // 宣言順の保持 (Req 3.5): [controller-expr, osc] が保たれる。
+            // 宣言順の保持 (Req 3.5): [input, osc] が保たれる。
             Assert.AreEqual(2, p2.LayerInputSources.Span[0].Length);
-            Assert.AreEqual("controller-expr", p2.LayerInputSources.Span[0][0].Id);
+            Assert.AreEqual("input", p2.LayerInputSources.Span[0][0].Id);
             Assert.AreEqual("osc", p2.LayerInputSources.Span[0][1].Id);
         }
 
@@ -132,8 +132,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
     ""layers"": [
         {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [
             {""id"": ""osc"", ""weight"": 0.3},
-            {""id"": ""controller-expr"", ""weight"": 0.3},
-            {""id"": ""keyboard-expr"", ""weight"": 0.4}
+            {""id"": ""input"", ""weight"": 0.3},
+            {""id"": ""analog-blendshape"", ""weight"": 0.4}
         ]}
     ],
     ""expressions"": [],
@@ -145,8 +145,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             var span = profile.LayerInputSources.Span[0];
             Assert.AreEqual(3, span.Length);
             Assert.AreEqual("osc", span[0].Id);
-            Assert.AreEqual("controller-expr", span[1].Id);
-            Assert.AreEqual("keyboard-expr", span[2].Id);
+            Assert.AreEqual("input", span[1].Id);
+            Assert.AreEqual("analog-blendshape", span[2].Id);
         }
 
         [Test]
@@ -157,7 +157,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
     ""layers"": [
         {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [
             {""id"": ""osc"", ""weight"": 0.3},
-            {""id"": ""controller-expr"", ""weight"": 0.7}
+            {""id"": ""input"", ""weight"": 0.7}
         ]}
     ],
     ""expressions"": [],
@@ -166,9 +166,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 
             var serialized = _parser.SerializeProfile(profile);
 
-            // 出力中の "osc" が "controller-expr" より先に現れること。
+            // 出力中の "osc" が "input" より先に現れること。
             int oscIdx = serialized.IndexOf("\"osc\"", System.StringComparison.Ordinal);
-            int ctrlIdx = serialized.IndexOf("\"controller-expr\"", System.StringComparison.Ordinal);
+            int ctrlIdx = serialized.IndexOf("\"input\"", System.StringComparison.Ordinal);
             Assert.Greater(oscIdx, 0);
             Assert.Greater(ctrlIdx, 0);
             Assert.Less(oscIdx, ctrlIdx, "宣言順が維持されて出力されること");
@@ -209,10 +209,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             Assert.AreEqual(profile.Layers.Length, profile.LayerInputSources.Length,
                 "LayerInputSources の外側インデックスは Layers と揃う");
 
-            Assert.AreEqual("controller-expr", profile.LayerInputSources.Span[0][0].Id);
+            Assert.AreEqual("input", profile.LayerInputSources.Span[0][0].Id);
             Assert.AreEqual("osc", profile.LayerInputSources.Span[0][1].Id);
             Assert.AreEqual("lipsync", profile.LayerInputSources.Span[1][0].Id);
-            Assert.AreEqual("keyboard-expr", profile.LayerInputSources.Span[2][0].Id);
+            Assert.AreEqual("input", profile.LayerInputSources.Span[2][0].Id);
         }
 
         [Test]
@@ -226,7 +226,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             {
                 new[]
                 {
-                    new InputSourceDeclaration("controller-expr", 0.5f, null),
+                    new InputSourceDeclaration("input", 0.5f, null),
                     new InputSourceDeclaration("osc", 0.5f, "{\"stalenessSeconds\":1.0}")
                 }
             };
@@ -239,7 +239,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             Assert.AreEqual(s1, s2);
 
             Assert.AreEqual(2, p2.LayerInputSources.Span[0].Length);
-            Assert.AreEqual("controller-expr", p2.LayerInputSources.Span[0][0].Id);
+            Assert.AreEqual("input", p2.LayerInputSources.Span[0][0].Id);
             Assert.AreEqual(0.5f, p2.LayerInputSources.Span[0][0].Weight);
             Assert.AreEqual("osc", p2.LayerInputSources.Span[0][1].Id);
             Assert.AreEqual(0.5f, p2.LayerInputSources.Span[0][1].Weight);

@@ -6,7 +6,7 @@
             "priority": 0,
             "exclusionMode": "lastWins",
             "inputSources": [
-                {"id": "controller-expr", "weight": 1.0, "options": {}}
+                {"id": "input", "weight": 1.0, "options": {}}
             ]
         }
     ],

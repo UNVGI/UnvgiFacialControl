@@ -128,7 +128,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             var json = @"{
                 ""schemaVersion"":""2.0"",
                 ""layers"":[
-                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""controller-expr"",""weight"":1.0}]},
+                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""input"",""weight"":1.0}]},
                     {""name"":""lipsync"",""priority"":1,""exclusionMode"":""blend""}
                 ],
                 ""expressions"":[]
@@ -157,15 +157,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             Assert.IsFalse(
                 accepted,
                 "InputSourceId.TryParse は 'legacy' を拒否する必要がある (D-5: legacy フォールバック廃止)。");
-        }
-
-        [Test]
-        public void InputSourceId_ReservedIds_DoesNotIncludeLegacy()
-        {
-            // 予約 ID 一覧から `legacy` が除外されていることの契約確認。
-            Assert.IsFalse(
-                InputSourceId.IsReservedId("legacy"),
-                "`legacy` は予約 ID ではない (Req 1.7, D-5)。");
         }
 
         [Test]
