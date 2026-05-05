@@ -21,7 +21,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
     /// core パッケージ側で本 drawer を登録しないこと（Req 3.1）。
     /// </para>
     /// <para>
-    /// 旧 <c>FacialCharacterSOInspector</c> の以下 UI を移植する：
+    /// 編集対象 UI:
     /// <list type="bullet">
     /// <item><description>Slug（<c>AdapterBindingBase</c> の public field）</description></item>
     /// <item><description>InputActionAsset（<c>_inputActionAsset</c>）</description></item>
@@ -62,8 +62,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             var actionMapDropdown = AddActionMapDropdown(root, property);
             var expressionBindingsList = AddExpressionBindingsList(root, property);
 
-            // _inputActionAsset 変更時に ActionMap / Action 候補と list rows を再構築する
-            // （旧 FacialCharacterSOInspector.BuildInputSection の挙動を踏襲）。
+            // _inputActionAsset 変更時に ActionMap / Action 候補と list rows を再構築する。
             assetField?.RegisterValueChangedCallback(_ =>
             {
                 RefreshActionMapChoices(actionMapDropdown, property);

@@ -16,8 +16,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
     /// <see cref="AdapterBindingBase"/> 派生（Req 6.1, 6.8）。
     /// </summary>
     /// <remarks>
-    /// 旧 <c>FacialCharacterInputExtension</c> / <c>InputFacialControllerExtension</c> /
-    /// <c>FacialCharacterSO</c> / <c>InputRegistration</c> の責務を統合する（D-8）。
+    /// Trigger / Analog / Gaze 経路を 1 binding に集約する（D-8）。
     /// <list type="bullet">
     ///   <item><see cref="OnStart"/>: <see cref="InputActionAsset.Instantiate()"/> +
     ///         <see cref="InputActionMap.Enable"/> +

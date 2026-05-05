@@ -127,7 +127,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
         [Test]
         public void OnStart_DoesNotEnableSourceAssetActionMap_OnlyRuntimeClone()
         {
-            // Source asset は未変更で、Instantiate された clone のみが Enable される（旧 FacialCharacterInputExtension の挙動を維持）。
+            // Source asset は未変更で、Instantiate された clone のみが Enable される。
             _sourceAsset = CreateExpressionActionAsset(
                 actionMapName: "Expression",
                 buttonActionName: "TriggerHappy",
@@ -217,7 +217,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
         public void OnStart_AnalogPath_RegistersAnalogSourceUnderCompositeSlug()
         {
             // D-8 集約: Analog 経路は GazeConfig.inputAction.action.name を sub-id とした composite slug 登録となる
-            // （旧 FacialCharacterInputExtension.EnsureAnalogReady 内の InputActionAnalogSource 構築相当）。
+            // （InputActionAnalogSource 構築相当）。
             const string slug = "input-system-analog-path";
             _sourceAsset = CreateGazeActionAsset(
                 actionMapName: "Expression",
