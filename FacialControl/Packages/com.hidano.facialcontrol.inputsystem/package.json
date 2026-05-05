@@ -15,7 +15,7 @@
     "samples": [
         {
             "displayName": "Multi Source Blend Demo",
-            "description": "InputSystem の Trigger Action 経由で controller / keyboard 双方を受ける単一 input ソースの加重和ブレンドに加え、左スティック → LeftEye/RightEye Euler、ARKit/OSC float → mouth-open BlendShape のアナログバインディングを 1 サンプルで網羅する統合デモ。Scene / FacialCharacterSO / InputActions / StreamingAssets JSON / HUD 一式を同梱し、ユーザーはモデルを Character の子に配置するだけで動作する (新統合 SO 形式)。",
+            "description": "InputSystem の Trigger Action 経由で controller / keyboard 双方を受ける単一 input-system ソースの加重和ブレンドに加え、左スティック → LeftEye/RightEye Euler、ARKit/OSC float → mouth-open BlendShape のアナログバインディングを 1 サンプルで網羅する統合デモ。Scene / FacialCharacterProfileSO (InputSystemAdapterBinding + OscAdapterBinding 同時保持) / InputActions / StreamingAssets JSON / HUD 一式を同梱し、ユーザーはモデルを Character の子に配置するだけで動作する (新 _adapterBindings + slug 駆動形式)。",
             "path": "Samples~/MultiSourceBlendDemo"
         }
     ],
