@@ -399,7 +399,7 @@
   - 観測可能完了条件: CHANGELOG に breaking change エントリが残り、migration-guide.md が現状を反映する
   - _Requirements: 6.7, 8.1, 8.2, 8.3, 8.4, 8.5, 12.7_
 
-- [ ] 12.6 Phase 2 完了 grep 検証と最終 sanity check
+- [x] 12.6 Phase 2 完了 grep 検証と最終 sanity check
   - `Grep` で旧資産（`FacialCharacterSO` / `IFacialControllerExtension` / `OscFacialControllerExtension` / `FacialCharacterInputExtension` / `InputFacialControllerExtension` / `InputSourceFactory` / `ReservedIds` / `IsReserved` / `IsReservedId`）が repository 内 0 件であることを最終確認する
   - 既存 PlayMode テスト全 green、新 PropertyDrawer を持つ各 binding が Inspector で正常表示、0-alloc perf test が pass を最終確認する
   - 観測可能完了条件: design.md `## Migration Strategy > Phase 2 検証 Checkpoints` を全て満たす
