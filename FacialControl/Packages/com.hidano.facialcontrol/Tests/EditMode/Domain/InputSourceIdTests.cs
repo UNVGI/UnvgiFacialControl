@@ -3,34 +3,26 @@ using Hidano.FacialControl.Domain.Models;
 
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
+    /// <summary>
+    /// <see cref="InputSourceId"/> の規約テスト。
+    /// </summary>
+    /// <remarks>
+    /// 旧 reserved id 体系（<c>osc</c> / <c>lipsync</c> / <c>input</c> 等）は D-13 / Req 12.5 で
+    /// 廃止済みのため、識別子の意味付けは <see cref="AdapterSlug"/> 側のテストでカバーされる。
+    /// 本ファイルは識別子文字列としての validation 契約（regex / 長さ / legacy 拒否 / 等価性）のみを保持する。
+    /// </remarks>
     [TestFixture]
     public class InputSourceIdTests
     {
-        [TestCase("osc")]
-        [TestCase("lipsync")]
-        [TestCase("input")]
-        [TestCase("analog-blendshape")]
-        [TestCase("analog-bonepose")]
-        public void TryParse_ReservedId_ReturnsTrueAndIsReservedIsTrue(string reserved)
-        {
-            var parsed = InputSourceId.TryParse(reserved, out var id);
-
-            Assert.IsTrue(parsed);
-            Assert.AreEqual(reserved, id.Value);
-            Assert.IsTrue(id.IsReserved);
-            Assert.IsFalse(id.IsThirdPartyExtension);
-        }
-
         [TestCase("x-mycompany-arm-sensor")]
         [TestCase("x-test")]
         [TestCase("x-")]
-        public void TryParse_ThirdPartyPrefix_ReturnsTrueAndIsReservedIsFalse(string extension)
+        public void TryParse_ThirdPartyPrefix_ReturnsTrueAndIsThirdPartyExtensionIsTrue(string extension)
         {
             var parsed = InputSourceId.TryParse(extension, out var id);
 
             Assert.IsTrue(parsed);
             Assert.AreEqual(extension, id.Value);
-            Assert.IsFalse(id.IsReserved);
             Assert.IsTrue(id.IsThirdPartyExtension);
         }
 
@@ -111,35 +103,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         }
 
         [Test]
-        public void TryParse_OscReservedId_YieldsIsReservedTrue()
-        {
-            Assert.IsTrue(InputSourceId.TryParse("osc", out var id));
-            Assert.IsTrue(id.IsReserved);
-        }
-
-        [Test]
-        public void IsReservedId_StaticHelper_ReturnsExpectedResults()
-        {
-            Assert.IsTrue(InputSourceId.IsReservedId("osc"));
-            Assert.IsTrue(InputSourceId.IsReservedId("lipsync"));
-            Assert.IsTrue(InputSourceId.IsReservedId("input"));
-            Assert.IsTrue(InputSourceId.IsReservedId("analog-blendshape"));
-            Assert.IsTrue(InputSourceId.IsReservedId("analog-bonepose"));
-
-            Assert.IsFalse(InputSourceId.IsReservedId("legacy"));
-            Assert.IsFalse(InputSourceId.IsReservedId("controller-expr"));
-            Assert.IsFalse(InputSourceId.IsReservedId("keyboard-expr"));
-            Assert.IsFalse(InputSourceId.IsReservedId("x-custom"));
-            Assert.IsFalse(InputSourceId.IsReservedId("unknown"));
-            Assert.IsFalse(InputSourceId.IsReservedId(null));
-            Assert.IsFalse(InputSourceId.IsReservedId(string.Empty));
-        }
-
-        [Test]
         public void Equality_SameValue_AreEqual()
         {
-            Assert.IsTrue(InputSourceId.TryParse("osc", out var a));
-            Assert.IsTrue(InputSourceId.TryParse("osc", out var b));
+            Assert.IsTrue(InputSourceId.TryParse("alpha", out var a));
+            Assert.IsTrue(InputSourceId.TryParse("alpha", out var b));
 
             Assert.AreEqual(a, b);
             Assert.IsTrue(a == b);
@@ -150,8 +117,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void Equality_DifferentValue_AreNotEqual()
         {
-            Assert.IsTrue(InputSourceId.TryParse("osc", out var a));
-            Assert.IsTrue(InputSourceId.TryParse("lipsync", out var b));
+            Assert.IsTrue(InputSourceId.TryParse("alpha", out var a));
+            Assert.IsTrue(InputSourceId.TryParse("beta", out var b));
 
             Assert.AreNotEqual(a, b);
             Assert.IsFalse(a == b);
@@ -167,12 +134,11 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         }
 
         [Test]
-        public void Default_ValueIsNullAndIsReservedIsFalse()
+        public void Default_ValueIsNullAndIsThirdPartyExtensionIsFalse()
         {
             var defaultId = default(InputSourceId);
 
             Assert.IsNull(defaultId.Value);
-            Assert.IsFalse(defaultId.IsReserved);
             Assert.IsFalse(defaultId.IsThirdPartyExtension);
         }
     }

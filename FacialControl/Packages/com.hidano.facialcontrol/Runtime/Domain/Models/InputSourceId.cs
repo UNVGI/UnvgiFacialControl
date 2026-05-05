@@ -4,17 +4,17 @@ using System.Text.RegularExpressions;
 namespace Hidano.FacialControl.Domain.Models
 {
     /// <summary>
-    /// 入力源識別子の value-object。Req 1.7 / D-6 に従い、
+    /// 入力源識別子の value-object。Req 12.6 に従い、
     /// パターン <c>[a-zA-Z0-9_.-]{1,64}</c> を満たす ASCII 文字列のみを受理する。
     /// </summary>
     /// <remarks>
     /// <para>
-    /// 予約 ID: <c>osc</c>, <c>lipsync</c>, <c>input</c>,
-    /// <c>analog-blendshape</c>, <c>analog-bonepose</c>。
-    /// サードパーティ拡張は <c>x-</c> プレフィックス推奨。
+    /// 旧 reserved id 体系（<c>osc</c> / <c>lipsync</c> / <c>input</c> / <c>analog-blendshape</c>
+    /// / <c>analog-bonepose</c>）は D-13 / Req 12.5 により撤廃済み。識別子の意味付けは
+    /// <see cref="AdapterSlug"/> 経由で各 binding 側が担う。
     /// 識別子 <c>legacy</c> は D-5 の legacy フォールバック廃止に伴い受理されない。
-    /// 旧 <c>controller-expr</c> / <c>keyboard-expr</c> は preview 段階で廃止され受理されない
-    /// （<c>input</c> 1 種に統合）。
+    /// 旧 <c>controller-expr</c> / <c>keyboard-expr</c> は preview 段階で廃止され受理されない。
+    /// サードパーティ拡張は <c>x-</c> プレフィックス推奨。
     /// </para>
     /// <para>
     /// Invariants: 構築後の <see cref="Value"/> は常にパターンを満たし、<c>legacy</c> ではない。
@@ -28,15 +28,6 @@ namespace Hidano.FacialControl.Domain.Models
         private const string ForbiddenLegacyId = "legacy";
         private const string ThirdPartyPrefix = "x-";
 
-        private static readonly string[] ReservedIds =
-        {
-            "osc",
-            "lipsync",
-            "input",
-            "analog-blendshape",
-            "analog-bonepose"
-        };
-
         /// <summary>
         /// 文字列としての識別子。未初期化インスタンスでは <c>null</c> となる。
         /// </summary>
@@ -46,12 +37,6 @@ namespace Hidano.FacialControl.Domain.Models
         {
             Value = validatedValue;
         }
-
-        /// <summary>
-        /// 予約 ID (<c>osc</c> / <c>lipsync</c> / <c>input</c> /
-        /// <c>analog-blendshape</c> / <c>analog-bonepose</c>) なら true。
-        /// </summary>
-        public bool IsReserved => IsReservedId(Value);
 
         /// <summary>
         /// <c>x-</c> プレフィックス付きのサードパーティ拡張識別子なら true。
@@ -88,27 +73,6 @@ namespace Hidano.FacialControl.Domain.Models
                 throw new FormatException($"Invalid InputSourceId: '{input ?? "<null>"}'.");
             }
             return id;
-        }
-
-        /// <summary>
-        /// 与えられた文字列が予約 ID のいずれかに一致するか判定する。
-        /// </summary>
-        public static bool IsReservedId(string candidate)
-        {
-            if (string.IsNullOrEmpty(candidate))
-            {
-                return false;
-            }
-
-            for (int i = 0; i < ReservedIds.Length; i++)
-            {
-                if (string.Equals(ReservedIds[i], candidate, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static bool IsValidIdentifier(string input)

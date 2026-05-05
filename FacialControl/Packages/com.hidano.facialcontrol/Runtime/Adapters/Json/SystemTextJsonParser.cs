@@ -187,19 +187,11 @@ namespace Hidano.FacialControl.Adapters.Json
                     var src = entries[j];
                     var rawId = src.id;
 
-                    if (!InputSourceId.TryParse(rawId, out var parsedId))
+                    if (!InputSourceId.TryParse(rawId, out _))
                     {
                         Debug.LogWarning(
                             $"SystemTextJsonParser: レイヤー '{layer.name}' の inputSources[{j}] に不正な識別子 '{rawId ?? "<null>"}' が指定されました。" +
                             "識別子は [a-zA-Z0-9_.-]{1,64} を満たす必要があります (D-5 により 'legacy' は受理されません)。スキップします。");
-                        continue;
-                    }
-
-                    if (!parsedId.IsReserved && !parsedId.IsThirdPartyExtension)
-                    {
-                        Debug.LogWarning(
-                            $"SystemTextJsonParser: レイヤー '{layer.name}' の inputSources[{j}] に未登録の識別子 '{rawId}' が指定されました。" +
-                            "予約 ID (osc / lipsync / input / analog-blendshape / analog-bonepose) または 'x-' プレフィックス拡張のみ使用できます。スキップします。");
                         continue;
                     }
 

@@ -160,15 +160,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         }
 
         [Test]
-        public void InputSourceId_ReservedIds_DoesNotIncludeLegacy()
-        {
-            // 予約 ID 一覧から `legacy` が除外されていることの契約確認。
-            Assert.IsFalse(
-                InputSourceId.IsReservedId("legacy"),
-                "`legacy` は予約 ID ではない (Req 1.7, D-5)。");
-        }
-
-        [Test]
         public void ParseProfile_InputSourcesDeclaredAsLegacy_SkippedNotAcceptedAsFallback()
         {
             // 仮にユーザーが `"id": "legacy"` を宣言しても、parser は InputSourceId の検証で弾き

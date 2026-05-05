@@ -61,9 +61,8 @@ namespace Hidano.FacialControl.Application.UseCases
         /// <see cref="LayerInputSourceRegistry"/> / <see cref="LayerInputSourceAggregator"/> に
         /// 同レイヤー上で追加登録する <see cref="IInputSource"/> の列。
         /// sourceIdx は各レイヤー内で 1 から昇順に自動割当される。<c>null</c> は空列と同義。
-        /// FacialController の初期化経路 (8.2) では
-        /// <c>InputSourceFactory.TryCreate</c> の結果をここに渡すことで、
-        /// osc / lipsync / input などを per-layer 加重和に合流できる。
+        /// 各 binding は VContainer LifetimeScope 経由で <c>InputSourceRegistry</c> に IInputSource を登録し、
+        /// 解決済みインスタンスを per-layer 加重和に合流させる。
         /// </param>
         public LayerUseCase(
             FacialProfile profile,

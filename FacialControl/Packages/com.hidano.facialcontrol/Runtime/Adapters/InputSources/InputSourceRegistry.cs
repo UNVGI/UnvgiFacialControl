@@ -16,7 +16,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
     /// （design.md `## InputSourceRegistry > 実装メモ`）。
     /// </para>
     /// <para>
-    /// 旧 <c>InputSourceFactory</c> の (id, options) ディスパッチ / JSON deserialize / reserved id
+    /// 旧ファクトリ経路の (id, options) ディスパッチ / JSON deserialize / reserved id
     /// チェックは本クラスでは保持しない（D-13 廃止、Req 6.10）。
     /// </para>
     /// <para>

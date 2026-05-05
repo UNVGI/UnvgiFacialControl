@@ -24,7 +24,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
     public class OscInputSourceTests
     {
         [Test]
-        public void Id_IsReservedOsc()
+        public void Id_MatchesOscReservedId()
         {
             using var buffer = new OscDoubleBuffer(4);
             var time = new ManualTimeProvider();
