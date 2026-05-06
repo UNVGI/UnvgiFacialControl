@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Hidano.FacialControl.Adapters.Bone;
 using Hidano.FacialControl.Adapters.InputSources;
+using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
@@ -52,6 +53,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
         [NonSerialized] private ExpressionInputSourceAdapter _adapter;
         [NonSerialized] private List<InputActionAnalogSource> _analogSources;
         [NonSerialized] private GazeBonePoseProvider _gazeBoneProvider;
+        [NonSerialized] private IReadOnlyList<GazeBindingConfig> _injectedGazeConfigs;
         [NonSerialized] private bool _isStarted;
 
         /// <summary>キーアサインを定義する InputActionAsset（Inspector / API 用）。</summary>
@@ -87,7 +89,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             InputActionAsset asset,
             string actionMapName,
             IReadOnlyList<ExpressionBindingEntry> expressionBindings,
-            IReadOnlyList<InputSystemGazeBinding> gazeInputBindings = null)
+            IReadOnlyList<InputSystemGazeBinding> gazeInputBindings = null,
+            IReadOnlyList<GazeBindingConfig> injectedGazeConfigs = null)
         {
             _inputActionAsset = asset;
             _actionMapName = actionMapName;
@@ -97,6 +100,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             _gazeInputBindings = gazeInputBindings == null
                 ? new List<InputSystemGazeBinding>()
                 : new List<InputSystemGazeBinding>(gazeInputBindings);
+            _injectedGazeConfigs = injectedGazeConfigs;
         }
 
         /// <inheritdoc />
@@ -301,6 +305,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
         private void BuildGazeProvider(in AdapterBuildContext ctx)
         {
             _gazeBoneProvider = null;
+            if (_injectedGazeConfigs == null || _injectedGazeConfigs.Count == 0)
+            {
+                return;
+            }
         }
 
         private static AnalogInputShape DetermineShape(InputAction action)
