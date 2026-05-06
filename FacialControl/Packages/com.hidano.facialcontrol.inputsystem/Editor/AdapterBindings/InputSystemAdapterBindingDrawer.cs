@@ -27,7 +27,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
     /// <item><description>InputActionAsset（<c>_inputActionAsset</c>）</description></item>
     /// <item><description>ActionMap 名（<c>_actionMapName</c>、Asset の ActionMap 一覧から候補補完）</description></item>
     /// <item><description>Expression Bindings リスト（<c>_expressionBindings</c>、Action 名・Expression ID・TriggerMode の 3 列）</description></item>
-    /// <item><description>Gaze Configs リスト（<c>_gazeConfigs</c>、Unity デフォルトの <see cref="UnityEditor.UIElements.PropertyField"/> 描画）</description></item>
+    /// <item><description>Gaze Input Bindings リスト（<c>_gazeInputBindings</c>、Unity デフォルトの <see cref="UnityEditor.UIElements.PropertyField"/> 描画）</description></item>
     /// </list>
     /// </para>
     /// <para>
@@ -41,7 +41,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
         private const string InputActionAssetFieldName = "_inputActionAsset";
         private const string ActionMapNameFieldName = "_actionMapName";
         private const string ExpressionBindingsFieldName = "_expressionBindings";
-        private const string GazeConfigsFieldName = "_gazeConfigs";
+        private const string GazeInputBindingsFieldName = "_gazeInputBindings";
 
         public const string RootClassName = "facial-control-input-system-adapter-binding";
         public const string ActionMapDropdownName = "input-system-binding-action-map-dropdown";
@@ -73,7 +73,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 expressionBindingsList?.Rebuild();
             });
 
-            AddBoundField(root, property, GazeConfigsFieldName, "Gaze Configs");
+            AddBoundField(root, property, GazeInputBindingsFieldName, "Gaze Input Bindings");
 
             return root;
         }

@@ -216,17 +216,17 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
         [Test]
         public void OnStart_AnalogPath_RegistersAnalogSourceUnderCompositeSlug()
         {
-            // D-8 集約: Analog 経路は GazeConfig.inputAction.action.name を sub-id とした composite slug 登録となる
+            // D-8 集約: Analog 経路は InputSystemGazeBinding.inputActionRef.action.name を sub-id とした composite slug 登録となる
             // （InputActionAnalogSource 構築相当）。
             const string slug = "input-system-analog-path";
             _sourceAsset = CreateGazeActionAsset(
                 actionMapName: "Expression",
                 gazeActionName: "GazeLook");
 
-            var gazeConfig = new GazeExpressionConfig
+            var gazeInputBinding = new InputSystemGazeBinding
             {
                 expressionId = "expr-gaze",
-                inputAction = InputActionReference.Create(_sourceAsset.FindActionMap("Expression").FindAction("GazeLook")),
+                inputActionRef = InputActionReference.Create(_sourceAsset.FindActionMap("Expression").FindAction("GazeLook")),
             };
 
             _binding = CreateBinding(
@@ -234,7 +234,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
                 asset: _sourceAsset,
                 actionMapName: "Expression",
                 expressionBindings: null,
-                gazeConfigs: new List<GazeExpressionConfig> { gazeConfig });
+                gazeInputBindings: new List<InputSystemGazeBinding> { gazeInputBinding });
 
             AdapterBuildContext ctx = CreateContext();
 
@@ -246,36 +246,6 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             Assert.IsTrue(resolved,
                 $"Analog 経路の InputSource は \"{slug}:GazeLook\" で解決できるべき（Req 12.4, D-8）。");
             Assert.IsNotNull(source);
-        }
-
-        [Test]
-        public void OnStart_GazePath_RegistersGazeBoneProviderForGazeConfig()
-        {
-            // Gaze 経路: GazeConfig が 1 件以上あれば binding は GazeBonePoseProvider を保持し公開する。
-            _sourceAsset = CreateGazeActionAsset(
-                actionMapName: "Expression",
-                gazeActionName: "GazeLook");
-
-            var gazeConfig = new GazeExpressionConfig
-            {
-                expressionId = "expr-gaze",
-                inputAction = InputActionReference.Create(_sourceAsset.FindActionMap("Expression").FindAction("GazeLook")),
-            };
-
-            _binding = CreateBinding(
-                slug: "input-system-gaze-path",
-                asset: _sourceAsset,
-                actionMapName: "Expression",
-                expressionBindings: null,
-                gazeConfigs: new List<GazeExpressionConfig> { gazeConfig });
-
-            AdapterBuildContext ctx = CreateContext();
-
-            _binding.OnStart(in ctx);
-            _bindingStarted = true;
-
-            Assert.IsTrue(_binding.HasGazeProvider,
-                "GazeConfig が 1 件以上ある場合は OnStart 後に Gaze provider が構築されるべき（Req 6.1, D-8）。");
         }
 
         // ---------------------------------------------------------------
@@ -439,11 +409,11 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             InputActionAsset asset,
             string actionMapName,
             IReadOnlyList<ExpressionBindingEntry> expressionBindings,
-            IReadOnlyList<GazeExpressionConfig> gazeConfigs = null)
+            IReadOnlyList<InputSystemGazeBinding> gazeInputBindings = null)
         {
             var binding = new InputSystemAdapterBinding();
             binding.Slug = slug;
-            binding.Configure(asset, actionMapName, expressionBindings, gazeConfigs);
+            binding.Configure(asset, actionMapName, expressionBindings, gazeInputBindings);
             return binding;
         }
 

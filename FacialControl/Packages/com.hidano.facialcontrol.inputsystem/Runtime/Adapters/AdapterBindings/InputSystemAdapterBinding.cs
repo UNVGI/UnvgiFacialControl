@@ -42,9 +42,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
         [SerializeField]
         private List<ExpressionBindingEntry> _expressionBindings = new List<ExpressionBindingEntry>();
 
-        [Tooltip("Vector2 アナログ表情（目線等）ごとの InputAction + 両目ボーン/BlendShape 設定。")]
+        [Tooltip("Vector2 gaze 入力を駆動する InputAction と Expression ID の対応一覧。")]
         [SerializeField]
-        private List<GazeExpressionConfig> _gazeConfigs = new List<GazeExpressionConfig>();
+        private List<InputSystemGazeBinding> _gazeInputBindings = new List<InputSystemGazeBinding>();
 
         [NonSerialized] private InputActionAsset _runtimeActionAsset;
         [NonSerialized] private InputActionMap _runtimeActionMap;
@@ -77,7 +77,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
         /// <summary><see cref="OnStart"/> 完了後 true、<see cref="Dispose"/> 後 false。</summary>
         public bool IsStarted => _isStarted;
 
-        /// <summary>Gaze provider が構築済みかどうか（<see cref="_gazeConfigs"/> が 1 件以上のとき true）。</summary>
+        /// <summary>Gaze provider が構築済みかどうか。</summary>
         public bool HasGazeProvider => _gazeBoneProvider != null;
 
         /// <summary>
@@ -87,16 +87,16 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             InputActionAsset asset,
             string actionMapName,
             IReadOnlyList<ExpressionBindingEntry> expressionBindings,
-            IReadOnlyList<GazeExpressionConfig> gazeConfigs = null)
+            IReadOnlyList<InputSystemGazeBinding> gazeInputBindings = null)
         {
             _inputActionAsset = asset;
             _actionMapName = actionMapName;
             _expressionBindings = expressionBindings == null
                 ? new List<ExpressionBindingEntry>()
                 : new List<ExpressionBindingEntry>(expressionBindings);
-            _gazeConfigs = gazeConfigs == null
-                ? new List<GazeExpressionConfig>()
-                : new List<GazeExpressionConfig>(gazeConfigs);
+            _gazeInputBindings = gazeInputBindings == null
+                ? new List<InputSystemGazeBinding>()
+                : new List<InputSystemGazeBinding>(gazeInputBindings);
         }
 
         /// <inheritdoc />
@@ -257,19 +257,19 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
 
         private void BuildAnalogSources(in AdapterBuildContext ctx, AdapterSlug slug)
         {
-            if (_gazeConfigs == null || _gazeConfigs.Count == 0)
+            if (_gazeInputBindings == null || _gazeInputBindings.Count == 0)
             {
                 return;
             }
 
-            for (int i = 0; i < _gazeConfigs.Count; i++)
+            for (int i = 0; i < _gazeInputBindings.Count; i++)
             {
-                var cfg = _gazeConfigs[i];
-                if (cfg == null || cfg.inputAction == null || cfg.inputAction.action == null)
+                var binding = _gazeInputBindings[i];
+                if (binding == null || binding.inputActionRef == null || binding.inputActionRef.action == null)
                 {
                     continue;
                 }
-                string actionName = cfg.inputAction.action.name;
+                string actionName = binding.inputActionRef.action.name;
                 if (string.IsNullOrWhiteSpace(actionName))
                 {
                     continue;
@@ -300,53 +300,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
 
         private void BuildGazeProvider(in AdapterBuildContext ctx)
         {
-            if (_gazeConfigs == null || _gazeConfigs.Count == 0)
-            {
-                return;
-            }
-
-            var resolver = new BoneTransformResolver(ctx.HostGameObject.transform);
-            var bindings = new List<GazeBoneBinding>(_gazeConfigs.Count);
-
-            for (int i = 0; i < _gazeConfigs.Count; i++)
-            {
-                var cfg = _gazeConfigs[i];
-                if (cfg == null || cfg.inputAction == null || cfg.inputAction.action == null)
-                {
-                    continue;
-                }
-                string actionName = cfg.inputAction.action.name;
-                if (string.IsNullOrWhiteSpace(actionName))
-                {
-                    continue;
-                }
-
-                IAnalogInputSource source = FindAnalogSource(actionName);
-                if (source == null)
-                {
-                    continue;
-                }
-
-                bindings.Add(new GazeBoneBinding(cfg, source));
-            }
-
-            _gazeBoneProvider = new GazeBonePoseProvider(resolver, bindings);
-        }
-
-        private IAnalogInputSource FindAnalogSource(string actionName)
-        {
-            if (_analogSources == null)
-            {
-                return null;
-            }
-            for (int i = 0; i < _analogSources.Count; i++)
-            {
-                if (string.Equals(_analogSources[i].Id, actionName, StringComparison.Ordinal))
-                {
-                    return _analogSources[i];
-                }
-            }
-            return null;
+            _gazeBoneProvider = null;
         }
 
         private static AnalogInputShape DetermineShape(InputAction action)
