@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Hidano.FacialControl.Adapters.Input;
+using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
 
 namespace Hidano.FacialControl.Adapters.InputSources
@@ -94,13 +95,22 @@ namespace Hidano.FacialControl.Adapters.InputSources
         }
 
         /// <summary>
-        /// <see cref="InputAction"/> と Expression ID のバインディングを登録する。
-        /// Button 型はトグル動作、Value 型は &gt;0 / =0 でアクティブ判定（既存
-        /// <c>InputSystemAdapter</c> 互換）。
+        /// <see cref="InputAction"/> と Expression ID のバインディングを登録する
+        /// （<paramref name="triggerMode"/> 既定 = <see cref="TriggerMode.Hold"/>、
+        /// <see cref="ExpressionBindingEntry.triggerMode"/> 既定値と一致）。
         /// </summary>
+        /// <remarks>
+        /// Button 型は <paramref name="triggerMode"/> によって挙動が変わる：
+        /// <list type="bullet">
+        ///   <item><see cref="TriggerMode.Hold"/>: 押下中のみ ON（performed で TriggerOn、canceled で TriggerOff）。</item>
+        ///   <item><see cref="TriggerMode.Toggle"/>: 押すたびに ON/OFF が切替わる（performed で flip）。</item>
+        /// </list>
+        /// Value 型は <paramref name="triggerMode"/> を無視し、値が &gt;0 のとき ON、=0 のとき OFF。
+        /// </remarks>
         /// <param name="action">対象 <see cref="InputAction"/>。null 不可。</param>
         /// <param name="expressionId">トリガー対象の Expression ID。null / 空文字不可。</param>
-        public void BindExpression(InputAction action, string expressionId)
+        /// <param name="triggerMode">押下時の動作モード（Button 型のみ参照）。</param>
+        public void BindExpression(InputAction action, string expressionId, TriggerMode triggerMode = TriggerMode.Hold)
         {
             if (action == null) throw new ArgumentNullException(nameof(action));
             if (string.IsNullOrEmpty(expressionId))
@@ -108,7 +118,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
             UnbindExpression(action);
 
-            var entry = new BindingEntry(this, action, expressionId);
+            var entry = new BindingEntry(this, action, expressionId, triggerMode);
             _bindings[action] = entry;
 
             if (_isSubscribed)
@@ -226,14 +236,25 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
             if (entry.Action.type == InputActionType.Button)
             {
-                entry.IsActive = !entry.IsActive;
-                if (entry.IsActive)
+                if (entry.TriggerMode == TriggerMode.Hold)
                 {
-                    sink.TriggerOn(entry.ExpressionId);
+                    if (!entry.IsActive)
+                    {
+                        entry.IsActive = true;
+                        sink.TriggerOn(entry.ExpressionId);
+                    }
                 }
                 else
                 {
-                    sink.TriggerOff(entry.ExpressionId);
+                    entry.IsActive = !entry.IsActive;
+                    if (entry.IsActive)
+                    {
+                        sink.TriggerOn(entry.ExpressionId);
+                    }
+                    else
+                    {
+                        sink.TriggerOff(entry.ExpressionId);
+                    }
                 }
                 return;
             }
@@ -266,6 +287,11 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
             if (entry.Action.type == InputActionType.Button)
             {
+                if (entry.TriggerMode == TriggerMode.Hold && entry.IsActive)
+                {
+                    entry.IsActive = false;
+                    sink.TriggerOff(entry.ExpressionId);
+                }
                 return;
             }
 
@@ -327,6 +353,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
         {
             public InputAction Action { get; }
             public string ExpressionId { get; }
+            public TriggerMode TriggerMode { get; }
             public bool IsActive { get; set; }
             public bool IsSubscribed { get; private set; }
 
@@ -337,11 +364,13 @@ namespace Hidano.FacialControl.Adapters.InputSources
             public BindingEntry(
                 ExpressionInputSourceAdapter adapter,
                 InputAction action,
-                string expressionId)
+                string expressionId,
+                TriggerMode triggerMode)
             {
                 _adapter = adapter;
                 Action = action;
                 ExpressionId = expressionId;
+                TriggerMode = triggerMode;
                 _onPerformed = OnPerformed;
                 _onCanceled = OnCanceled;
             }
