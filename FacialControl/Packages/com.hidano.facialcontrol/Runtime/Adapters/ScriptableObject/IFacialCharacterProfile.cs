@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using Hidano.FacialControl.Domain.Models;
+using GazeBindingConfig = Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig;
 
 namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 {
@@ -15,6 +17,11 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
         /// SO アセット名。StreamingAssets 配下の規約パス算出に使われる。
         /// </summary>
         string CharacterAssetName { get; }
+
+        /// <summary>
+        /// キャラ / モデル固有の gaze 設定。入力源結線とは独立した SO ルートの設定として公開する。
+        /// </summary>
+        IReadOnlyList<GazeBindingConfig> GazeConfigs { get; }
 
         /// <summary>
         /// JSON ファイルが見つからない場合に Inspector でシリアライズされた

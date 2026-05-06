@@ -5,7 +5,7 @@
 ## Phase 1: Core SO + JSON 層
 
 - [ ] 1. SO ルート `_gazeConfigs` データモデルと JSON スキーマ v2.1 を整備する
-- [ ] 1.1 `FacialCharacterProfileSO` ルートに gaze configs コレクションを追加し read-only 公開する
+- [x] 1.1 `FacialCharacterProfileSO` ルートに gaze configs コレクションを追加し read-only 公開する
   - SO ルート直下に `GazeBindingConfig` の serialized list を平坦に追加し、既存の `[SerializeReference]` adapter bindings 構造に副作用が出ないことを EditMode で確認する
   - `IFacialCharacterProfile` に gaze configs の read-only accessor を追加し、`FacialCharacterProfileSO` が空 list を null 化せず実装することを保証する
   - 観測条件: 既存 EditMode テスト一式が緑のまま、新たに追加した accessor 経由で空 list が取得できる

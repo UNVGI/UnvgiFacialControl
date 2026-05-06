@@ -5,6 +5,7 @@ using Hidano.FacialControl.Adapters.Json;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Models;
 using UnityEngine;
+using GazeBindingConfig = Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig;
 
 namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 {
@@ -18,6 +19,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
         [SerializeField] protected List<LayerDefinitionSerializable> _layers = new List<LayerDefinitionSerializable>();
         [SerializeField] protected List<ExpressionSerializable> _expressions = new List<ExpressionSerializable>();
         [SerializeField] protected List<string> _rendererPaths = new List<string>();
+        [SerializeField] protected List<GazeBindingConfig> _gazeConfigs = new List<GazeBindingConfig>();
         [SerializeReference] protected List<AdapterBindingBase> _adapterBindings = new List<AdapterBindingBase>();
 
 #if UNITY_EDITOR
@@ -30,6 +32,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
         public List<LayerDefinitionSerializable> Layers => _layers;
         public List<ExpressionSerializable> Expressions => _expressions;
         public List<string> RendererPaths => _rendererPaths;
+        public IReadOnlyList<GazeBindingConfig> GazeConfigs => _gazeConfigs ?? (_gazeConfigs = new List<GazeBindingConfig>());
         public IReadOnlyList<AdapterBindingBase> AdapterBindings => _adapterBindings;
 
         public virtual FacialProfile BuildFallbackProfile()
