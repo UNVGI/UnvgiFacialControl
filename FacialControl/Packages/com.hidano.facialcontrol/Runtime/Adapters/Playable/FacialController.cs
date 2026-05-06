@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.Playables;
 using VContainer;
@@ -12,6 +13,7 @@ using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
+using GazeBindingConfig = Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig;
 
 namespace Hidano.FacialControl.Adapters.Playable
 {
@@ -247,6 +249,18 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         private void BuildAdapterBindingsChildScope(FacialProfile profile, string[] blendShapeNames)
         {
+            IReadOnlyList<AdapterBindingBase> bindings =
+                _characterSO != null && _characterSO.AdapterBindings != null
+                    ? _characterSO.AdapterBindings
+                    : Array.Empty<AdapterBindingBase>();
+
+            IReadOnlyList<GazeBindingConfig> gazeConfigs =
+                _characterSO != null && _characterSO.GazeConfigs != null
+                    ? _characterSO.GazeConfigs
+                    : Array.Empty<GazeBindingConfig>();
+
+            ConfigureAdapterBindingsWithGazeConfigs(bindings, gazeConfigs);
+
             var appScope = FacialControlAppLifetimeScope.GetOrCreate();
             if (appScope == null)
             {
@@ -258,11 +272,6 @@ namespace Hidano.FacialControl.Adapters.Playable
             // _characterSO が null または AdapterBindings が空でも child scope は build する
             // （新 binding 経路一本化、tasks.md 11.1: 無条件 build）。
             // bindings が無い場合は空 list を渡して InputSourceRegistry のみ container に登録される。
-            IReadOnlyList<AdapterBindingBase> bindings =
-                _characterSO != null && _characterSO.AdapterBindings != null
-                    ? _characterSO.AdapterBindings
-                    : Array.Empty<AdapterBindingBase>();
-
             try
             {
                 _childLifetimeScope = FacialControllerLifetimeScope.Build(
@@ -279,6 +288,182 @@ namespace Hidano.FacialControl.Adapters.Playable
                     $"[FacialControl] FacialController: child LifetimeScope の build に失敗しました: {ex}");
                 _childLifetimeScope = null;
             }
+        }
+
+        private static void ConfigureAdapterBindingsWithGazeConfigs(
+            IReadOnlyList<AdapterBindingBase> bindings,
+            IReadOnlyList<GazeBindingConfig> gazeConfigs)
+        {
+            if (bindings == null || bindings.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < bindings.Count; i++)
+            {
+                AdapterBindingBase binding = bindings[i];
+                if (binding == null)
+                {
+                    continue;
+                }
+
+                ConfigureAdapterBindingWithGazeConfigs(binding, gazeConfigs);
+            }
+        }
+
+        private static void ConfigureAdapterBindingWithGazeConfigs(
+            AdapterBindingBase binding,
+            IReadOnlyList<GazeBindingConfig> gazeConfigs)
+        {
+            MethodInfo configure = FindGazeConfigureMethod(binding.GetType());
+            if (configure == null)
+            {
+                return;
+            }
+
+            ParameterInfo[] parameters = configure.GetParameters();
+            var args = new object[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                if (i == parameters.Length - 1)
+                {
+                    args[i] = gazeConfigs;
+                    continue;
+                }
+
+                if (!TryReadConfigureArgument(binding, parameters[i], out args[i]))
+                {
+                    return;
+                }
+            }
+
+            try
+            {
+                configure.Invoke(binding, args);
+            }
+            catch (TargetInvocationException ex)
+            {
+                Exception inner = ex.InnerException ?? ex;
+                Debug.LogWarning(
+                    "[FacialControl] FacialController: AdapterBinding Configure gaze injection failed: "
+                    + inner.Message);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning(
+                    "[FacialControl] FacialController: AdapterBinding Configure gaze injection failed: "
+                    + ex.Message);
+            }
+        }
+
+        private static MethodInfo FindGazeConfigureMethod(Type bindingType)
+        {
+            MethodInfo[] methods = bindingType.GetMethods(BindingFlags.Instance | BindingFlags.Public);
+            for (int i = 0; i < methods.Length; i++)
+            {
+                MethodInfo method = methods[i];
+                if (!string.Equals(method.Name, "Configure", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                ParameterInfo[] parameters = method.GetParameters();
+                if (parameters.Length == 0)
+                {
+                    continue;
+                }
+
+                Type lastParameterType = parameters[parameters.Length - 1].ParameterType;
+                if (IsGazeConfigListType(lastParameterType))
+                {
+                    return method;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsGazeConfigListType(Type type)
+        {
+            return type != null
+                && type.IsGenericType
+                && type.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)
+                && type.GetGenericArguments()[0] == typeof(GazeBindingConfig);
+        }
+
+        private static bool TryReadConfigureArgument(
+            AdapterBindingBase binding,
+            ParameterInfo parameter,
+            out object value)
+        {
+            string name = parameter.Name;
+            switch (name)
+            {
+                case "asset":
+                    return TryReadMemberValue(binding, "InputActionAsset", "_inputActionAsset", out value);
+                case "actionMapName":
+                    return TryReadMemberValue(binding, "ActionMapName", "_actionMapName", out value);
+                case "expressionBindings":
+                    return TryReadMemberValue(binding, null, "_expressionBindings", out value);
+                case "gazeInputBindings":
+                    return TryReadMemberValue(binding, null, "_gazeInputBindings", out value);
+                default:
+                    return TryReadMemberValue(
+                        binding,
+                        ToPascalCase(name),
+                        "_" + name,
+                        out value);
+            }
+        }
+
+        private static bool TryReadMemberValue(
+            AdapterBindingBase binding,
+            string propertyName,
+            string fieldName,
+            out object value)
+        {
+            Type type = binding.GetType();
+            if (!string.IsNullOrEmpty(propertyName))
+            {
+                PropertyInfo property = type.GetProperty(
+                    propertyName,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (property != null && property.GetIndexParameters().Length == 0)
+                {
+                    value = property.GetValue(binding);
+                    return true;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(fieldName))
+            {
+                FieldInfo field = type.GetField(
+                    fieldName,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (field != null)
+                {
+                    value = field.GetValue(binding);
+                    return true;
+                }
+            }
+
+            value = null;
+            return false;
+        }
+
+        private static string ToPascalCase(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return name;
+            }
+
+            if (name.Length == 1)
+            {
+                return char.ToUpperInvariant(name[0]).ToString();
+            }
+
+            return char.ToUpperInvariant(name[0]) + name.Substring(1);
         }
 
         private List<(int layerIdx, IInputSource source, float weight)> ResolveLayerInputSourcesFromRegistry(
