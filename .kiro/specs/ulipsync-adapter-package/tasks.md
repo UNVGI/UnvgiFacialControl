@@ -96,7 +96,7 @@
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 14.1, 14.5_
   - _Boundary: Tests/EditMode/Adapters_
 
-- [ ] 5.2 `ULipSyncProvider` 本体を実装し Red を Green にする
+- [x] 5.2 `ULipSyncProvider` 本体を実装し Red を Green にする
   - `sealed class ULipSyncProvider : ILipSyncProvider, IDisposable` をコンストラクタ `(IULipSyncEventSource, IReadOnlyList<PhonemeSnapshot>, int blendShapeCount)` で構築する
   - 内部バッファ `_accum: float[blendShapeCount]` / `_phonemeKeys: string[]` / `_phonemeIndices: int[]` を構築時にのみ確保する
   - `OnLipSyncUpdate(LipSyncInfo info)` で `_phonemeKeys[i]` を `TryGetValue` ループ参照（**DD-PhonemeLookup**）し、`ratio * info.volume * snapshot.Weights[k]` を `_accum` に加算する
