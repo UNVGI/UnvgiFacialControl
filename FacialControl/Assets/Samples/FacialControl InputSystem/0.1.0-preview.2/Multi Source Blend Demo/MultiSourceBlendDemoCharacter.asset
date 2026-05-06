@@ -29,14 +29,14 @@ MonoBehaviour:
     layer: emotion
     kind: 0
     animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e801, type: 2}
-    transitionDuration: 0.25
+    transitionDuration: 0.1
     transitionCurve:
       type: 0
       keys: []
     blendShapeValues: []
     layerOverrideMask: []
     cachedSnapshot:
-      transitionDuration: 0.25
+      transitionDuration: 0.1
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
@@ -53,14 +53,14 @@ MonoBehaviour:
     layer: emotion
     kind: 0
     animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e802, type: 2}
-    transitionDuration: 0.25
+    transitionDuration: 0.1
     transitionCurve:
       type: 0
       keys: []
     blendShapeValues: []
     layerOverrideMask: []
     cachedSnapshot:
-      transitionDuration: 0.25
+      transitionDuration: 0.1
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
@@ -80,14 +80,14 @@ MonoBehaviour:
     layer: emotion
     kind: 0
     animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e803, type: 2}
-    transitionDuration: 0.2
+    transitionDuration: 0.1
     transitionCurve:
       type: 0
       keys: []
     blendShapeValues: []
     layerOverrideMask: []
     cachedSnapshot:
-      transitionDuration: 0.2
+      transitionDuration: 0.1
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
@@ -125,14 +125,14 @@ MonoBehaviour:
     layer: emotion
     kind: 1
     animationClip: {fileID: 0}
-    transitionDuration: 0
+    transitionDuration: 0.1
     transitionCurve:
       type: 0
       keys: []
     blendShapeValues: []
     layerOverrideMask: []
     cachedSnapshot:
-      transitionDuration: 0
+      transitionDuration: 0.1
       transitionCurvePreset: Linear
       blendShapes: []
       bones: []
@@ -188,4 +188,4 @@ MonoBehaviour:
           triggerMode: 0
         _gazeInputBindings:
         - expressionId: eye_look
-          inputActionRef: {fileID: 0}
+          actionName: Look

@@ -451,37 +451,28 @@ namespace Hidano.FacialControl.Editor.Inspector
                 name = GazeConfigRowName,
                 userData = expressionId,
             };
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginBottom = 4;
-            row.style.paddingLeft = 4;
+            row.style.flexDirection = FlexDirection.Column;
+            row.style.marginBottom = 6;
+            row.style.paddingLeft = 6;
             row.style.paddingRight = 4;
-            row.style.paddingTop = 3;
-            row.style.paddingBottom = 3;
+            row.style.paddingTop = 4;
+            row.style.paddingBottom = 4;
             row.style.borderLeftColor = new StyleColor(new Color(0.4f, 0.65f, 0.9f));
             row.style.borderLeftWidth = 2;
+
+            var header = new VisualElement();
+            header.style.flexDirection = FlexDirection.Row;
+            header.style.alignItems = Align.Center;
+            header.style.marginBottom = 4;
 
             var expressionNameLabel = new Label(FindExpressionNameById(expressionId))
             {
                 name = GazeConfigExpressionNameLabelName,
                 tooltip = expressionId,
             };
-            expressionNameLabel.style.minWidth = 120;
+            expressionNameLabel.style.flexGrow = 1f;
             expressionNameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            row.Add(expressionNameLabel);
-
-            AddBoundTextField(row, cfgProp, "leftEyeBonePath", "左目", GazeConfigLeftBonePathFieldName, 120);
-            AddBoundTextField(row, cfgProp, "rightEyeBonePath", "右目", GazeConfigRightBonePathFieldName, 120);
-
-            AddBoundFloatField(row, cfgProp, "lookUpAngle", "上", GazeConfigLookUpAngleFieldName, 48);
-            AddBoundFloatField(row, cfgProp, "lookDownAngle", "下", GazeConfigLookDownAngleFieldName, 48);
-            AddBoundFloatField(row, cfgProp, "outerYawAngle", "外", GazeConfigOuterYawAngleFieldName, 48);
-            AddBoundFloatField(row, cfgProp, "innerYawAngle", "内", GazeConfigInnerYawAngleFieldName, 48);
-
-            AddBoundClipField(row, cfgProp, "lookLeftClip", "左Clip", GazeConfigLookLeftClipFieldName, 92);
-            AddBoundClipField(row, cfgProp, "lookRightClip", "右Clip", GazeConfigLookRightClipFieldName, 92);
-            AddBoundClipField(row, cfgProp, "lookUpClip", "上Clip", GazeConfigLookUpClipFieldName, 92);
-            AddBoundClipField(row, cfgProp, "lookDownClip", "下Clip", GazeConfigLookDownClipFieldName, 92);
+            header.Add(expressionNameLabel);
 
             var autoAssignButton = new Button(() => ResolveGazeConfigFromReferenceModel(configIndex))
             {
@@ -491,7 +482,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             };
             autoAssignButton.SetEnabled(HasReferenceModel());
             autoAssignButton.style.marginLeft = 4;
-            row.Add(autoAssignButton);
+            header.Add(autoAssignButton);
 
             var removeButton = new Button(() => RemoveGazeConfigAt(configIndex))
             {
@@ -499,7 +490,22 @@ namespace Hidano.FacialControl.Editor.Inspector
                 text = "削除",
             };
             removeButton.style.marginLeft = 4;
-            row.Add(removeButton);
+            header.Add(removeButton);
+
+            row.Add(header);
+
+            AddBoundTextField(row, cfgProp, "leftEyeBonePath", "左目ボーン", GazeConfigLeftBonePathFieldName);
+            AddBoundTextField(row, cfgProp, "rightEyeBonePath", "右目ボーン", GazeConfigRightBonePathFieldName);
+
+            AddBoundFloatField(row, cfgProp, "lookUpAngle", "上方向角度", GazeConfigLookUpAngleFieldName);
+            AddBoundFloatField(row, cfgProp, "lookDownAngle", "下方向角度", GazeConfigLookDownAngleFieldName);
+            AddBoundFloatField(row, cfgProp, "outerYawAngle", "外側角度", GazeConfigOuterYawAngleFieldName);
+            AddBoundFloatField(row, cfgProp, "innerYawAngle", "内側角度", GazeConfigInnerYawAngleFieldName);
+
+            AddBoundClipField(row, cfgProp, "lookLeftClip", "左 Clip", GazeConfigLookLeftClipFieldName);
+            AddBoundClipField(row, cfgProp, "lookRightClip", "右 Clip", GazeConfigLookRightClipFieldName);
+            AddBoundClipField(row, cfgProp, "lookUpClip", "上 Clip", GazeConfigLookUpClipFieldName);
+            AddBoundClipField(row, cfgProp, "lookDownClip", "下 Clip", GazeConfigLookDownClipFieldName);
 
             return row;
         }
@@ -509,8 +515,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             SerializedProperty cfgProp,
             string propertyName,
             string label,
-            string elementName,
-            float width)
+            string elementName)
         {
             var prop = cfgProp.FindPropertyRelative(propertyName);
             if (prop == null) return;
@@ -520,8 +525,6 @@ namespace Hidano.FacialControl.Editor.Inspector
                 name = elementName,
             };
             field.BindProperty(prop);
-            field.style.width = width;
-            field.style.marginLeft = 4;
             row.Add(field);
         }
 
@@ -530,8 +533,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             SerializedProperty cfgProp,
             string propertyName,
             string label,
-            string elementName,
-            float width)
+            string elementName)
         {
             var prop = cfgProp.FindPropertyRelative(propertyName);
             if (prop == null) return;
@@ -541,8 +543,6 @@ namespace Hidano.FacialControl.Editor.Inspector
                 name = elementName,
             };
             field.BindProperty(prop);
-            field.style.width = width;
-            field.style.marginLeft = 4;
             row.Add(field);
         }
 
@@ -551,8 +551,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             SerializedProperty cfgProp,
             string propertyName,
             string label,
-            string elementName,
-            float width)
+            string elementName)
         {
             var prop = cfgProp.FindPropertyRelative(propertyName);
             if (prop == null) return;
@@ -564,8 +563,6 @@ namespace Hidano.FacialControl.Editor.Inspector
                 allowSceneObjects = false,
             };
             field.BindProperty(prop);
-            field.style.width = width;
-            field.style.marginLeft = 4;
             row.Add(field);
         }
 

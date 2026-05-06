@@ -17,7 +17,7 @@
             "layer": "emotion",
             "layerOverrideMask": ["emotion"],
             "snapshot": {
-                "transitionDuration": 0.25,
+                "transitionDuration": 0.1,
                 "transitionCurvePreset": "Linear",
                 "blendShapes": [
                     {"rendererPath": "Body", "name": "笑い", "value": 100},
@@ -33,7 +33,7 @@
             "layer": "emotion",
             "layerOverrideMask": ["emotion"],
             "snapshot": {
-                "transitionDuration": 0.25,
+                "transitionDuration": 0.1,
                 "transitionCurvePreset": "Linear",
                 "blendShapes": [
                     {"rendererPath": "Body", "name": "怒り", "value": 100},
@@ -50,7 +50,7 @@
             "layer": "emotion",
             "layerOverrideMask": ["emotion"],
             "snapshot": {
-                "transitionDuration": 0.2,
+                "transitionDuration": 0.1,
                 "transitionCurvePreset": "Linear",
                 "blendShapes": [
                     {"rendererPath": "Body", "name": "びっくり", "value": 100},
@@ -81,7 +81,7 @@
             "layer": "emotion",
             "layerOverrideMask": ["emotion"],
             "snapshot": {
-                "transitionDuration": 0,
+                "transitionDuration": 0.1,
                 "transitionCurvePreset": "Linear",
                 "blendShapes": [],
                 "bones": [],

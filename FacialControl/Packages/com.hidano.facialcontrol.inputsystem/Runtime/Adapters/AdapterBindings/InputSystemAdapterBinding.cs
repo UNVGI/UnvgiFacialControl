@@ -269,15 +269,11 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             for (int i = 0; i < _gazeInputBindings.Count; i++)
             {
                 var binding = _gazeInputBindings[i];
-                if (binding == null || binding.inputActionRef == null || binding.inputActionRef.action == null)
+                if (binding == null || string.IsNullOrWhiteSpace(binding.actionName))
                 {
                     continue;
                 }
-                string actionName = binding.inputActionRef.action.name;
-                if (string.IsNullOrWhiteSpace(actionName))
-                {
-                    continue;
-                }
+                string actionName = binding.actionName;
 
                 var action = _runtimeActionMap.FindAction(actionName);
                 if (action == null)
@@ -429,18 +425,13 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
         {
             source = null;
             if (binding == null
-                || binding.inputActionRef == null
-                || binding.inputActionRef.action == null
+                || string.IsNullOrWhiteSpace(binding.actionName)
                 || _analogSources == null)
             {
                 return false;
             }
 
-            string actionName = binding.inputActionRef.action.name;
-            if (string.IsNullOrWhiteSpace(actionName))
-            {
-                return false;
-            }
+            string actionName = binding.actionName;
 
             for (int i = 0; i < _analogSources.Count; i++)
             {
