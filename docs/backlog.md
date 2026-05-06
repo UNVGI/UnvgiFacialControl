@@ -130,6 +130,13 @@
 - **影響範囲**: `Runtime/Adapters/Bone/GazeBoneBinding.cs`, `Runtime/Adapters/Bone/GazeBonePoseProvider.cs`, `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/AdapterBindings/InputSystemAdapterBinding.cs`, 新規合成戦略型, テスト
 - **関連**: M-4（BonePose 多重 provider のブレンド合成 — 異なる bone への複数 provider の話で別概念だが、合成戦略の設計はここと共通化できる可能性あり）
 
+### M-14: Domain への「動的 Expression driver」概念導入
+- **出典**: `.kiro/specs/gaze-config-promotion/` セッションでの user 指摘（2026-05-06）
+- **内容**: 現状 `Domain/Models/ExpressionSnapshot` は **AnimationClip サンプリング由来の静的 snapshot**（`BlendShapeSnapshot[]` + `BoneSnapshot[]` を不変保持）として設計されており、bone も BlendShape も first-class concept として表現可能。しかし「Vector2 入力で連続的に bone Euler を算出する gaze」のような **動的駆動 driver** は Domain の語彙に存在せず、`IBonePoseSource` / `GazeBonePoseProvider` という形で Adapters 層に閉じている。「目線操作も Expression の 1 種」という抽象化を Domain で表現するには、Expression を「静的 snapshot を持つもの」と「動的 driver を持つもの」の上位抽象に揃える Domain refactor が必要。具体的には (a) Expression interface を導入し `StaticExpressionSnapshot` と `DynamicExpressionDriver` を sibling として実装する / (b) `IExpressionEvaluator` を Domain に置き、入力に応じた evaluation strategy を expressing する / (c) 現状維持で動的 driver は Adapters のみ、のいずれか。preview.1 では (c) で固定。Domain refactor は preview.2 以降の大型 spec として独立化する。なお現状でも **Domain は BlendShape 前提ではなく `BoneSnapshot` も first-class** であるため、表情ボーンを使うキャラ（口元・眉毛・瞼を bone で動かす）の対応は本 spec の範囲外で既に成立している。
+- **トリガ**: gaze 以外の動的 driver（手書き lip sync curve、procedural な微表情ジッタ、analog 駆動の口開き等）が Adapters 層に増えて統一抽象が欲しくなったとき / 1.0 リリースに向けて Domain の安定 API を凍結するタイミング
+- **影響範囲**: `Runtime/Domain/Models/Expression.cs`, `Runtime/Domain/Models/ExpressionSnapshot.cs`, 新規 `IExpressionDriver` 等の interface, `Runtime/Adapters/Bone/GazeBonePoseProvider.cs` の Domain への昇格検討, `IFacialCharacterProfile` 経路, runtime 評価経路の再設計
+- **関連**: M-8（Burst / IAnimationJob への差替 — Domain 純化の延長線）、M-4（BonePose 多重 provider のブレンド合成）
+
 ---
 
 ## 横断フォローアップ（実装着手時に再確認するメモ）
@@ -159,3 +166,4 @@
 
 - 2026-05-04: 新設。HANDOVER.md 優先度低 #5（S-1）/ Phase 6.5 残課題（S-4）/ 各 spec の preview.2 以降宣言（M-3〜M-12）を集約。
 - 2026-05-06: spec `adapter-binding-architecture` クローズに伴い follow-up 2 件追加（S-5: Sample SO guid 再生成、S-6: VContainer dependency 宣言）。
+- 2026-05-06: spec `gaze-config-promotion` 設計セッションで preview.1 スコープ外と確定した 2 件を追加（M-13: 複数 Vector2 入力源での gaze 同時駆動、M-14: Domain への動的 Expression driver 概念導入）。

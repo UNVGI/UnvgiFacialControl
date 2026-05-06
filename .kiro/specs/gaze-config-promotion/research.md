@@ -6,7 +6,7 @@
 - **Discovery Scope**: Extension（既存 SO / AdapterBinding 構造の責務再配置）
 - **Key Findings**:
   - `FacialCharacterProfileSO` には `[SerializeReference] AdapterBindingBase` 経由で `InputSystemAdapterBinding` がぶら下がる構造で、現状 `_gazeConfigs` は binding 内部に格納されている。SO ルートに同名フィールドを新設しても `[SerializeReference]` 構造に干渉しないため、移植コストは小さい。
-  - `AdapterBindingBase.OnStart(in AdapterBuildContext ctx)` は Domain 層に置かれており、`AdapterBuildContext` は SO 自身への back-reference を持たない。runtime で SO ルートの `_gazeConfigs` を参照するには (a) `AdapterBuildContext` への field 追加 / (b) `OnStart` 引数の拡張 / (c) runtime 構築側で SO から `_gazeConfigs` を抜き出して binding に注入、のいずれかが必要。本 spec は最小破壊の (c) を採用する。
+  - `AdapterBindingBase.OnStart(in AdapterBuildContext ctx)` は Domain 層に置かれており、`AdapterBuildContext` は所有 SO への参照（子 binding から親 SO 方向の参照、いわゆる back-reference）を持たない。runtime で SO ルートの `_gazeConfigs` を参照するには (a) `AdapterBuildContext` への field 追加 / (b) `OnStart` 引数の拡張 / (c) runtime 構築側で SO から `_gazeConfigs` を抜き出して binding に注入、のいずれかが必要。本 spec は最小破壊かつ Domain → Adapters 依存方向違反を避ける (c) 「親が子に値を push する injection パターン」を採用する。
   - `FacialCharacterProfileConverter` / `FacialCharacterProfileExporter` は v2.0 では `gaze_configs[]` を扱わず、`InputSystemAdapterBinding` 内部の YAML serialization にしか存在しない。JSON ⇄ SO ラウンドトリップに gaze を載せるには Converter/Exporter/DTO 三点改修が必要。
   - `SystemTextJsonParser.ParseProfileSnapshotV2` は schemaVersion を strict で `"2.0"` 固定で要求するため、bump にあわせ parser 側の許容バージョンも改修必須。
   - 既存 Inspector は Expression 行内に Eye/Look フィールドを混入させる構造（`BuildEyeLookFields` / `BuildGazeClipField`）になっており、これらは新セクション分離後に dead code として削除する必要がある。
@@ -26,7 +26,7 @@
 
 ### Topic: AdapterBinding が SO ルート `_gazeConfigs` を取得する経路
 
-- **Context**: `InputSystemAdapterBinding.OnStart(in AdapterBuildContext ctx)` は Domain の `AdapterBuildContext` から service 群を受け取るが、自身を所有する `FacialCharacterProfileSO` への back-reference を持たない。SO ルートの `_gazeConfigs` を runtime で参照する経路を検討した。
+- **Context**: `InputSystemAdapterBinding.OnStart(in AdapterBuildContext ctx)` は Domain の `AdapterBuildContext` から service 群を受け取るが、自身を所有する `FacialCharacterProfileSO` への参照（子 binding から親 SO 方向、いわゆる back-reference）は持たない。SO ルートの `_gazeConfigs` を runtime で参照する経路を検討した。なお Domain 層の `AdapterBindingBase` から Adapters 層の `FacialCharacterProfileSO` を直接参照する設計は Clean Architecture の依存方向違反になるため、子→親の参照を確立せず親→子に値を push する injection パターンを優先する。
 - **Sources Consulted**: `AdapterBindingBase.cs`、`AdapterBuildContext.cs`、`FacialController.cs`（runtime build 経路、未読のため推測ベース。実装時に最終確認する）。
 - **Alternatives Considered**:
   1. `AdapterBuildContext` に `IReadOnlyList<GazeBindingConfig> RootGazeConfigs` を追加。Domain 層が `GazeBindingConfig`（Adapters 名前空間）を import することになり、依存方向の反転が起きる。
