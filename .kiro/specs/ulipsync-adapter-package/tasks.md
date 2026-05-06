@@ -113,7 +113,7 @@
   - _Boundary: Tests/EditMode/Performance_
 
 - [ ] 6. デバイス列挙抽象とリゾルバを TDD で実装する
-- [ ] 6.1 (P) `FakeAsioDriverEnumerator` / `FakeMicrophoneDeviceEnumerator` を `Tests/Shared` に追加する
+- [x] 6.1 (P) `FakeAsioDriverEnumerator` / `FakeMicrophoneDeviceEnumerator` を `Tests/Shared` に追加する
   - 任意の `string[]` を返す Fake をそれぞれ実装し、空配列・1 要素・同名重複（disambiguator 検証用）の各シナリオを構築可能にする
   - 観測可能完了条件: Fake を Test から new し、所定配列を返すことを EditMode テストで確認できる
   - _Requirements: 7.2, 7.3, 7.4, 14.1_
