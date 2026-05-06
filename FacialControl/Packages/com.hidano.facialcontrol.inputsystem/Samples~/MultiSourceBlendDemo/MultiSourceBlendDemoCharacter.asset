@@ -9,7 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 66b402a1dc2b31045843ee6bec45348a, type: 3}
+  m_Script: {fileID: 11500000, guid: d135770dce0e9d5479f0b6ee124b640a, type: 3}
   m_Name: MultiSourceBlendDemoCharacter
   m_EditorClassIdentifier:
   _schemaVersion: "2.0"
@@ -139,27 +139,51 @@ MonoBehaviour:
       rendererPaths: []
   _rendererPaths:
   - Body
+  _adapterBindings:
+  - rid: 8000000000000000001
   _referenceModel: {fileID: 0}
-  _inputActionAsset: {fileID: -944628639613478452, guid: 5e2f7a9c1b3d4e6f8a0b2c4d5e6f7a8b, type: 3}
-  _actionMapName: Expression
-  _expressionBindings:
-  - actionName: Trigger1
-    expressionId: smile
-  - actionName: Trigger2
-    expressionId: anger
-  - actionName: Trigger3
-    expressionId: surprise
-  - actionName: Trigger4
-    expressionId: lipsync_a
-  _gazeConfigs:
-  - expressionId: eye_look
-    inputAction: {fileID: 0}
-    leftEyeBonePath:
-    leftEyeInitialRotation: {x: 0, y: 0, z: 0}
-    rightEyeBonePath:
-    rightEyeInitialRotation: {x: 0, y: 0, z: 0}
-    leftEyeXBlendShape:
-    leftEyeYBlendShape:
-    rightEyeXBlendShape:
-    rightEyeYBlendShape:
-  _analogBindings: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 8000000000000000001
+      type: {class: InputSystemAdapterBinding, ns: Hidano.FacialControl.Adapters.AdapterBindings.InputSystem, asm: Hidano.FacialControl.InputSystem}
+      data:
+        Slug: input
+        _inputActionAsset: {fileID: -944628639613478452, guid: 5e2f7a9c1b3d4e6f8a0b2c4d5e6f7a8b, type: 3}
+        _actionMapName: Expression
+        _expressionBindings:
+        - actionName: Trigger1
+          expressionId: smile
+          triggerMode: 0
+        - actionName: Trigger2
+          expressionId: anger
+          triggerMode: 0
+        - actionName: Trigger3
+          expressionId: surprise
+          triggerMode: 0
+        - actionName: Trigger4
+          expressionId: lipsync_a
+          triggerMode: 0
+        _gazeConfigs:
+        - expressionId: eye_look
+          leftEyeBonePath:
+          leftEyeInitialRotation: {x: 0, y: 0, z: 0}
+          leftEyeYawAxisLocal: {x: 0, y: 1, z: 0}
+          leftEyePitchAxisLocal: {x: 1, y: 0, z: 0}
+          rightEyeBonePath:
+          rightEyeInitialRotation: {x: 0, y: 0, z: 0}
+          rightEyeYawAxisLocal: {x: 0, y: 1, z: 0}
+          rightEyePitchAxisLocal: {x: 1, y: 0, z: 0}
+          lookUpAngle: 15
+          lookDownAngle: 9
+          outerYawAngle: 15
+          innerYawAngle: 18
+          lookLeftClip: {fileID: 0}
+          lookRightClip: {fileID: 0}
+          lookUpClip: {fileID: 0}
+          lookDownClip: {fileID: 0}
+          lookLeftSamples: []
+          lookRightSamples: []
+          lookUpSamples: []
+          lookDownSamples: []
+          inputAction: {fileID: 0}
