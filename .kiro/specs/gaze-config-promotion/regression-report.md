@@ -36,24 +36,36 @@
 
 ### 4. 動作モード EnumField が Toggle に強制リセット
 
-**症状**: Expression Binding 行の「動作モード」 EnumField で Hold を選ぶと、保存後に Toggle に戻る。
+**症状**: Expression Binding で「動作モード」を Hold に設定しても、ランタイムの押下挙動が Toggle のまま。ボタンを離しても表情が ON のまま残る（Hold 期待: 押下中のみ ON、離したら OFF）。
 
-**原因**: `InputSystemAdapterBindingDrawer.BindExpressionBindingRow` の EnumField ハンドリングが、ListView の `bindItem` 内で `RegisterValueChangedCallback` を呼ぶ手動パターンを採用していた（`afd5156` 由来、本 spec で導入された問題ではない）。`bindItem` は ListView item の virtualization / 再利用 / 行追加削除 で繰り返し呼ばれ、その都度 callback が累積。Phase 3 で Inspector 側に GazeConfigs UI を追加した結果、`serializedObject` 変更頻度が上がり、callback 累積による副作用が安定再現するようになった。
+**初期誤診**: 当初「UI dropdown が Toggle に戻る」現象と読み違え、Drawer 側 EnumField の callback 累積回避（`Unbind() + BindProperty()`）のみ行った。Hidano からの再指摘で、保存値は Hold だが**ランタイム挙動が Hold で動作していない**ことが判明。
 
-具体的には：
-- callback クロージャは `index` をキャプチャしているが、ListView 仮想化により同一 EnumField インスタンスが index=0 と index=1 で再利用されると、古い callback が古い index へ書き込み続ける。
-- 結果として、ある行の Hold 選択イベントが別行（既に Toggle が保存済み）への上書きを誘発し、UI 側が次の rebind で「保存済み値 = Toggle」を読み戻して Toggle 表示に戻る。
+**真因**: `ExpressionInputSourceAdapter`（adapter 刷新で導入された新 input source adapter）が `TriggerMode` を完全に無視していた。
+- `BindExpression(InputAction, string)` のシグネチャに `TriggerMode` 引数が存在しない
+- `BindingEntry` に `TriggerMode` フィールド無し
+- `DispatchPerformed` で Button 型は無条件に `entry.IsActive = !entry.IsActive` のトグル動作
+- `DispatchCanceled` で Button 型は即 `return`（離した瞬間の OFF 経路が存在しない）
 
-**修正**: `triggerModeField.Unbind(); triggerModeField.BindProperty(triggerModeProp);` に置換。Unity 標準の SerializedProperty バインディングが累積問題と仮想化を内部で正しく処理する。
+旧 `InputSystemAdapter`（古い adapter, 同パッケージ内に残置）は `TriggerMode` 分岐実装済（Hold は `started + canceled`、Toggle は `performed`）だったが、`adapter-binding-architecture` spec で adapter を刷新する際、`TriggerMode` 分岐ロジックの移植が漏れていた。`InputSystemAdapterBinding.BindExpressionEntries` も `_adapter.BindExpression(action, entry.expressionId)` と 2 引数で呼んでいたため、データ層では保存される `entry.triggerMode` がランタイム入口で常に捨てられていた。
+
+**修正**:
+- `ExpressionInputSourceAdapter.BindExpression(InputAction, string, TriggerMode = Hold)` を追加（`ExpressionBindingEntry.triggerMode` 既定値と一致）。
+- `BindingEntry` に `TriggerMode` プロパティを追加。
+- `DispatchPerformed`: Button + Hold は「未 active のときのみ TriggerOn」。Button + Toggle は従来通りトグル。
+- `DispatchCanceled`: Button + Hold は「active のときのみ TriggerOff」。Button + Toggle は no-op。
+- `InputSystemAdapterBinding.BindExpressionEntries` から `entry.triggerMode` を渡すよう変更。
+- 副次的に `InputSystemAdapterBindingDrawer` の EnumField を `Unbind() + BindProperty()` に置換（UI 側 callback 累積の予防として残置）。
 
 ## 共通する根本原因
 
 | 観点 | 観察事実 |
 |------|----------|
-| **TDD 範囲** | Inspector の VisualElement 名 / 存在チェック / 結線 op はテスト化されていたが、「ユーザがフィールドを編集して保存し再描画後に値が保たれる」end-to-end の挙動はテスト無し。EnumField bindItem 累積問題が長期未検出だった原因 |
+| **TDD 範囲** | Inspector の VisualElement 名 / 存在チェック / 結線 op はテスト化されていたが、「ユーザがフィールドを編集して保存し再描画後に値が保たれる」end-to-end の挙動はテスト無し。Hold モード未実装が長期未検出だったのも、`ExpressionInputSourceAdapterTests` が Press のみで Press+Release シーケンス検証を持たないため |
+| **Adapter 刷新時の挙動移植チェック** | `adapter-binding-architecture` spec で旧 `InputSystemAdapter` から `ExpressionInputSourceAdapter` へ刷新した際、TriggerMode 分岐の移植が漏れた。旧 adapter の挙動を新 adapter で同等再現するための「挙動 parity チェックリスト」が tasks.md に無かった |
 | **UX 一貫性レビュー** | spec フェーズ（design / tasks）で「他バインディングとの UI 一貫性」が要件として扱われず、実装後の手動検証で初めて指摘 |
 | **Sample 値の保全** | スキーマ移行を行うとき、「構造の sync」と「過去に手調整された値の保全」が別軸の作業であることが意識されていない。tasks.md にも「値は別途確認」のチェックポイント無し |
 | **デザイン段階の物理検証不足** | 「単行 UI」決定時に Inspector 幅 × フィールド数 × ラベル幅の物理計算 / モックアップが行われず、実機検証で初めて視認不能と判明 |
+| **症状の読み違え** | UI 表示と実挙動を混同（"Toggle に強制" を dropdown 表示の問題と誤読）。一次対応で UI 側を修正したが本丸はランタイム dispatch だった。バグ報告を受けたら UI / データ / ランタイムの 3 層を切り分ける必要 |
 
 ## 再発防止策
 
@@ -76,6 +88,16 @@
 > **ListView の `bindItem` 内では、SerializedProperty 結線に必ず `BindProperty` (`UnityEditor.UIElements`) を使い、再 bind 前に `Unbind()` を呼ぶ。`RegisterValueChangedCallback` の手動結線は、callback 累積と仮想化による index ドリフトを引き起こすため使用禁止。**
 
 新規 drawer / inspector レビュー時のチェックリスト項目とする。
+
+### B-2. Adapter 刷新時の挙動 parity チェックリスト
+
+旧→新 adapter のリプレース系 spec（adapter-binding-architecture 等）の tasks.md に、刷新前の adapter が持っていた**観察可能な挙動の network**を列挙し、新 adapter で 1 件ずつ「移植済 / 仕様変更 / 削除」の判定を記載することを必須にする。今回 missed した項目の例：
+
+- TriggerMode 分岐（Hold = started + canceled、Toggle = performed）
+- DeviceCategory 推定（Keyboard / Controller / 未認識 fallback）
+- Value 型の処理（`>0 で ON、=0 で OFF`）
+
+レビュー時のセルフチェックでは「旧 adapter の public API ごとに、入力 → 観察可能な状態変化 のテーブルを書く」をテンプレ化。
 
 ### C. UX 一貫性チェックを spec design phase の必須項目に
 
@@ -105,7 +127,8 @@
 
 - `FacialControl/Packages/com.hidano.facialcontrol/Editor/Inspector/FacialCharacterProfileSOInspector.cs` — GazeConfig 行を縦並び化
 - `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/ScriptableObject/InputSystemGazeBinding.cs` — `inputActionRef` → `actionName`
-- `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/AdapterBindings/InputSystemAdapterBinding.cs` — analog source 構築の単純化
+- `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/AdapterBindings/InputSystemAdapterBinding.cs` — analog source 構築の単純化、`triggerMode` を adapter へ伝搬
+- `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/InputSources/ExpressionInputSourceAdapter.cs` — `BindExpression` に `TriggerMode` 引数追加、Hold / Toggle 分岐ロジック実装
 - `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Editor/AdapterBindings/InputSystemAdapterBindingDrawer.cs` — Gaze 行 dropdown 化、TriggerMode の `BindProperty` 化
 - `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Tests/EditMode/Adapters/ScriptableObject/InputSystemGazeBindingTests.cs`
 - `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Tests/PlayMode/Integration/InputSystemAdapterBindingIntegrationTests.cs`

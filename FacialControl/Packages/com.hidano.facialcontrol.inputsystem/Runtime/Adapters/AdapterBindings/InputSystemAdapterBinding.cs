@@ -255,7 +255,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                     continue;
                 }
 
-                _adapter.BindExpression(action, entry.expressionId);
+                _adapter.BindExpression(action, entry.expressionId, entry.triggerMode);
             }
         }
 
