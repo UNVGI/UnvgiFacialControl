@@ -121,7 +121,7 @@
   - 観測条件: Expression 行に id ラベルが存在せず、Debug セクションのマッピング一覧が SO 編集の都度更新される
   - _Requirements: 5.7, 8.1, 8.2, 8.3, 8.4_
 
-- [ ] 3.6 Inspector の dead code を整理し新名で再実装した API のみ残す
+- [x] 3.6 Inspector の dead code を整理し新名で再実装した API のみ残す
   - 旧 `_gazeConfigsProperty` / `AppendGazeConfigForExpression` / `RemoveGazeConfigByExpressionId` / `FindGazeConfigIndexByExpressionId` / `HasGazeConfigForExpression` / `BuildEyeLookFields` / `BuildGazeClipField` / `OnBuildAnalogExpressionInputSourceFields` / `ExpressionRowGazeXxx` 名前定数 / `ExpressionRowIdLabelName` 等を削除する
   - 同等動作は新 GazeConfigs セクション側で旧名を再利用しない新 API（例: append / remove-at / orphan-cleanup ヘルパー）として再実装されていることを確認する
   - Editor asmdef で警告なくコンパイルが通る状態にする
