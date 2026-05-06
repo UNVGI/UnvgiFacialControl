@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d135770dce0e9d5479f0b6ee124b640a, type: 3}
   m_Name: MultiSourceBlendDemoCharacter
   m_EditorClassIdentifier:
-  _schemaVersion: "2.0"
+  _schemaVersion: "1.0"
   _layers:
   - name: emotion
     priority: 0
@@ -139,6 +139,28 @@ MonoBehaviour:
       rendererPaths: []
   _rendererPaths:
   - Body
+  _gazeConfigs:
+  - expressionId: eye_look
+    leftEyeBonePath:
+    leftEyeInitialRotation: {x: 0, y: 0, z: 0}
+    leftEyeYawAxisLocal: {x: 0, y: 1, z: 0}
+    leftEyePitchAxisLocal: {x: 1, y: 0, z: 0}
+    rightEyeBonePath:
+    rightEyeInitialRotation: {x: 0, y: 0, z: 0}
+    rightEyeYawAxisLocal: {x: 0, y: 1, z: 0}
+    rightEyePitchAxisLocal: {x: 1, y: 0, z: 0}
+    lookUpAngle: 15
+    lookDownAngle: 9
+    outerYawAngle: 15
+    innerYawAngle: 18
+    lookLeftClip: {fileID: 0}
+    lookRightClip: {fileID: 0}
+    lookUpClip: {fileID: 0}
+    lookDownClip: {fileID: 0}
+    lookLeftSamples: []
+    lookRightSamples: []
+    lookUpSamples: []
+    lookDownSamples: []
   _adapterBindings:
   - rid: 8000000000000000001
   _referenceModel: {fileID: 0}
@@ -164,26 +186,6 @@ MonoBehaviour:
         - actionName: Trigger4
           expressionId: lipsync_a
           triggerMode: 0
-        _gazeConfigs:
+        _gazeInputBindings:
         - expressionId: eye_look
-          leftEyeBonePath:
-          leftEyeInitialRotation: {x: 0, y: 0, z: 0}
-          leftEyeYawAxisLocal: {x: 0, y: 1, z: 0}
-          leftEyePitchAxisLocal: {x: 1, y: 0, z: 0}
-          rightEyeBonePath:
-          rightEyeInitialRotation: {x: 0, y: 0, z: 0}
-          rightEyeYawAxisLocal: {x: 0, y: 1, z: 0}
-          rightEyePitchAxisLocal: {x: 1, y: 0, z: 0}
-          lookUpAngle: 15
-          lookDownAngle: 9
-          outerYawAngle: 15
-          innerYawAngle: 18
-          lookLeftClip: {fileID: 0}
-          lookRightClip: {fileID: 0}
-          lookUpClip: {fileID: 0}
-          lookDownClip: {fileID: 0}
-          lookLeftSamples: []
-          lookRightSamples: []
-          lookUpSamples: []
-          lookDownSamples: []
-          inputAction: {fileID: 0}
+          inputActionRef: {fileID: 0}

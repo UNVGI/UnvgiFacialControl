@@ -3,6 +3,8 @@ using NUnit.Framework;
 using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Models;
+using UnityEngine;
+using GazeBindingConfig = Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig;
 
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
 {
@@ -105,6 +107,66 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
             Assert.That(
                 profile.Expressions.Span[0].TransitionDuration,
                 Is.EqualTo(0.4f).Within(1e-6f));
+        }
+
+        [Test]
+        public void ToSORootGazeConfigs_RootDtoGazeConfigs_MapsEveryValueToRootConfig()
+        {
+            var dto = new ProfileSnapshotDto
+            {
+                gazeConfigs = new List<GazeBindingConfigDto>
+                {
+                    new GazeBindingConfigDto
+                    {
+                        expressionId = "eye_look",
+                        leftEyeBonePath = "Armature/Hips/Head/LeftEye",
+                        leftEyeInitialRotation = new Vector3(1f, 2f, 3f),
+                        leftEyeYawAxisLocal = new Vector3(0f, 1f, 0f),
+                        leftEyePitchAxisLocal = new Vector3(1f, 0f, 0f),
+                        rightEyeBonePath = "Armature/Hips/Head/RightEye",
+                        rightEyeInitialRotation = new Vector3(4f, 5f, 6f),
+                        rightEyeYawAxisLocal = new Vector3(0f, 0.75f, 0.25f),
+                        rightEyePitchAxisLocal = new Vector3(0.5f, 0f, 0.5f),
+                        lookUpAngle = 16f,
+                        lookDownAngle = 8f,
+                        outerYawAngle = 17f,
+                        innerYawAngle = 12f,
+                    },
+                },
+            };
+
+            List<GazeBindingConfig> configs = FacialCharacterProfileConverter.ToSORootGazeConfigs(dto);
+
+            Assert.That(configs, Has.Count.EqualTo(1));
+            GazeBindingConfig config = configs[0];
+            Assert.That(config.expressionId, Is.EqualTo("eye_look"));
+            Assert.That(config.leftEyeBonePath, Is.EqualTo("Armature/Hips/Head/LeftEye"));
+            Assert.That(config.leftEyeInitialRotation, Is.EqualTo(new Vector3(1f, 2f, 3f)));
+            Assert.That(config.leftEyeYawAxisLocal, Is.EqualTo(new Vector3(0f, 1f, 0f)));
+            Assert.That(config.leftEyePitchAxisLocal, Is.EqualTo(new Vector3(1f, 0f, 0f)));
+            Assert.That(config.rightEyeBonePath, Is.EqualTo("Armature/Hips/Head/RightEye"));
+            Assert.That(config.rightEyeInitialRotation, Is.EqualTo(new Vector3(4f, 5f, 6f)));
+            Assert.That(config.rightEyeYawAxisLocal, Is.EqualTo(new Vector3(0f, 0.75f, 0.25f)));
+            Assert.That(config.rightEyePitchAxisLocal, Is.EqualTo(new Vector3(0.5f, 0f, 0.5f)));
+            Assert.That(config.lookUpAngle, Is.EqualTo(16f));
+            Assert.That(config.lookDownAngle, Is.EqualTo(8f));
+            Assert.That(config.outerYawAngle, Is.EqualTo(17f));
+            Assert.That(config.innerYawAngle, Is.EqualTo(12f));
+            Assert.That(config.lookLeftClip, Is.Null);
+            Assert.That(config.lookRightClip, Is.Null);
+            Assert.That(config.lookUpClip, Is.Null);
+            Assert.That(config.lookDownClip, Is.Null);
+            Assert.That(config.lookLeftSamples, Is.Empty);
+            Assert.That(config.lookRightSamples, Is.Empty);
+            Assert.That(config.lookUpSamples, Is.Empty);
+            Assert.That(config.lookDownSamples, Is.Empty);
+        }
+
+        [Test]
+        public void ToSORootGazeConfigs_NullOrEmptyRootDto_ReturnsEmptyList()
+        {
+            Assert.That(FacialCharacterProfileConverter.ToSORootGazeConfigs((ProfileSnapshotDto)null), Is.Empty);
+            Assert.That(FacialCharacterProfileConverter.ToSORootGazeConfigs(new ProfileSnapshotDto()), Is.Empty);
         }
     }
 }

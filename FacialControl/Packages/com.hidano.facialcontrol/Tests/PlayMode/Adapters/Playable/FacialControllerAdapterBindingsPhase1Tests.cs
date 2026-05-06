@@ -3,11 +3,14 @@ using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.TestTools;
+using Hidano.FacialControl.Adapters.AdapterBindings.InputSystem;
 using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Models;
+using GazeBindingConfig = Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig;
 
 namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Playable
 {
@@ -104,6 +107,38 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Playable
             }
         }
 
+        [UnityTest]
+        public IEnumerator Initialize_InputSystemBinding_InjectsSORootGazeConfigsByReference()
+        {
+            _controllerGameObject = CreateControllerHost();
+            var controller = _controllerGameObject.AddComponent<FacialController>();
+            var so = ScriptableObject.CreateInstance<TestablePhase1ProfileSO>();
+            var binding = new InputSystemAdapterBinding { Slug = "input-system-gaze-injection" };
+            var asset = ScriptableObject.CreateInstance<InputActionAsset>();
+            asset.AddActionMap("Expression");
+            binding.InputActionAsset = asset;
+            so.WritableAdapterBindings.Add(binding);
+            so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "expr-gaze" });
+
+            try
+            {
+                controller.CharacterSO = so;
+                controller.Initialize();
+
+                object injected = ReadInjectedGazeConfigs(binding);
+                Assert.That(injected, Is.SameAs(so.GazeConfigs),
+                    "runtime build 経路で InputSystemAdapterBinding.Configure に SO ルート GazeConfigs が参照同値で注入されるべき。");
+
+                _controllerGameObject.SetActive(false);
+                yield return null;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(asset);
+                UnityEngine.Object.DestroyImmediate(so);
+            }
+        }
+
         // ---------------------------------------------------------------
         // Helpers / Mocks
         // ---------------------------------------------------------------
@@ -128,6 +163,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Playable
         public sealed class TestablePhase1ProfileSO : FacialCharacterProfileSO
         {
             public List<AdapterBindingBase> WritableAdapterBindings => _adapterBindings;
+            public List<GazeBindingConfig> WritableGazeConfigs => _gazeConfigs;
 
             public override FacialProfile LoadProfile()
             {
@@ -144,6 +180,16 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Playable
         /// 同 instance に対する <see cref="OnStart"/> / <see cref="OnLateTick"/> / <see cref="Dispose"/>
         /// の呼出回数を <c>NonSerialized</c> field で集計する。
         /// </summary>
+        private static object ReadInjectedGazeConfigs(InputSystemAdapterBinding binding)
+        {
+            var field = typeof(InputSystemAdapterBinding).GetField(
+                "_injectedGazeConfigs",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null,
+                "InputSystemAdapterBinding._injectedGazeConfigs は runtime 注入ハンドルとして存在するべき。");
+            return field.GetValue(binding);
+        }
+
         [Serializable]
         public sealed class TrackingAdapterBinding : AdapterBindingBase
         {

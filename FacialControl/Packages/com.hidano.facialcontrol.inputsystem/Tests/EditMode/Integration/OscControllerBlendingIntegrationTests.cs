@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
-using UnityEngine.TestTools.Constraints;
-using ConstraintIs = UnityEngine.TestTools.Constraints.Is;
+using Unity.Profiling;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.OSC;
 using Hidano.FacialControl.Domain.Interfaces;
@@ -42,9 +41,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
     /// 配列までの全パイプラインを検証する。
     /// </para>
     /// <para>
-    /// GC ゼロ契約: パイプライン全体を 1000 回回しても
-    /// <see cref="GC.GetTotalMemory(bool)"/> 差分が 0 バイト以下であることを検証する
-    /// (Req 6.1)。weight 変更や Trigger を含まない「集約のみ」のループを対象とする。
+    /// GC ゼロ契約: パイプライン全体を繰り返しても
+    /// <see cref="ProfilerRecorder"/> の <c>GC.Alloc</c> が 0 バイトであることを検証する。
+    /// weight 変更や Trigger を含まない「集約のみ」のループを対象とする。
     /// </para>
     /// </remarks>
     [TestFixture]
@@ -322,18 +321,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
         // GC ゼロ契約: パイプライン全体が per-frame 0-alloc であること
         // ------------------------------------------------------------------
 
-        // Unity Mono ヒープは 32〜64 KB 単位のページで確保されるため、EditMode で
-        // GC.GetTotalMemory(false) を before/after 比較すると、測定対象ホットパス自体が
-        // 0-alloc でも Editor / NUnit 内部活動が 1 ページ分ぶんだけ差分として観測され得る
-        // (Mono 実装詳細: 本リポジトリでの実測で 1 ページ ≒ 32KB〜40KB)。
-        // GC.GetAllocatedBytesForCurrentThread は Unity の Mono では未実装 (常に 0)、
-        // Profiler.GetTotalAllocatedMemoryLong は managed を返さず native のみのため EditMode では
-        // 該当ホットパスの per-method 精度で managed alloc を計測する手段が存在しない。
-        // そこで (1) ループを十分大きくして実アロケーションが発生した場合の累積が
-        // ページサイズを大きく上回るようにし、(2) 許容しきい値 = 1 ページ分ぶんの
-        // ノイズに設定する。実回帰 (e.g. 32 byte/iter) の場合でも 50,000 iter で 1.6MB となり、
-        // しきい値 (= ManagedPageNoiseToleranceBytes) をはるかに超えるため検出可能。
-        private const long ManagedPageNoiseToleranceBytes = 64 * 1024;
+        // ProfilerRecorder("GC.Alloc") を現在スレッドのみで記録し、Editor / NUnit の
+        // 別スレッド由来ノイズを拾わずに測定対象ループの managed allocation を検出する。
+        // 配列は測定開始前に確保し、ループ内では AggregateAndBlend の hot path のみを実行する。
         private const int ZeroAllocMeasureIterations = 50_000;
 
         [Test]
@@ -347,8 +337,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
             h.WeightBuffer.SetWeight(0, 1, 0.5f);
 
             // ウォームアップ: JIT / Id キャッシュ / StringBuilder などの初回確保を排除。
-            // ※ stackalloc は ref-like なので closure に持ち込めず、AllocatingGCMemory 制約内でも
-            //    ref-like を逃がせないため、warmup と measure 双方で一旦 heap 配列に載せる。
+            // ※ stackalloc は ref-like なので測定 API と相性が悪く、
+            //    warmup と measure 双方で一旦 heap 配列に載せる。
             int[] prioritiesArr = new[] { 0 };
             float[] layerWeightsArr = new[] { 1.0f };
             float[] finalOutputArr = new float[BlendShapeCount];
@@ -362,22 +352,28 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
                     finalOutput: finalOutputArr);
             }
 
-            // Unity Test Framework の AllocatingGCMemory 制約は Mono の per-allocation tracking を使うため
-            // テスト順や heap 状態に依存せずに per-method 精度で managed alloc を検出できる。
-            // 旧: GC.GetTotalMemory(false) は full-suite で他テストの mid-loop GC 活動を補足してしまい
-            //     test-order 依存の flaky だった (Mono ヒープページ単位の expansion ではなく heap 状態揺らぎ)。
-            Assert.That(() =>
+            using var recorder = ProfilerRecorder.StartNew(
+                ProfilerCategory.Memory,
+                "GC.Alloc",
+                1,
+                ProfilerRecorderOptions.SumAllSamplesInFrame
+                    | ProfilerRecorderOptions.CollectOnlyOnCurrentThread);
+
+            for (int i = 0; i < ZeroAllocMeasureIterations; i++)
             {
-                for (int i = 0; i < ZeroAllocMeasureIterations; i++)
-                {
-                    h.Aggregator.AggregateAndBlend(
-                        deltaTime: 0.016f,
-                        priorities: prioritiesArr,
-                        layerWeights: layerWeightsArr,
-                        finalOutput: finalOutputArr);
-                }
-            }, ConstraintIs.Not.AllocatingGCMemory(),
-            $"AggregateAndBlend {ZeroAllocMeasureIterations} 回ループで managed alloc 検出");
+                h.Aggregator.AggregateAndBlend(
+                    deltaTime: 0.016f,
+                    priorities: prioritiesArr,
+                    layerWeights: layerWeightsArr,
+                    finalOutput: finalOutputArr);
+            }
+
+            long gcAllocBytes = recorder.LastValue;
+
+            Assert.That(
+                gcAllocBytes,
+                Is.LessThanOrEqualTo(0L),
+                $"AggregateAndBlend {ZeroAllocMeasureIterations} 回ループで managed alloc 検出: {gcAllocBytes} bytes");
         }
     }
 }

@@ -227,8 +227,6 @@ GameObject:
   - component: {fileID: 345471964}
   - component: {fileID: 345471963}
   - component: {fileID: 345471962}
-  - component: {fileID: 345471961}
-  - component: {fileID: 345471965}
   m_Layer: 0
   m_Name: Character
   m_TagString: Untagged
@@ -291,19 +289,6 @@ MonoBehaviour:
   _displayedSourceIds:
   - left_stick
   - arkit_jaw_open
---- !u!114 &345471961
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 345471958}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 84132a162f5174b44ac175f15db583f4, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  _defaultExclusionMode: 0
 --- !u!114 &345471962
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -319,19 +304,6 @@ MonoBehaviour:
   _characterSO: {fileID: 11400000, guid: 998b06c123dcd304db38f158f30a1fac, type: 2}
   _profileSO: {fileID: 0}
   _skinnedMeshRenderers: []
---- !u!114 &345471965
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 345471958}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8a37e0c5c1f24f8db9e7e8b12c4d3a7e, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  _facialController: {fileID: 345471962}
 --- !u!95 &345471963
 Animator:
   serializedVersion: 7

@@ -2,7 +2,9 @@ using System.IO;
 using NUnit.Framework;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Models;
+using UnityEditor;
 using UnityEngine;
+using GazeBindingConfig = Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig;
 
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
 {
@@ -13,7 +15,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
     [TestFixture]
     public class FacialCharacterProfileSOTests
     {
-        private sealed class TestCharacterSO : FacialCharacterProfileSO { }
+        private sealed class TestCharacterSO : FacialCharacterProfileSO
+        {
+            public System.Collections.Generic.List<GazeBindingConfig> WritableGazeConfigs => _gazeConfigs;
+        }
 
         [Test]
         public void GetStreamingAssetsProfilePath_ValidName_ReturnsExpectedPath()
@@ -66,6 +71,55 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
                 Assert.That(profile.Expressions.Length, Is.EqualTo(1));
                 Assert.That(profile.LayerInputSources.Length, Is.EqualTo(1));
                 Assert.That(profile.RendererPaths.Length, Is.EqualTo(1));
+            }
+            finally
+            {
+                Object.DestroyImmediate(so);
+            }
+        }
+
+        [Test]
+        public void GazeConfigs_NewInstance_ExposesNonNullReadOnlyEmptyList()
+        {
+            var so = ScriptableObject.CreateInstance<TestCharacterSO>();
+            try
+            {
+                IFacialCharacterProfile profile = so;
+
+                Assert.That(profile.GazeConfigs, Is.Not.Null);
+                Assert.That(profile.GazeConfigs, Is.Empty);
+                Assert.That(so.GazeConfigs, Is.SameAs(profile.GazeConfigs));
+            }
+            finally
+            {
+                Object.DestroyImmediate(so);
+            }
+        }
+
+        [Test]
+        public void GazeConfigs_SerializedAtRoot_PreservesValuesBesideAdapterBindings()
+        {
+            var so = ScriptableObject.CreateInstance<TestCharacterSO>();
+            try
+            {
+                so.WritableGazeConfigs.Add(new GazeBindingConfig
+                {
+                    expressionId = "eye_look",
+                    leftEyeBonePath = "LeftEye",
+                });
+
+                var serializedObject = new SerializedObject(so);
+                SerializedProperty gazeConfigs = serializedObject.FindProperty("_gazeConfigs");
+                SerializedProperty adapterBindings = serializedObject.FindProperty("_adapterBindings");
+
+                Assert.That(gazeConfigs, Is.Not.Null);
+                Assert.That(gazeConfigs.isArray, Is.True);
+                Assert.That(gazeConfigs.arraySize, Is.EqualTo(1));
+                Assert.That(adapterBindings, Is.Not.Null);
+
+                SerializedProperty entry = gazeConfigs.GetArrayElementAtIndex(0);
+                Assert.That(entry.FindPropertyRelative("expressionId").stringValue, Is.EqualTo("eye_look"));
+                Assert.That(entry.FindPropertyRelative("leftEyeBonePath").stringValue, Is.EqualTo("LeftEye"));
             }
             finally
             {

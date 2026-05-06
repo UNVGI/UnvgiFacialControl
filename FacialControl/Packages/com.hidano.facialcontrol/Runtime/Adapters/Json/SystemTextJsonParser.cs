@@ -10,20 +10,19 @@ namespace Hidano.FacialControl.Adapters.Json
 {
     /// <summary>
     /// IJsonParser の実装。Unity の JsonUtility をベースに、
-    /// 中間 JSON Schema v2.0 専用 DTO 群（<see cref="ProfileSnapshotDto"/> 等）を介して
+    /// プロファイル JSON 専用 DTO 群（<see cref="ProfileSnapshotDto"/> 等）を介して
     /// ドメインモデルとの変換を行う。
     /// <para>
-    /// Phase 3.6 (inspector-and-data-model-redesign) で schema v1.0 経路を撤去し、
-    /// schemaVersion <c>"2.0"</c> 以外を <see cref="Debug.LogError(object)"/> +
-    /// <see cref="InvalidOperationException"/> で拒否する（Req 10.1）。
+    /// preview.1 リリース前段階のため、schemaVersion <c>"1.0"</c> 以外を
+    /// <see cref="Debug.LogError(object)"/> + <see cref="NotSupportedException"/> で拒否する（Req 10.1）。
     /// </para>
     /// </summary>
     public sealed class SystemTextJsonParser : IJsonParser
     {
         /// <summary>
-        /// 中間 JSON Schema v2.0 の strict version 文字列。
+        /// プロファイル JSON のサポートバージョン文字列（preview.1 前段階で "1.0" に統一）。
         /// </summary>
-        public const string SchemaVersionV2 = "2.0";
+        public const string SchemaVersionV2 = "1.0";
 
         /// <summary>
         /// 設定 JSON のサポートバージョン。Profile JSON とは別系統で v1.0 を維持する。
@@ -49,9 +48,9 @@ namespace Hidano.FacialControl.Adapters.Json
         }
 
         /// <summary>
-        /// 中間 JSON Schema v2.0 の専用パース経路。
+        /// プロファイル JSON の専用パース経路。
         /// <c>schemaVersion</c> が <see cref="SchemaVersionV2"/> 以外の場合は
-        /// <see cref="Debug.LogError(object)"/> + <see cref="InvalidOperationException"/> で拒否する（Req 10.1）。
+        /// <see cref="Debug.LogError(object)"/> + <see cref="NotSupportedException"/> で拒否する（Req 10.1）。
         /// 欠落 / null の snapshot は既定値（<c>transitionDuration=1/15</c>, <c>transitionCurvePreset="Linear"</c>,
         /// 各配列空）に正規化される。
         /// </summary>
@@ -67,7 +66,7 @@ namespace Hidano.FacialControl.Adapters.Json
             if (string.IsNullOrWhiteSpace(json))
                 throw new ArgumentException("JSON 文字列を空にすることはできません。", nameof(json));
 
-            preprocessed = PreprocessInputSourceOptions(json);
+            preprocessed = PreprocessInputSourceOptions(PreprocessGazeConfigsKey(json));
 
             ProfileSnapshotDto dto;
             try
@@ -76,19 +75,19 @@ namespace Hidano.FacialControl.Adapters.Json
             }
             catch (Exception ex)
             {
-                throw new FormatException("プロファイル JSON (v2.0) のパースに失敗しました。", ex);
+                throw new FormatException("プロファイル JSON (v1.0) のパースに失敗しました。", ex);
             }
 
             if (dto == null)
-                throw new FormatException("プロファイル JSON (v2.0) のパースに失敗しました。結果が null です。");
+                throw new FormatException("プロファイル JSON (v1.0) のパースに失敗しました。結果が null です。");
 
             if (string.IsNullOrEmpty(dto.schemaVersion) || dto.schemaVersion != SchemaVersionV2)
             {
                 var actual = string.IsNullOrEmpty(dto.schemaVersion) ? "<missing>" : dto.schemaVersion;
                 Debug.LogError(
-                    $"SystemTextJsonParser: 中間 JSON schema v2.0 の strict チェックに失敗しました。" +
-                    $"期待値 '{SchemaVersionV2}'、実際 '{actual}'。Req 10.1 により旧 schema は拒否されます。");
-                throw new InvalidOperationException(
+                    $"SystemTextJsonParser: プロファイル JSON schema v1.0 の strict チェックに失敗しました。" +
+                    $"期待値 '{SchemaVersionV2}'、実際 '{actual}'。Req 10.1 により未サポートの schema は拒否されます。");
+                throw new NotSupportedException(
                     $"サポートされていないスキーマバージョンです: '{actual}' (期待値 '{SchemaVersionV2}')。");
             }
 
@@ -109,6 +108,8 @@ namespace Hidano.FacialControl.Adapters.Json
                 dto.expressions = new List<ExpressionDto>();
             if (dto.rendererPaths == null)
                 dto.rendererPaths = new List<string>();
+            if (dto.gazeConfigs == null)
+                dto.gazeConfigs = new List<GazeBindingConfigDto>();
 
             for (int i = 0; i < dto.expressions.Count; i++)
             {
@@ -234,11 +235,11 @@ namespace Hidano.FacialControl.Adapters.Json
         {
             var dto = ConvertToProfileSnapshotDto(profile);
             var raw = JsonUtility.ToJson(dto, true);
-            return PostprocessInputSourceOptions(raw);
+            return PostprocessInputSourceOptions(PostprocessGazeConfigsKey(raw));
         }
 
         /// <summary>
-        /// 既に組み立て済みの <see cref="ProfileSnapshotDto"/> を schema v2.0 互換 JSON 文字列にシリアライズする。
+        /// 既に組み立て済みの <see cref="ProfileSnapshotDto"/> を schema v1.0 互換 JSON 文字列にシリアライズする。
         /// AutoExporter が AnimationClip サンプリング結果を直接 JSON へ書き出す経路で使用する（Req 9.1, 9.2）。
         /// </summary>
         /// <param name="dto">トップレベル DTO。<see cref="ProfileSnapshotDto.schemaVersion"/> が空の場合は <see cref="SchemaVersionV2"/> を補完する。</param>
@@ -250,7 +251,7 @@ namespace Hidano.FacialControl.Adapters.Json
             if (string.IsNullOrEmpty(dto.schemaVersion))
                 dto.schemaVersion = SchemaVersionV2;
             var raw = JsonUtility.ToJson(dto, true);
-            return PostprocessInputSourceOptions(raw);
+            return PostprocessInputSourceOptions(PostprocessGazeConfigsKey(raw));
         }
 
         /// <inheritdoc/>
@@ -355,6 +356,20 @@ namespace Hidano.FacialControl.Adapters.Json
             }
 
             return sb.ToString();
+        }
+
+        private static string PreprocessGazeConfigsKey(string json)
+        {
+            return string.IsNullOrEmpty(json)
+                ? json
+                : json.Replace("\"gaze_configs\"", "\"gazeConfigs\"");
+        }
+
+        private static string PostprocessGazeConfigsKey(string json)
+        {
+            return string.IsNullOrEmpty(json)
+                ? json
+                : json.Replace("\"gazeConfigs\"", "\"gaze_configs\"");
         }
 
         private static int FindMatchingBrace(string json, int openIndex)
@@ -728,7 +743,8 @@ namespace Hidano.FacialControl.Adapters.Json
                 schemaVersion = SchemaVersionV2,
                 layers = new List<LayerDefinitionDto>(),
                 expressions = new List<ExpressionDto>(),
-                rendererPaths = new List<string>()
+                rendererPaths = new List<string>(),
+                gazeConfigs = new List<GazeBindingConfigDto>()
             };
 
             var rendererPathsSpan = profile.RendererPaths.Span;

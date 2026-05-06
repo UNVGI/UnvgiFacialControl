@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Hidano.FacialControl.Adapters.Json;
 using Hidano.FacialControl.Adapters.Json.Dto;
+using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Domain.Models;
 
 namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
@@ -28,6 +29,49 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             var expressionArr = ConvertExpressions(expressions, layers);
             var rendererArr = ConvertStrings(rendererPaths);
             return new FacialProfile(version, layerArr, expressionArr, rendererArr, inputSourceArr);
+        }
+
+        /// <summary>
+        /// JSON root の gaze configs DTO を SO ルート用の <see cref="GazeBindingConfig"/> リストへ変換する。
+        /// Domain <see cref="FacialProfile"/> には gaze を載せず、SO ルートの sidecar data として扱う。
+        /// </summary>
+        public static List<GazeBindingConfig> ToSORootGazeConfigs(ProfileSnapshotDto dto)
+        {
+            return ToSORootGazeConfigs(dto?.gazeConfigs);
+        }
+
+        /// <summary>
+        /// JSON root の gaze configs DTO を SO ルート用の <see cref="GazeBindingConfig"/> リストへ変換する。
+        /// </summary>
+        public static List<GazeBindingConfig> ToSORootGazeConfigs(IReadOnlyList<GazeBindingConfigDto> dtoList)
+        {
+            if (dtoList == null || dtoList.Count == 0)
+                return new List<GazeBindingConfig>();
+
+            var result = new List<GazeBindingConfig>(dtoList.Count);
+            for (int i = 0; i < dtoList.Count; i++)
+            {
+                var src = dtoList[i];
+                if (src == null) continue;
+
+                result.Add(new GazeBindingConfig
+                {
+                    expressionId = src.expressionId,
+                    leftEyeBonePath = src.leftEyeBonePath,
+                    leftEyeInitialRotation = src.leftEyeInitialRotation,
+                    leftEyeYawAxisLocal = src.leftEyeYawAxisLocal,
+                    leftEyePitchAxisLocal = src.leftEyePitchAxisLocal,
+                    rightEyeBonePath = src.rightEyeBonePath,
+                    rightEyeInitialRotation = src.rightEyeInitialRotation,
+                    rightEyeYawAxisLocal = src.rightEyeYawAxisLocal,
+                    rightEyePitchAxisLocal = src.rightEyePitchAxisLocal,
+                    lookUpAngle = src.lookUpAngle,
+                    lookDownAngle = src.lookDownAngle,
+                    outerYawAngle = src.outerYawAngle,
+                    innerYawAngle = src.innerYawAngle,
+                });
+            }
+            return result;
         }
 
         /// <summary>

@@ -31,9 +31,9 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject
     /// clip 内の各 BlendShape curve の time=0 における値を keyframe weight として線形駆動する。
     /// </para>
     /// <para>
-    /// 入力源との結線は派生クラスが担当する。InputSystem 連携であれば
-    /// <c>Hidano.FacialControl.InputSystem.Adapters.ScriptableObject.GazeExpressionConfig</c> が
-    /// <c>InputActionReference</c> を持ち、本クラスを拡張する。OSC・ARKit 経路でも同様の派生で対応できる。
+    /// 入力源との結線は、本クラスを派生させず sidecar の結線型で扱う。
+    /// InputSystem 経路では <c>InputSystemGazeBinding</c> が expressionId と
+    /// <c>InputActionReference</c> のみを保持する。
     /// </para>
     /// </remarks>
     [Serializable]

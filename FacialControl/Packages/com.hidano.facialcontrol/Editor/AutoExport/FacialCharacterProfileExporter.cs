@@ -8,13 +8,14 @@ using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.Sampling;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
+using GazeBindingConfig = Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig;
 
 namespace Hidano.FacialControl.Editor.AutoExport
 {
     /// <summary>
     /// <see cref="FacialCharacterProfileSO"/> 系アセットの汎用エクスポート処理。
     /// AnimationClip サンプリング → <see cref="ExpressionSerializable.cachedSnapshot"/> 反映、
-    /// および <c>StreamingAssets/FacialControl/{SO 名}/profile.json</c> (schema v2.0) への
+    /// および <c>StreamingAssets/FacialControl/{SO 名}/profile.json</c> (schema v1.0) への
     /// 書き出しを行う。入力方式 (InputSystem / OSC / ARKit 等) には依存しない。
     /// </summary>
     /// <remarks>
@@ -131,6 +132,7 @@ namespace Hidano.FacialControl.Editor.AutoExport
                 layers = new List<LayerDefinitionDto>(),
                 expressions = new List<ExpressionDto>(),
                 rendererPaths = new List<string>(),
+                gazeConfigs = ConvertGazeConfigsToDto(so.GazeConfigs),
             };
 
             // top-level rendererPaths: Inspector 入力 + 各 Expression snapshot からの統合
@@ -208,6 +210,38 @@ namespace Hidano.FacialControl.Editor.AutoExport
             }
 
             return dto;
+        }
+
+        private static List<GazeBindingConfigDto> ConvertGazeConfigsToDto(IReadOnlyList<GazeBindingConfig> configs)
+        {
+            if (configs == null || configs.Count == 0)
+                return new List<GazeBindingConfigDto>();
+
+            var result = new List<GazeBindingConfigDto>(configs.Count);
+            for (int i = 0; i < configs.Count; i++)
+            {
+                var src = configs[i];
+                if (src == null) continue;
+
+                result.Add(new GazeBindingConfigDto
+                {
+                    expressionId = src.expressionId,
+                    leftEyeBonePath = src.leftEyeBonePath,
+                    leftEyeInitialRotation = src.leftEyeInitialRotation,
+                    leftEyeYawAxisLocal = src.leftEyeYawAxisLocal,
+                    leftEyePitchAxisLocal = src.leftEyePitchAxisLocal,
+                    rightEyeBonePath = src.rightEyeBonePath,
+                    rightEyeInitialRotation = src.rightEyeInitialRotation,
+                    rightEyeYawAxisLocal = src.rightEyeYawAxisLocal,
+                    rightEyePitchAxisLocal = src.rightEyePitchAxisLocal,
+                    lookUpAngle = src.lookUpAngle,
+                    lookDownAngle = src.lookDownAngle,
+                    outerYawAngle = src.outerYawAngle,
+                    innerYawAngle = src.innerYawAngle,
+                });
+            }
+
+            return result;
         }
 
         private static ExpressionSnapshotDto ConvertSnapshotToDto(ExpressionSnapshot snapshot)

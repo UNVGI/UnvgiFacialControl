@@ -1,5 +1,5 @@
 {
-    "schemaVersion": "2.0",
+    "schemaVersion": "1.0",
     "layers": [
         {
             "name": "emotion",
@@ -89,5 +89,22 @@
             }
         }
     ],
-    "rendererPaths": ["Body"]
+    "rendererPaths": ["Body"],
+    "gaze_configs": [
+        {
+            "expressionId": "eye_look",
+            "leftEyeBonePath": "",
+            "leftEyeInitialRotation": {"x": 0, "y": 0, "z": 0},
+            "leftEyeYawAxisLocal": {"x": 0, "y": 1, "z": 0},
+            "leftEyePitchAxisLocal": {"x": 1, "y": 0, "z": 0},
+            "rightEyeBonePath": "",
+            "rightEyeInitialRotation": {"x": 0, "y": 0, "z": 0},
+            "rightEyeYawAxisLocal": {"x": 0, "y": 1, "z": 0},
+            "rightEyePitchAxisLocal": {"x": 1, "y": 0, "z": 0},
+            "lookUpAngle": 15,
+            "lookDownAngle": 9,
+            "outerYawAngle": 15,
+            "innerYawAngle": 18
+        }
+    ]
 }

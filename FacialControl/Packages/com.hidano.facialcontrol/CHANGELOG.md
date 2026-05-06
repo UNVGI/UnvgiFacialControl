@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Breaking changes
+
+- GazeConfig は `InputSystemAdapterBinding._gazeConfigs` から `FacialCharacterProfileSO` ルート直下の `_gazeConfigs` へ昇格しました。InputSystem 側は入力結線のみを保持する構造に変わるため、既存 SO YAML は binding 内部の gaze configs を SO ルートへ移植する必要があります。
+- `profile.json` の `schemaVersion` は preview.1 リリース前段階のため `"1.0"` に統一しました。バージョンを別管理しないポリシーに従い、旧開発過程で出現した `"2.0"` / `"2.1"` の JSON は preview 段階の破壊的変更として migration なしで `"1.0"` への hand-edit が必要です。
+
 ### ⚠ BREAKING CHANGES — Adapter Binding アーキテクチャ移行 (spec `adapter-binding-architecture`)
 
 > 本リリースは spec `adapter-binding-architecture` に基づく Adapter 結線モデルの全面刷新を含む。**v0.1.0-preview.2 以前の `FacialCharacterSO` / `*FacialControllerExtension` MonoBehaviour 経路 / reserved id (`controller-expr` / `keyboard-expr` / `osc` / `lipsync` / `input` 等) を前提とする scene / asset / JSON はロード・動作できない**。preview 段階のため自動マイグレーションは提供しない（Req 8.1, 8.3）。移行手順は [`Documentation~/migration-guide.md`](Documentation~/migration-guide.md) を参照（Req 8.2, 8.5）。
@@ -90,7 +95,7 @@
 
 #### 中間 JSON schema 破壊
 
-- `schemaVersion` を `"2.0"` に bump。`SystemTextJsonParser` は `schemaVersion != "2.0"` を `Debug.LogError` + `InvalidOperationException` で拒否（schema v1.0 ロード不可）
+- `schemaVersion` を `"1.0"` 固定としました（preview.1 リリース前段階でバージョンを別管理しないため）。`SystemTextJsonParser` は `schemaVersion != "1.0"` を `Debug.LogError` + `NotSupportedException` で拒否します
 - `expressions[]` を `id / name / layer / layerOverrideMask: List<string> / snapshot: ExpressionSnapshotDto` の snapshot table 形式に再構成。旧 `transitionDuration / transitionCurve / blendShapeValues / layerSlots` field を撤去
 - top-level `rendererPaths[]` を新設し、各 Expression snapshot の `rendererPaths[]` がそのサブセットであることを保証
 

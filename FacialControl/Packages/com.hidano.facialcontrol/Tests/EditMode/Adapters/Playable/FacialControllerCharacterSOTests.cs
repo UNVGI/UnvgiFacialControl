@@ -1,9 +1,13 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using Hidano.FacialControl.Adapters.AdapterBindings.InputSystem;
 using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
+using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Models;
+using GazeBindingConfig = Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig;
 
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.Playable
 {
@@ -14,7 +18,20 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Playable
     [TestFixture]
     public class FacialControllerCharacterSOTests
     {
-        private sealed class TestCharacterSO : FacialCharacterProfileSO { }
+        private sealed class TestCharacterSO : FacialCharacterProfileSO
+        {
+            public List<AdapterBindingBase> WritableAdapterBindings => _adapterBindings;
+            public List<GazeBindingConfig> WritableGazeConfigs => _gazeConfigs;
+
+            public override FacialProfile LoadProfile()
+            {
+                var layers = new[]
+                {
+                    new LayerDefinition("emotion", 0, ExclusionMode.LastWins)
+                };
+                return new FacialProfile("2.0", layers);
+            }
+        }
 
         [Test]
         public void CharacterSO_Setter_PersistsValue()
@@ -78,6 +95,52 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Playable
             {
                 Object.DestroyImmediate(go);
             }
+        }
+
+        [Test]
+        public void Initialize_InputSystemBinding_InjectsSORootGazeConfigsByReferenceInEditMode()
+        {
+            var go = CreateControllerHost();
+            var so = ScriptableObject.CreateInstance<TestCharacterSO>();
+            try
+            {
+                var controller = go.AddComponent<FacialController>();
+                var binding = new InputSystemAdapterBinding { Slug = "input-system-gaze-injection-editmode" };
+                so.WritableAdapterBindings.Add(binding);
+                so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "expr-gaze" });
+
+                controller.CharacterSO = so;
+                controller.Initialize();
+
+                object injected = ReadInjectedGazeConfigs(binding);
+                Assert.That(injected, Is.SameAs(so.GazeConfigs),
+                    "EditMode の FacialController.Initialize 経路でも SO ルート GazeConfigs が参照同値で注入されるべき。");
+            }
+            finally
+            {
+                Object.DestroyImmediate(so);
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        private static GameObject CreateControllerHost()
+        {
+            var go = new GameObject("FacialControllerHost");
+            go.AddComponent<Animator>();
+            var meshGo = new GameObject("Mesh");
+            meshGo.transform.SetParent(go.transform);
+            meshGo.AddComponent<SkinnedMeshRenderer>();
+            return go;
+        }
+
+        private static object ReadInjectedGazeConfigs(InputSystemAdapterBinding binding)
+        {
+            var field = typeof(InputSystemAdapterBinding).GetField(
+                "_injectedGazeConfigs",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null,
+                "InputSystemAdapterBinding._injectedGazeConfigs は runtime 注入ハンドルとして存在するべき。");
+            return field.GetValue(binding);
         }
     }
 }

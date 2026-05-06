@@ -9,7 +9,7 @@ namespace Hidano.FacialControl.Adapters.Bone
     /// </summary>
     /// <remarks>
     /// <para>
-    /// InputSystem 経路では <c>cfg.inputAction.action.name</c> を sourceId として
+    /// InputSystem 経路では <c>InputSystemGazeBinding.inputActionRef.action.name</c> を sourceId として
     /// 事前に解決済みの <see cref="IAnalogInputSource"/> をペアにする。OSC・ARKit 経路では
     /// それぞれの sourceId 体系で解決する。本構造体は入力方式に依存しない。
     /// </para>
