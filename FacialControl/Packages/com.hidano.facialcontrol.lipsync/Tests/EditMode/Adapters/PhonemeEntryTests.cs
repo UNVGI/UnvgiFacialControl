@@ -174,12 +174,5 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
             Assert.That(loaded, Is.Not.Null);
             return loaded;
         }
-
-        private sealed class PhonemeEntryTestAsset : ScriptableObject
-        {
-            [SerializeReference] private PhonemeEntryBase _entry;
-
-            public PhonemeEntryBase Entry => _entry;
-        }
     }
 }

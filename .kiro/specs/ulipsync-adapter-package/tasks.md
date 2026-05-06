@@ -60,7 +60,7 @@
   - _Requirements: 3.3, 4.1, 4.3, 4.4, 11.5, 14.5_
   - _Boundary: Tests/EditMode/Adapters_
 
-- [ ] 3.2 `PhonemeEntryBase` 抽象クラスと派生 2 種を実装する
+- [x] 3.2 `PhonemeEntryBase` 抽象クラスと派生 2 種を実装する
   - `Hidano.FacialControl.LipSync.Adapters.PhonemeEntries.PhonemeEntryBase` abstract class を `[Serializable]` で定義し、共通 public field（`PhonemeId` / `MaxWeight`）を保持する
   - `BlendShapePhonemeEntry`（`BlendShapeName: string`）と `AnimationClipPhonemeEntry`（`Clip: AnimationClip`）を `sealed [Serializable]` で実装する
   - 内部値オブジェクト `PhonemeSnapshot`（`readonly struct (PhonemeId, Weights[])`）を実装する

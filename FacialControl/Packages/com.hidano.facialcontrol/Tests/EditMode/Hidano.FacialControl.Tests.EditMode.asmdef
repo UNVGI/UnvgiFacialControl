@@ -8,6 +8,7 @@
         "Hidano.FacialControl.Editor",
         "Hidano.FacialControl.Osc",
         "Hidano.FacialControl.InputSystem",
+        "Hidano.FacialControl.LipSync",
         "Hidano.FacialControl.Tests.Shared",
         "Unity.Collections",
         "Unity.InputSystem",

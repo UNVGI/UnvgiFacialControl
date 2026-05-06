@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Hidano.FacialControl.Domain.Adapters;
+using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
 using Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.AdapterBindings;
 using NUnit.Framework;
 using UnityEditor;
@@ -145,24 +146,5 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         [SerializeReference] private List<PhonemeEntryBase> _phonemeEntries = new List<PhonemeEntryBase>();
 
         public List<PhonemeEntryBase> PhonemeEntries => _phonemeEntries;
-    }
-
-    [Serializable]
-    public abstract class PhonemeEntryBase
-    {
-        public string PhonemeId;
-        public float MaxWeight;
-    }
-
-    [Serializable]
-    public sealed class BlendShapePhonemeEntry : PhonemeEntryBase
-    {
-        public string BlendShapeName;
-    }
-
-    [Serializable]
-    public sealed class AnimationClipPhonemeEntry : PhonemeEntryBase
-    {
-        public AnimationClip Clip;
     }
 }
