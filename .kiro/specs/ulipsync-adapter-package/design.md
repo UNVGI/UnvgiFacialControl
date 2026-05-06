@@ -264,8 +264,15 @@ sequenceDiagram
     else Resolved
         Bind->>Bind: ResolveAnalyzerProfile (SerializeField or Resources fallback)
         Bind->>Bind: Build PhonemeSnapshot[] (BlendShape direct fill)
-        Bind->>Host: SampleAnimation(t=0) per AnimationClip entry
-        Note over Host: SMR weights are temporarily overwritten<br/>and restored after sampling
+        Bind->>Host: GetComponentsInChildren<SkinnedMeshRenderer>() → allSmrs
+        Bind->>Host: saveAllSmrWeights(allSmrs) → _savedWeights[][]
+        Note over Host: try { ... } finally { restoreAllSmrWeights }<br/>全 SMR の全 BlendShape weight を退避
+        loop AnimationClip entry ごと
+            Bind->>Host: AnimationClip.SampleAnimation(host, clip, 0f)
+            Bind->>Host: 全 SMR から BlendShape weight 読み取り → snapshot[entry]
+        end
+        Bind->>Host: restoreAllSmrWeights(allSmrs, _savedWeights)
+        Note over Host: 例外発生時も finally で復元、Prefab 状態を変更しない
         Bind->>Host: AddComponent AudioSource
         Bind->>Host: AddComponent uLipSync.uLipSync
         Bind->>ULS: profile = analyzerProfile
@@ -274,13 +281,20 @@ sequenceDiagram
         Bind->>Prov: new ULipSyncProvider(eventSource, snapshots, blendShapeCount)
         Bind->>ULS: onLipSyncUpdate += Prov.OnLipSyncUpdate
         Bind->>Reg: Register(slug, new LipSyncInputSource(Prov, blendShapeCount))
+        Bind->>Prov: RequestZeroOutputForNextFrame()
+        Note over Prov: 初フレーム保険 — uLipSync.uLipSync の<br/>Awake/profile 競合期間を必ず無音化
         Bind->>Bind: _started = true
     end
 ```
 
 **Key decisions**:
-- `uLipSync.uLipSync.profile` を AddComponent **後** に注入。Awake の `AllocateBuffers` は `profile=null` のまま `phonemeCount=1` で確保するが、`uLipSync.Update()` の自己整合性チェック（`profile.mfccs.Count * mfccNum != _phonemes.Length` で再 `AllocateBuffers`）が次フレームで補正する（DD-E）。
-- AnimationClip サンプリング時の SMR weight は OnStart スコープ内で完全に保存・復元。次フレームの onLipSyncUpdate イベント前に元値が復帰している保証（DD-AnimSampling）。
+- `uLipSync.uLipSync.profile` を AddComponent **後** に注入。Awake の `AllocateBuffers` は `profile=null` のまま `phonemeCount=1` で確保するが、`uLipSync.Update()` の自己整合性チェック（`profile.mfccs.Count * mfccNum != _phonemes.Length` で再 `AllocateBuffers`）が次フレームで補正する（DD-E）。この 1 フレーム期間に `onLipSyncUpdate` が garbage 値で発火した場合の保険として、`OnStart` 末尾で `Provider.RequestZeroOutputForNextFrame()` を **明示的に呼ぶ**ことで初回 `GetLipSyncValues` を強制 zero settle に固定する（DD-StartupSettle）。これにより半開きの口が一瞬出る flicker を `LipSyncInputSource.SilenceThreshold` 経路の挙動に依存させずに排除する（Req 9.3 整合）。
+- AnimationClip サンプリング時の SMR weight 保存・復元シーケンス（DD-AnimSampling）:
+  1. `ctx.HostGameObject.GetComponentsInChildren<SkinnedMeshRenderer>(includeInactive: true)` で **全 SMR を列挙**（複数メッシュ持ちキャラの衣装メッシュ等を含む）。
+  2. 各 SMR について現在の全 BlendShape weight を `float[][] _savedWeights` に退避。
+  3. `try { foreach (clip) { AnimationClip.SampleAnimation(host, clip, 0f); 各 SMR から BlendShape weight 読み取り → snapshot[entry] } } finally { 全 SMR の全 BlendShape weight を `_savedWeights` から復元 }` の順序で実行。
+  4. 例外（不正 clip / curve binding 不整合等）で中断しても `finally` 経路で必ず復元し、Prefab の BlendShape 状態を変更しない（Prefab-Clean Contract 拡張）。
+  5. 全 clip 処理後に **1 度だけ**復元するため、各 entry ごとに save/restore する必要はなく、最初の `SampleAnimation` 呼出による上書きを次の `SampleAnimation` で上書きする形で進める（性能最適化）。
 - Provider の `onLipSyncUpdate` 購読は LipSyncInputSource 登録の **直前** に行うことで、Aggregator が登録済み source を初回参照する前にイベントを 1 度受け取る最低限のタイミングを担保。
 
 ### Flow 2: ホットパス（フレーム毎）
@@ -961,8 +975,10 @@ erDiagram
 | DD-AddOrder | Resolved | コンポーネント追加順 | `AudioSource` → `uLipSync.uLipSync` → `uLipSync.profile` 注入 → `uLipSyncMicrophone` または `uLipSyncAsioInput` の deterministic 順序。Dispose は逆順 |
 | DD-PhonemeLookup | Resolved | `Dictionary<string,float>` の 0-alloc 列挙 | `info.phonemeRatios` を `_phonemeKeys[]` で `TryGetValue` ループ。Dictionary の foreach enumerator は struct なので alloc-free だが、TryGetValue ループの方が型変更耐性あり |
 | DD-Settle | Resolved | zero-frame settle 機構 | `LayerInputSourceAggregator` の per-layer `Array.Clear` + `LipSyncInputSource.TryWriteValues == false` の挙動を活用（gap-analysis §5）。本パッケージは provider に `RequestZeroOutputForNextFrame` を追加するだけ |
+| DD-StartupSettle | Resolved | AddComponent 直後の uLipSync `Awake/profile=null` 期間における garbage 出力の保険 | `OnStart` 末尾で `Provider.RequestZeroOutputForNextFrame()` を **明示呼出**し、初回 `GetLipSyncValues` を強制 zero settle に固定。これにより uLipSync の自己整合性チェック挙動に依存せず Req 9.3「半開きの口が残らない」を担保 |
+| DD-AnimSampling | Resolved | AnimationClip サンプリング時の SMR weight 副作用 | `ctx.HostGameObject` 配下の **全 SMR**（衣装メッシュ等含む）を `GetComponentsInChildren` で列挙し、全 BlendShape weight を `_savedWeights[][]` に退避 → `try { foreach (clip) SampleAnimation } finally { 全 SMR 復元 }` のパターンで例外時も Prefab 状態を変更しない。各 entry ごとの save/restore は不要（最後に 1 度だけ復元） |
 | Risk-1 | Open | `uLipSync.LipSyncUpdateEvent` (UnityEvent<LipSyncInfo>) の Invoke が内部で `List<UnityAction>` 列挙を行うため、購読者数次第で micro-alloc 発生の可能性 | Production で 1 binding = 1 listener 構成のため実質影響なし。実機計測で 0 byte 確認できれば mitigated |
-| Risk-2 | Open | `_phonemeEntries` Drawer の `[SerializeReference]` 多態リストは新規実装で工数 1〜2 日 | Editor タスクを独立 task 化し、Runtime + Tests の TDD サイクルを Drawer 完成前から進められるよう `Configure(...)` プログラム API を併設 |
+| Risk-2 | **Spike (tasks Phase 0)** | `_phonemeEntries` の `[SerializeReference]` ネスト多態リスト round-trip — `_adapterBindings` (`[SerializeReference]`) → `_phonemeEntries` (`[SerializeReference]`) の二重ネストはコア既存テストでカバーされていない。Unity 6 で `managedReferenceFullTypename` 解決失敗 → データロスのリスク | tasks の最先頭にスパイクタスクとして「ネスト SerializeReference round-trip スモークテスト」を配置（コア `SerializeReferenceRoundTripSmokeTests.cs` の 2 段ネスト版）。失敗時は `PhonemeEntryBase` を抽象クラスから `enum + 共通 struct` に切り替える退路を仕様書に明記 |
 | Risk-3 | Mitigated | uLipSync 側の `phonemeRatios` Dictionary 内容は `profile.mfccs` の音素群に依存 | profile 差異吸収のため未マップ key を無視（5.6） |
 
 ---
