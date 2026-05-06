@@ -122,6 +122,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         private Label _saveStatusLabel;
         private VisualElement _layersContainer;
         private VisualElement _gazeConfigsContainer;
+        private Button _gazeConfigBulkResolveButton;
 
         // ====================================================================
         // 候補リスト
@@ -131,6 +132,9 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         protected IExpressionAnimationClipSampler _sampler;
         private bool _autoSavePending;
+#if UNITY_EDITOR
+        private GameObject _lastReferenceModel;
+#endif
 
         // ====================================================================
         // Editor lifecycle
@@ -165,6 +169,10 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             // 自動保存: SerializedObject の変更を監視
             root.TrackSerializedObjectValue(serializedObject, _ => OnSerializedObjectChanged());
+
+#if UNITY_EDITOR
+            TrackReferenceModelChanges(root);
+#endif
 
             return root;
         }
@@ -376,16 +384,16 @@ namespace Hidano.FacialControl.Editor.Inspector
         {
             var foldout = MakeSectionFoldout(GazeConfigsFoldoutName, "GazeConfigs", open: true);
 
-            var bulkButton = new Button(() => { })
+            _gazeConfigBulkResolveButton = new Button(ResolveAllGazeConfigsFromReferenceModel)
             {
                 name = GazeConfigBulkResolveButtonName,
                 text = "全 GazeConfig を参照モデルから再解決",
-                tooltip = "参照モデルからの再解決は 3.3 で実装します。",
+                tooltip = "全ての GazeConfig を現在の参照モデルから再解決し、既存値を上書きします。",
             };
-            bulkButton.SetEnabled(false);
-            bulkButton.style.alignSelf = Align.FlexStart;
-            bulkButton.style.marginBottom = 4;
-            foldout.Add(bulkButton);
+            _gazeConfigBulkResolveButton.SetEnabled(HasReferenceModel());
+            _gazeConfigBulkResolveButton.style.alignSelf = Align.FlexStart;
+            _gazeConfigBulkResolveButton.style.marginBottom = 4;
+            foldout.Add(_gazeConfigBulkResolveButton);
 
             _gazeConfigsContainer = new VisualElement();
             _gazeConfigsContainer.style.flexDirection = FlexDirection.Column;
@@ -502,13 +510,13 @@ namespace Hidano.FacialControl.Editor.Inspector
             AddBoundClipField(row, cfgProp, "lookUpClip", "上Clip", GazeConfigLookUpClipFieldName, 92);
             AddBoundClipField(row, cfgProp, "lookDownClip", "下Clip", GazeConfigLookDownClipFieldName, 92);
 
-            var autoAssignButton = new Button(() => { })
+            var autoAssignButton = new Button(() => ResolveGazeConfigFromReferenceModel(configIndex))
             {
                 name = GazeConfigAutoAssignButtonName,
                 text = "参照モデルから自動設定",
-                tooltip = "参照モデルからの自動設定は 3.3 で実装します。",
+                tooltip = "現在の参照モデルからこの GazeConfig を再解決し、既存値を上書きします。",
             };
-            autoAssignButton.SetEnabled(false);
+            autoAssignButton.SetEnabled(HasReferenceModel());
             autoAssignButton.style.marginLeft = 4;
             row.Add(autoAssignButton);
 
@@ -742,6 +750,145 @@ namespace Hidano.FacialControl.Editor.Inspector
         {
             var prop = owner.FindPropertyRelative(propertyName);
             if (prop != null && prop.isArray) prop.ClearArray();
+        }
+
+        private void ResolveGazeConfigFromReferenceModel(int configIndex)
+        {
+            if (!HasReferenceModel() || _gazeConfigsProperty == null) return;
+
+            serializedObject.Update();
+            if (configIndex < 0 || configIndex >= _gazeConfigsProperty.arraySize) return;
+
+            AssignGazeConfigFromReferenceModel(
+                _gazeConfigsProperty.GetArrayElementAtIndex(configIndex),
+                resetRangesToDefaults: true);
+            RebuildGazeConfigsUI();
+            UpdateValidation();
+        }
+
+        private void ResolveAllGazeConfigsFromReferenceModel()
+        {
+            if (!HasReferenceModel() || _gazeConfigsProperty == null) return;
+
+            serializedObject.Update();
+            int configCount = _gazeConfigsProperty.arraySize;
+            for (int i = 0; i < configCount; i++)
+            {
+                AssignGazeConfigFromReferenceModel(
+                    _gazeConfigsProperty.GetArrayElementAtIndex(i),
+                    resetRangesToDefaults: true);
+                serializedObject.Update();
+            }
+
+            RebuildGazeConfigsUI();
+            UpdateValidation();
+        }
+
+#if UNITY_EDITOR
+        private void TrackReferenceModelChanges(VisualElement root)
+        {
+            if (root == null || _referenceModelProperty == null) return;
+
+            _lastReferenceModel = GetReferenceModel();
+            root.TrackPropertyValue(_referenceModelProperty, _ => OnReferenceModelPropertyChanged());
+        }
+
+        private void OnReferenceModelPropertyChanged()
+        {
+            var previousReferenceModel = _lastReferenceModel;
+            var currentReferenceModel = GetReferenceModel();
+            _lastReferenceModel = currentReferenceModel;
+
+            UpdateGazeConfigResolveButtonStates();
+            if (currentReferenceModel == null || currentReferenceModel == previousReferenceModel) return;
+
+            AutoFillEmptyGazeConfigsFromReferenceModel();
+        }
+
+        private void AutoFillEmptyGazeConfigsFromReferenceModel()
+        {
+            if (!HasReferenceModel() || _gazeConfigsProperty == null) return;
+
+            serializedObject.Update();
+            int configCount = _gazeConfigsProperty.arraySize;
+            for (int i = 0; i < configCount; i++)
+            {
+                var cfg = _gazeConfigsProperty.GetArrayElementAtIndex(i);
+                var leftBonePathProp = cfg.FindPropertyRelative("leftEyeBonePath");
+                var rightBonePathProp = cfg.FindPropertyRelative("rightEyeBonePath");
+                if (!IsEmptyString(leftBonePathProp) || !IsEmptyString(rightBonePathProp)) continue;
+
+                AssignGazeConfigFromReferenceModel(cfg, resetRangesToDefaults: false);
+                serializedObject.Update();
+            }
+
+            RebuildGazeConfigsUI();
+            UpdateValidation();
+        }
+#endif
+
+        private void AssignGazeConfigFromReferenceModel(
+            SerializedProperty cfg,
+            bool resetRangesToDefaults)
+        {
+            if (cfg == null) return;
+
+            AutoAssignGazeBonesFromReferenceModel(
+                cfg.FindPropertyRelative("leftEyeBonePath"),
+                cfg.FindPropertyRelative("leftEyeInitialRotation"),
+                cfg.FindPropertyRelative("rightEyeBonePath"),
+                cfg.FindPropertyRelative("rightEyeInitialRotation"),
+                cfg.FindPropertyRelative("leftEyeYawAxisLocal"),
+                cfg.FindPropertyRelative("leftEyePitchAxisLocal"),
+                cfg.FindPropertyRelative("rightEyeYawAxisLocal"),
+                cfg.FindPropertyRelative("rightEyePitchAxisLocal"));
+
+            if (!resetRangesToDefaults) return;
+
+            SetDefaultGazeConfigRanges(cfg);
+            serializedObject.ApplyModifiedProperties();
+        }
+
+        private static void SetDefaultGazeConfigRanges(SerializedProperty cfg)
+        {
+            SetFloat(cfg, "lookUpAngle", 15f);
+            SetFloat(cfg, "lookDownAngle", 9f);
+            SetFloat(cfg, "outerYawAngle", 15f);
+            SetFloat(cfg, "innerYawAngle", 18f);
+        }
+
+        private void UpdateGazeConfigResolveButtonStates()
+        {
+            bool hasReferenceModel = HasReferenceModel();
+            if (_gazeConfigBulkResolveButton != null)
+            {
+                _gazeConfigBulkResolveButton.SetEnabled(hasReferenceModel);
+            }
+
+            if (_gazeConfigsContainer == null) return;
+            _gazeConfigsContainer.Query<Button>(GazeConfigAutoAssignButtonName).ForEach(
+                button => button.SetEnabled(hasReferenceModel));
+        }
+
+        private bool HasReferenceModel()
+        {
+            return GetReferenceModel() != null;
+        }
+
+        private GameObject GetReferenceModel()
+        {
+#if UNITY_EDITOR
+            return _referenceModelProperty != null
+                ? _referenceModelProperty.objectReferenceValue as GameObject
+                : null;
+#else
+            return null;
+#endif
+        }
+
+        private static bool IsEmptyString(SerializedProperty prop)
+        {
+            return prop == null || string.IsNullOrEmpty(prop.stringValue);
         }
 
         private struct GazeConfigCandidate

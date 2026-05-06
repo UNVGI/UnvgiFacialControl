@@ -22,6 +22,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
 
         private TestCharacterSO _so;
         private UnityEditor.Editor _editor;
+        private readonly List<GameObject> _createdGameObjects = new List<GameObject>();
 
         [TearDown]
         public void TearDown()
@@ -37,6 +38,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
                 Object.DestroyImmediate(_so);
                 _so = null;
             }
+
+            for (int i = 0; i < _createdGameObjects.Count; i++)
+            {
+                if (_createdGameObjects[i] != null)
+                {
+                    Object.DestroyImmediate(_createdGameObjects[i]);
+                }
+            }
+            _createdGameObjects.Clear();
         }
 
         [Test]
@@ -114,6 +124,139 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             Assert.That(root.Q<Button>(FacialCharacterProfileSOInspector.GazeConfigBulkResolveButtonName), Is.Not.Null);
         }
 
+        [Test]
+        public void GazeConfigResolveButtons_WhenReferenceModelMissing_AreDisabled()
+        {
+            _so = CreateProfile();
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "analog-one" });
+
+            var root = BuildInspectorRoot();
+
+            var rowButton = root.Q<Button>(FacialCharacterProfileSOInspector.GazeConfigAutoAssignButtonName);
+            var bulkButton = root.Q<Button>(FacialCharacterProfileSOInspector.GazeConfigBulkResolveButtonName);
+            Assert.That(rowButton, Is.Not.Null);
+            Assert.That(bulkButton, Is.Not.Null);
+            Assert.That(rowButton.enabledSelf, Is.False);
+            Assert.That(bulkButton.enabledSelf, Is.False);
+        }
+
+        [Test]
+        public void GazeConfigResolveButtons_WhenReferenceModelAssigned_AreEnabled()
+        {
+            _so = CreateProfile();
+            _so.ReferenceModel = CreateReferenceModel();
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "analog-one" });
+
+            var root = BuildInspectorRoot();
+
+            var rowButton = root.Q<Button>(FacialCharacterProfileSOInspector.GazeConfigAutoAssignButtonName);
+            var bulkButton = root.Q<Button>(FacialCharacterProfileSOInspector.GazeConfigBulkResolveButtonName);
+            Assert.That(rowButton, Is.Not.Null);
+            Assert.That(bulkButton, Is.Not.Null);
+            Assert.That(rowButton.enabledSelf, Is.True);
+            Assert.That(bulkButton.enabledSelf, Is.True);
+        }
+
+        [Test]
+        public void ResolveGazeConfigFromReferenceModel_OverwritesExistingBoneValues()
+        {
+            _so = CreateProfile();
+            _so.ReferenceModel = CreateReferenceModel();
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig
+            {
+                expressionId = "analog-one",
+                leftEyeBonePath = "ManualLeft",
+                rightEyeBonePath = "ManualRight",
+                lookUpAngle = 42f,
+                lookDownAngle = 43f,
+                outerYawAngle = 44f,
+                innerYawAngle = 45f,
+            });
+            BuildInspectorRoot();
+
+            InvokeResolveGazeConfig(0);
+
+            Assert.That(_so.GazeConfigs[0].leftEyeBonePath, Is.EqualTo("LeftEye"));
+            Assert.That(_so.GazeConfigs[0].rightEyeBonePath, Is.EqualTo("RightEye"));
+            Assert.That(_so.GazeConfigs[0].lookUpAngle, Is.EqualTo(15f));
+            Assert.That(_so.GazeConfigs[0].lookDownAngle, Is.EqualTo(9f));
+            Assert.That(_so.GazeConfigs[0].outerYawAngle, Is.EqualTo(15f));
+            Assert.That(_so.GazeConfigs[0].innerYawAngle, Is.EqualTo(18f));
+        }
+
+        [Test]
+        public void ResolveAllGazeConfigsFromReferenceModel_OverwritesEveryEntry()
+        {
+            _so = CreateProfile();
+            _so.ReferenceModel = CreateReferenceModel();
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-two", "Analog Two", ExpressionKind.Analog));
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig
+            {
+                expressionId = "analog-one",
+                leftEyeBonePath = "ManualLeftOne",
+                rightEyeBonePath = "ManualRightOne",
+                lookUpAngle = 31f,
+            });
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig
+            {
+                expressionId = "analog-two",
+                leftEyeBonePath = "ManualLeftTwo",
+                rightEyeBonePath = "ManualRightTwo",
+                outerYawAngle = 32f,
+            });
+            BuildInspectorRoot();
+
+            InvokeResolveAllGazeConfigs();
+
+            Assert.That(_so.GazeConfigs[0].leftEyeBonePath, Is.EqualTo("LeftEye"));
+            Assert.That(_so.GazeConfigs[0].rightEyeBonePath, Is.EqualTo("RightEye"));
+            Assert.That(_so.GazeConfigs[1].leftEyeBonePath, Is.EqualTo("LeftEye"));
+            Assert.That(_so.GazeConfigs[1].rightEyeBonePath, Is.EqualTo("RightEye"));
+            Assert.That(_so.GazeConfigs[0].lookUpAngle, Is.EqualTo(15f));
+            Assert.That(_so.GazeConfigs[1].outerYawAngle, Is.EqualTo(15f));
+        }
+
+        [Test]
+        public void ReferenceModelChanged_AutoFillsOnlyEntriesWithBothBonePathsEmpty()
+        {
+            _so = CreateProfile();
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-two", "Analog Two", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-three", "Analog Three", ExpressionKind.Analog));
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig
+            {
+                expressionId = "analog-one",
+                lookUpAngle = 42f,
+            });
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig
+            {
+                expressionId = "analog-two",
+                leftEyeBonePath = "ManualLeft",
+            });
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig
+            {
+                expressionId = "analog-three",
+                leftEyeBonePath = "ManualLeftThree",
+                rightEyeBonePath = "ManualRightThree",
+            });
+            BuildInspectorRoot();
+
+            AssignReferenceModel(CreateReferenceModel());
+            InvokeReferenceModelChanged();
+
+            Assert.That(_so.GazeConfigs[0].leftEyeBonePath, Is.EqualTo("LeftEye"));
+            Assert.That(_so.GazeConfigs[0].rightEyeBonePath, Is.EqualTo("RightEye"));
+            Assert.That(_so.GazeConfigs[0].lookUpAngle, Is.EqualTo(42f));
+            Assert.That(_so.GazeConfigs[1].leftEyeBonePath, Is.EqualTo("ManualLeft"));
+            Assert.That(_so.GazeConfigs[1].rightEyeBonePath, Is.Null.Or.Empty);
+            Assert.That(_so.GazeConfigs[2].leftEyeBonePath, Is.EqualTo("ManualLeftThree"));
+            Assert.That(_so.GazeConfigs[2].rightEyeBonePath, Is.EqualTo("ManualRightThree"));
+        }
+
         private VisualElement BuildInspectorRoot()
         {
             _editor = UnityEditor.Editor.CreateEditor(_so, typeof(FacialCharacterProfileSOInspector));
@@ -128,6 +271,59 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(method, Is.Not.Null);
             method.Invoke(_editor, new object[] { expressionId });
+        }
+
+        private void InvokeResolveGazeConfig(int index)
+        {
+            var method = typeof(FacialCharacterProfileSOInspector).GetMethod(
+                "ResolveGazeConfigFromReferenceModel",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(_editor, new object[] { index });
+        }
+
+        private void InvokeResolveAllGazeConfigs()
+        {
+            var method = typeof(FacialCharacterProfileSOInspector).GetMethod(
+                "ResolveAllGazeConfigsFromReferenceModel",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(_editor, null);
+        }
+
+        private void InvokeReferenceModelChanged()
+        {
+            var method = typeof(FacialCharacterProfileSOInspector).GetMethod(
+                "OnReferenceModelPropertyChanged",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(_editor, null);
+        }
+
+        private void AssignReferenceModel(GameObject referenceModel)
+        {
+            var so = _editor.serializedObject;
+            so.Update();
+            var prop = so.FindProperty("_referenceModel");
+            Assert.That(prop, Is.Not.Null);
+            prop.objectReferenceValue = referenceModel;
+            so.ApplyModifiedProperties();
+        }
+
+        private GameObject CreateReferenceModel()
+        {
+            var root = new GameObject("ReferenceModel");
+            _createdGameObjects.Add(root);
+
+            var leftEye = new GameObject("LeftEye");
+            leftEye.transform.SetParent(root.transform, false);
+            leftEye.transform.localEulerAngles = new Vector3(1f, 2f, 3f);
+
+            var rightEye = new GameObject("RightEye");
+            rightEye.transform.SetParent(root.transform, false);
+            rightEye.transform.localEulerAngles = new Vector3(4f, 5f, 6f);
+
+            return root;
         }
 
         private static TestCharacterSO CreateProfile()
