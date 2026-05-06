@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
@@ -10,6 +12,7 @@ using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
 using Hidano.FacialControl.LipSync.Tests.Shared;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
 {
@@ -141,6 +144,90 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
             _binding.Provider.GetLipSyncValues(output);
             Assert.That(output[0], Is.GreaterThan(0f),
                 "zero settle は初回読み出しだけに適用され、受信済みの非ゼロ値は次回以降に読めるべき。");
+        }
+
+        [UnityTest]
+        public IEnumerator Dispose_AfterStart_RemovesAllAddedComponentsAndUnregistersInputSource()
+        {
+            _binding = CreateBinding();
+            AdapterBuildContext ctx = CreateContext();
+
+            _binding.OnStart(in ctx);
+            _bindingStarted = true;
+
+            var audioSource = _hostGameObject.GetComponent<AudioSource>();
+            var analyzer = _hostGameObject.GetComponent<uLipSync.uLipSync>();
+            var microphone = _hostGameObject.GetComponent<uLipSync.uLipSyncMicrophone>();
+            Assert.That(audioSource, Is.Not.Null);
+            Assert.That(analyzer, Is.Not.Null);
+            Assert.That(microphone, Is.Not.Null);
+            Assert.That(_registry.TryResolve(Slug, out _), Is.True);
+
+            _binding.Dispose();
+            _bindingStarted = false;
+
+            yield return null;
+
+            Assert.That(_binding.IsStarted, Is.False);
+            Assert.That(_binding.Provider, Is.Null);
+            Assert.That(_binding.InputSource, Is.Null);
+            Assert.That(_binding.Analyzer, Is.Null);
+            Assert.That(audioSource == null, Is.True);
+            Assert.That(analyzer == null, Is.True);
+            Assert.That(microphone == null, Is.True);
+            Assert.That(_hostGameObject.GetComponent<AudioSource>(), Is.Null);
+            Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSync>(), Is.Null);
+            Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncMicrophone>(), Is.Null);
+            Assert.That(_registry.TryResolve(Slug, out var removed), Is.False);
+            Assert.That(removed, Is.Null);
+            CollectionAssert.DoesNotContain(_registry.RegisteredIds, Slug);
+        }
+
+        [Test]
+        public void OnFixedTick_WhenSwapIsNotPending_IsNoOp()
+        {
+            _binding = CreateBinding();
+            AdapterBuildContext ctx = CreateContext();
+
+            _binding.OnStart(in ctx);
+            _bindingStarted = true;
+
+            var analyzer = _binding.Analyzer;
+            var provider = _binding.Provider;
+            var inputSource = _binding.InputSource;
+
+            _binding.OnFixedTick(0.02f);
+            _binding.OnFixedTick(0.02f);
+
+            Assert.That(_binding.IsStarted, Is.True);
+            Assert.That(_binding.Analyzer, Is.SameAs(analyzer));
+            Assert.That(_binding.Provider, Is.SameAs(provider));
+            Assert.That(_binding.InputSource, Is.SameAs(inputSource));
+            Assert.That(_registry.TryResolve(Slug, out IInputSource resolved), Is.True);
+            Assert.That(resolved, Is.SameAs(inputSource));
+        }
+
+        [Test]
+        public void OnStart_DuplicateSlug_LogsErrorAndSkipsInitialization()
+        {
+            _binding = CreateBinding();
+            AdapterBuildContext ctx = CreateContext();
+
+            _binding.OnStart(in ctx);
+            _bindingStarted = true;
+
+            int analyzerCountBefore = _hostGameObject.GetComponents<uLipSync.uLipSync>().Length;
+            var duplicate = CreateBinding();
+
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex("ULipSyncAdapterBinding.*ulipsync.*already registered"));
+            duplicate.OnStart(in ctx);
+
+            Assert.That(duplicate.IsStarted, Is.False);
+            Assert.That(duplicate.Provider, Is.Null);
+            Assert.That(duplicate.InputSource, Is.Null);
+            Assert.That(_hostGameObject.GetComponents<uLipSync.uLipSync>().Length, Is.EqualTo(analyzerCountBefore));
         }
 
         private ULipSyncAdapterBinding CreateBinding()

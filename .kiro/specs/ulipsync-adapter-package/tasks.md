@@ -167,7 +167,7 @@
   - _Requirements: 4.3, 4.4, 4.5, 4.7, 14.1, 14.5_
   - _Boundary: Tests/EditMode/Adapters_
 
-- [ ] 7.5 `Dispose` と OnFixedTick を実装する
+- [x] 7.5 `Dispose` と OnFixedTick を実装する
   - `Dispose` で (a) `Provider.Dispose`（購読解除）、(b) `ctx.InputSourceRegistry.Unregister(slug)`、(c) AddComponent した uLipSync 系コンポーネント全件を `UnityEngine.Object.Destroy`、(d) `_started = false`、を逆順で実行する
   - `OnFixedTick(float dt)` は `_swapPending` フラグ判定経路のみ持ち、フラグ未セット時は no-op（GC 0 byte 維持、**11.2**）
   - 重複 binding 検知: `Register` が既に同 slug 登録済みの場合 `Debug.LogError` + 後続初期化を skip（**10.3**）

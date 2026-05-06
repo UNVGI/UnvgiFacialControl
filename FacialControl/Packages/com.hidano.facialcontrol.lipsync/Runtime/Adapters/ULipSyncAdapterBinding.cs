@@ -64,6 +64,18 @@ namespace Hidano.FacialControl.LipSync.Adapters
         private bool _started;
 
         [NonSerialized]
+        private IInputSourceRegistry _inputSourceRegistry;
+
+        [NonSerialized]
+        private AdapterSlug _registeredSlug;
+
+        [NonSerialized]
+        private bool _registeredInputSource;
+
+        [NonSerialized]
+        private bool _swapPending;
+
+        [NonSerialized]
         private bool _addedAudioSource;
 
         public ULipSyncAdapterBinding()
@@ -122,6 +134,14 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 return;
             }
 
+            if (ctx.InputSourceRegistry.TryResolve(slug.Value, out _))
+            {
+                Debug.LogError(
+                    $"[ULipSyncAdapterBinding] Input source slug '{slug.Value}' is already registered. " +
+                    "Duplicate binding initialization was skipped.");
+                return;
+            }
+
             DeviceResolution resolution = DeviceResolver.Resolve(
                 _deviceDescriptor,
                 _asioEnumerator ?? new DefaultAsioDriverEnumerator(),
@@ -164,6 +184,9 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 _provider = new ULipSyncProvider(_eventBridge, snapshots, ctx.BlendShapeNames.Count);
                 _inputSource = new LipSyncInputSource(_provider, ctx.BlendShapeNames.Count);
                 ctx.InputSourceRegistry.Register(slug, _inputSource);
+                _inputSourceRegistry = ctx.InputSourceRegistry;
+                _registeredSlug = slug;
+                _registeredInputSource = true;
 
                 _provider.RequestZeroOutputForNextFrame();
                 _started = true;
@@ -173,6 +196,16 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 Debug.LogError($"[ULipSyncAdapterBinding] OnStart failed: {exception}");
                 RollbackStartedResources();
             }
+        }
+
+        public override void OnFixedTick(float fixedDeltaTime)
+        {
+            if (!_started || !_swapPending)
+            {
+                return;
+            }
+
+            _swapPending = false;
         }
 
         public override void Dispose()
@@ -529,14 +562,21 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
         private void RollbackStartedResources()
         {
-            _started = false;
-            _inputSource = null;
-
             if (_provider != null)
             {
                 _provider.Dispose();
                 _provider = null;
             }
+
+            if (_registeredInputSource && _inputSourceRegistry != null)
+            {
+                _inputSourceRegistry.Unregister(_registeredSlug);
+            }
+
+            _registeredInputSource = false;
+            _inputSourceRegistry = null;
+            _registeredSlug = default;
+            _inputSource = null;
 
             if (_eventBridge != null)
             {
@@ -570,6 +610,8 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
             _audioSource = null;
             _addedAudioSource = false;
+            _swapPending = false;
+            _started = false;
         }
     }
 }
