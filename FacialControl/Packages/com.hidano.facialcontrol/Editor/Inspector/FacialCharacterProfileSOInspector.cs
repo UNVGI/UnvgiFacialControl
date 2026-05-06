@@ -38,9 +38,11 @@ namespace Hidano.FacialControl.Editor.Inspector
         // ====================================================================
 
         public const string LayersFoldoutName = "facial-character-layers-foldout";
+        public const string GazeConfigsFoldoutName = "facial-character-gaze-configs-foldout";
         public const string DebugFoldoutName = "facial-character-debug-foldout";
         public const string AdapterBindingsFoldoutName = "facial-character-adapter-bindings-foldout";
 
+        public const string SaveStatusBarName = "facial-character-save-status-bar";
         public const string SaveButtonName = "facial-character-save-button";
         public const string SaveStatusLabelName = "facial-character-save-status";
         public const string ExpressionsValidationHelpName = "facial-character-expressions-validation";
@@ -132,10 +134,11 @@ namespace Hidano.FacialControl.Editor.Inspector
             }
 
             BuildSaveStatusBar(root);
+            BuildReferenceModelSection(root);
+            BuildLayersSection(root);
+            BuildGazeConfigsSection(root);
             OnBuildPreLayersSections(root);
             BuildAdapterBindingsSection(root);
-            BuildLayersSection(root);
-            BuildReferenceModelSection(root);
             BuildDebugSection(root);
 
             RefreshLayerNameChoices();
@@ -210,10 +213,19 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         private void BuildSaveStatusBar(VisualElement root)
         {
-            var bar = new VisualElement();
+            var bar = new VisualElement
+            {
+                name = SaveStatusBarName,
+            };
             bar.style.flexDirection = FlexDirection.Row;
             bar.style.alignItems = Align.Center;
+            bar.style.paddingLeft = 6;
+            bar.style.paddingRight = 6;
+            bar.style.paddingTop = 4;
+            bar.style.paddingBottom = 4;
             bar.style.marginBottom = 6;
+            bar.style.borderBottomColor = new StyleColor(new Color(0.28f, 0.28f, 0.28f, 0.45f));
+            bar.style.borderBottomWidth = 1;
 
             _saveStatusLabel = new Label("変更は自動的に保存されます")
             {
@@ -334,6 +346,16 @@ namespace Hidano.FacialControl.Editor.Inspector
             listView.Bind(serializedObject);
             foldout.Add(listView);
 
+            root.Add(foldout);
+        }
+
+        // ====================================================================
+        // Section: GazeConfigs
+        // ====================================================================
+
+        private void BuildGazeConfigsSection(VisualElement root)
+        {
+            var foldout = MakeSectionFoldout(GazeConfigsFoldoutName, "GazeConfigs", open: true);
             root.Add(foldout);
         }
 
