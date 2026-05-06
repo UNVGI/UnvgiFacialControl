@@ -106,7 +106,7 @@
   - 観測可能完了条件: 5.1 のテストが全て green になる
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 11.1, 11.3_
 
-- [ ] 5.3 (P) `ULipSyncProvider` ホットパス 0 byte ベンチマークテストを追加する
+- [x] 5.3 (P) `ULipSyncProvider` ホットパス 0 byte ベンチマークテストを追加する
   - `Tests/EditMode/Performance/ULipSyncProviderAllocationTests.cs` を新規作成し、`GC.GetTotalAllocatedBytes(true)` 差分計測パターン（既存 `Tests/PlayMode/Performance/GCAllocationTests.cs` 等を踏襲）で `OnLipSyncUpdate` + `GetLipSyncValues` を 10000 回連続呼出した差分が 0 byte であることを assert する
   - 観測可能完了条件: ベンチマークテストが green、即ちホットパスでヒープ確保が発生しないことが保証される
   - _Requirements: 11.1, 11.3, 11.4, 14.1_
