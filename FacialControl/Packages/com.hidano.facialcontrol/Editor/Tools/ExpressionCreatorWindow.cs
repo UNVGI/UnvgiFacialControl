@@ -287,7 +287,7 @@ namespace Hidano.FacialControl.Editor.Tools
             if (_modelField == null || _targetObject != null)
                 return;
 
-            var controller = UnityEngine.Object.FindObjectOfType<FacialController>();
+            var controller = UnityEngine.Object.FindFirstObjectByType<FacialController>();
             if (controller != null)
             {
                 _modelField.value = controller.gameObject;

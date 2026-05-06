@@ -340,22 +340,27 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         }
 
         [Test]
-        public void ExpressionRows_DoNotRenderLegacyIdLabelOrGazeControls()
+        public void ExpressionRows_DoNotRenderIdTextOrGazeConfigControls()
         {
             _so = CreateProfile();
             _so.Layers.Add(CreateLayer("base"));
             _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
 
             var root = BuildInspectorRoot();
+            var layersSection = root.Q<VisualElement>(FacialCharacterProfileSOInspector.LayersFoldoutName);
+            Assert.That(layersSection, Is.Not.Null);
 
-            Assert.That(root.Q<Label>("expression-row-id-label"), Is.Null);
-            Assert.That(root.Q<TextField>(FacialCharacterProfileSOInspector.ExpressionRowGazeLeftBonePathName), Is.Null);
-            Assert.That(root.Q<TextField>(FacialCharacterProfileSOInspector.ExpressionRowGazeRightBonePathName), Is.Null);
-            Assert.That(root.Q<Button>(FacialCharacterProfileSOInspector.ExpressionRowGazeAutoAssignButtonName), Is.Null);
-            Assert.That(root.Q<ObjectField>(FacialCharacterProfileSOInspector.ExpressionRowGazeLookLeftClipName), Is.Null);
-            Assert.That(root.Q<ObjectField>(FacialCharacterProfileSOInspector.ExpressionRowGazeLookRightClipName), Is.Null);
-            Assert.That(root.Q<ObjectField>(FacialCharacterProfileSOInspector.ExpressionRowGazeLookUpClipName), Is.Null);
-            Assert.That(root.Q<ObjectField>(FacialCharacterProfileSOInspector.ExpressionRowGazeLookDownClipName), Is.Null);
+            var layerLabels = new List<string>();
+            layersSection.Query<Label>().ForEach(label => layerLabels.Add(label.text));
+            Assert.That(layerLabels, Does.Not.Contain("analog-one"));
+            Assert.That(layersSection.Q<VisualElement>(FacialCharacterProfileSOInspector.GazeConfigRowName), Is.Null);
+            Assert.That(layersSection.Q<TextField>(FacialCharacterProfileSOInspector.GazeConfigLeftBonePathFieldName), Is.Null);
+            Assert.That(layersSection.Q<TextField>(FacialCharacterProfileSOInspector.GazeConfigRightBonePathFieldName), Is.Null);
+            Assert.That(layersSection.Q<Button>(FacialCharacterProfileSOInspector.GazeConfigAutoAssignButtonName), Is.Null);
+            Assert.That(layersSection.Q<ObjectField>(FacialCharacterProfileSOInspector.GazeConfigLookLeftClipFieldName), Is.Null);
+            Assert.That(layersSection.Q<ObjectField>(FacialCharacterProfileSOInspector.GazeConfigLookRightClipFieldName), Is.Null);
+            Assert.That(layersSection.Q<ObjectField>(FacialCharacterProfileSOInspector.GazeConfigLookUpClipFieldName), Is.Null);
+            Assert.That(layersSection.Q<ObjectField>(FacialCharacterProfileSOInspector.GazeConfigLookDownClipFieldName), Is.Null);
         }
 
         [Test]
