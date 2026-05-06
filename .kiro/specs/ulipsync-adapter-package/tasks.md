@@ -152,7 +152,7 @@
   - 観測可能完了条件: 7.1 のテストが green、`HostGameObject` への AddComponent 順序と Provider 初期化が assert を通過
   - _Requirements: 2.1, 2.2, 2.3, 3.2, 3.4, 3.5, 6.1, 6.2, 6.3, 6.7, 10.2, 10.4_
 
-- [ ] 7.3 `BuildSnapshots` を実装し AnimationClip time-0 サンプリングを安全化する
+- [x] 7.3 `BuildSnapshots` を実装し AnimationClip time-0 サンプリングを安全化する
   - `_phonemeEntries` を走査して `PhonemeSnapshot[]` を構築する private メソッドを実装する
   - BlendShape 形式: `BlendShapeName` を SMR の BlendShape 名と照合し、対応 index に `MaxWeight / 100 * _maxWeightScale` を fill。未解決時 `Debug.LogWarning` + skip（**4.7**）
   - AnimationClip 形式: `ctx.HostGameObject.GetComponentsInChildren<SkinnedMeshRenderer>(includeInactive: true)` で全 SMR 列挙 → 各 SMR の全 BlendShape weight を `_savedWeights[][]` に退避 → `try { foreach (clip) AnimationClip.SampleAnimation(host, clip, 0f); 各 SMR から weight 読み取り → snapshot[entry] } finally { 全 SMR 復元 }` の順で実行（**DD-AnimSampling**）

@@ -224,64 +224,96 @@ namespace Hidano.FacialControl.LipSync.Adapters
         private PhonemeSnapshot[] BuildSnapshots(in AdapterBuildContext ctx)
         {
             var snapshots = new List<PhonemeSnapshot>(_phonemeEntries.Count);
-            SkinnedMeshRenderer renderer = null;
+            SkinnedMeshRenderer[] renderers =
+                ctx.HostGameObject.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            SkinnedMeshRenderer targetRenderer = ResolveRenderer(ctx.HostGameObject, renderers);
+            SavedBlendShapeWeights[] savedWeights = HasAnimationClipEntries()
+                ? SaveBlendShapeWeights(renderers)
+                : null;
 
-            for (int i = 0; i < _phonemeEntries.Count; i++)
+            try
             {
-                PhonemeEntryBase entry = _phonemeEntries[i];
-                if (entry == null)
+                for (int i = 0; i < _phonemeEntries.Count; i++)
                 {
-                    Debug.LogWarning($"[ULipSyncAdapterBinding] Phoneme entry at index {i} is null. Skipping.");
-                    continue;
-                }
+                    PhonemeEntryBase entry = _phonemeEntries[i];
+                    if (entry == null)
+                    {
+                        Debug.LogWarning($"[ULipSyncAdapterBinding] Phoneme entry at index {i} is null. Skipping.");
+                        continue;
+                    }
 
-                if (string.IsNullOrEmpty(entry.PhonemeId))
-                {
-                    Debug.LogWarning(
-                        $"[ULipSyncAdapterBinding] PhonemeId is empty at index {i}. Skipping.");
-                    continue;
-                }
+                    if (string.IsNullOrEmpty(entry.PhonemeId))
+                    {
+                        Debug.LogWarning(
+                            $"[ULipSyncAdapterBinding] PhonemeId is empty at index {i}. Skipping.");
+                        continue;
+                    }
 
-                float[] weights = new float[ctx.BlendShapeNames.Count];
-                if (entry is BlendShapePhonemeEntry blendShapeEntry)
-                {
-                    FillBlendShapeSnapshot(blendShapeEntry, ctx.BlendShapeNames, weights);
-                    snapshots.Add(new PhonemeSnapshot(entry.PhonemeId, weights));
-                    continue;
-                }
+                    float[] weights = new float[ctx.BlendShapeNames.Count];
+                    if (entry is BlendShapePhonemeEntry blendShapeEntry)
+                    {
+                        if (TryFillBlendShapeSnapshot(
+                                blendShapeEntry,
+                                targetRenderer,
+                                ctx.BlendShapeNames,
+                                weights))
+                        {
+                            snapshots.Add(new PhonemeSnapshot(entry.PhonemeId, weights));
+                        }
 
-                if (entry is AnimationClipPhonemeEntry animationEntry)
-                {
-                    renderer = renderer == null ? ResolveRenderer(ctx.HostGameObject) : renderer;
-                    if (TryFillAnimationClipSnapshot(animationEntry, renderer, ctx, weights))
+                        continue;
+                    }
+
+                    if (entry is AnimationClipPhonemeEntry animationEntry
+                        && TryFillAnimationClipSnapshot(
+                            animationEntry,
+                            targetRenderer,
+                            savedWeights,
+                            ctx,
+                            weights))
                     {
                         snapshots.Add(new PhonemeSnapshot(entry.PhonemeId, weights));
                     }
                 }
             }
+            finally
+            {
+                RestoreBlendShapeWeights(savedWeights);
+            }
 
             return snapshots.ToArray();
         }
 
-        private void FillBlendShapeSnapshot(
+        private bool TryFillBlendShapeSnapshot(
             BlendShapePhonemeEntry entry,
+            SkinnedMeshRenderer targetRenderer,
             IReadOnlyList<string> blendShapeNames,
             float[] weights)
         {
-            int index = FindBlendShapeIndex(blendShapeNames, entry.BlendShapeName);
-            if (index < 0)
+            if (targetRenderer == null || targetRenderer.sharedMesh == null)
             {
                 Debug.LogWarning(
                     $"[ULipSyncAdapterBinding] BlendShape '{entry.BlendShapeName}' could not be resolved.");
-                return;
+                return false;
+            }
+
+            int index = FindBlendShapeIndex(blendShapeNames, entry.BlendShapeName);
+            int meshIndex = targetRenderer.sharedMesh.GetBlendShapeIndex(entry.BlendShapeName);
+            if (index < 0 || meshIndex < 0)
+            {
+                Debug.LogWarning(
+                    $"[ULipSyncAdapterBinding] BlendShape '{entry.BlendShapeName}' could not be resolved.");
+                return false;
             }
 
             weights[index] = NormalizeWeight(entry.MaxWeight);
+            return true;
         }
 
         private bool TryFillAnimationClipSnapshot(
             AnimationClipPhonemeEntry entry,
-            SkinnedMeshRenderer renderer,
+            SkinnedMeshRenderer targetRenderer,
+            SavedBlendShapeWeights[] savedWeights,
             in AdapterBuildContext ctx,
             float[] weights)
         {
@@ -292,45 +324,34 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 return false;
             }
 
-            if (renderer == null || renderer.sharedMesh == null)
+            if (targetRenderer == null || targetRenderer.sharedMesh == null)
             {
                 Debug.LogWarning(
                     $"[ULipSyncAdapterBinding] No SkinnedMeshRenderer was found for phoneme '{entry.PhonemeId}'.");
                 return false;
             }
 
-            Mesh mesh = renderer.sharedMesh;
-            int blendShapeCount = mesh.blendShapeCount;
-            var previousWeights = new float[blendShapeCount];
-            for (int i = 0; i < blendShapeCount; i++)
-            {
-                previousWeights[i] = renderer.GetBlendShapeWeight(i);
-                renderer.SetBlendShapeWeight(i, 0f);
-            }
-
+            ClearBlendShapeWeights(savedWeights);
             entry.Clip.SampleAnimation(ctx.HostGameObject, 0f);
 
+            Mesh mesh = targetRenderer.sharedMesh;
             float scale = NormalizeWeight(entry.MaxWeight);
             for (int i = 0; i < ctx.BlendShapeNames.Count; i++)
             {
                 int meshIndex = mesh.GetBlendShapeIndex(ctx.BlendShapeNames[i]);
                 if (meshIndex >= 0)
                 {
-                    weights[i] = Mathf.Clamp01((renderer.GetBlendShapeWeight(meshIndex) / 100f) * scale);
+                    weights[i] = Mathf.Clamp01((targetRenderer.GetBlendShapeWeight(meshIndex) / 100f) * scale);
                 }
-            }
-
-            for (int i = 0; i < blendShapeCount; i++)
-            {
-                renderer.SetBlendShapeWeight(i, previousWeights[i]);
             }
 
             return true;
         }
 
-        private SkinnedMeshRenderer ResolveRenderer(GameObject hostGameObject)
+        private SkinnedMeshRenderer ResolveRenderer(
+            GameObject hostGameObject,
+            SkinnedMeshRenderer[] renderers)
         {
-            SkinnedMeshRenderer[] renderers = hostGameObject.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             if (renderers == null || renderers.Length == 0)
             {
                 return null;
@@ -356,6 +377,90 @@ namespace Hidano.FacialControl.LipSync.Adapters
             }
 
             return renderers[0];
+        }
+
+        private bool HasAnimationClipEntries()
+        {
+            for (int i = 0; i < _phonemeEntries.Count; i++)
+            {
+                if (_phonemeEntries[i] is AnimationClipPhonemeEntry)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static SavedBlendShapeWeights[] SaveBlendShapeWeights(SkinnedMeshRenderer[] renderers)
+        {
+            if (renderers == null || renderers.Length == 0)
+            {
+                return Array.Empty<SavedBlendShapeWeights>();
+            }
+
+            var savedWeights = new SavedBlendShapeWeights[renderers.Length];
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                SkinnedMeshRenderer renderer = renderers[i];
+                Mesh mesh = renderer != null ? renderer.sharedMesh : null;
+                int blendShapeCount = mesh != null ? mesh.blendShapeCount : 0;
+                var weights = new float[blendShapeCount];
+                for (int j = 0; j < blendShapeCount; j++)
+                {
+                    weights[j] = renderer.GetBlendShapeWeight(j);
+                }
+
+                savedWeights[i] = new SavedBlendShapeWeights(renderer, weights);
+            }
+
+            return savedWeights;
+        }
+
+        private static void ClearBlendShapeWeights(SavedBlendShapeWeights[] savedWeights)
+        {
+            if (savedWeights == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < savedWeights.Length; i++)
+            {
+                SkinnedMeshRenderer renderer = savedWeights[i].Renderer;
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                int blendShapeCount = savedWeights[i].Weights.Length;
+                for (int j = 0; j < blendShapeCount; j++)
+                {
+                    renderer.SetBlendShapeWeight(j, 0f);
+                }
+            }
+        }
+
+        private static void RestoreBlendShapeWeights(SavedBlendShapeWeights[] savedWeights)
+        {
+            if (savedWeights == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < savedWeights.Length; i++)
+            {
+                SkinnedMeshRenderer renderer = savedWeights[i].Renderer;
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                float[] weights = savedWeights[i].Weights;
+                for (int j = 0; j < weights.Length; j++)
+                {
+                    renderer.SetBlendShapeWeight(j, weights[j]);
+                }
+            }
         }
 
         private static string GetRelativePath(Transform root, Transform target)
@@ -408,6 +513,18 @@ namespace Hidano.FacialControl.LipSync.Adapters
             }
 
             return -1;
+        }
+
+        private readonly struct SavedBlendShapeWeights
+        {
+            public readonly SkinnedMeshRenderer Renderer;
+            public readonly float[] Weights;
+
+            public SavedBlendShapeWeights(SkinnedMeshRenderer renderer, float[] weights)
+            {
+                Renderer = renderer;
+                Weights = weights;
+            }
         }
 
         private void RollbackStartedResources()
