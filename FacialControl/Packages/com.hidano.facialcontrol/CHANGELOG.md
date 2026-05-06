@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Breaking changes
+
+- GazeConfig は `InputSystemAdapterBinding._gazeConfigs` から `FacialCharacterProfileSO` ルート直下の `_gazeConfigs` へ昇格しました。InputSystem 側は入力結線のみを保持する構造に変わるため、既存 SO YAML は binding 内部の gaze configs を SO ルートへ移植する必要があります。
+- `profile.json` の `schemaVersion` を `"2.1"` に bump しました。旧 `"2.0"` 形式は preview 段階の破壊的変更として migration なしで扱われます。
+
 ### ⚠ BREAKING CHANGES — Adapter Binding アーキテクチャ移行 (spec `adapter-binding-architecture`)
 
 > 本リリースは spec `adapter-binding-architecture` に基づく Adapter 結線モデルの全面刷新を含む。**v0.1.0-preview.2 以前の `FacialCharacterSO` / `*FacialControllerExtension` MonoBehaviour 経路 / reserved id (`controller-expr` / `keyboard-expr` / `osc` / `lipsync` / `input` 等) を前提とする scene / asset / JSON はロード・動作できない**。preview 段階のため自動マイグレーションは提供しない（Req 8.1, 8.3）。移行手順は [`Documentation~/migration-guide.md`](Documentation~/migration-guide.md) を参照（Req 8.2, 8.5）。
