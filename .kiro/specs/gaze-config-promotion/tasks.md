@@ -108,7 +108,7 @@
   - 観測条件: 両方空の entry のみ自動補完されることと、単行 / 一括ボタンが上書き再解決を実行することが Editor test で確認できる
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
 
-- [ ] 3.4 孤児 GazeConfig の自動削除と Undo group 集約を実装する
+- [x] 3.4 孤児 GazeConfig の自動削除と Undo group 集約を実装する
   - Expression 削除時 / Analog→非 Analog kind 変換時に同 expressionId の gaze config を SO ルートから削除する
   - `Undo.IncrementCurrentGroup` / `SetCurrentGroupName` / `CollapseUndoOperations` で 1 ユーザー操作 = 1 Undo step に集約する
   - 削除トリガーが (a) ユーザー明示削除 / (b) Expression 削除 / (c) Analog→Digital 変換 の 3 種に限定されることを実装上保証する

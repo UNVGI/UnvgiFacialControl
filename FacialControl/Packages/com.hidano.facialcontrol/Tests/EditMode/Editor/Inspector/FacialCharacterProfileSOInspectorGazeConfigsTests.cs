@@ -27,6 +27,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         [TearDown]
         public void TearDown()
         {
+            Undo.ClearAll();
+
             if (_editor != null)
             {
                 Object.DestroyImmediate(_editor);
@@ -257,6 +259,86 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             Assert.That(_so.GazeConfigs[2].rightEyeBonePath, Is.EqualTo("ManualRightThree"));
         }
 
+        [Test]
+        public void RemoveExpression_RemovesMatchingGazeConfigAndUndoRestoresBothInOneStep()
+        {
+            Undo.ClearAll();
+            _so = CreateProfile();
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "analog-one" });
+            BuildInspectorRoot();
+
+            InvokeRemoveExpression(0);
+
+            Assert.That(_so.Expressions, Is.Empty);
+            Assert.That(_so.GazeConfigs, Is.Empty);
+
+            Undo.PerformUndo();
+
+            Assert.That(_so.Expressions, Has.Count.EqualTo(1));
+            Assert.That(_so.Expressions[0].id, Is.EqualTo("analog-one"));
+            Assert.That(_so.GazeConfigs, Has.Count.EqualTo(1));
+            Assert.That(_so.GazeConfigs[0].expressionId, Is.EqualTo("analog-one"));
+        }
+
+        [Test]
+        public void ChangeExpressionKind_AnalogToDigital_RemovesMatchingGazeConfigAndUndoRestoresBothInOneStep()
+        {
+            Undo.ClearAll();
+            _so = CreateProfile();
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "analog-one" });
+            BuildInspectorRoot();
+
+            InvokeChangeExpressionKind(0, ExpressionKind.Digital);
+
+            Assert.That(_so.Expressions[0].kind, Is.EqualTo(ExpressionKind.Digital));
+            Assert.That(_so.GazeConfigs, Is.Empty);
+
+            Undo.PerformUndo();
+
+            Assert.That(_so.Expressions[0].kind, Is.EqualTo(ExpressionKind.Analog));
+            Assert.That(_so.GazeConfigs, Has.Count.EqualTo(1));
+            Assert.That(_so.GazeConfigs[0].expressionId, Is.EqualTo("analog-one"));
+        }
+
+        [Test]
+        public void ChangeExpressionKind_DigitalToDigital_DoesNotRemoveGazeConfig()
+        {
+            _so = CreateProfile();
+            _so.Expressions.Add(CreateExpression("digital-one", "Digital One", ExpressionKind.Digital));
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "digital-one" });
+            BuildInspectorRoot();
+
+            InvokeChangeExpressionKind(0, ExpressionKind.Digital);
+
+            Assert.That(_so.Expressions[0].kind, Is.EqualTo(ExpressionKind.Digital));
+            Assert.That(_so.GazeConfigs, Has.Count.EqualTo(1));
+            Assert.That(_so.GazeConfigs[0].expressionId, Is.EqualTo("digital-one"));
+        }
+
+        [Test]
+        public void RemoveGazeConfigAt_ExplicitUserRemoval_DoesNotRemoveExpressionAndUndoRestoresConfig()
+        {
+            Undo.ClearAll();
+            _so = CreateProfile();
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "analog-one" });
+            BuildInspectorRoot();
+
+            InvokeRemoveGazeConfigAt(0);
+
+            Assert.That(_so.Expressions, Has.Count.EqualTo(1));
+            Assert.That(_so.Expressions[0].id, Is.EqualTo("analog-one"));
+            Assert.That(_so.GazeConfigs, Is.Empty);
+
+            Undo.PerformUndo();
+
+            Assert.That(_so.Expressions, Has.Count.EqualTo(1));
+            Assert.That(_so.GazeConfigs, Has.Count.EqualTo(1));
+            Assert.That(_so.GazeConfigs[0].expressionId, Is.EqualTo("analog-one"));
+        }
+
         private VisualElement BuildInspectorRoot()
         {
             _editor = UnityEditor.Editor.CreateEditor(_so, typeof(FacialCharacterProfileSOInspector));
@@ -289,6 +371,33 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(method, Is.Not.Null);
             method.Invoke(_editor, null);
+        }
+
+        private void InvokeRemoveExpression(int index)
+        {
+            var method = typeof(FacialCharacterProfileSOInspector).GetMethod(
+                "RemoveExpression",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(_editor, new object[] { index });
+        }
+
+        private void InvokeChangeExpressionKind(int index, ExpressionKind kind)
+        {
+            var method = typeof(FacialCharacterProfileSOInspector).GetMethod(
+                "ChangeExpressionKind",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(_editor, new object[] { index, kind });
+        }
+
+        private void InvokeRemoveGazeConfigAt(int index)
+        {
+            var method = typeof(FacialCharacterProfileSOInspector).GetMethod(
+                "RemoveGazeConfigAt",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(_editor, new object[] { index });
         }
 
         private void InvokeReferenceModelChanged()

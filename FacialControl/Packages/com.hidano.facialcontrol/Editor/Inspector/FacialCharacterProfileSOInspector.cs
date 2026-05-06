@@ -83,6 +83,9 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string GazeConfigAutoAssignButtonName = "gaze-config-auto-assign-button";
         public const string GazeConfigRemoveButtonName = "gaze-config-remove-button";
 
+        private const string ExpressionKindDigitalLabel = "デジタル操作";
+        private const string ExpressionKindAnalogLabel = "アナログ操作";
+
         // ====================================================================
         // 共通スタイル定数
         // ====================================================================
@@ -642,6 +645,7 @@ namespace Hidano.FacialControl.Editor.Inspector
                 return;
             }
 
+            int undoGroup = BeginUndoGroup("Add GazeConfig");
             int newIndex = _gazeConfigsProperty.arraySize;
             _gazeConfigsProperty.InsertArrayElementAtIndex(newIndex);
             var cfg = _gazeConfigsProperty.GetArrayElementAtIndex(newIndex);
@@ -650,7 +654,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             var idProp = cfg.FindPropertyRelative("expressionId");
             if (idProp != null) idProp.stringValue = expressionId;
 
-            serializedObject.ApplyModifiedProperties();
+            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
             RebuildGazeConfigsUI();
             UpdateValidation();
         }
@@ -662,8 +666,10 @@ namespace Hidano.FacialControl.Editor.Inspector
             serializedObject.Update();
             if (configIndex < 0 || configIndex >= _gazeConfigsProperty.arraySize) return;
 
+            int undoGroup = BeginUndoGroup("Remove GazeConfig");
+            ValidateGazeConfigDeletionTrigger(GazeConfigDeletionTrigger.ExplicitUserRemoval);
             _gazeConfigsProperty.DeleteArrayElementAtIndex(configIndex);
-            serializedObject.ApplyModifiedProperties();
+            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
             RebuildGazeConfigsUI();
             UpdateValidation();
         }
@@ -1132,6 +1138,9 @@ namespace Hidano.FacialControl.Editor.Inspector
             }
 
             serializedObject.Update();
+            if (layerIndex < 0 || layerIndex >= _layersProperty.arraySize) return;
+
+            int undoGroup = BeginUndoGroup("Remove Layer with Expressions");
             string layerName = string.Empty;
             var layerProp = _layersProperty.GetArrayElementAtIndex(layerIndex);
             var nameProp = layerProp.FindPropertyRelative("name");
@@ -1146,13 +1155,18 @@ namespace Hidano.FacialControl.Editor.Inspector
                     && string.Equals(exprLayerProp.stringValue, layerName, StringComparison.Ordinal))
                 {
                     var idProp = exprElem.FindPropertyRelative("id");
-                    if (idProp != null) RemoveGazeConfigByExpressionId(idProp.stringValue);
+                    if (idProp != null)
+                    {
+                        RemoveGazeConfigsByExpressionId(
+                            idProp.stringValue,
+                            GazeConfigDeletionTrigger.ExpressionDeletion);
+                    }
                     _expressionsProperty.DeleteArrayElementAtIndex(i);
                 }
             }
 
             _layersProperty.DeleteArrayElementAtIndex(layerIndex);
-            serializedObject.ApplyModifiedProperties();
+            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
 
             RefreshLayerNameChoices();
             RebuildLayersUI();
@@ -1247,30 +1261,16 @@ namespace Hidano.FacialControl.Editor.Inspector
             var kindDropdown = new DropdownField("種別")
             {
                 name = ExpressionRowKindDropdownName,
-                choices = new List<string> { "デジタル操作", "アナログ操作" },
+                choices = new List<string> { ExpressionKindDigitalLabel, ExpressionKindAnalogLabel },
             };
-            kindDropdown.SetValueWithoutNotify(currentKind == ExpressionKind.Analog ? "アナログ操作" : "デジタル操作");
+            kindDropdown.SetValueWithoutNotify(currentKind == ExpressionKind.Analog ? ExpressionKindAnalogLabel : ExpressionKindDigitalLabel);
             kindDropdown.style.flexGrow = 1f;
             kindDropdown.RegisterValueChangedCallback(evt =>
             {
-                serializedObject.Update();
-                var p = _expressionsProperty.GetArrayElementAtIndex(exprIndex).FindPropertyRelative("kind");
-                if (p != null)
-                {
-                    var newKind = string.Equals(evt.newValue, "アナログ操作", StringComparison.Ordinal)
-                        ? ExpressionKind.Analog
-                        : ExpressionKind.Digital;
-                    p.enumValueIndex = (int)newKind;
-                    serializedObject.ApplyModifiedProperties();
-
-                    var idForCfg = idProp != null ? idProp.stringValue : string.Empty;
-                    if (newKind == ExpressionKind.Digital)
-                    {
-                        RemoveGazeConfigByExpressionId(idForCfg);
-                    }
-                    RebuildLayersUI();
-                    RebuildGazeConfigsUI();
-                }
+                var newKind = string.Equals(evt.newValue, ExpressionKindAnalogLabel, StringComparison.Ordinal)
+                    ? ExpressionKind.Analog
+                    : ExpressionKind.Digital;
+                ChangeExpressionKind(exprIndex, newKind);
             });
             headerRow.Add(kindDropdown);
 
@@ -1344,6 +1344,35 @@ namespace Hidano.FacialControl.Editor.Inspector
             UpdateRowValidation(row, exprIndex);
 
             return row;
+        }
+
+        private void ChangeExpressionKind(int exprIndex, ExpressionKind newKind)
+        {
+            serializedObject.Update();
+            if (exprIndex < 0 || exprIndex >= _expressionsProperty.arraySize) return;
+
+            var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
+            var kindProp = entryProp.FindPropertyRelative("kind");
+            if (kindProp == null) return;
+
+            var previousKind = (ExpressionKind)kindProp.enumValueIndex;
+            if (previousKind == newKind) return;
+
+            int undoGroup = BeginUndoGroup("Change Expression Kind");
+            kindProp.enumValueIndex = (int)newKind;
+
+            if (previousKind == ExpressionKind.Analog && newKind != ExpressionKind.Analog)
+            {
+                var idProp = entryProp.FindPropertyRelative("id");
+                RemoveGazeConfigsByExpressionId(
+                    idProp != null ? idProp.stringValue : string.Empty,
+                    GazeConfigDeletionTrigger.AnalogToNonAnalogKindTransition);
+            }
+
+            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
+            RebuildLayersUI();
+            RebuildGazeConfigsUI();
+            UpdateValidation();
         }
 
         private void BuildAnimationClipFields(VisualElement row, int exprIndex)
@@ -1560,9 +1589,10 @@ namespace Hidano.FacialControl.Editor.Inspector
             var idProp = entryProp.FindPropertyRelative("id");
             string id = idProp != null ? idProp.stringValue : string.Empty;
 
-            RemoveGazeConfigByExpressionId(id);
+            int undoGroup = BeginUndoGroup("Remove Expression with GazeConfig");
+            RemoveGazeConfigsByExpressionId(id, GazeConfigDeletionTrigger.ExpressionDeletion);
             _expressionsProperty.DeleteArrayElementAtIndex(exprIndex);
-            serializedObject.ApplyModifiedProperties();
+            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
 
             RebuildLayersUI();
             RebuildGazeConfigsUI();
@@ -1572,6 +1602,26 @@ namespace Hidano.FacialControl.Editor.Inspector
         // ====================================================================
         // GazeConfig ヘルパー
         // ====================================================================
+
+        private enum GazeConfigDeletionTrigger
+        {
+            ExplicitUserRemoval,
+            ExpressionDeletion,
+            AnalogToNonAnalogKindTransition,
+        }
+
+        private static int BeginUndoGroup(string groupName)
+        {
+            Undo.IncrementCurrentGroup();
+            Undo.SetCurrentGroupName(groupName);
+            return Undo.GetCurrentGroup();
+        }
+
+        private void ApplyModifiedPropertiesAndCollapseUndo(int undoGroup)
+        {
+            serializedObject.ApplyModifiedProperties();
+            Undo.CollapseUndoOperations(undoGroup);
+        }
 
         protected int FindGazeConfigIndexByExpressionId(string expressionId)
         {
@@ -1605,10 +1655,26 @@ namespace Hidano.FacialControl.Editor.Inspector
             serializedObject.ApplyModifiedProperties();
         }
 
-        protected void RemoveGazeConfigByExpressionId(string expressionId)
+        private static void ValidateGazeConfigDeletionTrigger(GazeConfigDeletionTrigger trigger)
         {
-            if (_gazeConfigsProperty == null || string.IsNullOrEmpty(expressionId)) return;
-            serializedObject.Update();
+            switch (trigger)
+            {
+                case GazeConfigDeletionTrigger.ExplicitUserRemoval:
+                case GazeConfigDeletionTrigger.ExpressionDeletion:
+                case GazeConfigDeletionTrigger.AnalogToNonAnalogKindTransition:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(trigger), trigger, null);
+            }
+        }
+
+        private int RemoveGazeConfigsByExpressionId(string expressionId, GazeConfigDeletionTrigger trigger)
+        {
+            ValidateGazeConfigDeletionTrigger(trigger);
+
+            if (_gazeConfigsProperty == null || string.IsNullOrEmpty(expressionId)) return 0;
+
+            int removedCount = 0;
             for (int i = _gazeConfigsProperty.arraySize - 1; i >= 0; i--)
             {
                 var cfg = _gazeConfigsProperty.GetArrayElementAtIndex(i);
@@ -1616,9 +1682,10 @@ namespace Hidano.FacialControl.Editor.Inspector
                 if (idP != null && string.Equals(idP.stringValue, expressionId, StringComparison.Ordinal))
                 {
                     _gazeConfigsProperty.DeleteArrayElementAtIndex(i);
+                    removedCount++;
                 }
             }
-            serializedObject.ApplyModifiedProperties();
+            return removedCount;
         }
 
         // ====================================================================

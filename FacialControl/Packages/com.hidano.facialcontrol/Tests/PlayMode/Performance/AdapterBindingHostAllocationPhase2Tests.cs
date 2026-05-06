@@ -10,6 +10,7 @@ using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Tests.Shared;
 using NUnit.Framework;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.TestTools;
 using VContainer.Unity;
@@ -246,10 +247,15 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
 
         private static long MeasureManagedAllocation(Action action)
         {
-            long before = GC.GetTotalMemory(forceFullCollection: false);
+            using var recorder = ProfilerRecorder.StartNew(
+                ProfilerCategory.Memory,
+                "GC.Alloc",
+                1,
+                ProfilerRecorderOptions.SumAllSamplesInFrame
+                    | ProfilerRecorderOptions.CollectOnlyOnCurrentThread);
+
             action();
-            long after = GC.GetTotalMemory(forceFullCollection: false);
-            return after - before;
+            return recorder.LastValue;
         }
 
         private static void StabilizeManagedHeap()
