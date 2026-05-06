@@ -305,10 +305,164 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
         private void BuildGazeProvider(in AdapterBuildContext ctx)
         {
             _gazeBoneProvider = null;
-            if (_injectedGazeConfigs == null || _injectedGazeConfigs.Count == 0)
+
+            WarnForGazeBindingsWithoutConfig();
+
+            if (_injectedGazeConfigs == null
+                || _injectedGazeConfigs.Count == 0
+                || _gazeInputBindings == null
+                || _gazeInputBindings.Count == 0)
             {
                 return;
             }
+
+            var gazeBoneBindings = new List<GazeBoneBinding>();
+            for (int i = 0; i < _injectedGazeConfigs.Count; i++)
+            {
+                GazeBindingConfig config = _injectedGazeConfigs[i];
+                if (config == null || string.IsNullOrWhiteSpace(config.expressionId))
+                {
+                    continue;
+                }
+
+                InputSystemGazeBinding binding = FindGazeInputBinding(config.expressionId);
+                if (binding == null)
+                {
+                    continue;
+                }
+
+                if (!TryFindAnalogSource(binding, out InputActionAnalogSource source))
+                {
+                    continue;
+                }
+
+                gazeBoneBindings.Add(new GazeBoneBinding(config, source));
+            }
+
+            if (gazeBoneBindings.Count == 0)
+            {
+                return;
+            }
+
+            var resolver = new BoneTransformResolver(ctx.HostGameObject.transform);
+            _gazeBoneProvider = new GazeBonePoseProvider(resolver, gazeBoneBindings);
+        }
+
+        private InputSystemGazeBinding FindGazeInputBinding(string expressionId)
+        {
+            if (_gazeInputBindings == null || string.IsNullOrWhiteSpace(expressionId))
+            {
+                return null;
+            }
+
+            for (int i = 0; i < _gazeInputBindings.Count; i++)
+            {
+                InputSystemGazeBinding binding = _gazeInputBindings[i];
+                if (binding == null)
+                {
+                    continue;
+                }
+
+                if (string.Equals(binding.expressionId, expressionId, StringComparison.Ordinal))
+                {
+                    return binding;
+                }
+            }
+
+            return null;
+        }
+
+        private void WarnForGazeBindingsWithoutConfig()
+        {
+            if (_gazeInputBindings == null || _gazeInputBindings.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < _gazeInputBindings.Count; i++)
+            {
+                InputSystemGazeBinding binding = _gazeInputBindings[i];
+                if (binding == null)
+                {
+                    continue;
+                }
+
+                if (HasInjectedGazeConfig(binding.expressionId))
+                {
+                    continue;
+                }
+
+                Debug.LogWarning(
+                    $"[InputSystemAdapterBinding] Gaze binding expressionId '{FormatExpressionId(binding.expressionId)}' に対応する GazeBindingConfig が SO ルートに存在しません。skip します。");
+            }
+        }
+
+        private bool HasInjectedGazeConfig(string expressionId)
+        {
+            if (_injectedGazeConfigs == null
+                || _injectedGazeConfigs.Count == 0
+                || string.IsNullOrWhiteSpace(expressionId))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < _injectedGazeConfigs.Count; i++)
+            {
+                GazeBindingConfig config = _injectedGazeConfigs[i];
+                if (config == null)
+                {
+                    continue;
+                }
+
+                if (string.Equals(config.expressionId, expressionId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool TryFindAnalogSource(
+            InputSystemGazeBinding binding,
+            out InputActionAnalogSource source)
+        {
+            source = null;
+            if (binding == null
+                || binding.inputActionRef == null
+                || binding.inputActionRef.action == null
+                || _analogSources == null)
+            {
+                return false;
+            }
+
+            string actionName = binding.inputActionRef.action.name;
+            if (string.IsNullOrWhiteSpace(actionName))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < _analogSources.Count; i++)
+            {
+                InputActionAnalogSource candidate = _analogSources[i];
+                if (candidate == null)
+                {
+                    continue;
+                }
+
+                if (string.Equals(candidate.Id, actionName, StringComparison.Ordinal))
+                {
+                    source = candidate;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string FormatExpressionId(string expressionId)
+        {
+            return string.IsNullOrWhiteSpace(expressionId) ? "<empty>" : expressionId;
         }
 
         private static AnalogInputShape DetermineShape(InputAction action)

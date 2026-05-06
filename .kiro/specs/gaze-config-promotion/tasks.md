@@ -66,7 +66,7 @@
   - _Requirements: 1.5, 10.6_
   - _Depends: 2.2_
 
-- [ ] 2.4 `OnStart` で expressionId による pairing / warn / skip ロジックを実装する
+- [x] 2.4 `OnStart` で expressionId による pairing / warn / skip ロジックを実装する
   - injected gaze configs の各 entry を `_gazeInputBindings` から expressionId で lookup し、一致時に gaze provider を構築する
   - config 不在の binding は `Debug.LogWarning` で warn + skip、binding 不在の config は silent skip とし、いずれも例外を投げない
   - binding 自身に gaze 関連 field（bone path / range / look-clip）を一切読みに行かないことを実装上の不変条件として確保する
