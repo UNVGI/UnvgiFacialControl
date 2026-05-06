@@ -123,6 +123,13 @@
 - **内容**: preview.1 の `FacialAnalogInputBinder` は BlendShape / BonePose 両方の binding を 1 MonoBehaviour で扱う。責務肥大が問題化したら `AnalogBlendShapeBinder` / `AnalogBonePoseBinder` の 2 MonoBehaviour に分割する。
 - **トリガ**: 該当ファイルの行数が増えてレビュー困難化したとき
 
+### M-13: 複数 Vector2 入力源での gaze 同時駆動（multi-source gaze blending）
+- **出典**: `.kiro/specs/gaze-config-promotion/design.md` の重複 `expressionId` 取り扱い決定（2026-05-06 セッション）
+- **内容**: `gaze-config-promotion` spec の preview.1 では、`InputSystemAdapterBinding._gazeInputBindings[]` の中で同 `expressionId` が複数あった場合は **warn ログ + 最初の 1 件のみ採用** とする。これは「左スティックと右スティックの両方を同じ gaze に bind」のような multi-source 同時駆動を **preview.1 では非対応** にする選択。理由は `GazeBoneBinding` の現状構造が単一 `IAnalogVector2InputSource` 前提で組まれており、複数源の合成戦略（max-magnitude blend / sum / dead-zone-aware merge / 後勝ち等）を確定するための設計判断が preview.1 のスコープを超えるため。preview.2 以降の別 spec で「multi-source gaze blending」として正式に設計する。要検討項目: 合成戦略 (a) max-magnitude / (b) component-wise sum / (c) priority + fallback / (d) ユーザー設定可能な切替。`GazeBoneBinding` 内部構造を「複数 source 受け」に拡張する変更も同時に必要。
+- **トリガ**: 1.0 リリースに向けて実機 VTuber 環境で「複数コントローラ / OSC + InputSystem 同居」要件が顕在化したとき / `gaze-config-promotion` 完了後の sample 拡張で multi-source デモを切るとき
+- **影響範囲**: `Runtime/Adapters/Bone/GazeBoneBinding.cs`, `Runtime/Adapters/Bone/GazeBonePoseProvider.cs`, `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/AdapterBindings/InputSystemAdapterBinding.cs`, 新規合成戦略型, テスト
+- **関連**: M-4（BonePose 多重 provider のブレンド合成 — 異なる bone への複数 provider の話で別概念だが、合成戦略の設計はここと共通化できる可能性あり）
+
 ---
 
 ## 横断フォローアップ（実装着手時に再確認するメモ）
