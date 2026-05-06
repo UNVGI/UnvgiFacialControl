@@ -127,7 +127,7 @@
   - 観測可能完了条件: Default 実装を直接 new した EditMode 単体テスト（または PlayMode 動作確認）で `GetDriverNames()` / `GetDeviceNames()` が文字列配列を返却し、例外時も空配列で fallback する
   - _Requirements: 1.6, 7.2, 7.3_
 
-- [ ] 6.3 `DeviceResolverTests` を書き、`DeviceResolver` を TDD で実装する
+- [x] 6.3 `DeviceResolverTests` を書き、`DeviceResolver` を TDD で実装する
   - `Resolve_AsioMatch_ReturnsAsioKind`（7.2）、`Resolve_MicMatch_ReturnsMicrophoneKind`（7.3）、`Resolve_DisambiguatorIndex_SelectsNthMatch`（7.4）、`Resolve_NoMatch_ReturnsUnresolvedWithSnapshots`（9.1）、`Resolve_NullEnumerator_ThrowsArgumentNullException` を Red で書く
   - `static class DeviceResolver` の `Resolve(DeviceDescriptor, IAsioDriverEnumerator, IMicrophoneDeviceEnumerator)` を実装し、ASIO を Mic より先に検査する純粋関数とする
   - 同名重複時は `DisambiguatorIndex` を消費して N 番目を選択し、不一致時 `Unresolved` に列挙スナップショットを持たせる
