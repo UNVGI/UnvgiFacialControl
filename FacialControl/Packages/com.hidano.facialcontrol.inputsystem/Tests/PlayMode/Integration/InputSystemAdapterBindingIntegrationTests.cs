@@ -217,7 +217,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
         [Test]
         public void OnStart_AnalogPath_RegistersAnalogSourceUnderCompositeSlug()
         {
-            // D-8 集約: Analog 経路は InputSystemGazeBinding.inputActionRef.action.name を sub-id とした composite slug 登録となる
+            // D-8 集約: Analog 経路は InputSystemGazeBinding.actionName を sub-id とした composite slug 登録となる
             // （InputActionAnalogSource 構築相当）。
             const string slug = "input-system-analog-path";
             _sourceAsset = CreateGazeActionAsset(
@@ -227,7 +227,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             var gazeInputBinding = new InputSystemGazeBinding
             {
                 expressionId = "expr-gaze",
-                inputActionRef = InputActionReference.Create(_sourceAsset.FindActionMap("Expression").FindAction("GazeLook")),
+                actionName = "GazeLook",
             };
 
             _binding = CreateBinding(
@@ -549,11 +549,12 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             string gazeActionName,
             string expressionId)
         {
+            _ = asset;
+            _ = actionMapName;
             return new InputSystemGazeBinding
             {
                 expressionId = expressionId,
-                inputActionRef = InputActionReference.Create(
-                    asset.FindActionMap(actionMapName).FindAction(gazeActionName)),
+                actionName = gazeActionName,
             };
         }
 

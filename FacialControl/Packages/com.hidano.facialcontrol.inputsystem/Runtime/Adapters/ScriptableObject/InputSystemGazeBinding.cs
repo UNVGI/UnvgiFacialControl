@@ -1,13 +1,13 @@
 using System;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
 {
     /// <summary>
     /// InputSystem 側が保持する gaze 用の薄い結線情報。
     /// キャラ固有のボーンパスや可動範囲は SO ルートの GazeBindingConfig が所有し、
-    /// この型は対応する expressionId と InputActionReference のみを保持する。
+    /// この型は対応する expressionId と <see cref="InputSystemAdapterBinding.ActionMapName"/>
+    /// 配下の Action 名のみを保持する。
     /// </summary>
     [Serializable]
     public sealed class InputSystemGazeBinding
@@ -15,7 +15,8 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
         [Tooltip("対応する SO ルート GazeBindingConfig.expressionId。")]
         public string expressionId;
 
-        [Tooltip("Vector2 入力を提供する InputActionReference。ExpectedControlType=Vector2 を推奨。")]
-        public InputActionReference inputActionRef;
+        [Tooltip("Vector2 入力を提供する InputAction の名前 (binding と同じ ActionMap 配下)。"
+            + " ExpectedControlType=Vector2 を推奨。")]
+        public string actionName;
     }
 }

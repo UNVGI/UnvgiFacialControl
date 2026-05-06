@@ -27,7 +27,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
     /// <item><description>InputActionAsset（<c>_inputActionAsset</c>）</description></item>
     /// <item><description>ActionMap 名（<c>_actionMapName</c>、Asset の ActionMap 一覧から候補補完）</description></item>
     /// <item><description>Expression Bindings リスト（<c>_expressionBindings</c>、Action 名・Expression ID・TriggerMode の 3 列）</description></item>
-    /// <item><description>Gaze Input Bindings リスト（<c>_gazeInputBindings</c>、expressionId と InputActionReference の薄い行 UI）</description></item>
+    /// <item><description>Gaze Input Bindings リスト（<c>_gazeInputBindings</c>、expressionId と Action 名の薄い行 UI）</description></item>
     /// </list>
     /// </para>
     /// <para>
@@ -51,7 +51,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
         public const string ExpressionDropdownName = "input-system-binding-expression-dropdown";
         public const string TriggerModeFieldName = "input-system-binding-trigger-mode-field";
         public const string GazeExpressionDropdownName = "input-system-binding-gaze-expression-dropdown";
-        public const string GazeInputActionRefFieldName = "input-system-binding-gaze-input-action-ref-field";
+        public const string GazeActionDropdownName = "input-system-binding-gaze-action-dropdown";
 
         /// <inheritdoc />
         public override VisualElement CreatePropertyGUI(SerializedProperty property)
@@ -372,22 +372,8 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             var triggerModeField = element.Q<EnumField>(TriggerModeFieldName);
             if (triggerModeField != null && triggerModeProp != null)
             {
-                var current = (TriggerMode)triggerModeProp.enumValueIndex;
-                triggerModeField.SetValueWithoutNotify(current);
-                triggerModeField.RegisterValueChangedCallback(evt =>
-                {
-                    if (!(evt.newValue is TriggerMode mode)) return;
-                    var so = bindingProperty.serializedObject;
-                    so.Update();
-                    var list = bindingProperty.FindPropertyRelative(ExpressionBindingsFieldName);
-                    if (list == null || index >= list.arraySize) return;
-                    var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("triggerMode");
-                    if (prop != null)
-                    {
-                        prop.enumValueIndex = (int)mode;
-                        so.ApplyModifiedProperties();
-                    }
-                });
+                triggerModeField.Unbind();
+                triggerModeField.BindProperty(triggerModeProp);
             }
         }
 
@@ -413,18 +399,18 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             });
             container.Add(expressionDropdown);
 
-            var actionRefField = new ObjectField("InputActionReference")
+            var actionDropdown = new DropdownField("Action 名")
             {
-                name = GazeInputActionRefFieldName,
-                objectType = typeof(InputActionReference),
-                allowSceneObjects = false,
+                name = GazeActionDropdownName,
+                tooltip = "binding と同じ ActionMap 配下の InputAction 名。"
+                    + " ExpectedControlType=Vector2 を推奨。",
             };
-            actionRefField.RegisterValueChangedCallback(evt =>
+            actionDropdown.RegisterValueChangedCallback(evt =>
             {
-                if (!(actionRefField.userData is GazeInputBindingRowState state)) return;
-                SetGazeInputBindingActionRef(state.BindingProperty, state.Index, evt.newValue as InputActionReference);
+                if (!(actionDropdown.userData is GazeInputBindingRowState state)) return;
+                SetGazeInputBindingActionName(state.BindingProperty, state.Index, evt.newValue);
             });
-            container.Add(actionRefField);
+            container.Add(actionDropdown);
 
             return container;
         }
@@ -442,7 +428,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
 
             var entryProp = listProp.GetArrayElementAtIndex(index);
             var expressionIdProp = entryProp.FindPropertyRelative("expressionId");
-            var inputActionRefProp = entryProp.FindPropertyRelative("inputActionRef");
+            var actionNameProp = entryProp.FindPropertyRelative("actionName");
 
             var state = new GazeInputBindingRowState(bindingProperty, index);
 
@@ -456,11 +442,14 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 expressionDropdown.SetValueWithoutNotify(expressionIdProp.stringValue ?? string.Empty);
             }
 
-            var actionRefField = element.Q<ObjectField>(GazeInputActionRefFieldName);
-            if (actionRefField != null && inputActionRefProp != null)
+            var actionDropdown = element.Q<DropdownField>(GazeActionDropdownName);
+            if (actionDropdown != null && actionNameProp != null)
             {
-                actionRefField.userData = state;
-                actionRefField.SetValueWithoutNotify(inputActionRefProp.objectReferenceValue);
+                var actionChoices = CollectActionNames(bindingProperty);
+                var safeChoices = BuildSafeChoices(actionChoices, actionNameProp.stringValue);
+                actionDropdown.userData = state;
+                actionDropdown.choices = safeChoices;
+                actionDropdown.SetValueWithoutNotify(actionNameProp.stringValue ?? string.Empty);
             }
         }
 
@@ -586,10 +575,10 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 expressionIdProp.stringValue = string.Empty;
             }
 
-            var inputActionRefProp = entryProp.FindPropertyRelative("inputActionRef");
-            if (inputActionRefProp != null)
+            var actionNameProp = entryProp.FindPropertyRelative("actionName");
+            if (actionNameProp != null)
             {
-                inputActionRefProp.objectReferenceValue = null;
+                actionNameProp.stringValue = string.Empty;
             }
         }
 
@@ -609,18 +598,18 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             }
         }
 
-        private static void SetGazeInputBindingActionRef(
-            SerializedProperty bindingProperty, int index, InputActionReference value)
+        private static void SetGazeInputBindingActionName(
+            SerializedProperty bindingProperty, int index, string value)
         {
             var so = bindingProperty.serializedObject;
             so.Update();
             var list = bindingProperty.FindPropertyRelative(GazeInputBindingsFieldName);
             if (list == null || index < 0 || index >= list.arraySize) return;
 
-            var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("inputActionRef");
+            var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("actionName");
             if (prop != null)
             {
-                prop.objectReferenceValue = value;
+                prop.stringValue = value ?? string.Empty;
                 so.ApplyModifiedProperties();
             }
         }
