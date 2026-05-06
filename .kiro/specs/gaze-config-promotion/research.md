@@ -1,5 +1,7 @@
 # Research & Design Decisions
 
+> **Note (post-implementation amendment, 2026-05-06)**: 本 research は `profile.json` の `schemaVersion` を `"2.0"` → `"2.1"` に bump する前提で記述しているが、preview.1 リリース前段階のため最終実装では `"1.0"` に統一された。本文の `"2.0"` / `"2.1"` 言及は historical な調査結果として残し、最終仕様は `"1.0"` strict として読み替えること。
+
 ## Summary
 
 - **Feature**: `gaze-config-promotion`

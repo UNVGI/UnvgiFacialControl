@@ -10,15 +10,14 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 {
     /// <summary>
-    /// 中間 JSON Schema v2.0（タスク 2.3）の DTO 群と
-    /// <see cref="SystemTextJsonParser.ParseProfileSnapshotV2(string)"/> に対する Red テスト。
+    /// プロファイル JSON DTO 群と <see cref="SystemTextJsonParser.ParseProfileSnapshotV2(string)"/> に対する契約テスト。
     ///
     /// 検証範囲:
     ///   1. <c>RoundTrip_FullSnapshot_PreservesAllFields</c>:
     ///      schemaVersion / layers / expressions / rendererPaths を全て埋めた
     ///      <see cref="ProfileSnapshotDto"/> を JSON へ書き出し、再パース後に同値であることを確認。
     ///   2. <c>Parse_SchemaVersionMismatch_ThrowsInvalidOperation</c>:
-    ///      schemaVersion が "2.1" 以外の場合に <see cref="Debug.LogError(object)"/> + <see cref="NotSupportedException"/> を出すこと（Req 10.1）。
+    ///      schemaVersion が "1.0" 以外の場合に <see cref="Debug.LogError(object)"/> + <see cref="NotSupportedException"/> を出すこと（Req 10.1）。
     ///   3. <c>Parse_MissingSnapshot_ProducesEmptySnapshot</c>:
     ///      <c>expressions[].snapshot</c> 欠落時に空 snapshot（duration=0.25 / Linear / 空配列）に正規化されること。
     ///   4. <c>RendererPaths_AreSubset_Of_TopLevelRendererPaths</c>:
@@ -140,15 +139,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         [Test]
         public void Parse_SchemaVersionMismatch_ThrowsInvalidOperation()
         {
-            // schemaVersion = "1.0" を渡すと Debug.LogError + InvalidOperationException が出る（Req 10.1）。
-            var json = "{\"schemaVersion\":\"1.0\",\"layers\":[],\"expressions\":[],\"rendererPaths\":[]}";
+            // schemaVersion = "2.0"（未サポート）を渡すと Debug.LogError + NotSupportedException が出る（Req 10.1）。
+            var json = "{\"schemaVersion\":\"2.0\",\"layers\":[],\"expressions\":[],\"rendererPaths\":[]}";
 
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("schema v2.1 の strict チェックに失敗"));
+            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("schema v1.0 の strict チェックに失敗"));
 
             var parser = new SystemTextJsonParser();
             var ex = Assert.Throws<NotSupportedException>(() => parser.ParseProfileSnapshotV2(json));
+            StringAssert.Contains("'2.0'", ex.Message);
             StringAssert.Contains("'1.0'", ex.Message);
-            StringAssert.Contains("'2.1'", ex.Message);
         }
 
         [Test]
@@ -157,7 +156,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // schemaVersion 自体が無いケースも Req 10.1 により拒否される。
             var json = "{\"layers\":[],\"expressions\":[],\"rendererPaths\":[]}";
 
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("schema v2.1 の strict チェックに失敗"));
+            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("schema v1.0 の strict チェックに失敗"));
 
             var parser = new SystemTextJsonParser();
             var ex = Assert.Throws<NotSupportedException>(() => parser.ParseProfileSnapshotV2(json));
@@ -175,7 +174,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // 既定値: transitionDuration=Expression.DefaultTransitionDuration (1/15), transitionCurvePreset="Linear", blendShapes/bones/rendererPaths は空 List。
             var json =
                 "{" +
-                "\"schemaVersion\":\"2.1\"," +
+                "\"schemaVersion\":\"1.0\"," +
                 "\"layers\":[]," +
                 "\"expressions\":[{\"id\":\"smile-id\",\"name\":\"Smile\",\"layer\":\"emotion\",\"layerOverrideMask\":[]}]," +
                 "\"rendererPaths\":[]" +
@@ -209,7 +208,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // Req 9.7: expressions[].snapshot.rendererPaths はトップレベル rendererPaths の subset
             var json =
                 "{" +
-                "\"schemaVersion\":\"2.1\"," +
+                "\"schemaVersion\":\"1.0\"," +
                 "\"layers\":[]," +
                 "\"expressions\":[" +
                 "  {\"id\":\"e1\",\"name\":\"Smile\",\"layer\":\"emotion\",\"layerOverrideMask\":[]," +

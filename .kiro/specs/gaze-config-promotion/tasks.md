@@ -4,16 +4,16 @@
 
 ## Phase 1: Core SO + JSON 層
 
-- [ ] 1. SO ルート `_gazeConfigs` データモデルと JSON スキーマ v2.1 を整備する
+- [ ] 1. SO ルート `_gazeConfigs` データモデルと JSON スキーマ（preview.1 で `"1.0"` 統一）を整備する
 - [x] 1.1 `FacialCharacterProfileSO` ルートに gaze configs コレクションを追加し read-only 公開する
   - SO ルート直下に `GazeBindingConfig` の serialized list を平坦に追加し、既存の `[SerializeReference]` adapter bindings 構造に副作用が出ないことを EditMode で確認する
   - `IFacialCharacterProfile` に gaze configs の read-only accessor を追加し、`FacialCharacterProfileSO` が空 list を null 化せず実装することを保証する
   - 観測条件: 既存 EditMode テスト一式が緑のまま、新たに追加した accessor 経由で空 list が取得できる
   - _Requirements: 1.1, 1.2, 1.7_
 
-- [ ] 1.2 JSON DTO とスキーマバージョン bump を実装する
+- [x] 1.2 JSON DTO とスキーマバージョン bump を実装する
   - `gaze_configs[]` を root に持つ DTO 構造を導入し、`ProfileSnapshotDto` に gaze configs フィールドを追加する
-  - `SystemTextJsonParser` のスキーマバージョン定数を `"2.1"` に bump し、旧 v2.0 を strict 拒否することを確認する
+  - `SystemTextJsonParser` のスキーマバージョン定数は preview.1 リリース前段階のため `"1.0"` で固定し、`"1.0"` 以外を strict 拒否することを確認する（バージョンを別管理しないポリシー）
   - look-clip / lookXxxSamples は JSON 出力対象外（SO YAML 側 source-of-truth）の運用を DTO 設計に反映する
   - 観測条件: 新スキーマ JSON を parser に通すと DTO の gaze configs フィールドが値を保持し、旧 v2.0 JSON は `NotSupportedException` で拒否される
   - _Requirements: 2.1, 2.2_
@@ -35,7 +35,7 @@
   - _Boundary: FacialCharacterProfileExporter_
   - _Depends: 1.2_
 
-- [ ] 1.5 SO ↔ JSON ラウンドトリップで gaze configs が value-equal であることを保証する
+- [x] 1.5 SO ↔ JSON ラウンドトリップで gaze configs が value-equal であることを保証する
   - SO に gaze configs を持たせた状態で Exporter → Converter のラウンドトリップを行い、value-equal を assert する EditMode テストを追加する
   - 旧 v2.0 JSON 自動 migration コードが repository に存在しないことを確認し、CI が落ちる挙動を維持する
   - 観測条件: ラウンドトリップ後の SO gaze configs が元と value-equal、かつ旧スキーマに対する自動 migration コードがコードベースに存在しない
@@ -47,19 +47,19 @@
 ## Phase 2: InputSystem binding
 
 - [ ] 2. InputSystem 結線レイヤを `InputSystemGazeBinding` に縮退し runtime pairing を実装する
-- [ ] 2.1 `InputSystemGazeBinding` を新設し `GazeExpressionConfig` 派生型を削除する
+- [x] 2.1 `InputSystemGazeBinding` を新設し `GazeExpressionConfig` 派生型を削除する
   - `expressionId` + `InputActionReference` のみを保持する薄い `[Serializable]` 値クラスを導入する
   - 旧 `GazeExpressionConfig` 派生型を削除し、依存テストおよび Sample asset の `RefIds[].type` 参照箇所を同 PR 内で書き換え／削除する
   - 観測条件: コードベース全体に `GazeExpressionConfig` 型参照が残らず、新クラスが asmdef 上で正しくシリアライズされる
   - _Requirements: 1.4, 1.8_
 
-- [ ] 2.2 `InputSystemAdapterBinding` から旧 `_gazeConfigs` フィールドを撤去し新フィールド構成を導入する
+- [x] 2.2 `InputSystemAdapterBinding` から旧 `_gazeConfigs` フィールドを撤去し新フィールド構成を導入する
   - binding から bone path / 可動範囲 / look-clip 系フィールドを完全に撤去し、`_gazeInputBindings` の serialized list と runtime 注入用の `[NonSerialized]` injected gaze configs ハンドルを追加する
   - 観測条件: binding の serialized field 一覧に gaze 関連の bone path / look-clip フィールドが存在せず、`_gazeInputBindings` のみが残る
   - _Requirements: 1.3, 10.5_
   - _Depends: 2.1_
 
-- [ ] 2.3 binding の `Configure` シグネチャを拡張し SO ルート gaze configs を注入できるようにする
+- [x] 2.3 binding の `Configure` シグネチャを拡張し SO ルート gaze configs を注入できるようにする
   - 既存 `Configure` に `gazeInputBindings` と `injectedGazeConfigs` を渡す引数を追加し、binding が両者を保持できるようにする
   - runtime 構築コード（FacialController 系）に「SO の gaze configs を取得して `Configure` に注入する 1 行」を追加し、Editor／PlayMode の双方から再現可能にする
   - 観測条件: runtime 構築経路を辿った後、binding の `_injectedGazeConfigs` が SO ルートの list と参照同値で保持されている
@@ -74,7 +74,7 @@
   - _Requirements: 1.5, 1.6, 10.1, 10.2, 10.3, 10.4, 10.5_
   - _Depends: 2.3_
 
-- [ ] 2.5 PlayMode integration test `OnStart_GazePath_*` を新構造で書き換える
+- [x] 2.5 PlayMode integration test `OnStart_GazePath_*` を新構造で書き換える
   - 旧 `_gazeConfigs` 直接参照を新構造（SO ルート injected configs + binding `_gazeInputBindings`）に置き換えた integration test に書き換える
   - 旧構造（`InputSystemAdapterBinding._gazeConfigs` / `GazeExpressionConfig` bone-path フィールド）を参照していた既存テストを削除または更新し、コードベースに残らないことを確認する
   - 観測条件: PlayMode integration test が新構造で全 pass し、旧構造への参照を持つテストが grep で検出されない
@@ -88,20 +88,20 @@
 > 注意: Phase 3 の leaf はすべて `FacialCharacterProfileSOInspector.cs`（および同パッケージの `InputSystemAdapterBindingDrawer.cs`）への変更に集中する。同一ファイル編集のため leaf は逐次（`(P)` 不付与）で進める。
 
 - [ ] 3. Inspector セクション再編と GazeConfigs UX を実装する
-- [ ] 3.1 `CreateInspectorGUI` のセクション build 順を再編する
+- [x] 3.1 `CreateInspectorGUI` のセクション build 順を再編する
   - 「Save Status / Reference Model / Layers and Expressions / GazeConfigs（空セクションでよい） / Adapter Bindings / Debug」の順に build 順を変更する
   - 各セクションを foldout / labeled container として独立した視覚グループに分離し、Save Status Bar は最上段固定を維持する
   - 観測条件: Inspector を開いたときセクション順が指定どおりであり、Adapter Bindings は GazeConfigs の後に必ず描画される
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 3.2 GazeConfigs セクションの opt-in 追加 UX と単行 UI を実装する
+- [x] 3.2 GazeConfigs セクションの opt-in 追加 UX と単行 UI を実装する
   - 「+ GazeConfig を追加」ドロップダウンを Analog kind かつ未存在 expressionId の Expression のみで動的構成し、選択時に SO ルート gaze configs に append する
   - 候補 0 件のときはドロップダウンを disabled にし、その旨のラベルを表示する
   - 各 entry を「Expression 名 / bone path / range / look-clip / "参照モデルから自動設定"ボタン / remove ボタン」を備えた行として描画する
   - 観測条件: opt-in ドロップダウンから entry を追加すると SO ルート gaze configs に同 expressionId の entry が現れ、remove ボタンで該当 entry のみが消える
   - _Requirements: 5.1, 5.2, 5.3, 5.5, 5.6_
 
-- [ ] 3.3 参照モデル割当て自動補完と一括／単行再解決ボタンを実装する
+- [x] 3.3 参照モデル割当て自動補完と一括／単行再解決ボタンを実装する
   - reference model の null→non-null / 別 model 遷移を検出し、両方空の bone path のみ既存ヘルパーで自動補完する（手動値は保持）
   - 単行「参照モデルから自動設定」ボタンで該当 entry を上書き再解決し、GazeConfigs セクションに「全 GazeConfig を参照モデルから再解決」一括ボタンを設置して全 entry を上書き再解決する
   - reference model 未割当て時は単行ボタンと一括ボタンの両方を disabled にする
@@ -128,7 +128,7 @@
   - 観測条件: 旧名前定数 / 旧メソッドが grep で見つからず、Inspector が新セクション構成のみで Editor asmdef を通過する
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
 
-- [ ] 3.7 `InputSystemAdapterBindingDrawer` の gaze UI を新フィールドに合わせて差し替える
+- [x] 3.7 `InputSystemAdapterBindingDrawer` の gaze UI を新フィールドに合わせて差し替える
   - 旧 `_gazeConfigs` の inline UI 描画を削除し、`_gazeInputBindings` の薄い UI（expressionId + InputActionReference）を ListView ベースで追加する
   - 観測条件: binding drawer 上で `_gazeInputBindings` の追加 / 編集 / 削除が動作し、bone path / look-clip 系 UI が drawer から消えている
   - _Requirements: 1.4, 1.8_
@@ -144,7 +144,7 @@
 ## Phase 4: Samples + Docs
 
 - [ ] 4. Sample 二重管理同期と破壊変更ドキュメントを更新する
-- [ ] 4.1 (P) Sample asset（YAML）2 ファイルを新スキーマに同期手術する
+- [x] 4.1 (P) Sample asset（YAML）2 ファイルを新スキーマに同期手術する
   - `Assets/Samples/.../MultiSourceBlendDemoCharacter.asset` の YAML を直接編集し、SO ルートに `_gazeConfigs` を、binding 内部に `_gazeInputBindings` を配置する。`GazeExpressionConfig` 削除に伴い `RefIds[].type` も更新する
   - `Packages/com.hidano.facialcontrol.inputsystem/Samples~/.../MultiSourceBlendDemoCharacter.asset` を上記と同内容で同期する
   - binding 内部の `_gazeInputBindings` 各 entry の expressionId が SO ルート `_gazeConfigs` の expressionId と一致していることを目視で確認する
@@ -153,8 +153,8 @@
   - _Boundary: Sample assets (YAML)_
   - _Depends: 2.1, 2.2, 2.5_
 
-- [ ] 4.2 (P) Sample profile.json 2 ファイルを新スキーマに同期する
-  - dev `Assets/Samples/.../profile.json` と UPM `Samples~/.../profile.json` の `schemaVersion` を `"2.1"` に bump し、root 直下に `gaze_configs[]` を配置する
+- [x] 4.2 (P) Sample profile.json 2 ファイルを新スキーマに同期する
+  - dev `Assets/Samples/.../profile.json` と UPM `Samples~/.../profile.json` の `schemaVersion` を preview.1 統一値 `"1.0"` に揃え、root 直下に `gaze_configs[]` を配置する
   - 観測条件: 双方の JSON が同一 diff で新スキーマに更新されており、parser が `NotSupportedException` を出さずに読み取れる
   - _Requirements: 3.2, 3.3_
   - _Boundary: Sample profile.json_
@@ -166,15 +166,15 @@
   - _Requirements: 3.4_
   - _Depends: 4.1, 4.2_
 
-- [ ] 4.4 (P) `CHANGELOG.md` に破壊変更エントリを追加する
-  - `com.hidano.facialcontrol/CHANGELOG.md` の "Breaking changes" 区画に gaze configs root 昇格と schemaVersion `"2.1"` bump を記録する
+- [x] 4.4 (P) `CHANGELOG.md` に破壊変更エントリを追加する
+  - `com.hidano.facialcontrol/CHANGELOG.md` の "Breaking changes" 区画に gaze configs root 昇格と schemaVersion を preview.1 統一値 `"1.0"` に揃えた件を記録する
   - 観測条件: CHANGELOG にエントリが追加され、リリースノートとしてそのままビルド出力できる
   - _Requirements: 2.7_
   - _Boundary: com.hidano.facialcontrol/CHANGELOG.md_
   - _Depends: 1.5, 2.5_
 
-- [ ] 4.5 (P) `Documentation~/migration-guide.md` に hand-edit 手順を追記する
-  - 旧 v2.0 → v2.1 への JSON / SO YAML hand-edit 手順を例示し、binding 内部 `_gazeConfigs` から SO ルート `_gazeConfigs` + binding `_gazeInputBindings` への移植例を記載する
+- [x] 4.5 (P) `Documentation~/migration-guide.md` に hand-edit 手順を追記する
+  - 旧構造 → 新構造（schemaVersion `"1.0"` 統一）への JSON / SO YAML hand-edit 手順を例示し、binding 内部 `_gazeConfigs` から SO ルート `_gazeConfigs` + binding `_gazeInputBindings` への移植例を記載する
   - 自動 migration コードを書かない方針も明記する
   - 観測条件: migration guide を読みながら旧スキーマ asset を手動で書き換えると、Sample と同じ新スキーマに到達できる
   - _Requirements: 2.6, 2.8_

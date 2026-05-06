@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d135770dce0e9d5479f0b6ee124b640a, type: 3}
   m_Name: MultiSourceBlendDemoCharacter
   m_EditorClassIdentifier:
-  _schemaVersion: "2.1"
+  _schemaVersion: "1.0"
   _layers:
   - name: emotion
     priority: 0

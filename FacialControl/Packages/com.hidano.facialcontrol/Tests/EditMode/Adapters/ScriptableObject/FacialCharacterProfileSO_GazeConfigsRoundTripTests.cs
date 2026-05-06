@@ -33,7 +33,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
             // ラウンドトリップ手順（Req 2.5 / 11.1）:
             //   (a) SO ルートに GazeBindingConfig を 2 件詰める。
             //   (b) FacialCharacterProfileExporter で StreamingAssets profile.json に書き出す（SO → JSON）。
-            //   (c) SystemTextJsonParser.ParseProfileSnapshotV2 で v2.1 strict パース。
+            //   (c) SystemTextJsonParser.ParseProfileSnapshotV2 で v1.0 strict パース。
             //   (d) FacialCharacterProfileConverter.ToSORootGazeConfigs で SO ルート相当に復元（JSON → SO）。
             //   (e) 復元結果が元 SO の _gazeConfigs と value-equal であることを assert する。
             //   look-clip / lookXxxSamples は JSON 出力対象外（SO YAML 側 source-of-truth）の運用のため、
@@ -125,23 +125,23 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
         }
 
         [Test]
-        public void Parse_LegacyV20SchemaVersion_IsRejectedToKeepCIFailingOnLegacyJson()
+        public void Parse_UnsupportedSchemaVersion_IsRejectedToKeepCIFailingOnUnsupportedJson()
         {
-            // Req 2.6: 旧 v2.0 JSON が誤って silent migrate されないこと。
-            // パーサが旧 schemaVersion="2.0" を NotSupportedException で拒否し続けることで、
+            // Req 2.6: preview.1 段階の "1.0" 以外（未サポート）の JSON が誤って silent migrate されないこと。
+            // パーサが schemaVersion="2.0" のような未サポート値を NotSupportedException で拒否し続けることで、
             // 自動 migration コードを書かないという方針が CI で守られる（CI が落ちる挙動を維持）。
-            var legacyJson =
+            var unsupportedJson =
                 "{\"schemaVersion\":\"2.0\"," +
                 "\"layers\":[]," +
                 "\"expressions\":[]," +
                 "\"rendererPaths\":[]}";
 
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("schema v2.1 の strict チェックに失敗"));
+            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("schema v1.0 の strict チェックに失敗"));
 
             var parser = new SystemTextJsonParser();
-            var ex = Assert.Throws<NotSupportedException>(() => parser.ParseProfileSnapshotV2(legacyJson));
+            var ex = Assert.Throws<NotSupportedException>(() => parser.ParseProfileSnapshotV2(unsupportedJson));
             StringAssert.Contains("'2.0'", ex.Message);
-            StringAssert.Contains("'2.1'", ex.Message);
+            StringAssert.Contains("'1.0'", ex.Message);
         }
 
         private static List<GazeBindingConfig> BuildSourceGazeConfigs()

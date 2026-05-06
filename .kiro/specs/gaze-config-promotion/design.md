@@ -1,5 +1,7 @@
 # Technical Design: gaze-config-promotion
 
+> **Note (post-implementation amendment, 2026-05-06)**: 本 design 内では `profile.json` の `schemaVersion` を `"2.0"` → `"2.1"` に bump する設計で記述しているが、preview.1 リリース前段階のためバージョンを別管理しないポリシーに従い、**実装上は `"1.0"` に統一**された。本文の `"2.1"` 言及はすべて `"1.0"` 統一値として読み替えること。実装は `SystemTextJsonParser.SchemaVersionV2 = "1.0"` で固定し、`"1.0"` 以外を strict 拒否する。
+
 ## Overview
 
 **Purpose**: 目線（gaze）のキャラ固有設定（左右目ボーンパス・可動範囲・LookXxx Clip）を、入力源（InputSystem / OSC / ARKit）から分離し `FacialCharacterProfileSO` ルートに昇格させる。`InputSystemAdapterBinding` は「どの InputAction でその gaze を駆動するか」だけを保持する薄い結線レイヤに縮退する。

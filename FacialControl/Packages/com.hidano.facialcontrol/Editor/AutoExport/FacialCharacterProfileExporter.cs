@@ -15,7 +15,7 @@ namespace Hidano.FacialControl.Editor.AutoExport
     /// <summary>
     /// <see cref="FacialCharacterProfileSO"/> 系アセットの汎用エクスポート処理。
     /// AnimationClip サンプリング → <see cref="ExpressionSerializable.cachedSnapshot"/> 反映、
-    /// および <c>StreamingAssets/FacialControl/{SO 名}/profile.json</c> (schema v2.1) への
+    /// および <c>StreamingAssets/FacialControl/{SO 名}/profile.json</c> (schema v1.0) への
     /// 書き出しを行う。入力方式 (InputSystem / OSC / ARKit 等) には依存しない。
     /// </summary>
     /// <remarks>

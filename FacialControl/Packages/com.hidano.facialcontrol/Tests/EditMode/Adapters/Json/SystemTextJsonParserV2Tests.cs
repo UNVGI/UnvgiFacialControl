@@ -9,9 +9,8 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 {
     /// <summary>
-    /// Phase 3.6 (inspector-and-data-model-redesign) tasks.md 3.6:
-    /// <see cref="SystemTextJsonParser"/> が schema v2.0 専用となり、
-    /// <c>schemaVersion: "2.1"</c> 以外を <see cref="Debug.LogError(object)"/> +
+    /// preview.1 リリース前段階で <see cref="SystemTextJsonParser"/> がプロファイル JSON 専用となり、
+    /// <c>schemaVersion: "1.0"</c> 以外を <see cref="Debug.LogError(object)"/> +
     /// <see cref="NotSupportedException"/> で拒否することの契約テスト（Req 9.1, 9.2, 9.7, 10.1）。
     /// </summary>
     [TestFixture]
@@ -33,7 +32,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void Parse_SchemaV2_ReturnsExpectedProfile()
         {
             var json = @"{
-                ""schemaVersion"": ""2.1"",
+                ""schemaVersion"": ""1.0"",
                 ""rendererPaths"": [""Body""],
                 ""layers"": [
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
@@ -83,31 +82,11 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         }
 
         // ================================================================
-        // Parse_SchemaV1_ThrowsAndLogsError
+        // Parse_UnsupportedSchemaVersion_ThrowsNotSupportedException
         // ================================================================
 
         [Test]
-        public void Parse_SchemaV1_ThrowsAndLogsError()
-        {
-            var json = @"{
-                ""schemaVersion"": ""1.0"",
-                ""layers"": [
-                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
-                        {""id"":""input"",""weight"":1.0}
-                    ]}
-                ],
-                ""expressions"": []
-            }";
-
-            LogAssert.Expect(LogType.Error, new Regex("schema v2.1 の strict チェックに失敗"));
-
-            var ex = Assert.Throws<NotSupportedException>(() => _parser.ParseProfile(json));
-            StringAssert.Contains("'1.0'", ex.Message);
-            StringAssert.Contains("'2.1'", ex.Message);
-        }
-
-        [Test]
-        public void Parse_SchemaV20_ThrowsNotSupportedException()
+        public void Parse_UnsupportedSchemaVersion_ThrowsNotSupportedException()
         {
             var json = @"{
                 ""schemaVersion"": ""2.0"",
@@ -121,18 +100,18 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""gazeConfigs"": []
             }";
 
-            LogAssert.Expect(LogType.Error, new Regex("schema v2.1 の strict チェックに失敗"));
+            LogAssert.Expect(LogType.Error, new Regex("schema v1.0 の strict チェックに失敗"));
 
             var ex = Assert.Throws<NotSupportedException>(() => _parser.ParseProfile(json));
             StringAssert.Contains("'2.0'", ex.Message);
-            StringAssert.Contains("'2.1'", ex.Message);
+            StringAssert.Contains("'1.0'", ex.Message);
         }
 
         [Test]
         public void ParseProfileSnapshotV2_RootGazeConfigs_PreservesValues()
         {
             var json = @"{
-                ""schemaVersion"": ""2.1"",
+                ""schemaVersion"": ""1.0"",
                 ""layers"": [],
                 ""expressions"": [],
                 ""rendererPaths"": [],
@@ -186,11 +165,11 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""expressions"": []
             }";
 
-            LogAssert.Expect(LogType.Error, new Regex("schema v2.1 の strict チェックに失敗"));
+            LogAssert.Expect(LogType.Error, new Regex("schema v1.0 の strict チェックに失敗"));
 
             var ex = Assert.Throws<NotSupportedException>(() => _parser.ParseProfile(json));
             StringAssert.Contains("<missing>", ex.Message);
-            StringAssert.Contains("'2.1'", ex.Message);
+            StringAssert.Contains("'1.0'", ex.Message);
         }
     }
 }

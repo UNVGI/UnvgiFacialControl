@@ -7,7 +7,7 @@
 ### Breaking changes
 
 - GazeConfig は `InputSystemAdapterBinding._gazeConfigs` から `FacialCharacterProfileSO` ルート直下の `_gazeConfigs` へ昇格しました。InputSystem 側は入力結線のみを保持する構造に変わるため、既存 SO YAML は binding 内部の gaze configs を SO ルートへ移植する必要があります。
-- `profile.json` の `schemaVersion` を `"2.1"` に bump しました。旧 `"2.0"` 形式は preview 段階の破壊的変更として migration なしで扱われます。
+- `profile.json` の `schemaVersion` は preview.1 リリース前段階のため `"1.0"` に統一しました。バージョンを別管理しないポリシーに従い、旧開発過程で出現した `"2.0"` / `"2.1"` の JSON は preview 段階の破壊的変更として migration なしで `"1.0"` への hand-edit が必要です。
 
 ### ⚠ BREAKING CHANGES — Adapter Binding アーキテクチャ移行 (spec `adapter-binding-architecture`)
 
@@ -95,7 +95,7 @@
 
 #### 中間 JSON schema 破壊
 
-- `schemaVersion` を `"2.0"` に bump。`SystemTextJsonParser` は `schemaVersion != "2.0"` を `Debug.LogError` + `InvalidOperationException` で拒否（schema v1.0 ロード不可）
+- `schemaVersion` を `"1.0"` 固定としました（preview.1 リリース前段階でバージョンを別管理しないため）。`SystemTextJsonParser` は `schemaVersion != "1.0"` を `Debug.LogError` + `NotSupportedException` で拒否します
 - `expressions[]` を `id / name / layer / layerOverrideMask: List<string> / snapshot: ExpressionSnapshotDto` の snapshot table 形式に再構成。旧 `transitionDuration / transitionCurve / blendShapeValues / layerSlots` field を撤去
 - top-level `rendererPaths[]` を新設し、各 Expression snapshot の `rendererPaths[]` がそのサブセットであることを保証
 
