@@ -19,7 +19,7 @@
   - _Requirements: 2.1, 2.2_
   - _Depends: 1.1_
 
-- [ ] 1.3 (P) Converter で root → SO ルート方向の gaze configs マッピングを実装する
+- [x] 1.3 (P) Converter で root → SO ルート方向の gaze configs マッピングを実装する
   - JSON DTO の root 直下 `gaze_configs[]` を SO ルートの gaze configs コレクションに変換するロジックを追加する
   - Domain `FacialProfile` には gaze を載せない方針を維持し、SO ルートのみに反映する
   - 観測条件: EditMode テストで DTO → SO 変換結果が期待 entry 数 / 各値で一致する
