@@ -339,6 +339,79 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             Assert.That(_so.GazeConfigs[0].expressionId, Is.EqualTo("analog-one"));
         }
 
+        [Test]
+        public void ExpressionRows_DoNotRenderLegacyIdLabelOrGazeControls()
+        {
+            _so = CreateProfile();
+            _so.Layers.Add(CreateLayer("base"));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+
+            var root = BuildInspectorRoot();
+
+            Assert.That(root.Q<Label>("expression-row-id-label"), Is.Null);
+            Assert.That(root.Q<TextField>(FacialCharacterProfileSOInspector.ExpressionRowGazeLeftBonePathName), Is.Null);
+            Assert.That(root.Q<TextField>(FacialCharacterProfileSOInspector.ExpressionRowGazeRightBonePathName), Is.Null);
+            Assert.That(root.Q<Button>(FacialCharacterProfileSOInspector.ExpressionRowGazeAutoAssignButtonName), Is.Null);
+            Assert.That(root.Q<ObjectField>(FacialCharacterProfileSOInspector.ExpressionRowGazeLookLeftClipName), Is.Null);
+            Assert.That(root.Q<ObjectField>(FacialCharacterProfileSOInspector.ExpressionRowGazeLookRightClipName), Is.Null);
+            Assert.That(root.Q<ObjectField>(FacialCharacterProfileSOInspector.ExpressionRowGazeLookUpClipName), Is.Null);
+            Assert.That(root.Q<ObjectField>(FacialCharacterProfileSOInspector.ExpressionRowGazeLookDownClipName), Is.Null);
+        }
+
+        [Test]
+        public void DebugExpressionIdMapping_RendersNameExpressionIdKindAndLayerForEveryExpression()
+        {
+            _so = CreateProfile();
+            _so.Layers.Add(CreateLayer("base"));
+            _so.Layers.Add(CreateLayer("eye"));
+            _so.Expressions.Add(CreateExpression("smile", "Smile", ExpressionKind.Digital, "base"));
+            _so.Expressions.Add(CreateExpression("look", "Look", ExpressionKind.Analog, "eye"));
+
+            var root = BuildInspectorRoot();
+
+            Assert.That(
+                root.Q<Label>(FacialCharacterProfileSOInspector.DebugExpressionIdMappingTitleName)?.text,
+                Is.EqualTo("Expression ID マッピング"));
+            Assert.That(CollectLabelTexts(root, FacialCharacterProfileSOInspector.DebugExpressionIdMappingNameCellName),
+                Is.EqualTo(new[] { "Smile", "Look" }));
+            Assert.That(CollectLabelTexts(root, FacialCharacterProfileSOInspector.DebugExpressionIdMappingExpressionIdCellName),
+                Is.EqualTo(new[] { "smile", "look" }));
+            Assert.That(CollectLabelTexts(root, FacialCharacterProfileSOInspector.DebugExpressionIdMappingKindCellName),
+                Is.EqualTo(new[] { "Digital", "Analog" }));
+            Assert.That(CollectLabelTexts(root, FacialCharacterProfileSOInspector.DebugExpressionIdMappingLayerCellName),
+                Is.EqualTo(new[] { "base", "eye" }));
+        }
+
+        [Test]
+        public void DebugExpressionIdMapping_RebuildReflectsExpressionEdits()
+        {
+            _so = CreateProfile();
+            _so.Layers.Add(CreateLayer("base"));
+            _so.Layers.Add(CreateLayer("eye"));
+            _so.Expressions.Add(CreateExpression("smile", "Smile", ExpressionKind.Digital, "base"));
+
+            var root = BuildInspectorRoot();
+
+            _so.Expressions[0].name = "Smile Renamed";
+            _so.Expressions[0].kind = ExpressionKind.Analog;
+            _so.Expressions[0].layer = "eye";
+            _so.Expressions.Add(CreateExpression("blink", "Blink", ExpressionKind.Digital, "base"));
+            InvokeRebuildExpressionIdMapping();
+
+            Assert.That(CollectLabelTexts(root, FacialCharacterProfileSOInspector.DebugExpressionIdMappingNameCellName),
+                Is.EqualTo(new[] { "Smile Renamed", "Blink" }));
+            Assert.That(CollectLabelTexts(root, FacialCharacterProfileSOInspector.DebugExpressionIdMappingKindCellName),
+                Is.EqualTo(new[] { "Analog", "Digital" }));
+            Assert.That(CollectLabelTexts(root, FacialCharacterProfileSOInspector.DebugExpressionIdMappingLayerCellName),
+                Is.EqualTo(new[] { "eye", "base" }));
+
+            _so.Expressions.RemoveAt(0);
+            InvokeRebuildExpressionIdMapping();
+
+            Assert.That(CollectLabelTexts(root, FacialCharacterProfileSOInspector.DebugExpressionIdMappingExpressionIdCellName),
+                Is.EqualTo(new[] { "blink" }));
+        }
+
         private VisualElement BuildInspectorRoot()
         {
             _editor = UnityEditor.Editor.CreateEditor(_so, typeof(FacialCharacterProfileSOInspector));
@@ -409,6 +482,16 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             method.Invoke(_editor, null);
         }
 
+        private void InvokeRebuildExpressionIdMapping()
+        {
+            _editor.serializedObject.Update();
+            var method = typeof(FacialCharacterProfileSOInspector).GetMethod(
+                "RebuildExpressionIdMapping",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(_editor, null);
+        }
+
         private void AssignReferenceModel(GameObject referenceModel)
         {
             var so = _editor.serializedObject;
@@ -442,18 +525,36 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             return so;
         }
 
+        private static LayerDefinitionSerializable CreateLayer(string name)
+        {
+            return new LayerDefinitionSerializable
+            {
+                name = name,
+                priority = 0,
+                exclusionMode = ExclusionMode.LastWins,
+            };
+        }
+
         private static ExpressionSerializable CreateExpression(
             string id,
             string name,
-            ExpressionKind kind)
+            ExpressionKind kind,
+            string layer = "base")
         {
             return new ExpressionSerializable
             {
                 id = id,
                 name = name,
-                layer = "base",
+                layer = layer,
                 kind = kind,
             };
+        }
+
+        private static List<string> CollectLabelTexts(VisualElement root, string name)
+        {
+            var result = new List<string>();
+            root.Query<Label>(name).ForEach(label => result.Add(label.text));
+            return result;
         }
     }
 }

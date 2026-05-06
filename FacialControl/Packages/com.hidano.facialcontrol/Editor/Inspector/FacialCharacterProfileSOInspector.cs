@@ -46,6 +46,13 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string SaveButtonName = "facial-character-save-button";
         public const string SaveStatusLabelName = "facial-character-save-status";
         public const string ExpressionsValidationHelpName = "facial-character-expressions-validation";
+        public const string DebugExpressionIdMappingTitleName = "debug-expression-id-mapping-title";
+        public const string DebugExpressionIdMappingName = "debug-expression-id-mapping";
+        public const string DebugExpressionIdMappingRowName = "debug-expression-id-mapping-row";
+        public const string DebugExpressionIdMappingNameCellName = "debug-expression-id-mapping-name";
+        public const string DebugExpressionIdMappingExpressionIdCellName = "debug-expression-id-mapping-expression-id";
+        public const string DebugExpressionIdMappingKindCellName = "debug-expression-id-mapping-kind";
+        public const string DebugExpressionIdMappingLayerCellName = "debug-expression-id-mapping-layer";
 
         public const string ReferenceModelFoldoutName = "facial-character-reference-model-foldout";
 
@@ -121,6 +128,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         private Label _debugLayerCountLabel;
         private Label _debugExpressionCountLabel;
         private Label _debugJsonPathLabel;
+        private VisualElement _debugExpressionIdMappingContainer;
         private HelpBox _expressionsValidationHelp;
         private Label _saveStatusLabel;
         private VisualElement _layersContainer;
@@ -169,6 +177,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             RefreshLayerNameChoices();
             UpdateValidation();
             UpdateDebugLabels();
+            RebuildExpressionIdMapping();
 
             // 自動保存: SerializedObject の変更を監視
             root.TrackSerializedObjectValue(serializedObject, _ => OnSerializedObjectChanged());
@@ -285,6 +294,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             EditorUtility.SetDirty(target);
             UpdateValidation();
             UpdateDebugLabels();
+            RebuildExpressionIdMapping();
             RefreshLayerNameChoices();
 
             if (!_autoSavePending)
@@ -1196,6 +1206,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             RebuildLayersUI();
             RebuildGazeConfigsUI();
+            RebuildExpressionIdMapping();
             UpdateValidation();
         }
 
@@ -1283,17 +1294,6 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             row.Add(headerRow);
 
-            // ID label
-            var idLabel = new Label
-            {
-                name = ExpressionRowIdLabelName,
-                text = $"ID: {(idProp != null ? idProp.stringValue : string.Empty)}",
-            };
-            idLabel.AddToClassList(FacialControlStyles.InfoLabel);
-            idLabel.style.fontSize = 10;
-            idLabel.style.color = new StyleColor(new Color(0.5f, 0.5f, 0.5f));
-            row.Add(idLabel);
-
             // 名前
             var nameField = new TextField("名前")
             {
@@ -1310,6 +1310,7 @@ namespace Hidano.FacialControl.Editor.Inspector
                     {
                         p.stringValue = evt.newValue ?? string.Empty;
                         serializedObject.ApplyModifiedProperties();
+                        RebuildExpressionIdMapping();
                     }
                 });
             }
@@ -1372,6 +1373,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
             RebuildLayersUI();
             RebuildGazeConfigsUI();
+            RebuildExpressionIdMapping();
             UpdateValidation();
         }
 
@@ -1596,6 +1598,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             RebuildLayersUI();
             RebuildGazeConfigsUI();
+            RebuildExpressionIdMapping();
             UpdateValidation();
         }
 
@@ -1872,6 +1875,23 @@ namespace Hidano.FacialControl.Editor.Inspector
             _debugJsonPathLabel.style.whiteSpace = WhiteSpace.Normal;
             foldout.Add(_debugJsonPathLabel);
 
+            var mappingTitle = new Label("Expression ID マッピング")
+            {
+                name = DebugExpressionIdMappingTitleName,
+            };
+            mappingTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+            mappingTitle.style.marginTop = 6;
+            foldout.Add(mappingTitle);
+
+            _debugExpressionIdMappingContainer = new VisualElement
+            {
+                name = DebugExpressionIdMappingName,
+            };
+            _debugExpressionIdMappingContainer.style.flexDirection = FlexDirection.Column;
+            foldout.Add(_debugExpressionIdMappingContainer);
+
+            RebuildExpressionIdMapping();
+
             root.Add(foldout);
         }
 
@@ -1904,6 +1924,84 @@ namespace Hidano.FacialControl.Editor.Inspector
                         FacialCharacterProfileSO.ProfileJsonFileName);
                 _debugJsonPathLabel.text = $"JSON 出力先: {path}";
             }
+        }
+
+        private void RebuildExpressionIdMapping()
+        {
+            if (_debugExpressionIdMappingContainer == null) return;
+
+            _debugExpressionIdMappingContainer.Clear();
+            _debugExpressionIdMappingContainer.Add(BuildExpressionIdMappingHeaderRow());
+
+            if (_expressionsProperty == null) return;
+
+            serializedObject.Update();
+            for (int i = 0; i < _expressionsProperty.arraySize; i++)
+            {
+                var expr = _expressionsProperty.GetArrayElementAtIndex(i);
+                _debugExpressionIdMappingContainer.Add(BuildExpressionIdMappingRow(expr));
+            }
+        }
+
+        private VisualElement BuildExpressionIdMappingHeaderRow()
+        {
+            var row = BuildExpressionIdMappingRowContainer();
+            row.Add(BuildExpressionIdMappingCell("name", null, bold: true));
+            row.Add(BuildExpressionIdMappingCell("expressionId", null, bold: true));
+            row.Add(BuildExpressionIdMappingCell("kind", null, bold: true));
+            row.Add(BuildExpressionIdMappingCell("layer", null, bold: true));
+            return row;
+        }
+
+        private VisualElement BuildExpressionIdMappingRow(SerializedProperty expr)
+        {
+            string kind = string.Empty;
+            var kindProp = expr.FindPropertyRelative("kind");
+            if (kindProp != null)
+            {
+                kind = ((ExpressionKind)kindProp.enumValueIndex).ToString();
+            }
+
+            var row = BuildExpressionIdMappingRowContainer();
+            row.Add(BuildExpressionIdMappingCell(
+                ReadStringProperty(expr, "name"),
+                DebugExpressionIdMappingNameCellName));
+            row.Add(BuildExpressionIdMappingCell(
+                ReadStringProperty(expr, "id"),
+                DebugExpressionIdMappingExpressionIdCellName));
+            row.Add(BuildExpressionIdMappingCell(kind, DebugExpressionIdMappingKindCellName));
+            row.Add(BuildExpressionIdMappingCell(
+                ReadStringProperty(expr, "layer"),
+                DebugExpressionIdMappingLayerCellName));
+            return row;
+        }
+
+        private static VisualElement BuildExpressionIdMappingRowContainer()
+        {
+            var row = new VisualElement
+            {
+                name = DebugExpressionIdMappingRowName,
+            };
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.marginBottom = 2;
+            return row;
+        }
+
+        private static Label BuildExpressionIdMappingCell(string text, string name, bool bold = false)
+        {
+            var label = new Label(text ?? string.Empty)
+            {
+                name = name,
+            };
+            label.style.minWidth = 96;
+            label.style.flexGrow = 1f;
+            label.style.whiteSpace = WhiteSpace.Normal;
+            if (bold)
+            {
+                label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            }
+            return label;
         }
 
         // ====================================================================

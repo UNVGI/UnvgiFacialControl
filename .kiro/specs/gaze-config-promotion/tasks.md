@@ -115,7 +115,7 @@
   - 観測条件: Expression 削除後に `Undo.PerformUndo` を 1 回行うと Expression と gaze config の双方が同時に巻き戻り、他のトリガーで gaze config が消えない
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 3.5 Expression 行 ID 表示を撤去し Debug セクションに ID マッピング一覧を追加する
+- [x] 3.5 Expression 行 ID 表示を撤去し Debug セクションに ID マッピング一覧を追加する
   - Expression 行から expressionId ラベルを完全に取り除き、Layers and Expressions セクションから gaze 編集 UI が消えていることを保証する
   - Debug セクションに「Expression ID マッピング」一覧（name / expressionId / kind / layer の 4 列）を追加し、Expression 追加 / 削除 / 名前 / kind / layer 変更が次回 repaint に反映されるよう track する
   - 観測条件: Expression 行に id ラベルが存在せず、Debug セクションのマッピング一覧が SO 編集の都度更新される
