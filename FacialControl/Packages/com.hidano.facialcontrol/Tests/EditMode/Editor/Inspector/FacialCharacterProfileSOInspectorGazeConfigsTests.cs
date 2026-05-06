@@ -364,6 +364,34 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         }
 
         [Test]
+        public void InspectorRoot_QueryDoesNotFindLegacyDeadElementNames()
+        {
+            _so = CreateProfile();
+            _so.Layers.Add(CreateLayer("base"));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+
+            var root = BuildInspectorRoot();
+            var legacyNames = new[]
+            {
+                "expression-row-id-label",
+                "expression-row-gaze-left-bone-path",
+                "expression-row-gaze-left-init-rot",
+                "expression-row-gaze-right-bone-path",
+                "expression-row-gaze-right-init-rot",
+                "expression-row-gaze-look-left-clip",
+                "expression-row-gaze-look-right-clip",
+                "expression-row-gaze-look-up-clip",
+                "expression-row-gaze-look-down-clip",
+                "expression-row-gaze-auto-assign-button",
+            };
+
+            foreach (var legacyName in legacyNames)
+            {
+                Assert.That(root.Q<VisualElement>(legacyName), Is.Null, legacyName);
+            }
+        }
+
+        [Test]
         public void DebugExpressionIdMapping_RendersNameExpressionIdKindAndLayerForEveryExpression()
         {
             _so = CreateProfile();
