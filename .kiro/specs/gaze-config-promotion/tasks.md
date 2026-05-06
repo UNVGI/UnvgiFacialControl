@@ -27,7 +27,7 @@
   - _Boundary: FacialCharacterProfileConverter_
   - _Depends: 1.2_
 
-- [ ] 1.4 (P) Exporter で SO ルート → root の gaze configs シリアライズを実装する
+- [x] 1.4 (P) Exporter で SO ルート → root の gaze configs シリアライズを実装する
   - SO ルート gaze configs を JSON DTO の root 直下 `gaze_configs[]` に詰める出力ロジックを追加する
   - look-clip / lookXxxSamples は JSON 出力対象外の運用を Exporter にも反映する
   - 観測条件: EditMode テストで SO → DTO 変換結果が root 直下に gaze configs を出力し、binding 内部には出力されない

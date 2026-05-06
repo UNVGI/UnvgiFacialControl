@@ -236,7 +236,7 @@ namespace Hidano.FacialControl.Adapters.Json
         {
             var dto = ConvertToProfileSnapshotDto(profile);
             var raw = JsonUtility.ToJson(dto, true);
-            return PostprocessInputSourceOptions(raw);
+            return PostprocessInputSourceOptions(PostprocessGazeConfigsKey(raw));
         }
 
         /// <summary>
@@ -252,7 +252,7 @@ namespace Hidano.FacialControl.Adapters.Json
             if (string.IsNullOrEmpty(dto.schemaVersion))
                 dto.schemaVersion = SchemaVersionV2;
             var raw = JsonUtility.ToJson(dto, true);
-            return PostprocessInputSourceOptions(raw);
+            return PostprocessInputSourceOptions(PostprocessGazeConfigsKey(raw));
         }
 
         /// <inheritdoc/>
@@ -364,6 +364,13 @@ namespace Hidano.FacialControl.Adapters.Json
             return string.IsNullOrEmpty(json)
                 ? json
                 : json.Replace("\"gaze_configs\"", "\"gazeConfigs\"");
+        }
+
+        private static string PostprocessGazeConfigsKey(string json)
+        {
+            return string.IsNullOrEmpty(json)
+                ? json
+                : json.Replace("\"gazeConfigs\"", "\"gaze_configs\"");
         }
 
         private static int FindMatchingBrace(string json, int openIndex)
