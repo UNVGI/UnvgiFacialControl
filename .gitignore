@@ -157,6 +157,8 @@ ClientBin/
 *~
 !Samples~/
 !Samples~/**
+!FacialControl/Packages/com.hidano.facialcontrol.lipsync/Documentation~/
+!FacialControl/Packages/com.hidano.facialcontrol.lipsync/Documentation~/**
 *.dbmdl
 *.dbproj.schemaview
 *.pfx

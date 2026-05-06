@@ -27,7 +27,7 @@
 ## Phase 1: パッケージ scaffolding
 
 - [ ] 2. パッケージ `com.hidano.facialcontrol.lipsync` の足場を整備する
-- [ ] 2.1 `package.json` と標準 UPM ディレクトリレイアウトを作成する
+- [x] 2.1 `package.json` と標準 UPM ディレクトリレイアウトを作成する
   - `Packages/com.hidano.facialcontrol.lipsync/package.json` を新規作成し、id・displayName・version・unity 6000.3.2f1・description・keywords（windows-only 明記）・samples 配列・dependencies（コア + `com.hidano.ulipsync-asio`）を宣言する
   - `Runtime/` / `Editor/` / `Tests/EditMode/` / `Tests/PlayMode/` / `Tests/Shared/` / `Samples~/` / `Documentation~/` の空ディレクトリと `README.md` / `CHANGELOG.md` / `LICENSE.md` 雛形を配置する
   - `FacialControl/Packages/manifest.json` にローカルパッケージ参照（`file:` プロトコル）を追加し、`packages-lock.json` を同期する

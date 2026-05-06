@@ -19,6 +19,7 @@
     "com.hidano.facialcontrol": "file:com.hidano.facialcontrol",
     "com.hidano.facialcontrol.osc": "file:com.hidano.facialcontrol.osc",
     "com.hidano.facialcontrol.inputsystem": "file:com.hidano.facialcontrol.inputsystem",
+    "com.hidano.facialcontrol.lipsync": "file:com.hidano.facialcontrol.lipsync",
     "jp.hadashikick.vcontainer": "1.17.0",
     "com.hidano.scene-view-style-camera-controller": "1.0.0",
     "com.hidano.ulipsync-asio": "3.1.5-custom.0",
