@@ -119,7 +119,7 @@
   - _Requirements: 7.2, 7.3, 7.4, 14.1_
   - _Boundary: Tests/Shared_
 
-- [ ] 6.2 `IAsioDriverEnumerator` / `IMicrophoneDeviceEnumerator` インタフェースと Default 実装を追加する
+- [x] 6.2 `IAsioDriverEnumerator` / `IMicrophoneDeviceEnumerator` インタフェースと Default 実装を追加する
   - `IAsioDriverEnumerator.GetDriverNames()` / `IMicrophoneDeviceEnumerator.GetDeviceNames()` を Runtime asmdef に定義する
   - `DefaultAsioDriverEnumerator` を `#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN` ガード付きで実装し、`NAudio.Wave.Asio.AsioOut.GetDriverNames()` を try/catch + LogError + 空配列で安全化する（**DD-A**）
   - `DefaultMicrophoneDeviceEnumerator` は `UnityEngine.Microphone.devices` をそのまま返す

@@ -1,8 +1,9 @@
 using System;
+using Hidano.FacialControl.LipSync.Adapters.Devices;
 
 namespace Hidano.FacialControl.LipSync.Tests.Shared
 {
-    public sealed class FakeMicrophoneDeviceEnumerator
+    public sealed class FakeMicrophoneDeviceEnumerator : IMicrophoneDeviceEnumerator
     {
         private readonly string[] _deviceNames;
 

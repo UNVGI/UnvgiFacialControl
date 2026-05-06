@@ -1,8 +1,9 @@
 using System;
+using Hidano.FacialControl.LipSync.Adapters.Devices;
 
 namespace Hidano.FacialControl.LipSync.Tests.Shared
 {
-    public sealed class FakeAsioDriverEnumerator
+    public sealed class FakeAsioDriverEnumerator : IAsioDriverEnumerator
     {
         private readonly string[] _driverNames;
 
