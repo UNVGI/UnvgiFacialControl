@@ -43,7 +43,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseLayerInputSources_IdViolatesRegex_LogsWarningAndSkips()
         {
             var json = @"{
-                ""schemaVersion"":""2.0"",
+                ""schemaVersion"":""2.1"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""invalid id with space"",""weight"":1.0},
@@ -67,7 +67,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             // D-5: legacy フォールバック廃止。InputSourceId は 'legacy' を受理しない。
             var json = @"{
-                ""schemaVersion"":""2.0"",
+                ""schemaVersion"":""2.1"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""legacy"",""weight"":1.0},
@@ -91,7 +91,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // 65 文字 ID は regex {1,64} に違反する。
             string tooLong = new string('a', 65);
             var json = @"{
-                ""schemaVersion"":""2.0"",
+                ""schemaVersion"":""2.1"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""" + tooLong + @""",""weight"":1.0},
@@ -121,7 +121,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // `osc` / `my-binding` / `x-custom-sensor` のように slug 規約 (regex) を満たす
             // 任意の識別子は parse 段階で skip されない。
             var json = @"{
-                ""schemaVersion"":""2.0"",
+                ""schemaVersion"":""2.1"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""input"",""weight"":0.5},
@@ -149,7 +149,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseLayerInputSources_DuplicateId_LogsWarningAndKeepsLast()
         {
             var json = @"{
-                ""schemaVersion"":""2.0"",
+                ""schemaVersion"":""2.1"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""osc"",""weight"":0.25,""options"":{""stalenessSeconds"":1.0}},
@@ -177,7 +177,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             // 入力: [A1, B, A2, C]  → 出力: [B, A2, C] (A は最後の出現位置で保持)
             var json = @"{
-                ""schemaVersion"":""2.0"",
+                ""schemaVersion"":""2.1"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""osc"",""weight"":0.1},
@@ -205,7 +205,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         {
             // 異なるレイヤーなら同 id は重複ではない。
             var json = @"{
-                ""schemaVersion"":""2.0"",
+                ""schemaVersion"":""2.1"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""osc"",""weight"":1.0}
@@ -236,7 +236,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // D-13 / Req 12.5 により reserved id 体系は撤廃済みのため、
             // syntactic に valid な slug (`unknown-thing`) は skip されず保持される。
             var json = @"{
-                ""schemaVersion"":""2.0"",
+                ""schemaVersion"":""2.1"",
                 ""layers"":[
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
                         {""id"":""bad id"",""weight"":1.0},

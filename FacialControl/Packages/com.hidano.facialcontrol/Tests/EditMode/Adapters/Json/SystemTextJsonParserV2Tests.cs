@@ -11,8 +11,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
     /// <summary>
     /// Phase 3.6 (inspector-and-data-model-redesign) tasks.md 3.6:
     /// <see cref="SystemTextJsonParser"/> が schema v2.0 専用となり、
-    /// <c>schemaVersion: "2.0"</c> 以外を <see cref="Debug.LogError(object)"/> +
-    /// <see cref="InvalidOperationException"/> で拒否することの契約テスト（Req 9.1, 9.2, 9.7, 10.1）。
+    /// <c>schemaVersion: "2.1"</c> 以外を <see cref="Debug.LogError(object)"/> +
+    /// <see cref="NotSupportedException"/> で拒否することの契約テスト（Req 9.1, 9.2, 9.7, 10.1）。
     /// </summary>
     [TestFixture]
     public class SystemTextJsonParserV2Tests
@@ -33,7 +33,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void Parse_SchemaV2_ReturnsExpectedProfile()
         {
             var json = @"{
-                ""schemaVersion"": ""2.0"",
+                ""schemaVersion"": ""2.1"",
                 ""rendererPaths"": [""Body""],
                 ""layers"": [
                     {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
@@ -99,11 +99,75 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""expressions"": []
             }";
 
-            LogAssert.Expect(LogType.Error, new Regex("schema v2.0 の strict チェックに失敗"));
+            LogAssert.Expect(LogType.Error, new Regex("schema v2.1 の strict チェックに失敗"));
 
-            var ex = Assert.Throws<InvalidOperationException>(() => _parser.ParseProfile(json));
+            var ex = Assert.Throws<NotSupportedException>(() => _parser.ParseProfile(json));
             StringAssert.Contains("'1.0'", ex.Message);
+            StringAssert.Contains("'2.1'", ex.Message);
+        }
+
+        [Test]
+        public void Parse_SchemaV20_ThrowsNotSupportedException()
+        {
+            var json = @"{
+                ""schemaVersion"": ""2.0"",
+                ""layers"": [
+                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[
+                        {""id"":""input"",""weight"":1.0}
+                    ]}
+                ],
+                ""expressions"": [],
+                ""rendererPaths"": [],
+                ""gazeConfigs"": []
+            }";
+
+            LogAssert.Expect(LogType.Error, new Regex("schema v2.1 の strict チェックに失敗"));
+
+            var ex = Assert.Throws<NotSupportedException>(() => _parser.ParseProfile(json));
             StringAssert.Contains("'2.0'", ex.Message);
+            StringAssert.Contains("'2.1'", ex.Message);
+        }
+
+        [Test]
+        public void ParseProfileSnapshotV2_RootGazeConfigs_PreservesValues()
+        {
+            var json = @"{
+                ""schemaVersion"": ""2.1"",
+                ""layers"": [],
+                ""expressions"": [],
+                ""rendererPaths"": [],
+                ""gaze_configs"": [
+                    {
+                        ""expressionId"": ""eye_look"",
+                        ""leftEyeBonePath"": ""Head/LeftEye"",
+                        ""leftEyeInitialRotation"": {""x"":0,""y"":1,""z"":2},
+                        ""leftEyeYawAxisLocal"": {""x"":0,""y"":1,""z"":0},
+                        ""leftEyePitchAxisLocal"": {""x"":1,""y"":0,""z"":0},
+                        ""rightEyeBonePath"": ""Head/RightEye"",
+                        ""rightEyeInitialRotation"": {""x"":3,""y"":4,""z"":5},
+                        ""rightEyeYawAxisLocal"": {""x"":0,""y"":1,""z"":0},
+                        ""rightEyePitchAxisLocal"": {""x"":1,""y"":0,""z"":0},
+                        ""lookUpAngle"": 16,
+                        ""lookDownAngle"": 8,
+                        ""outerYawAngle"": 17,
+                        ""innerYawAngle"": 7
+                    }
+                ]
+            }";
+
+            var dto = _parser.ParseProfileSnapshotV2(json);
+
+            Assert.AreEqual(1, dto.gazeConfigs.Count);
+            var cfg = dto.gazeConfigs[0];
+            Assert.AreEqual("eye_look", cfg.expressionId);
+            Assert.AreEqual("Head/LeftEye", cfg.leftEyeBonePath);
+            Assert.AreEqual("Head/RightEye", cfg.rightEyeBonePath);
+            Assert.AreEqual(1f, cfg.leftEyeInitialRotation.y);
+            Assert.AreEqual(4f, cfg.rightEyeInitialRotation.y);
+            Assert.AreEqual(16f, cfg.lookUpAngle);
+            Assert.AreEqual(8f, cfg.lookDownAngle);
+            Assert.AreEqual(17f, cfg.outerYawAngle);
+            Assert.AreEqual(7f, cfg.innerYawAngle);
         }
 
         // ================================================================
@@ -122,11 +186,11 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""expressions"": []
             }";
 
-            LogAssert.Expect(LogType.Error, new Regex("schema v2.0 の strict チェックに失敗"));
+            LogAssert.Expect(LogType.Error, new Regex("schema v2.1 の strict チェックに失敗"));
 
-            var ex = Assert.Throws<InvalidOperationException>(() => _parser.ParseProfile(json));
+            var ex = Assert.Throws<NotSupportedException>(() => _parser.ParseProfile(json));
             StringAssert.Contains("<missing>", ex.Message);
-            StringAssert.Contains("'2.0'", ex.Message);
+            StringAssert.Contains("'2.1'", ex.Message);
         }
     }
 }

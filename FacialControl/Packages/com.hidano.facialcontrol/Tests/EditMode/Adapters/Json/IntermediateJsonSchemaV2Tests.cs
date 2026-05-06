@@ -18,7 +18,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
     ///      schemaVersion / layers / expressions / rendererPaths を全て埋めた
     ///      <see cref="ProfileSnapshotDto"/> を JSON へ書き出し、再パース後に同値であることを確認。
     ///   2. <c>Parse_SchemaVersionMismatch_ThrowsInvalidOperation</c>:
-    ///      schemaVersion が "2.0" 以外の場合に <see cref="Debug.LogError(object)"/> + <see cref="InvalidOperationException"/> を出すこと（Req 10.1）。
+    ///      schemaVersion が "2.1" 以外の場合に <see cref="Debug.LogError(object)"/> + <see cref="NotSupportedException"/> を出すこと（Req 10.1）。
     ///   3. <c>Parse_MissingSnapshot_ProducesEmptySnapshot</c>:
     ///      <c>expressions[].snapshot</c> 欠落時に空 snapshot（duration=0.25 / Linear / 空配列）に正規化されること。
     ///   4. <c>RendererPaths_AreSubset_Of_TopLevelRendererPaths</c>:
@@ -113,6 +113,17 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 Assert.AreEqual(src.rendererPaths[i], dst.rendererPaths[i]);
             }
 
+            Assert.AreEqual(src.gazeConfigs.Count, dst.gazeConfigs.Count, "gazeConfigs count mismatch");
+            Assert.AreEqual(src.gazeConfigs[0].expressionId, dst.gazeConfigs[0].expressionId);
+            Assert.AreEqual(src.gazeConfigs[0].leftEyeBonePath, dst.gazeConfigs[0].leftEyeBonePath);
+            Assert.AreEqual(src.gazeConfigs[0].rightEyeBonePath, dst.gazeConfigs[0].rightEyeBonePath);
+            Assert.AreEqual(src.gazeConfigs[0].leftEyeYawAxisLocal, dst.gazeConfigs[0].leftEyeYawAxisLocal);
+            Assert.AreEqual(src.gazeConfigs[0].rightEyePitchAxisLocal, dst.gazeConfigs[0].rightEyePitchAxisLocal);
+            Assert.AreEqual(src.gazeConfigs[0].lookUpAngle, dst.gazeConfigs[0].lookUpAngle);
+            Assert.AreEqual(src.gazeConfigs[0].lookDownAngle, dst.gazeConfigs[0].lookDownAngle);
+            Assert.AreEqual(src.gazeConfigs[0].outerYawAngle, dst.gazeConfigs[0].outerYawAngle);
+            Assert.AreEqual(src.gazeConfigs[0].innerYawAngle, dst.gazeConfigs[0].innerYawAngle);
+
             // パーサ経由でも同じ DTO が得られることを確認（normalize は既定値のものなので no-op）
             var parser = new SystemTextJsonParser();
             var parsed = parser.ParseProfileSnapshotV2(json);
@@ -132,12 +143,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // schemaVersion = "1.0" を渡すと Debug.LogError + InvalidOperationException が出る（Req 10.1）。
             var json = "{\"schemaVersion\":\"1.0\",\"layers\":[],\"expressions\":[],\"rendererPaths\":[]}";
 
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("schema v2.0 の strict チェックに失敗"));
+            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("schema v2.1 の strict チェックに失敗"));
 
             var parser = new SystemTextJsonParser();
-            var ex = Assert.Throws<InvalidOperationException>(() => parser.ParseProfileSnapshotV2(json));
+            var ex = Assert.Throws<NotSupportedException>(() => parser.ParseProfileSnapshotV2(json));
             StringAssert.Contains("'1.0'", ex.Message);
-            StringAssert.Contains("'2.0'", ex.Message);
+            StringAssert.Contains("'2.1'", ex.Message);
         }
 
         [Test]
@@ -146,10 +157,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // schemaVersion 自体が無いケースも Req 10.1 により拒否される。
             var json = "{\"layers\":[],\"expressions\":[],\"rendererPaths\":[]}";
 
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("schema v2.0 の strict チェックに失敗"));
+            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("schema v2.1 の strict チェックに失敗"));
 
             var parser = new SystemTextJsonParser();
-            var ex = Assert.Throws<InvalidOperationException>(() => parser.ParseProfileSnapshotV2(json));
+            var ex = Assert.Throws<NotSupportedException>(() => parser.ParseProfileSnapshotV2(json));
             StringAssert.Contains("<missing>", ex.Message);
         }
 
@@ -164,7 +175,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // 既定値: transitionDuration=Expression.DefaultTransitionDuration (1/15), transitionCurvePreset="Linear", blendShapes/bones/rendererPaths は空 List。
             var json =
                 "{" +
-                "\"schemaVersion\":\"2.0\"," +
+                "\"schemaVersion\":\"2.1\"," +
                 "\"layers\":[]," +
                 "\"expressions\":[{\"id\":\"smile-id\",\"name\":\"Smile\",\"layer\":\"emotion\",\"layerOverrideMask\":[]}]," +
                 "\"rendererPaths\":[]" +
@@ -198,7 +209,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             // Req 9.7: expressions[].snapshot.rendererPaths はトップレベル rendererPaths の subset
             var json =
                 "{" +
-                "\"schemaVersion\":\"2.0\"," +
+                "\"schemaVersion\":\"2.1\"," +
                 "\"layers\":[]," +
                 "\"expressions\":[" +
                 "  {\"id\":\"e1\",\"name\":\"Smile\",\"layer\":\"emotion\",\"layerOverrideMask\":[]," +
@@ -312,6 +323,25 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                     },
                 },
                 rendererPaths = new List<string> { "Body", "Face" },
+                gazeConfigs = new List<GazeBindingConfigDto>
+                {
+                    new GazeBindingConfigDto
+                    {
+                        expressionId = "550e8400-e29b-41d4-a716-446655440000",
+                        leftEyeBonePath = "Armature/Head/LeftEye",
+                        leftEyeInitialRotation = Vector3.zero,
+                        leftEyeYawAxisLocal = Vector3.up,
+                        leftEyePitchAxisLocal = Vector3.right,
+                        rightEyeBonePath = "Armature/Head/RightEye",
+                        rightEyeInitialRotation = Vector3.zero,
+                        rightEyeYawAxisLocal = Vector3.up,
+                        rightEyePitchAxisLocal = Vector3.right,
+                        lookUpAngle = 15f,
+                        lookDownAngle = 9f,
+                        outerYawAngle = 15f,
+                        innerYawAngle = 18f,
+                    },
+                },
             };
         }
     }

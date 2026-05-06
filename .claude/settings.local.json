@@ -74,7 +74,10 @@
       "Bash(git check-ignore *)",
       "Bash(unset CLAUDECODE:*)",
       "Bash(claude -p:*)",
-      "Bash(echo \"\" | claude -p:*)"
+      "Bash(echo \"\" | claude -p:*)",
+      "Bash(codex --version)",
+      "Bash(codex exec --dangerously-bypass-approvals-and-sandbox *)",
+      "Bash(codex exec --dangerously-bypass-approvals-and-sandbox - <<*)"
     ]
   }
 }

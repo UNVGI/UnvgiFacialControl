@@ -1,4 +1,5 @@
 using System;
+using Hidano.FacialControl.Adapters.Json;
 using Hidano.FacialControl.Domain.Models;
 
 namespace Hidano.FacialControl.Editor.Windows
@@ -228,7 +229,7 @@ namespace Hidano.FacialControl.Editor.Windows
                 ? BuildSampleExpressions(Naming)
                 : Array.Empty<Expression>();
 
-            return new FacialProfile("2.0", layerDefinitions, expressions);
+            return new FacialProfile(SystemTextJsonParser.SchemaVersionV2, layerDefinitions, expressions);
         }
     }
 }

@@ -11,14 +11,14 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
     /// との衝突を避けるため <c>ProfileSnapshotDto</c> という名称で公開する。
     /// </para>
     /// <para>
-    /// schemaVersion は <c>"2.0"</c> 以外を許容しない（Req 10.1）。
+    /// schemaVersion は <c>"2.1"</c> 以外を許容しない（Req 10.1）。
     /// パース時の strict チェックは <see cref="SystemTextJsonParser.ParseProfileSnapshotV2(string)"/> が担う。
     /// </para>
     /// </summary>
     [System.Serializable]
     public sealed class ProfileSnapshotDto
     {
-        /// <summary>スキーマバージョン文字列（v2.0 では <c>"2.0"</c> 固定）。</summary>
+        /// <summary>スキーマバージョン文字列（v2.1 では <c>"2.1"</c> 固定）。</summary>
         public string schemaVersion;
 
         /// <summary>レイヤー定義配列。</summary>
@@ -32,5 +32,7 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
         /// 各 <see cref="ExpressionSnapshotDto.rendererPaths"/> はこの集合の subset である必要がある（Req 9.7）。
         /// </summary>
         public List<string> rendererPaths;
+
+        public List<GazeBindingConfigDto> gazeConfigs;
     }
 }

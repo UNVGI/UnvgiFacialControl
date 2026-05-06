@@ -10,7 +10,7 @@ namespace Hidano.FacialControl.Adapters.Json
         /// <summary>
         /// 現在サポートする Profile JSON スキーマバージョン（Phase 3.6 で v2.0 へ移行）。
         /// </summary>
-        public const string CurrentSchemaVersion = "2.0";
+        public const string CurrentSchemaVersion = "2.1";
 
         /// <summary>
         /// 現在サポートする設定 JSON スキーマバージョン（Profile とは別系統）。
@@ -270,7 +270,7 @@ namespace Hidano.FacialControl.Adapters.Json
         /// 技術仕様書 §13.7 のサンプルプロファイル JSON（schema v2.0 / snapshot 形式）
         /// </summary>
         public const string SampleProfileJson = @"{
-    ""schemaVersion"": ""2.0"",
+    ""schemaVersion"": ""2.1"",
     ""rendererPaths"": [""Armature/Body"", ""Face""],
     ""layers"": [
         {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [
