@@ -234,7 +234,7 @@
   - _Requirements: 13.6_
   - _Boundary: Assets/Samples_
 
-- [ ] 10.3 (P) `Samples~/AnimationClipLipSyncDemo/`（任意）を整備する
+- [x] 10.3 (P) `Samples~/AnimationClipLipSyncDemo/`（任意）を整備する
   - 任意 Sample として AnimationClip 形式と BlendShape 形式の混在エントリを使う `FacialCharacterProfileSO` と Scene を配置する
   - `package.json` の `samples` 配列に登録する
   - 観測可能完了条件: Package Manager から Import 可能、混在エントリを使った時 0 サンプリング動作が目視確認できる

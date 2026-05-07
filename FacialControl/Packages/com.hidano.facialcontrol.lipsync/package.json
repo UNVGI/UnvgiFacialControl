@@ -27,6 +27,11 @@
       "displayName": "MicLipSyncDemo",
       "description": "uLipSync のマイク入力を FacialControl の lipsync 入力ソースへ接続するデモ。Character GameObject には uLipSync 系コンポーネントを事前付与しない構成を示します。",
       "path": "Samples~/MicLipSyncDemo"
+    },
+    {
+      "displayName": "AnimationClipLipSyncDemo",
+      "description": "uLipSync の音素入力を BlendShape entry と AnimationClip entry の混在設定へ接続するデモ。AnimationClip entry は time 0 の BlendShape 値をサンプリングします。",
+      "path": "Samples~/AnimationClipLipSyncDemo"
     }
   ]
 }
