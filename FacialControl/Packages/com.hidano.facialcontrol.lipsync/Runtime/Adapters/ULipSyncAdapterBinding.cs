@@ -61,6 +61,9 @@ namespace Hidano.FacialControl.LipSync.Adapters
         private LipSyncInputSource _inputSource;
 
         [NonSerialized]
+        private GameObject _hostGameObject;
+
+        [NonSerialized]
         private bool _started;
 
         [NonSerialized]
@@ -74,6 +77,9 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
         [NonSerialized]
         private bool _swapPending;
+
+        [NonSerialized]
+        private DeviceDescriptor _pendingDescriptor;
 
         [NonSerialized]
         private bool _addedAudioSource;
@@ -142,17 +148,10 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 return;
             }
 
-            DeviceResolution resolution = DeviceResolver.Resolve(
-                _deviceDescriptor,
-                _asioEnumerator ?? new DefaultAsioDriverEnumerator(),
-                _microphoneEnumerator ?? new DefaultMicrophoneDeviceEnumerator());
+            DeviceResolution resolution = ResolveDevice(_deviceDescriptor);
             if (resolution.Kind == DeviceKind.Unresolved)
             {
-                Debug.LogError(
-                    $"[ULipSyncAdapterBinding] Device '{_deviceDescriptor.DeviceName}' could not be resolved. " +
-                    $"DisambiguatorIndex={_deviceDescriptor.DisambiguatorIndex}, " +
-                    $"ASIO=[{string.Join(", ", resolution.AvailableAsio)}], " +
-                    $"Microphone=[{string.Join(", ", resolution.AvailableMic)}]");
+                LogUnresolvedDevice(_deviceDescriptor, resolution);
                 return;
             }
 
@@ -168,17 +167,18 @@ namespace Hidano.FacialControl.LipSync.Adapters
             PhonemeSnapshot[] snapshots = BuildSnapshots(ctx);
             try
             {
-                _audioSource = ctx.HostGameObject.GetComponent<AudioSource>();
+                _hostGameObject = ctx.HostGameObject;
+                _audioSource = _hostGameObject.GetComponent<AudioSource>();
                 if (_audioSource == null)
                 {
-                    _audioSource = ctx.HostGameObject.AddComponent<AudioSource>();
+                    _audioSource = _hostGameObject.AddComponent<AudioSource>();
                     _addedAudioSource = true;
                 }
 
-                _analyzer = ctx.HostGameObject.AddComponent<uLipSync.uLipSync>();
+                _analyzer = _hostGameObject.AddComponent<uLipSync.uLipSync>();
                 _analyzer.profile = profile;
 
-                AddInputComponent(ctx.HostGameObject, resolution);
+                AddInputComponent(_hostGameObject, resolution);
 
                 _eventBridge = new ULipSyncEventBridge(_analyzer);
                 _provider = new ULipSyncProvider(_eventBridge, snapshots, ctx.BlendShapeNames.Count);
@@ -206,11 +206,65 @@ namespace Hidano.FacialControl.LipSync.Adapters
             }
 
             _swapPending = false;
+
+            DeviceDescriptor descriptor = _pendingDescriptor;
+            DestroyInputComponents();
+
+            DeviceResolution resolution = ResolveDevice(descriptor);
+            if (resolution.Kind == DeviceKind.Unresolved)
+            {
+                LogUnresolvedDevice(descriptor, resolution);
+                return;
+            }
+
+            try
+            {
+                AddInputComponent(_hostGameObject, resolution);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"[ULipSyncAdapterBinding] SwapDevice failed: {exception}");
+                DestroyInputComponents();
+            }
+        }
+
+        public void SwapDevice(string deviceName, int disambiguatorIndex)
+        {
+            if (!_started || _provider == null)
+            {
+                Debug.LogError("[ULipSyncAdapterBinding] SwapDevice requires a started binding.");
+                return;
+            }
+
+            _provider.RequestZeroOutputForNextFrame();
+            _pendingDescriptor = new DeviceDescriptor
+            {
+                DeviceName = deviceName,
+                DisambiguatorIndex = disambiguatorIndex,
+            };
+            _swapPending = true;
         }
 
         public override void Dispose()
         {
             RollbackStartedResources();
+        }
+
+        private DeviceResolution ResolveDevice(DeviceDescriptor descriptor)
+        {
+            return DeviceResolver.Resolve(
+                descriptor,
+                _asioEnumerator ?? new DefaultAsioDriverEnumerator(),
+                _microphoneEnumerator ?? new DefaultMicrophoneDeviceEnumerator());
+        }
+
+        private static void LogUnresolvedDevice(DeviceDescriptor descriptor, DeviceResolution resolution)
+        {
+            Debug.LogError(
+                $"[ULipSyncAdapterBinding] Device '{descriptor.DeviceName}' could not be resolved. " +
+                $"DisambiguatorIndex={descriptor.DisambiguatorIndex}, " +
+                $"ASIO=[{string.Join(", ", resolution.AvailableAsio)}], " +
+                $"Microphone=[{string.Join(", ", resolution.AvailableMic)}]");
         }
 
         private uLipSync.Profile ResolveAnalyzerProfile()
@@ -238,6 +292,22 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 _asioInput = hostGameObject.AddComponent<uLipSync.uLipSyncAsioInput>();
                 SetAsioField("lipSync", _analyzer);
                 SetAsioField("selectedDeviceIndex", resolution.ResolvedIndex);
+            }
+        }
+
+        private void DestroyInputComponents()
+        {
+            if (_microphoneInput != null)
+            {
+                UnityEngine.Object.Destroy(_microphoneInput);
+                _microphoneInput = null;
+            }
+
+            if (_asioInput != null)
+            {
+                _asioInput.StopRecord();
+                UnityEngine.Object.Destroy(_asioInput);
+                _asioInput = null;
             }
         }
 
@@ -584,18 +654,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 _eventBridge = null;
             }
 
-            if (_microphoneInput != null)
-            {
-                UnityEngine.Object.Destroy(_microphoneInput);
-                _microphoneInput = null;
-            }
-
-            if (_asioInput != null)
-            {
-                _asioInput.StopRecord();
-                UnityEngine.Object.Destroy(_asioInput);
-                _asioInput = null;
-            }
+            DestroyInputComponents();
 
             if (_analyzer != null)
             {
@@ -609,6 +668,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
             }
 
             _audioSource = null;
+            _hostGameObject = null;
             _addedAudioSource = false;
             _swapPending = false;
             _started = false;

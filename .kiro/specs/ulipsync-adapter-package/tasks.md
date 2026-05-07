@@ -181,7 +181,7 @@
   - _Requirements: 8.1, 8.2, 8.3, 8.5, 9.3, 9.4, 9.5, 14.2, 14.5_
   - _Boundary: Tests/PlayMode/HotSwap_
 
-- [ ] 8.2 `SwapDevice` 公開 API（deferred swap）を実装する
+- [x] 8.2 `SwapDevice` 公開 API（deferred swap）を実装する
   - `public void SwapDevice(string deviceName, int disambiguatorIndex)` を実装し、(a) `Provider.RequestZeroOutputForNextFrame()`、(b) `_pendingDescriptor = new DeviceDescriptor(...)`、(c) `_swapPending = true` のみ実施する（**DD-C**）
   - `OnFixedTick` で `_swapPending` 検出時に旧 Mic/Asio コンポーネントを `Destroy` → `DeviceResolver.Resolve` → 解決成功時のみ新コンポーネントを AddComponent し uLipSync.uLipSync と再連結。解決失敗時は `Debug.LogError` + silence モード維持（新コンポーネント未付加）
   - swap 中も `uLipSync.uLipSync` 本体と `ULipSyncProvider` インスタンス、`InputSourceRegistry` 登録は破棄せず維持する（**8.3**）
