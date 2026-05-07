@@ -257,7 +257,7 @@
   - _Requirements: 14.6, 14.7_
   - _Boundary: Documentation_
 
-- [ ] 11.3 (P) `Documentation~/usage.md` を作成し AnimationClip time-0 サンプリングと ASIO 利用手順を記述する
+- [x] 11.3 (P) `Documentation~/usage.md` を作成し AnimationClip time-0 サンプリングと ASIO 利用手順を記述する
   - AnimationClip 形式エントリは **time-0 のみサンプリング**され、時間軸再生は行われないこと（0.5 秒等の口開け遷移は再生されない、**4.6**）を明記する
   - ASIO 利用手順（プロジェクト固有ドライバ名・ASIO 4 ALL 等への対応）を明記し、ASIO Sample Scene を同梱しない理由を説明する（**13.5**）
   - 観測可能完了条件: `Documentation~/usage.md` が日本語で配置され、time-0 制約と ASIO 手順の 2 章が読める状態
