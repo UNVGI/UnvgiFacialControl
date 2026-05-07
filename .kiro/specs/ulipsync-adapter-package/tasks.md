@@ -193,7 +193,7 @@
 ## Phase 3: Editor PropertyDrawer
 
 - [ ] 9. `ULipSyncAdapterBindingDrawer` を UI Toolkit で実装する
-- [ ] 9.1 (P) `DeviceDescriptorPopup` を実装する
+- [x] 9.1 (P) `DeviceDescriptorPopup` を実装する
   - UI Toolkit `PopupField<string>` で choices を `IAsioDriverEnumerator` + `IMicrophoneDeviceEnumerator` の Default 実装から動的取得する
   - 接続中でないデバイス名を入力可能な手動 override `TextField` と `disambiguatorIndex` の `IntegerField`（既定 0）を併設する
   - ASIO/Mic toggle UI は出さない（**7.5**）
