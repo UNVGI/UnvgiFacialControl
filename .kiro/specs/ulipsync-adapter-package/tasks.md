@@ -209,7 +209,7 @@
   - 観測可能完了条件: Inspector で `_phonemeEntries` を編集できる Sample Profile を開いた際、BlendShape 形式 / AnimationClip 形式の混在 row が ListView に表示され、Add / Remove / Reorder と型セレクタが動作する
   - _Requirements: 12.3, 12.6_
 
-- [ ] 9.3 `ULipSyncAdapterBindingDrawer` を統合する
+- [x] 9.3 `ULipSyncAdapterBindingDrawer` を統合する
   - `[CustomPropertyDrawer(typeof(ULipSyncAdapterBinding))]` を `Editor/Inspector/ULipSyncAdapterBindingDrawer.cs` に実装し、`CreatePropertyGUI(SerializedProperty property)` を override する
   - VisualElement ツリー: Slug 行（`PropertyField`）/ `DeviceDescriptorPopup` / Analyzer Profile `ObjectField`（未指定時「パッケージ同梱既定」プレースホルダ）/ `PhonemeEntryListView` / `_maxWeightScale` 行を配置する
   - 既存 `OscAdapterBindingDrawer` の折りたたみ・余白・Validation 配置と整合させる（**12.7**）

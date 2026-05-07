@@ -6,7 +6,8 @@
         "Hidano.FacialControl.Application",
         "Hidano.FacialControl.Adapters",
         "Hidano.FacialControl.Editor",
-        "Hidano.FacialControl.LipSync"
+        "Hidano.FacialControl.LipSync",
+        "uLipSync.Runtime"
     ],
     "includePlatforms": [
         "Editor"
