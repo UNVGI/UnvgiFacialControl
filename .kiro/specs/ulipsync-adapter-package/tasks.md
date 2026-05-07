@@ -292,7 +292,7 @@
   - _Requirements: 8.4, 10.1, 10.2, 10.4, 14.2_
   - _Boundary: Tests/PlayMode/MultiCharacter_
 
-- [ ] 12.3 (P) end-to-end GC 0 byte PlayMode 計測を追加する
+- [x] 12.3 (P) end-to-end GC 0 byte PlayMode 計測を追加する
   - `Tests/PlayMode/Performance/EndToEndGcAllocationTests.cs` を新規作成し、UnityEvent invoke を含む実 `uLipSync.uLipSync` → `ULipSyncProvider` → `LipSyncInputSource` → `LayerInputSourceAggregator` 経路を 1000 フレーム回した際の GC 差分が 0 byte（または Risk-1 micro-alloc 範囲内）であることを assert する
   - 計測は `GC.GetTotalAllocatedBytes(true)` 差分パターン
   - 観測可能完了条件: end-to-end 経路の GC 計測テストが green、Risk-1 が実質影響なしであると確認できる
