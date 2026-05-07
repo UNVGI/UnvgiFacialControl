@@ -11,6 +11,8 @@ env:
   UNITY_PROJECT_PATH: FacialControl
   TEST_RESULTS_DIR: test-results
   PACKAGE_PATH: FacialControl/Packages/com.hidano.facialcontrol
+  LIPSYNC_EDITMODE_TEST_ASSEMBLY: Hidano.FacialControl.LipSync.Tests.EditMode
+  LIPSYNC_PLAYMODE_TEST_ASSEMBLY: Hidano.FacialControl.LipSync.Tests.PlayMode
 
 jobs:
   package-validation:
@@ -93,3 +95,79 @@ jobs:
         with:
           name: playmode-test-results
           path: ${{ env.TEST_RESULTS_DIR }}/playmode.xml
+
+  lipsync-editmode-tests:
+    needs: package-validation
+    name: uLipSync EditMode テスト
+    runs-on: self-hosted
+    timeout-minutes: 30
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: テスト結果ディレクトリ作成
+        run: |
+          if (-Not (Test-Path "${{ env.TEST_RESULTS_DIR }}")) {
+            New-Item -ItemType Directory -Path "${{ env.TEST_RESULTS_DIR }}"
+          }
+        shell: pwsh
+
+      - name: uLipSync EditMode テスト実行
+        run: |
+          $testResultsDir = (Resolve-Path "${{ env.TEST_RESULTS_DIR }}").Path
+          $testResultsPath = Join-Path $testResultsDir "lipsync-editmode.xml"
+          & "$env:UNITY_PATH/Unity.exe" `
+            -batchmode `
+            -nographics `
+            -projectPath "${{ env.UNITY_PROJECT_PATH }}" `
+            -runTests `
+            -testPlatform EditMode `
+            -assemblyNames "${{ env.LIPSYNC_EDITMODE_TEST_ASSEMBLY }}" `
+            -testResults "$testResultsPath"
+        shell: pwsh
+
+      - name: テスト結果アップロード
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lipsync-editmode-test-results
+          path: ${{ env.TEST_RESULTS_DIR }}/lipsync-editmode.xml
+          if-no-files-found: error
+
+  lipsync-playmode-tests:
+    needs: package-validation
+    name: uLipSync PlayMode テスト
+    runs-on: self-hosted
+    timeout-minutes: 30
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: テスト結果ディレクトリ作成
+        run: |
+          if (-Not (Test-Path "${{ env.TEST_RESULTS_DIR }}")) {
+            New-Item -ItemType Directory -Path "${{ env.TEST_RESULTS_DIR }}"
+          }
+        shell: pwsh
+
+      - name: uLipSync PlayMode テスト実行
+        run: |
+          $testResultsDir = (Resolve-Path "${{ env.TEST_RESULTS_DIR }}").Path
+          $testResultsPath = Join-Path $testResultsDir "lipsync-playmode.xml"
+          & "$env:UNITY_PATH/Unity.exe" `
+            -batchmode `
+            -nographics `
+            -projectPath "${{ env.UNITY_PROJECT_PATH }}" `
+            -runTests `
+            -testPlatform PlayMode `
+            -assemblyNames "${{ env.LIPSYNC_PLAYMODE_TEST_ASSEMBLY }}" `
+            -testResults "$testResultsPath"
+        shell: pwsh
+
+      - name: テスト結果アップロード
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lipsync-playmode-test-results
+          path: ${{ env.TEST_RESULTS_DIR }}/lipsync-playmode.xml
+          if-no-files-found: error

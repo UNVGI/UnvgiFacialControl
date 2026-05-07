@@ -299,7 +299,7 @@
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 14.2_
   - _Boundary: Tests/PlayMode/Performance_
 
-- [ ] 12.4 CI 設定に EditMode + PlayMode テストランを組み込む
+- [x] 12.4 CI 設定に EditMode + PlayMode テストランを組み込む
   - 既存 GitHub Actions セルフホストランナー設定に `com.hidano.facialcontrol.lipsync` の EditMode + PlayMode 両テスト実行を追加し、失敗ゼロ必須要件を反映する
   - 観測可能完了条件: PR 上で本パッケージのテストがランされ、結果が `test-results/` に出力される
   - _Requirements: 14.4_
