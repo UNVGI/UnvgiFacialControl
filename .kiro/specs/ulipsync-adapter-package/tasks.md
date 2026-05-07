@@ -221,7 +221,7 @@
 ## Phase 4: Samples 二重管理
 
 - [ ] 10. `MicLipSyncDemo` Sample を Samples~ と Assets/Samples 双方に配置する
-- [ ] 10.1 `Samples~/MicLipSyncDemo/` を canonical サンプルとして整備する
+- [x] 10.1 `Samples~/MicLipSyncDemo/` を canonical サンプルとして整備する
   - `Samples~/MicLipSyncDemo/Scenes/MicLipSyncDemo.unity`（`Character` 空 GameObject、uLipSync 系コンポーネントなし）/ `Profiles/MicLipSyncDemoProfile.asset`（`ULipSyncAdapterBinding` を inline serialized で配線済み、A/I/U/E/O 等の音素を BlendShape 形式エントリで設定）/ `README.md`（自前モデル差し込み手順）を配置する
   - `package.json` の `samples` 配列に `MicLipSyncDemo` を登録する
   - 観測可能完了条件: Package Manager から `MicLipSyncDemo` を Import し、Scene 再生時に `ULipSyncAdapterBinding` が動的に uLipSync 系コンポーネントを AddComponent することが目視確認できる（Prefab-Clean Contract、**13.3**）
