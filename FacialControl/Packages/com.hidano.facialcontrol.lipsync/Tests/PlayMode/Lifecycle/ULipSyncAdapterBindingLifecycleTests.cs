@@ -21,6 +21,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
     {
         private const string Slug = "ulipsync";
         private const string MicDeviceName = "Unit Test Mic";
+        private const string MissingDeviceName = "Missing Mic";
         private const string BlendShapeName = "Mouth_A";
         private const string PhonemeId = "A";
 
@@ -208,7 +209,55 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
         }
 
         [Test]
-        public void OnStart_DuplicateSlug_LogsErrorAndSkipsInitialization()
+        public void OnStart_UnresolvedDevice_LogsErrorAndDoesNotRegister()
+        {
+            _binding = CreateBinding(MissingDeviceName, _profile);
+            AdapterBuildContext ctx = CreateContext();
+
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex("ULipSyncAdapterBinding.*Missing Mic.*could not be resolved.*Microphone=\\[Unit Test Mic\\]"));
+            _binding.OnStart(in ctx);
+
+            Assert.That(_binding.IsStarted, Is.False);
+            Assert.That(_binding.Provider, Is.Null);
+            Assert.That(_binding.InputSource, Is.Null);
+            Assert.That(_binding.Analyzer, Is.Null);
+            Assert.That(_hostGameObject.GetComponent<AudioSource>(), Is.Null);
+            Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSync>(), Is.Null);
+            Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncMicrophone>(), Is.Null);
+            Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncAsioInput>(), Is.Null);
+            Assert.That(_registry.TryResolve(Slug, out var source), Is.False);
+            Assert.That(source, Is.Null);
+            CollectionAssert.DoesNotContain(_registry.RegisteredIds, Slug);
+        }
+
+        [Test]
+        public void OnStart_AnalyzerProfileMissing_LogsErrorAndRollsBack()
+        {
+            _binding = CreateBinding(MicDeviceName, null);
+            AdapterBuildContext ctx = CreateContext();
+
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex("ULipSyncAdapterBinding.*Analyzer profile.*default profile.*could not be loaded"));
+            _binding.OnStart(in ctx);
+
+            Assert.That(_binding.IsStarted, Is.False);
+            Assert.That(_binding.Provider, Is.Null);
+            Assert.That(_binding.InputSource, Is.Null);
+            Assert.That(_binding.Analyzer, Is.Null);
+            Assert.That(_hostGameObject.GetComponent<AudioSource>(), Is.Null);
+            Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSync>(), Is.Null);
+            Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncMicrophone>(), Is.Null);
+            Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncAsioInput>(), Is.Null);
+            Assert.That(_registry.TryResolve(Slug, out var source), Is.False);
+            Assert.That(source, Is.Null);
+            CollectionAssert.DoesNotContain(_registry.RegisteredIds, Slug);
+        }
+
+        [Test]
+        public void OnStart_DuplicateBindingOnSameCharacter_LogsErrorAndSkips()
         {
             _binding = CreateBinding();
             AdapterBuildContext ctx = CreateContext();
@@ -228,18 +277,25 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
             Assert.That(duplicate.Provider, Is.Null);
             Assert.That(duplicate.InputSource, Is.Null);
             Assert.That(_hostGameObject.GetComponents<uLipSync.uLipSync>().Length, Is.EqualTo(analyzerCountBefore));
+            Assert.That(_registry.TryResolve(Slug, out IInputSource source), Is.True);
+            Assert.That(source, Is.SameAs(_binding.InputSource));
         }
 
         private ULipSyncAdapterBinding CreateBinding()
+        {
+            return CreateBinding(MicDeviceName, _profile);
+        }
+
+        private ULipSyncAdapterBinding CreateBinding(string deviceName, uLipSync.Profile analyzerProfile)
         {
             var binding = new ULipSyncAdapterBinding { Slug = Slug };
             binding.Configure(
                 new DeviceDescriptor
                 {
-                    DeviceName = MicDeviceName,
+                    DeviceName = deviceName,
                     DisambiguatorIndex = 0,
                 },
-                _profile,
+                analyzerProfile,
                 new PhonemeEntryBase[]
                 {
                     new BlendShapePhonemeEntry

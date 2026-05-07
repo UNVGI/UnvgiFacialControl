@@ -275,7 +275,7 @@
 ## Phase 6: PlayMode 統合と性能テスト
 
 - [ ] 12. PlayMode テストスイートを完成させる
-- [ ] 12.1 `ULipSyncAdapterBindingLifecycleTests` を完成させる（OnStart 失敗経路を含む）
+- [x] 12.1 `ULipSyncAdapterBindingLifecycleTests` を完成させる（OnStart 失敗経路を含む）
   - `OnStart_UnresolvedDevice_LogsErrorAndDoesNotRegister`（9.1, 9.2: OS 既定への自動フォールバック禁止）
   - `OnStart_AnalyzerProfileMissing_LogsErrorAndRollsBack`（6.6）
   - `OnStart_DuplicateBindingOnSameCharacter_LogsErrorAndSkips`（10.3）
