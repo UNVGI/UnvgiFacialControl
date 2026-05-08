@@ -28,7 +28,7 @@ MonoBehaviour:
   _gazeConfigs: []
   _adapterBindings:
   - rid: 4448593420807569408
-  _referenceModel: {fileID: 8198287467416625081, guid: 5588fb1befbdc5344a5457a74467ca94, type: 3}
+  _referenceModel: {fileID: 0}
   references:
     version: 2
     RefIds:
@@ -37,9 +37,9 @@ MonoBehaviour:
       data:
         Slug: ulipsync
         _deviceDescriptor:
-          DeviceName: Line (3- AG06/AG03)
+          DeviceName: 
           DisambiguatorIndex: 0
-        _analyzerProfile: {fileID: 11400000, guid: 65cdbbb470404a778d5a03dac3bbafc1, type: 2}
+        _analyzerProfile: {fileID: 0}
         _phonemeEntries:
         - rid: 4448593420807569409
         - rid: 4448593420807569410
@@ -53,28 +53,28 @@ MonoBehaviour:
       data:
         PhonemeId: A
         MaxWeight: 100
-        BlendShapeName: "\u3042"
+        BlendShapeName: A
     - rid: 4448593420807569410
       type: {class: BlendShapePhonemeEntry, ns: Hidano.FacialControl.LipSync.Adapters.PhonemeEntries, asm: Hidano.FacialControl.LipSync}
       data:
         PhonemeId: I
         MaxWeight: 100
-        BlendShapeName: "\u3044"
+        BlendShapeName: I
     - rid: 4448593420807569411
       type: {class: BlendShapePhonemeEntry, ns: Hidano.FacialControl.LipSync.Adapters.PhonemeEntries, asm: Hidano.FacialControl.LipSync}
       data:
         PhonemeId: U
         MaxWeight: 100
-        BlendShapeName: "\u3046"
+        BlendShapeName: U
     - rid: 4448593420807569412
       type: {class: BlendShapePhonemeEntry, ns: Hidano.FacialControl.LipSync.Adapters.PhonemeEntries, asm: Hidano.FacialControl.LipSync}
       data:
         PhonemeId: E
         MaxWeight: 100
-        BlendShapeName: "\u3048"
+        BlendShapeName: E
     - rid: 4448593420807569413
       type: {class: BlendShapePhonemeEntry, ns: Hidano.FacialControl.LipSync.Adapters.PhonemeEntries, asm: Hidano.FacialControl.LipSync}
       data:
         PhonemeId: O
         MaxWeight: 100
-        BlendShapeName: "\u304A"
+        BlendShapeName: O

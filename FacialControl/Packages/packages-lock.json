@@ -23,7 +23,7 @@
       "source": "embedded",
       "dependencies": {
         "com.hidano.facialcontrol": "0.1.0-preview.2",
-        "com.hidano.ulipsync-asio": "3.1.5-custom.1"
+        "com.hidano.ulipsync-asio": "3.1.5-custom.2"
       }
     },
     "com.hidano.facialcontrol.osc": {
@@ -45,7 +45,7 @@
       "url": "https://registry.npmjs.org"
     },
     "com.hidano.ulipsync-asio": {
-      "version": "3.1.5-custom.1",
+      "version": "3.1.5-custom.2",
       "depth": 1,
       "source": "registry",
       "dependencies": {
