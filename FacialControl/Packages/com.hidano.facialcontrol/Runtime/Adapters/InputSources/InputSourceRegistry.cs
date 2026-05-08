@@ -66,6 +66,12 @@ namespace Hidano.FacialControl.Adapters.InputSources
         }
 
         /// <inheritdoc />
+        public void Unregister(AdapterSlug slug)
+        {
+            UnregisterInternal(slug.Value);
+        }
+
+        /// <inheritdoc />
         public bool TryResolve(string layerInputSourceId, out IInputSource source)
         {
             if (string.IsNullOrEmpty(layerInputSourceId))
@@ -89,6 +95,23 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
             _entries.Add(key, source);
             _registeredIds.Add(key);
+        }
+
+        private void UnregisterInternal(string key)
+        {
+            if (string.IsNullOrEmpty(key) || !_entries.Remove(key))
+            {
+                return;
+            }
+
+            for (int i = 0; i < _registeredIds.Count; i++)
+            {
+                if (string.Equals(_registeredIds[i], key, StringComparison.Ordinal))
+                {
+                    _registeredIds.RemoveAt(i);
+                    return;
+                }
+            }
         }
     }
 }

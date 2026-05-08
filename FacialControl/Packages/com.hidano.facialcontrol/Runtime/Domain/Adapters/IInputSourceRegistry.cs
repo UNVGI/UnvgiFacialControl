@@ -45,6 +45,11 @@ namespace Hidano.FacialControl.Adapters.InputSources
         void Register(AdapterSlug slug, string sub, IInputSource source);
 
         /// <summary>
+        /// <c>&lt;slug&gt;</c> primary id の登録を解除する。未登録の場合は何もしない。
+        /// </summary>
+        void Unregister(AdapterSlug slug);
+
+        /// <summary>
         /// layer.inputSources[].id 形式の文字列（<c>&lt;slug&gt;</c> または <c>&lt;slug&gt;:&lt;sub&gt;</c>）
         /// を登録済 <see cref="IInputSource"/> に解決する（Req 12.4）。
         /// </summary>

@@ -199,6 +199,29 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
             Assert.IsNull(emptyResolved);
         }
 
+        [Test]
+        public void Unregister_PrimarySlug_RemovesRegisteredSource()
+        {
+            var registry = new InputSourceRegistry();
+            var slug = AdapterSlug.Parse("osc");
+            registry.Register(slug, new StubInputSource("primary"));
+
+            registry.Unregister(slug);
+
+            Assert.IsFalse(registry.TryResolve("osc", out var resolved));
+            Assert.IsNull(resolved);
+            CollectionAssert.DoesNotContain(registry.RegisteredIds, "osc");
+        }
+
+        [Test]
+        public void Unregister_UnregisteredSlug_DoesNotThrow()
+        {
+            var registry = new InputSourceRegistry();
+
+            Assert.DoesNotThrow(() => registry.Unregister(AdapterSlug.Parse("missing")));
+            Assert.AreEqual(0, registry.RegisteredIds.Count);
+        }
+
         // ---------------------------------------------------------------
         // RegisteredIds
         // ---------------------------------------------------------------
@@ -310,6 +333,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
             Assert.IsTrue(registry.TryResolve("osc:vrchat", out var c));
             Assert.AreSame(composite, c);
             Assert.AreEqual(2, registry.RegisteredIds.Count);
+
+            registry.Unregister(slug);
+            Assert.IsFalse(registry.TryResolve("osc", out var removed));
+            Assert.IsNull(removed);
+            Assert.IsTrue(registry.TryResolve("osc:vrchat", out c));
+            Assert.AreSame(composite, c);
+            Assert.AreEqual(1, registry.RegisteredIds.Count);
         }
     }
 }
