@@ -1,0 +1,19 @@
+﻿{
+    "schemaVersion": "2.0",
+    "layers": [
+        {
+            "name": "lipsync",
+            "priority": 0,
+            "exclusionMode": "blend",
+            "inputSources": [
+                {
+                    "id": "ulipsync",
+                    "weight": 1.0
+                }
+            ]
+        }
+    ],
+    "expressions": [],
+    "rendererPaths": [],
+    "gaze_configs": []
+}
