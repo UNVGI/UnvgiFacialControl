@@ -39,7 +39,7 @@ MonoBehaviour:
         _deviceDescriptor:
           DeviceName: 
           DisambiguatorIndex: 0
-        _analyzerProfile: {fileID: 11400000, guid: 81e2903662544047ba67ed2ff41a1e8f, type: 2}
+        _analyzerProfile: {fileID: 0}
         _phonemeEntries:
         - rid: 4448593420807569409
         - rid: 4448593420807569410

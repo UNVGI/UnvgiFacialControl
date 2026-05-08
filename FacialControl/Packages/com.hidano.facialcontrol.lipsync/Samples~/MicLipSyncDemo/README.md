@@ -11,3 +11,5 @@
 5. モデル側の口 BlendShape 名が異なる場合は、A / I / U / E / O の各 entry の `BlendShapeName` を合わせます。
 
 Scene 上の `Character` には、再生前に `uLipSync.uLipSync` / `uLipSyncMicrophone` / `AudioSource` は付いていません。再生時に `ULipSyncAdapterBinding` が Host GameObject へ動的に追加し、停止または Dispose で取り外します。
+
+Analyzer Profile は同梱しません。`_analyzerProfile` を未指定のまま再生すると、パッケージ同梱の `Resources/FacialControl/LipSync/Default uLipSync Profile.asset` が `Resources.Load` でフォールバック適用されます。独自に学習させた Profile を使う場合のみ Inspector で割り当ててください。

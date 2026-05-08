@@ -12,13 +12,14 @@
 
 ## Phase 0: Spike — ネスト [SerializeReference] round-trip 検証（gating）
 
-- [ ] 1. ネスト `[SerializeReference]` の二重多態リスト round-trip を検証する
-- [ ] 1.1 ネスト `[SerializeReference]` round-trip スモークテストを EditMode に追加する
+- [x] 1. ネスト `[SerializeReference]` の二重多態リスト round-trip を検証する
+- [x] 1.1 ネスト `[SerializeReference]` round-trip スモークテストを EditMode に追加する
   - コア既存の `Tests/EditMode/Adapters/ScriptableObject/SerializeReferenceRoundTripSmokeTests.cs` のパターンを 2 段ネスト用に拡張し、本パッケージの `Tests/EditMode/Adapters/PhonemeEntrySerializeReferenceSmokeTests.cs` に新規スモークテストを作成する
   - `_adapterBindings`（`[SerializeReference]`）→ `ULipSyncAdapterBinding._phonemeEntries`（`[SerializeReference]` 多態リスト）の二重ネスト構造を検証対象にする
   - `BlendShapePhonemeEntry` / `AnimationClipPhonemeEntry` を仕様の本実装より前に **テスト内 Stub として最小宣言**（後続タスクで本実装へ差し替え）し、各派生型を 1 個ずつ含む `List<PhonemeEntryBase>` を `FacialCharacterProfileSO` 経由で保存する
   - Editor 再起動相当の round-trip（`AssetDatabase.SaveAssets` → `Resources.UnloadUnusedAssets` → 再 `AssetDatabase.LoadAssetAtPath`）後も `managedReferenceFullTypename` 解決が成功し、両派生型のフィールド値が保持されていることを assert する
   - 観測可能完了条件: スモークテストが green。fail した場合は本仕様 Phase 2 以降を停止し、`PhonemeEntryBase` を抽象クラスから `enum + 共通 struct` に切り替える設計修正タスクを別途起票する退路に切替える判断材料となる
+  - **配置パス相違**: 実装は `com.hidano.facialcontrol/Tests/EditMode/Adapters/PhonemeEntrySerializeReferenceSmokeTests.cs`（コアパッケージ側）に配置。Phase 0 Spike としての目的（早期失敗の判断材料）は達成済み。本パッケージへの移送は backlog（preview.2 以降）で検討
   - _Requirements: 3.3, 4.1, 12.3_
   - _Boundary: Tests/EditMode/Adapters_
 
@@ -26,7 +27,7 @@
 
 ## Phase 1: パッケージ scaffolding
 
-- [ ] 2. パッケージ `com.hidano.facialcontrol.lipsync` の足場を整備する
+- [x] 2. パッケージ `com.hidano.facialcontrol.lipsync` の足場を整備する
 - [x] 2.1 `package.json` と標準 UPM ディレクトリレイアウトを作成する
   - `Packages/com.hidano.facialcontrol.lipsync/package.json` を新規作成し、id・displayName・version・unity 6000.3.2f1・description・keywords（windows-only 明記）・samples 配列・dependencies（コア + `com.hidano.ulipsync-asio`）を宣言する
   - `Runtime/` / `Editor/` / `Tests/EditMode/` / `Tests/PlayMode/` / `Tests/Shared/` / `Samples~/` / `Documentation~/` の空ディレクトリと `README.md` / `CHANGELOG.md` / `LICENSE.md` 雛形を配置する
@@ -34,7 +35,7 @@
   - 観測可能完了条件: Unity Editor を起動した際に Package Manager に `com.hidano.facialcontrol.lipsync` が認識され、依存（コア / `com.hidano.ulipsync-asio`）が解決済みになる
   - _Requirements: 1.1, 1.2, 1.5, 1.6_
 
-- [ ] 2.2 Runtime / Editor / Tests asmdef を作成し参照を確立する
+- [x] 2.2 Runtime / Editor / Tests asmdef を作成し参照を確立する
   - `Runtime/Hidano.FacialControl.LipSync.asmdef`（`includePlatforms: ["Editor", "WindowsStandalone64"]`、references: コアの 3 asmdef + `uLipSync.Runtime` + `uLipSync.Runtime.Windows` + `Unity.Animation`）を作成する
   - `Editor/Hidano.FacialControl.LipSync.Editor.asmdef`（`includePlatforms: ["Editor"]`、Runtime asmdef + コア Editor を参照）を作成する
   - `Tests/EditMode/...EditMode.asmdef` / `Tests/PlayMode/...PlayMode.asmdef` / `Tests/Shared/...Shared.asmdef` を `nunit` / `UnityEngine.TestRunner` を含めて作成する
@@ -42,7 +43,7 @@
   - 観測可能完了条件: Editor が再ロードされ、Runtime / Editor / Tests の各 asmdef がコンパイルエラー無くビルドされる（Domain 純度違反の参照は無いこと）
   - _Requirements: 1.3, 1.4, 1.6, 14.7, 14.8_
 
-- [ ] 2.3 (P) `Hidano.FacialControl.LipSync` 名前空間の placeholder 型を配置する
+- [x] 2.3 (P) `Hidano.FacialControl.LipSync` 名前空間の placeholder 型を配置する
   - 各 asmdef に対応する空 namespace ファイル（`Adapters/.gitkeep` 相当の placeholder C#）を配置し、後続タスクで具体型を追加する基盤を作る
   - 観測可能完了条件: `Hidano.FacialControl.LipSync.*` 名前空間ルート配下で型を追加すれば自動的に asmdef が拾うことを Editor で確認できる
   - _Requirements: 1.3, 14.8_
@@ -52,8 +53,8 @@
 
 ## Phase 2: Runtime 実装（TDD）
 
-- [ ] 3. `PhonemeEntryBase` と派生 2 種を実装する
-- [ ] 3.1 `PhonemeEntryBase` / `BlendShapePhonemeEntry` / `AnimationClipPhonemeEntry` の EditMode テストを書く（Red）
+- [x] 3. `PhonemeEntryBase` と派生 2 種を実装する
+- [x] 3.1 `PhonemeEntryBase` / `BlendShapePhonemeEntry` / `AnimationClipPhonemeEntry` の EditMode テストを書く（Red）
   - 各派生型の `[Serializable]` 属性、共通フィールド（`PhonemeId` / `MaxWeight`）、固有フィールド（`BlendShapeName` / `Clip`）を `SerializedProperty` 経由で round-trip するテストを書く
   - `MaxWeight` は `[0..100]` を許容しビルダー側で `100` 換算する仕様を明文化したテストを書く
   - 観測可能完了条件: テストが Red の状態でコミット可能であり、対応実装ファイルがまだ存在しない
@@ -67,22 +68,22 @@
   - 観測可能完了条件: 3.1 のテストが全て green になり、Phase 0 のスモークテスト（1.1）も実 Type を参照した状態で green を維持
   - _Requirements: 3.3, 4.1, 4.3, 4.4, 11.5_
 
-- [ ] 4. `IULipSyncEventSource` 抽象と既定実装を整備する
-- [ ] 4.1 `FakeULipSyncEventSource` を `Tests/Shared` に追加する
+- [x] 4. `IULipSyncEventSource` 抽象と既定実装を整備する
+- [x] 4.1 `FakeULipSyncEventSource` を `Tests/Shared` に追加する
   - 任意 `LipSyncInfo` を `Invoke(LipSyncInfo info)` 経由で公開ハンドラに流す Fake を実装する
   - `IULipSyncEventSource` インタフェース（`event Action<uLipSync.LipSyncInfo> OnLipSyncUpdate`）も同 PR で定義する（Production 実装の前にテスト境界を確定）
   - 観測可能完了条件: Fake をテストから new し、`OnLipSyncUpdate += handler` → `Invoke(info)` で handler が指定回数呼ばれる EditMode テストが green
   - _Requirements: 5.2, 14.1_
   - _Boundary: Tests/Shared, Runtime/Adapters_
 
-- [ ] 4.2 `ULipSyncEventBridge` を実装し UnityEvent と接続する
+- [x] 4.2 `ULipSyncEventBridge` を実装し UnityEvent と接続する
   - `internal sealed class ULipSyncEventBridge : IULipSyncEventSource, IDisposable` を実装し、ctor で `uLipSync.uLipSync.onLipSyncUpdate.AddListener(...)`、`Dispose` で `RemoveListener` を呼ぶ
   - 内部の C# event 中継で UnityEvent からの `LipSyncInfo` を購読者へフォワードする
   - 観測可能完了条件: Bridge を実装後、production の binding が `IULipSyncEventSource` 抽象を介して uLipSync コンポーネントに接続できることを EditMode（Bridge を direct new して `uLipSync.uLipSync` の偽 onLipSyncUpdate を Invoke）または PlayMode で確認できる
   - _Requirements: 5.2, 5.9_
 
-- [ ] 5. `ULipSyncProvider`（ホットパス GC 0 byte）を TDD で実装する
-- [ ] 5.1 `ULipSyncProviderTests` を書く（Red）
+- [x] 5. `ULipSyncProvider`（ホットパス GC 0 byte）を TDD で実装する
+- [x] 5.1 `ULipSyncProviderTests` を書く（Red）
   - `Constructor_NullSource_ThrowsArgumentNullException`（5.8）
   - `OnLipSyncUpdate_PhonemeRatiosWithKnownKeys_AccumulatesWeightedSum`（5.2, 5.3）
   - `OnLipSyncUpdate_UnknownPhonemeKey_IsIgnoredWithoutLog`（5.6）
@@ -112,7 +113,7 @@
   - _Requirements: 11.1, 11.3, 11.4, 14.1_
   - _Boundary: Tests/EditMode/Performance_
 
-- [ ] 6. デバイス列挙抽象とリゾルバを TDD で実装する
+- [x] 6. デバイス列挙抽象とリゾルバを TDD で実装する
 - [x] 6.1 (P) `FakeAsioDriverEnumerator` / `FakeMicrophoneDeviceEnumerator` を `Tests/Shared` に追加する
   - 任意の `string[]` を返す Fake をそれぞれ実装し、空配列・1 要素・同名重複（disambiguator 検証用）の各シナリオを構築可能にする
   - 観測可能完了条件: Fake を Test から new し、所定配列を返すことを EditMode テストで確認できる
@@ -135,15 +136,15 @@
   - 観測可能完了条件: テストが全て green、`Resolve` が GC を発生させない手動 for ループ実装になっている
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 9.1, 9.2, 11.6, 14.1, 14.5_
 
-- [ ] 7. `ULipSyncAdapterBinding` lifecycle を TDD で実装する
-- [ ] 7.1 `ULipSyncAdapterBinding` 構築・OnStart 成功経路の PlayMode テストを書く（Red）
+- [x] 7. `ULipSyncAdapterBinding` lifecycle を TDD で実装する
+- [x] 7.1 `ULipSyncAdapterBinding` 構築・OnStart 成功経路の PlayMode テストを書く（Red）
   - `Tests/PlayMode/Lifecycle/ULipSyncAdapterBindingLifecycleTests.cs` を新規作成し、Mic 経路で `OnStart` 成功時に `AudioSource` → `uLipSync.uLipSync` → `uLipSyncMicrophone` の順で `HostGameObject` に AddComponent され、`Provider` / `Analyzer` プロパティが非 null になることを assert する（**DD-AddOrder**）
   - `OnStart` 末尾で `Provider.RequestZeroOutputForNextFrame()` が呼ばれ、初回 `GetLipSyncValues` が zero settle されることを assert する（**DD-StartupSettle**）
   - 観測可能完了条件: テストが Red の状態でコミット可能で、`ULipSyncAdapterBinding` 実装は未存在
   - _Requirements: 2.1, 2.2, 2.3, 6.1, 6.2, 6.3, 6.7, 9.3, 14.2, 14.5_
   - _Boundary: Tests/PlayMode/Lifecycle_
 
-- [ ] 7.2 `ULipSyncAdapterBinding` を実装し OnStart Green を達成する
+- [x] 7.2 `ULipSyncAdapterBinding` を実装し OnStart Green を達成する
   - `[Serializable] [FacialAdapterBinding(displayName: "uLipSync")] sealed class ULipSyncAdapterBinding : AdapterBindingBase` を引数なし ctor で実装する
   - `[SerializeField] DeviceDescriptor _deviceDescriptor` / `[SerializeField] uLipSync.Profile _analyzerProfile`（任意）/ `[SerializeReference] List<PhonemeEntryBase> _phonemeEntries` / `[SerializeField] string _targetMeshHint` / `[SerializeField] float _maxWeightScale = 1f` を配置する
   - `OnStart(in AdapterBuildContext ctx)` で (a) ガード、(b) `DeviceResolver.Resolve` 呼出、(c) Analyzer Profile 解決（`_analyzerProfile` 優先 → `Resources.Load` でパッケージ同梱の既定 Profile にフォールバック）、(d) BuildSnapshots 呼出、(e) AudioSource → uLipSync.uLipSync → profile 注入 → Mic/Asio AddComponent の順序、(f) `ULipSyncProvider` 構築 + `LipSyncInputSource` 構築 + `ctx.InputSourceRegistry.Register(slug, source)`、(g) `Provider.RequestZeroOutputForNextFrame()`、`_started = true`、を順序立てて実行する（**DD-AddOrder / DD-StartupSettle**）
@@ -160,7 +161,7 @@
   - 観測可能完了条件: BlendShape / AnimationClip / 混在エントリの各シナリオで `PhonemeSnapshot[]` が期待値どおり構築される EditMode `PhonemeSnapshotBuilderTests` が green
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.7, 11.5, 14.1_
 
-- [ ] 7.4 (P) `PhonemeSnapshotBuilderTests` を EditMode に追加する
+- [x] 7.4 (P) `PhonemeSnapshotBuilderTests` を EditMode に追加する
   - `Build_BlendShapeEntryDirectFill_FillsCorrectIndex`（4.3）/ `Build_AnimationClipEntryTimeZero_ExtractsBlendShapeWeights`（4.4）/ `Build_MixedEntries_BothApplyConsistently`（4.5）/ `Build_UnresolvedBlendShapeName_LogsWarningAndSkips`（4.7）/ `Build_AfterAnimationClipSampling_RestoresSmrWeights`（DD-AnimSampling 副作用 finally 検証）/ `Build_TargetMeshHintMissing_FallsBackToFirstSmr`（DD-B）を追加する
   - PlayMode 必須とせず EditMode で完結させる（mock SMR + 単一 GameObject 構成）
   - 観測可能完了条件: 全テスト green、AnimationClip サンプリング後にホスト SMR の BlendShape weight が元値に復元されていることを assert で確認
@@ -174,8 +175,8 @@
   - 観測可能完了条件: PlayMode テスト `Dispose_AfterStart_RemovesAllAddedComponents` が green、Host から uLipSync 系コンポーネントが全件消える
   - _Requirements: 2.4, 6.5, 6.6, 10.3, 11.2_
 
-- [ ] 8. ホットスワップと silence モードを TDD で実装する
-- [ ] 8.1 `DeviceHotSwapTests` を PlayMode に書く（Red）
+- [x] 8. ホットスワップと silence モードを TDD で実装する
+- [x] 8.1 `DeviceHotSwapTests` を PlayMode に書く（Red）
   - `SwapDevice_MicToMicSecondDevice_ZeroSettlesThenRebinds`（8.1, 8.2）/ `SwapDevice_UnresolvedTarget_EntersSilenceModeWithoutBrokenComponents`（8.5, 9.3）/ `SwapDevice_PreservesULipSyncAndProviderInstances`（8.3）を Red で書く
   - 観測可能完了条件: テストが Red、`SwapDevice` 実装は未存在
   - _Requirements: 8.1, 8.2, 8.3, 8.5, 9.3, 9.4, 9.5, 14.2, 14.5_
@@ -192,7 +193,7 @@
 
 ## Phase 3: Editor PropertyDrawer
 
-- [ ] 9. `ULipSyncAdapterBindingDrawer` を UI Toolkit で実装する
+- [x] 9. `ULipSyncAdapterBindingDrawer` を UI Toolkit で実装する
 - [x] 9.1 (P) `DeviceDescriptorPopup` を実装する
   - UI Toolkit `PopupField<string>` で choices を `IAsioDriverEnumerator` + `IMicrophoneDeviceEnumerator` の Default 実装から動的取得する
   - 接続中でないデバイス名を入力可能な手動 override `TextField` と `disambiguatorIndex` の `IntegerField`（既定 0）を併設する
@@ -201,7 +202,7 @@
   - _Requirements: 7.5, 12.4_
   - _Boundary: Editor/Inspector_
 
-- [ ] 9.2 `PhonemeEntryListView` を実装する（多態リスト + 型セレクタ + reorderable）
+- [x] 9.2 `PhonemeEntryListView` を実装する（多態リスト + 型セレクタ + reorderable）
   - UI Toolkit `ListView` を使用し、`makeItem` で row container、`bindItem` で `managedReferenceFullTypename` を判定して BlendShape 形式 / AnimationClip 形式の row を切替（**12.3**）
   - Add ボタンは `AdvancedDropdown` または GenericMenu で 2 種類の派生型を提示し、選択時 `managedReferenceValue = new BlendShapePhonemeEntry()` 等を代入 → `ApplyModifiedProperties`（コア `AdapterBindingsListView` の Add ドロップダウン手法を踏襲）
   - Remove / Reorder は ListView 標準機能を使用
@@ -220,17 +221,16 @@
 
 ## Phase 4: Samples 二重管理
 
-- [ ] 10. `MicLipSyncDemo` Sample を Samples~ と Assets/Samples 双方に配置する
+- [x] 10. `MicLipSyncDemo` Sample を Samples~ と Assets/Samples 双方に配置する
 - [x] 10.1 `Samples~/MicLipSyncDemo/` を canonical サンプルとして整備する
   - `Samples~/MicLipSyncDemo/Scenes/MicLipSyncDemo.unity`（`Character` 空 GameObject、uLipSync 系コンポーネントなし）/ `Profiles/MicLipSyncDemoProfile.asset`（`ULipSyncAdapterBinding` を inline serialized で配線済み、A/I/U/E/O 等の音素を BlendShape 形式エントリで設定）/ `README.md`（自前モデル差し込み手順）を配置する
   - `package.json` の `samples` 配列に `MicLipSyncDemo` を登録する
   - 観測可能完了条件: Package Manager から `MicLipSyncDemo` を Import し、Scene 再生時に `ULipSyncAdapterBinding` が動的に uLipSync 系コンポーネントを AddComponent することが目視確認できる（Prefab-Clean Contract、**13.3**）
   - _Requirements: 13.1, 13.2, 13.3_
 
-- [ ] 10.2 (P) `FacialControl/Assets/Samples/com.hidano.facialcontrol.lipsync/MicLipSyncDemo/` ミラーを配置する
-  - `Samples~/MicLipSyncDemo/` と同一構成を `Assets/Samples/` 側にコピーし、dev プロジェクトで scene 結線済みの動作確認用環境を維持する
-  - 二重管理ルール（編集時の同期手順）を後続 10.4 のドキュメントタスクで明記する
-  - 観測可能完了条件: dev プロジェクトを Unity で開き、`Assets/Samples/.../MicLipSyncDemo.unity` を再生して動作する
+- [x] 10.2 (P) ~~`FacialControl/Assets/Samples/com.hidano.facialcontrol.lipsync/MicLipSyncDemo/` ミラーを配置する~~ **方針変更により廃止**
+  - **方針変更（preview.1 検証時）**: 二重管理が紛らわしいため `Assets/Samples/com.hidano.facialcontrol.lipsync/` 配下を全削除。`Samples~/` のみを正本とし、dev での動作確認も Package Manager の Sample Import 機能経由で `Assets/Samples/FacialControl uLipSync Adapter/<version>/<sampleName>/` へ展開して行う方針へ変更
+  - 関連: パッケージ README の「Samples 構成」節、CLAUDE.md の二重管理ルール記述（後者は本変更を受けて更新検討要）
   - _Requirements: 13.6_
   - _Boundary: Assets/Samples_
 
@@ -245,13 +245,13 @@
 
 ## Phase 5: ドキュメント
 
-- [ ] 11. README / CHANGELOG / Documentation~ を整備する
-- [ ] 11.1 `README.md` をパッケージルートに配置する
+- [x] 11. README / CHANGELOG / Documentation~ を整備する
+- [x] 11.1 `README.md` をパッケージルートに配置する
   - インストール手順、最小サンプル手順（`MicLipSyncDemo` Import）、Windows 限定スコープ、コア（`com.hidano.facialcontrol`）と `com.hidano.ulipsync-asio` への依存、preview 期の破壊変更可能性、Hot Path GC 0 byte 方針（**11.6**）、`Samples~/` ↔ `Assets/Samples/` 二重管理ルールを日本語で記述する
   - 観測可能完了条件: Package Manager で `com.hidano.facialcontrol.lipsync` を選択した際に README が日本語で表示される
   - _Requirements: 1.6, 11.6, 13.6, 14.6, 14.7_
 
-- [ ] 11.2 (P) `CHANGELOG.md` を Keep a Changelog 形式で初版エントリを配置する
+- [x] 11.2 (P) `CHANGELOG.md` を Keep a Changelog 形式で初版エントリを配置する
   - `Unreleased` または初版バージョン（例: `0.1.0-preview.1`）の Added エントリで主要機能（パッケージ scaffolding / ULipSyncAdapterBinding / Mic & ASIO 自動判定 / Hot-swap / Multi-character / GC 0 byte / Editor PropertyDrawer / MicLipSyncDemo）を列挙する
   - 観測可能完了条件: Keep a Changelog 形式に従ったヘッダ・セクション・日付が日本語で記述されている
   - _Requirements: 14.6, 14.7_
@@ -264,7 +264,7 @@
   - _Requirements: 4.6, 13.5, 14.6, 14.7_
   - _Boundary: Documentation_
 
-- [ ] 11.4 (P) `Documentation~/migration-guide.md` を作成し旧手結線からの移行 4 ステップを記述する
+- [x] 11.4 (P) `Documentation~/migration-guide.md` を作成し旧手結線からの移行 4 ステップを記述する
   - 旧 `uLipSyncBlendShape` 手結線パターンからの移行: (1) 旧コンポーネントを Prefab から取り外す → (2) `FacialCharacterProfileSO._adapterBindings` に `ULipSyncAdapterBinding` を追加 → (3) 音素エントリを Inspector で配線 → (4) Scene を再生して動作確認、の 4 ステップを日本語で記述する
   - 観測可能完了条件: 4 ステップそれぞれにスクリーンショット手順想定の plain text 説明が記述されている（スクリーンショット添付は preview.2 以降）
   - _Requirements: 14.6, 14.7_
@@ -274,7 +274,7 @@
 
 ## Phase 6: PlayMode 統合と性能テスト
 
-- [ ] 12. PlayMode テストスイートを完成させる
+- [x] 12. PlayMode テストスイートを完成させる
 - [x] 12.1 `ULipSyncAdapterBindingLifecycleTests` を完成させる（OnStart 失敗経路を含む）
   - `OnStart_UnresolvedDevice_LogsErrorAndDoesNotRegister`（9.1, 9.2: OS 既定への自動フォールバック禁止）
   - `OnStart_AnalyzerProfileMissing_LogsErrorAndRollsBack`（6.6）
@@ -285,7 +285,7 @@
   - _Requirements: 2.4, 6.5, 6.6, 9.1, 9.2, 10.3, 14.2, 14.3, 14.5_
   - _Boundary: Tests/PlayMode/Lifecycle_
 
-- [ ] 12.2 (P) `TenCharacterIsolationTests` を PlayMode に追加する
+- [x] 12.2 (P) `TenCharacterIsolationTests` を PlayMode に追加する
   - 同時に 10 個の `FacialCharacter` インスタンスを生成し、それぞれに独立した `ULipSyncAdapterBinding` と異なる `DeviceDescriptor` を割り当てる
   - 1 個の binding に対し `SwapDevice` を呼んでも、他 9 個の binding の入力チェーン（Provider / LipSyncInputSource / Registry 登録）が一切影響を受けないことを assert する（**8.4, 10.1**）
   - 観測可能完了条件: 10 体同時動作下で 1 件 swap がフレーム落ちなく完了し、他 9 体の Provider 出力が継続する

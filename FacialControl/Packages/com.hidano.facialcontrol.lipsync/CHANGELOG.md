@@ -17,3 +17,4 @@
 - `ULipSyncProvider` のイベント受信、スナップショット蓄積、`GetLipSyncValues` のホットパスで GC アロケーション 0 byte を維持する方針と検証テストを追加。
 - `ULipSyncAdapterBinding` 用の UI Toolkit PropertyDrawer を追加し、デバイス設定、Analyzer Profile、BlendShape / AnimationClip 形式の音素エントリを Inspector から編集できるようにした。
 - `MicLipSyncDemo` sample を追加し、Package Manager から Import してマイク入力の最小構成を確認できるようにした。
+- `Runtime/Resources/FacialControl/LipSync/Default uLipSync Profile.asset` を同梱し、`ULipSyncAdapterBinding._analyzerProfile` 未指定時に `Resources.Load` 経由でフォールバックされるようにした。

@@ -11,3 +11,5 @@
 5. BlendShape 名が異なる場合は、A / E の `BlendShapeName` と、`Animations/` 内の I / U / O 用 AnimationClip の BlendShape カーブ名を合わせます。
 
 Profile には A / E を BlendShape entry、I / U / O を AnimationClip entry として設定しています。AnimationClip entry は再生時間ではなく time 0 の BlendShape 値だけを初期化時にサンプリングします。
+
+Analyzer Profile は同梱しません。`_analyzerProfile` を未指定のまま再生すると、パッケージ同梱の `Resources/FacialControl/LipSync/Default uLipSync Profile.asset` が `Resources.Load` でフォールバック適用されます。
