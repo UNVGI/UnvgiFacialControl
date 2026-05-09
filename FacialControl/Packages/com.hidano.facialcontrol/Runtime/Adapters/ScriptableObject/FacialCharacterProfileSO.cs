@@ -18,6 +18,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
         [SerializeField] protected string _schemaVersion = SystemTextJsonParser.SchemaVersionV2;
         [SerializeField] protected List<LayerDefinitionSerializable> _layers = new List<LayerDefinitionSerializable>();
         [SerializeField] protected List<ExpressionSerializable> _expressions = new List<ExpressionSerializable>();
+        [SerializeField] protected BaseExpressionSerializable _baseExpression = new BaseExpressionSerializable();
         [SerializeField] protected List<string> _rendererPaths = new List<string>();
         [SerializeField] protected List<GazeBindingConfig> _gazeConfigs = new List<GazeBindingConfig>();
         [SerializeReference] protected List<AdapterBindingBase> _adapterBindings = new List<AdapterBindingBase>();
@@ -31,6 +32,20 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
         public string SchemaVersion { get => _schemaVersion; set => _schemaVersion = value; }
         public List<LayerDefinitionSerializable> Layers => _layers;
         public List<ExpressionSerializable> Expressions => _expressions;
+        public BaseExpressionSerializable BaseExpression
+        {
+            get
+            {
+                if (_baseExpression == null)
+                {
+                    _baseExpression = new BaseExpressionSerializable();
+                }
+
+                _baseExpression.EnsureCachedSnapshot();
+                return _baseExpression;
+            }
+        }
+
         public List<string> RendererPaths => _rendererPaths;
         public IReadOnlyList<GazeBindingConfig> GazeConfigs => _gazeConfigs ?? (_gazeConfigs = new List<GazeBindingConfig>());
         public IReadOnlyList<AdapterBindingBase> AdapterBindings => _adapterBindings;

@@ -7,6 +7,7 @@ using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
+using RoundTripProfileSO = Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.AdapterBindings.TestFacialCharacterProfileSO;
 
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
 {
@@ -54,7 +55,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
         [Test]
         public void BaseExpression_Unset_ReturnsEmptyCachedBlendShapeSnapshot()
         {
-            var so = ScriptableObject.CreateInstance<TestCharacterSO>();
+            var so = ScriptableObject.CreateInstance<RoundTripProfileSO>();
             try
             {
                 object baseExpression = GetBaseExpression(so);
@@ -75,7 +76,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
         [Test]
         public void BaseExpression_NullSerializedField_GetterDoesNotThrow()
         {
-            var so = ScriptableObject.CreateInstance<TestCharacterSO>();
+            var so = ScriptableObject.CreateInstance<RoundTripProfileSO>();
             try
             {
                 Type baseExpressionType = ResolveBaseExpressionType();
@@ -95,7 +96,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
         [Test]
         public void BaseExpression_AnimationClipAndCachedSnapshot_RoundTripsThroughAssetReload()
         {
-            var so = ScriptableObject.CreateInstance<TestCharacterSO>();
+            var so = ScriptableObject.CreateInstance<RoundTripProfileSO>();
             var clip = new AnimationClip { name = "BaseExpression_RoundTripClip" };
 
             try
@@ -114,7 +115,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
                 Resources.UnloadAsset(so);
                 Resources.UnloadAsset(clip);
 
-                var loaded = AssetDatabase.LoadAssetAtPath<TestCharacterSO>(_assetPath);
+                var loaded = AssetDatabase.LoadAssetAtPath<RoundTripProfileSO>(_assetPath);
                 Assert.That(loaded, Is.Not.Null);
 
                 object loadedBaseExpression = GetBaseExpression(loaded);
@@ -274,10 +275,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
             Assert.That(actual.rendererPath, Is.EqualTo(expectedRendererPath));
             Assert.That(actual.name, Is.EqualTo(expectedName));
             Assert.That(actual.value, Is.EqualTo(expectedValue).Within(1e-6f));
-        }
-
-        private sealed class TestCharacterSO : FacialCharacterProfileSO
-        {
         }
     }
 }
