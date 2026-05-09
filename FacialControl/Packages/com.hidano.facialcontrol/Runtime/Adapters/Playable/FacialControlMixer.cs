@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine.Playables;
+using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Services;
 
 namespace Hidano.FacialControl.Adapters.Playable
@@ -20,6 +21,8 @@ namespace Hidano.FacialControl.Adapters.Playable
     {
         private int _blendShapeCount;
         private string[] _blendShapeNames;
+        private FacialCharacterProfileSO _characterProfile;
+        private LayerInputSourceAggregator _aggregator;
 
         // 最終出力バッファ
         private NativeArray<float> _outputWeights;
@@ -31,8 +34,39 @@ namespace Hidano.FacialControl.Adapters.Playable
         private LayerBlender.LayerInput[] _layerInputBuffer;
         private float[] _outputBuffer;
         private float[][] _layerValueBuffers;
+        private int[] _aggregationPriorities;
+        private float[] _aggregationLayerWeights;
+        private float[] _baseExpressionValues;
 
         private bool _disposed;
+
+        private void EnsureOutputBuffer()
+        {
+            if (_outputBuffer == null || _outputBuffer.Length < _blendShapeCount)
+            {
+                _outputBuffer = new float[_blendShapeCount];
+            }
+        }
+
+        private void InitializeOutputBuffer()
+        {
+            if (_baseExpressionValues != null && _baseExpressionValues.Length >= _blendShapeCount)
+            {
+                Array.Copy(_baseExpressionValues, _outputBuffer, _blendShapeCount);
+            }
+            else
+            {
+                Array.Clear(_outputBuffer, 0, _blendShapeCount);
+            }
+        }
+
+        private void CopyOutputBufferToNativeArray()
+        {
+            for (int i = 0; i < _blendShapeCount; i++)
+            {
+                _outputWeights[i] = _outputBuffer[i];
+            }
+        }
 
         /// <summary>
         /// 最終出力 BlendShape ウェイト配列（読み取り専用）。
@@ -66,14 +100,85 @@ namespace Hidano.FacialControl.Adapters.Playable
         {
             var playable = ScriptPlayable<FacialControlMixer>.Create(graph);
             var behaviour = playable.GetBehaviour();
-            behaviour.Initialize(blendShapeNames);
+            behaviour.Initialize(blendShapeNames, null, null, null, null);
             return playable;
         }
 
-        private void Initialize(string[] blendShapeNames)
+        public static ScriptPlayable<FacialControlMixer> Create(
+            PlayableGraph graph,
+            string[] blendShapeNames,
+            FacialCharacterProfileSO characterProfile)
+        {
+            var playable = ScriptPlayable<FacialControlMixer>.Create(graph);
+            var behaviour = playable.GetBehaviour();
+            behaviour.Initialize(blendShapeNames, characterProfile, null, null, null);
+            return playable;
+        }
+
+        public static ScriptPlayable<FacialControlMixer> Create(
+            PlayableGraph graph,
+            string[] blendShapeNames,
+            LayerInputSourceAggregator aggregator,
+            int[] priorities,
+            float[] layerWeights)
+        {
+            var playable = ScriptPlayable<FacialControlMixer>.Create(graph);
+            var behaviour = playable.GetBehaviour();
+            behaviour.Initialize(blendShapeNames, null, aggregator, priorities, layerWeights);
+            return playable;
+        }
+
+        public static ScriptPlayable<FacialControlMixer> Create(
+            PlayableGraph graph,
+            string[] blendShapeNames,
+            LayerInputSourceAggregator aggregator)
+        {
+            var playable = ScriptPlayable<FacialControlMixer>.Create(graph);
+            var behaviour = playable.GetBehaviour();
+            behaviour.Initialize(blendShapeNames, null, aggregator, priorities: null, layerWeights: null);
+            return playable;
+        }
+
+        public static ScriptPlayable<FacialControlMixer> Create(
+            PlayableGraph graph,
+            string[] blendShapeNames,
+            FacialCharacterProfileSO characterProfile,
+            LayerInputSourceAggregator aggregator,
+            int[] priorities,
+            float[] layerWeights)
+        {
+            var playable = ScriptPlayable<FacialControlMixer>.Create(graph);
+            var behaviour = playable.GetBehaviour();
+            behaviour.Initialize(blendShapeNames, characterProfile, aggregator, priorities, layerWeights);
+            return playable;
+        }
+
+        public static ScriptPlayable<FacialControlMixer> Create(
+            PlayableGraph graph,
+            string[] blendShapeNames,
+            FacialCharacterProfileSO characterProfile,
+            LayerInputSourceAggregator aggregator)
+        {
+            var playable = ScriptPlayable<FacialControlMixer>.Create(graph);
+            var behaviour = playable.GetBehaviour();
+            behaviour.Initialize(blendShapeNames, characterProfile, aggregator, priorities: null, layerWeights: null);
+            return playable;
+        }
+
+        private void Initialize(
+            string[] blendShapeNames,
+            FacialCharacterProfileSO characterProfile,
+            LayerInputSourceAggregator aggregator,
+            int[] priorities,
+            float[] layerWeights)
         {
             _blendShapeNames = blendShapeNames ?? Array.Empty<string>();
             _blendShapeCount = _blendShapeNames.Length;
+            _characterProfile = characterProfile;
+            _aggregator = aggregator;
+            _aggregationPriorities = CopyOrEmpty(priorities);
+            _aggregationLayerWeights = CopyOrEmpty(layerWeights);
+            BuildBaseExpressionValues();
 
             if (_blendShapeCount > 0)
             {
@@ -113,6 +218,10 @@ namespace Hidano.FacialControl.Adapters.Playable
                         _layers[i].Priority,
                         weight,
                         _layers[i].Playable);
+                    if (_aggregationLayerWeights != null && i < _aggregationLayerWeights.Length)
+                    {
+                        _aggregationLayerWeights[i] = weight;
+                    }
                     return;
                 }
             }
@@ -134,7 +243,7 @@ namespace Hidano.FacialControl.Adapters.Playable
             }
 
             // レイヤー出力をブレンドして最終出力を計算
-            ComputeOutput();
+            ComputeOutput(deltaTime);
         }
 
         /// <summary>
@@ -142,18 +251,34 @@ namespace Hidano.FacialControl.Adapters.Playable
         /// </summary>
         public void ComputeOutput()
         {
+            ComputeOutput(0f);
+        }
+
+        public void ComputeOutput(float deltaTime)
+        {
             if (_blendShapeCount == 0)
             {
                 return;
             }
 
+            EnsureOutputBuffer();
+            InitializeOutputBuffer();
+
+            if (_aggregator != null)
+            {
+                EnsureAggregationMetadata();
+                _aggregator.AggregateAndBlend(
+                    deltaTime,
+                    _aggregationPriorities,
+                    _aggregationLayerWeights,
+                    _outputBuffer);
+                CopyOutputBufferToNativeArray();
+                return;
+            }
+
             if (_layers.Count == 0)
             {
-                // レイヤーなし: 出力をゼロに
-                for (int i = 0; i < _blendShapeCount; i++)
-                {
-                    _outputWeights[i] = 0f;
-                }
+                CopyOutputBufferToNativeArray();
                 return;
             }
 
@@ -186,7 +311,7 @@ namespace Hidano.FacialControl.Adapters.Playable
             }
 
             // 出力バッファをゼロクリア
-            Array.Clear(_outputBuffer, 0, _blendShapeCount);
+            InitializeOutputBuffer();
 
             // Domain サービスでブレンド計算
             LayerBlender.Blend(_layerInputBuffer, _outputBuffer);
@@ -206,10 +331,7 @@ namespace Hidano.FacialControl.Adapters.Playable
         {
             int layerCount = _layers.Count;
 
-            if (_outputBuffer == null || _outputBuffer.Length < _blendShapeCount)
-            {
-                _outputBuffer = new float[_blendShapeCount];
-            }
+            EnsureOutputBuffer();
 
             if (_layerInputBuffer == null || _layerInputBuffer.Length < layerCount)
             {
@@ -233,6 +355,126 @@ namespace Hidano.FacialControl.Adapters.Playable
                     _layerValueBuffers[i] = new float[_blendShapeCount];
                 }
             }
+        }
+
+        /// <summary>
+        /// Aggregator 直接経路に渡すレイヤーメタデータを確保する。
+        /// </summary>
+        private void EnsureAggregationMetadata()
+        {
+            int layerCount = _aggregator != null ? _aggregator.LayerCount : _layers.Count;
+            if (layerCount == 0)
+            {
+                return;
+            }
+
+            if (_aggregationPriorities == null || _aggregationPriorities.Length < layerCount)
+            {
+                _aggregationPriorities = new int[layerCount];
+                for (int i = 0; i < layerCount; i++)
+                {
+                    _aggregationPriorities[i] = i < _layers.Count ? _layers[i].Priority : i;
+                }
+            }
+
+            if (_aggregationLayerWeights == null || _aggregationLayerWeights.Length < layerCount)
+            {
+                _aggregationLayerWeights = new float[layerCount];
+                for (int i = 0; i < layerCount; i++)
+                {
+                    _aggregationLayerWeights[i] = i < _layers.Count ? _layers[i].Weight : 1f;
+                }
+            }
+        }
+
+        private void BuildBaseExpressionValues()
+        {
+            _baseExpressionValues = null;
+            if (_characterProfile == null || _blendShapeCount == 0)
+            {
+                return;
+            }
+
+            _baseExpressionValues = new float[_blendShapeCount];
+            var baseExpression = _characterProfile.BaseExpression;
+            if (baseExpression == null || baseExpression.animationClip == null)
+            {
+                return;
+            }
+
+            var snapshot = baseExpression.EnsureCachedSnapshot();
+            var blendShapes = snapshot.blendShapes;
+            if (blendShapes == null || blendShapes.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < blendShapes.Count; i++)
+            {
+                var item = blendShapes[i];
+                if (item == null || string.IsNullOrEmpty(item.name))
+                {
+                    continue;
+                }
+
+                int index = FindBlendShapeIndex(item.name);
+                if (index >= 0)
+                {
+                    _baseExpressionValues[index] = Clamp01(item.value);
+                }
+            }
+        }
+
+        private int FindBlendShapeIndex(string name)
+        {
+            for (int i = 0; i < _blendShapeNames.Length; i++)
+            {
+                if (_blendShapeNames[i] == name)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static int[] CopyOrEmpty(int[] values)
+        {
+            if (values == null || values.Length == 0)
+            {
+                return Array.Empty<int>();
+            }
+
+            var copy = new int[values.Length];
+            Array.Copy(values, copy, values.Length);
+            return copy;
+        }
+
+        private static float[] CopyOrEmpty(float[] values)
+        {
+            if (values == null || values.Length == 0)
+            {
+                return Array.Empty<float>();
+            }
+
+            var copy = new float[values.Length];
+            Array.Copy(values, copy, values.Length);
+            return copy;
+        }
+
+        private static float Clamp01(float value)
+        {
+            if (value < 0f)
+            {
+                return 0f;
+            }
+
+            if (value > 1f)
+            {
+                return 1f;
+            }
+
+            return value;
         }
 
         /// <summary>

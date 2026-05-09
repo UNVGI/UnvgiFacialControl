@@ -110,6 +110,8 @@ namespace Hidano.FacialControl.Domain.Services
         private bool _verboseLoggingEnabled;
         private const double VerboseLogIntervalSeconds = 1.0;
 
+        public int LayerCount => _registry.LayerCount;
+
         /// <summary>
         /// Aggregator を構築する。per-layer 出力用の <c>float[]</c> を各レイヤー分
         /// 1 本ずつ確保する (レイヤー数 × blendShapeCount のメモリコスト)。
