@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Hidano.FacialControl.Adapters.Bone;
 using Hidano.FacialControl.Adapters.InputSources;
@@ -487,6 +488,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             public AnalogInputSourceWrapper(InputActionAnalogSource inner)
             {
                 _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+                ContributeMask = new BitArray(0);
             }
 
             public string Id => _inner.Id;
@@ -494,6 +496,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             public InputSourceType Type => InputSourceType.ValueProvider;
 
             public int BlendShapeCount => 0;
+
+            public BitArray ContributeMask { get; }
 
             public void Tick(float deltaTime)
             {

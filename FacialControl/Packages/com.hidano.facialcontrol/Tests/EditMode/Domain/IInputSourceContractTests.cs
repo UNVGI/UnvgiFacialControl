@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using NUnit.Framework;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
@@ -19,11 +20,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
                 Id = id;
                 Type = type;
                 BlendShapeCount = blendShapeCount;
+                ContributeMask = new BitArray(blendShapeCount, true);
             }
 
             public string Id { get; }
             public InputSourceType Type { get; }
             public int BlendShapeCount { get; }
+            public BitArray ContributeMask { get; }
 
             public int TickCallCount { get; private set; }
             public float LastDeltaTime { get; private set; }

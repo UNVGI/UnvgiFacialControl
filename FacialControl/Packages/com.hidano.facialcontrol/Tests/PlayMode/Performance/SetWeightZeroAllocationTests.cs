@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
@@ -38,12 +39,14 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
             {
                 Id = id;
                 BlendShapeCount = blendShapeCount;
+                ContributeMask = new BitArray(blendShapeCount, true);
                 _value = value;
             }
 
             public string Id { get; }
             public InputSourceType Type => InputSourceType.ValueProvider;
             public int BlendShapeCount { get; }
+            public BitArray ContributeMask { get; }
 
             public void Tick(float deltaTime)
             {

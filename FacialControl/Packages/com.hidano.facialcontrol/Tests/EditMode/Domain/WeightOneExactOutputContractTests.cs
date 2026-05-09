@@ -1,9 +1,11 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
+using Hidano.FacialControl.Tests.Shared;
 
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
@@ -38,12 +40,14 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             {
                 Id = id;
                 BlendShapeCount = values.Length;
+                ContributeMask = ContributeMaskTestHelper.AllSetContributeMask(values.Length);
                 _values = values;
             }
 
             public string Id { get; }
             public InputSourceType Type => InputSourceType.ValueProvider;
             public int BlendShapeCount { get; }
+            public BitArray ContributeMask { get; }
 
             public void Tick(float deltaTime) { }
 

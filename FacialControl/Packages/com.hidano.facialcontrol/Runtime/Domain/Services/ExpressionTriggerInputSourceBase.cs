@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
@@ -43,6 +44,9 @@ namespace Hidano.FacialControl.Domain.Services
 
         /// <summary>本入力源が書込む BlendShape の個数 (構築後不変)。</summary>
         public int BlendShapeCount { get; }
+
+        /// <inheritdoc />
+        public virtual BitArray ContributeMask { get; }
 
         /// <summary>内部スタックの最大深度 (構築時指定)。</summary>
         protected int MaxStackDepth { get; }
@@ -116,6 +120,7 @@ namespace Hidano.FacialControl.Domain.Services
 
             Id = id.Value;
             BlendShapeCount = blendShapeCount;
+            ContributeMask = new BitArray(blendShapeCount, true);
             MaxStackDepth = maxStackDepth;
             ExclusionMode = exclusionMode;
 
