@@ -36,6 +36,9 @@ namespace Hidano.FacialControl.Editor.Inspector
         // ====================================================================
 
         public const string LayersFoldoutName = "facial-character-layers-foldout";
+        public const string BaseExpressionFoldoutName = "facial-character-base-expression-foldout";
+        public const string BaseExpressionClipFieldName = "facial-character-base-expression-clip-field";
+        public const string BaseExpressionUnsetHelpName = "facial-character-base-expression-unset-help";
         public const string GazeConfigsFoldoutName = "facial-character-gaze-configs-foldout";
         public const string DebugFoldoutName = "facial-character-debug-foldout";
         public const string AdapterBindingsFoldoutName = "facial-character-adapter-bindings-foldout";
@@ -94,6 +97,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         protected SerializedProperty _layersProperty;
         protected SerializedProperty _expressionsProperty;
+        protected SerializedProperty _baseExpressionProperty;
         protected SerializedProperty _schemaVersionProperty;
         protected SerializedProperty _adapterBindingsProperty;
 
@@ -157,6 +161,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             BuildSaveStatusBar(root);
             BuildReferenceModelSection(root);
             BuildLayersSection(root);
+            BuildBaseExpressionSection(root);
             BuildGazeConfigsSection(root);
             OnBuildPreLayersSections(root);
             BuildAdapterBindingsSection(root);
@@ -180,6 +185,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         {
             _layersProperty = serializedObject.FindProperty("_layers");
             _expressionsProperty = serializedObject.FindProperty("_expressions");
+            _baseExpressionProperty = serializedObject.FindProperty("_baseExpression");
             _schemaVersionProperty = serializedObject.FindProperty("_schemaVersion");
             _adapterBindingsProperty = serializedObject.FindProperty("_adapterBindings");
 
@@ -350,6 +356,59 @@ namespace Hidano.FacialControl.Editor.Inspector
             foldout.Add(listView);
 
             root.Add(foldout);
+        }
+
+        // ====================================================================
+        // Section: ベース表情
+        // ====================================================================
+
+        private void BuildBaseExpressionSection(VisualElement root)
+        {
+            var foldout = MakeSectionFoldout(BaseExpressionFoldoutName, "ベース表情", open: true);
+
+            if (_baseExpressionProperty == null)
+            {
+                foldout.Add(MakeHelpBox("ベース表情の保存先が見つかりません。", HelpBoxMessageType.Warning));
+                root.Add(foldout);
+                return;
+            }
+
+            var clipProp = _baseExpressionProperty.FindPropertyRelative("animationClip");
+            if (clipProp == null)
+            {
+                foldout.Add(MakeHelpBox("ベース表情の AnimationClip 保存先が見つかりません。", HelpBoxMessageType.Warning));
+                root.Add(foldout);
+                return;
+            }
+
+            var clipField = new ObjectField("AnimationClip")
+            {
+                name = BaseExpressionClipFieldName,
+                objectType = typeof(AnimationClip),
+                allowSceneObjects = false,
+            };
+            clipField.BindProperty(clipProp);
+            foldout.Add(clipField);
+
+            var unsetHelp = MakeHelpBox(
+                "ベース表情は、常時固定表情キャラや衣装固定 BlendShape など、"
+                + "どのレイヤーも contribute しない BlendShape に残す初期値です。"
+                + "AnimationClip を割り当てると自動保存時に cachedSnapshot が更新されます。");
+            unsetHelp.name = BaseExpressionUnsetHelpName;
+            SetBaseExpressionUnsetHelpVisibility(unsetHelp, clipProp.objectReferenceValue as AnimationClip);
+            clipField.RegisterValueChangedCallback(evt =>
+            {
+                SetBaseExpressionUnsetHelpVisibility(unsetHelp, evt.newValue as AnimationClip);
+            });
+            foldout.Add(unsetHelp);
+
+            root.Add(foldout);
+        }
+
+        private static void SetBaseExpressionUnsetHelpVisibility(HelpBox unsetHelp, AnimationClip clip)
+        {
+            if (unsetHelp == null) return;
+            unsetHelp.style.display = clip == null ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         // ====================================================================

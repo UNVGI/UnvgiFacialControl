@@ -211,7 +211,7 @@
   - _Boundary: Editor.AutoExport.FacialCharacterProfileExporter_
   - _Depends: 5.3, 8.2, 9.1_
 
-- [ ] 9.3 FacialCharacterProfileSOInspector に BuildBaseExpressionSection を追加する
+- [x] 9.3 FacialCharacterProfileSOInspector に BuildBaseExpressionSection を追加する
   - Layers セクションと GazeConfigs セクションの間に「ベース表情」 専用セクションを挿入する (D-8)
   - セクション内に AnimationClip ObjectField を配置し、 clip 未設定時は用途説明 (常時固定表情キャラ / 衣装固定 BlendShape) の HelpBox を表示する
   - bake / rebake ボタンは露出させない (D-2 / R8.4)、 UI Toolkit で実装し IMGUI を新規導入しない (R8.5)
