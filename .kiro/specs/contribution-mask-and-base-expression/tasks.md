@@ -28,7 +28,7 @@
 
 ## 2. Domain サービス: LayerBlender mask 駆動化と Aggregator OR 集約
 
-- [ ] 2.1 LayerBlender の mask 駆動契約を red テストで定義する
+- [x] 2.1 LayerBlender の mask 駆動契約を red テストで定義する
   - `LayerBlenderTests` (新設) に「mask 全立て + 出力初期値 0 → 旧 lerp 出力と一致」 を追加 (R10.1, R3.4)
   - `LayerBlenderMaskTests` (新設) に「mask 部分立て → 立たない index は呼出前の output 値を保持」 を追加 (R10.2, R3.3)
   - 「mask null → 全立てフォールバック」 のケースも red として追加する
