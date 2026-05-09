@@ -179,7 +179,7 @@
 
 ## 8. Editor: AnimationClipExpressionSampler の contribute index 抽出
 
-- [ ] 8.1 AnimationClipExpressionSampler の contribute index 抽出 red テストを追加する
+- [x] 8.1 AnimationClipExpressionSampler の contribute index 抽出 red テストを追加する
   - `AnimationClipExpressionSamplerContributeMaskTests` (新設、 EditMode) に「複数 BlendShape curve を持つ AnimationClip → 全 BlendShape 名が漏れなく集合化される」「BlendShape 以外の curve (Transform / Material) のみ → 空集合」「2 バイト文字 / 特殊記号を含む BlendShape 名でも正しく解決」 を red で追加する (R10.6)
   - 観測可能な完了条件: 追加テストが現実装で red になる
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 10.6_
