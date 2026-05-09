@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 
 namespace Hidano.FacialControl.Domain.Interfaces
 {
@@ -21,5 +22,20 @@ namespace Hidano.FacialControl.Domain.Interfaces
         /// 対応する BlendShape 名の一覧を取得する。
         /// </summary>
         ReadOnlySpan<string> BlendShapeNames { get; }
+    }
+
+    /// <summary>
+    /// リップシンク provider が書き込む BlendShape index 集合を公開する任意契約。
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ContributeMask"/> は構築時に確定した事前確保済み参照を返す。
+    /// この契約を実装しない provider は、後方互換のため全 index contribute として扱われる。
+    /// </remarks>
+    public interface ILipSyncContributeMaskProvider
+    {
+        /// <summary>
+        /// provider が contribute する BlendShape index 集合。
+        /// </summary>
+        BitArray ContributeMask { get; }
     }
 }

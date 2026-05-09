@@ -1,14 +1,16 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
 
 namespace Hidano.FacialControl.LipSync.Adapters
 {
-    public sealed class ULipSyncProvider : ILipSyncProvider, IDisposable
+    public sealed class ULipSyncProvider : ILipSyncProvider, ILipSyncContributeMaskProvider, IDisposable
     {
         private readonly IULipSyncEventSource _eventSource;
         private readonly float[] _accum;
+        private readonly BitArray _contributeMask;
         private readonly string[] _blendShapeNames;
         private readonly string[] _phonemeKeys;
         private readonly int[] _phonemeIndices;
@@ -39,6 +41,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
             _eventSource = eventSource;
             _accum = new float[blendShapeCount];
+            _contributeMask = new BitArray(blendShapeCount, false);
             _blendShapeNames = new string[blendShapeCount];
             for (int i = 0; i < _blendShapeNames.Length; i++)
             {
@@ -61,6 +64,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 }
 
                 _snapshotWeights[i] = CopyWeights(snapshot.Weights, blendShapeCount);
+                MarkContributeIndexes(_snapshotWeights[i], _contributeMask);
                 _phonemeKeys[validCount] = snapshot.PhonemeId;
                 _phonemeIndices[validCount] = i;
                 validCount++;
@@ -71,6 +75,8 @@ namespace Hidano.FacialControl.LipSync.Adapters
         }
 
         public ReadOnlySpan<string> BlendShapeNames => _blendShapeNames;
+
+        public BitArray ContributeMask => _contributeMask;
 
         public void GetLipSyncValues(Span<float> output)
         {
@@ -163,6 +169,18 @@ namespace Hidano.FacialControl.LipSync.Adapters
             }
 
             return weights;
+        }
+
+        private static void MarkContributeIndexes(float[] weights, BitArray mask)
+        {
+            int count = weights.Length < mask.Length ? weights.Length : mask.Length;
+            for (int i = 0; i < count; i++)
+            {
+                if (weights[i] != 0f)
+                {
+                    mask[i] = true;
+                }
+            }
         }
     }
 }

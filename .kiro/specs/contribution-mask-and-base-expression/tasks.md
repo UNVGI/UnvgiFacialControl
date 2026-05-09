@@ -93,7 +93,7 @@
   - _Requirements: 1.5, 1.6, 10.10_
   - _Boundary: Tests.EditMode.Adapters.AnalogBlendShapeInputSource_
 
-- [ ] 4.3 ULipSyncProvider に union mask 構築・公開を実装し LipSyncInputSource から参照する
+- [x] 4.3 ULipSyncProvider に union mask 構築・公開を実装し LipSyncInputSource から参照する
   - `ULipSyncProvider` 構築時 (binding 初期化フェーズ) に全 `PhonemeSnapshot.Weights[i] != 0` index を OR して union BitArray を 1 本 preallocate し、 `BitArray ContributeMask { get; }` で公開する
   - `LipSyncInputSource` は構築時に provider から union mask 参照を受け取り、 `IInputSource.ContributeMask` でその参照を返す
   - 観測可能な完了条件: 4.1 の red テスト全件が green、 既存 LipSync テストが後方互換維持で green
