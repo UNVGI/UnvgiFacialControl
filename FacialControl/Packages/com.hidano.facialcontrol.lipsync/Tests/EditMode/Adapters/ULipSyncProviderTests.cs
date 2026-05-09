@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.LipSync.Adapters;
 using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
@@ -95,6 +97,66 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         }
 
         [Test]
+        public void ContributeMask_AllNonZeroPhonemeWeightIndexes_AreIncludedInUnionMask()
+        {
+            var source = new FakeULipSyncEventSource();
+            using var provider = CreateProvider(
+                source,
+                5,
+                Snapshot("A", 1f, 0f, 0.25f, 0f, 0f),
+                Snapshot("I", 0f, 0.5f, 0f, 0f, 0f),
+                Snapshot("O", 0f, 0f, 0f, 0.75f, 0f));
+
+            BitArray mask = GetContributeMask(provider);
+
+            Assert.That(mask[0], Is.True);
+            Assert.That(mask[1], Is.True);
+            Assert.That(mask[2], Is.True);
+            Assert.That(mask[3], Is.True);
+            Assert.That(mask[4], Is.False);
+        }
+
+        [Test]
+        public void ContributeMask_AfterConstruction_LengthMatchesBlendShapeCount()
+        {
+            var source = new FakeULipSyncEventSource();
+            using var provider = CreateProvider(
+                source,
+                4,
+                Snapshot("A", 1f, 0f),
+                Snapshot("I", 0f, 0f, 0.5f, 0f));
+
+            BitArray mask = GetContributeMask(provider);
+
+            Assert.That(mask.Length, Is.EqualTo(4));
+        }
+
+        [Test]
+        public void ContributeMask_DuringRuntime_ReturnsSameReference()
+        {
+            var source = new FakeULipSyncEventSource();
+            using var provider = CreateProvider(
+                source,
+                3,
+                Snapshot("A", 1f, 0f, 0f),
+                Snapshot("I", 0f, 0.5f, 0.25f));
+            var output = new float[3];
+
+            BitArray first = GetContributeMask(provider);
+
+            source.Invoke(Info(1f, ("A", 1f)));
+            provider.GetLipSyncValues(output);
+            BitArray afterFrame = GetContributeMask(provider);
+
+            provider.RequestZeroOutputForNextFrame();
+            provider.GetLipSyncValues(output);
+            BitArray afterZeroRequest = GetContributeMask(provider);
+
+            Assert.That(afterFrame, Is.SameAs(first));
+            Assert.That(afterZeroRequest, Is.SameAs(first));
+        }
+
+        [Test]
         public void Dispose_AfterCall_NoLongerReceivesEvents()
         {
             var source = new FakeULipSyncEventSource();
@@ -145,6 +207,20 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         private static PhonemeSnapshot Snapshot(string phonemeId, params float[] weights)
         {
             return new PhonemeSnapshot(phonemeId, weights);
+        }
+
+        private static BitArray GetContributeMask(ULipSyncProvider provider)
+        {
+            PropertyInfo property = typeof(ULipSyncProvider).GetProperty(
+                "ContributeMask",
+                BindingFlags.Public | BindingFlags.Instance);
+            Assert.That(property, Is.Not.Null,
+                "ULipSyncProvider は ContributeMask プロパティを公開する必要があります。");
+            Assert.That(property.PropertyType, Is.EqualTo(typeof(BitArray)));
+
+            object value = property.GetValue(provider);
+            Assert.That(value, Is.Not.Null);
+            return (BitArray)value;
         }
 
         private static uLipSync.LipSyncInfo Info(
