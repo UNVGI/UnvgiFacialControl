@@ -52,7 +52,7 @@
   - _Boundary: Tests.EditMode.Domain.LayerInputSourceAggregator_
   - _Depends: 1.3_
 
-- [ ] 2.4 LayerInputSourceAggregator に per-layer BitArray バッファと OR 集約ループを実装する
+- [x] 2.4 LayerInputSourceAggregator に per-layer BitArray バッファと OR 集約ループを実装する
   - 構築時に `BitArray[] _perLayerMask` (長さ LayerCount、 各要素 `new BitArray(blendShapeCount)`) を 1 回だけ確保する
   - 各 layer ループ開始時に `_perLayerMask[l].SetAll(false)`、 valid な source のみ `_perLayerMask[l].Or(source.ContributeMask)` で集約する
   - `LayerBlender.LayerInput` 詰込み時に `_perLayerMask[l]` を渡す

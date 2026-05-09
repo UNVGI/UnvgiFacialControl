@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -86,6 +87,7 @@ namespace Hidano.FacialControl.Domain.Services
         private readonly LayerInputSourceWeightBuffer _weightBuffer;
         private readonly int _blendShapeCount;
         private readonly float[][] _perLayerOutput;
+        private readonly BitArray[] _perLayerMask;
         private readonly bool[] _emptyLayerWarned;
         private readonly LayerBlender.LayerInput[] _layerInputScratch;
 
@@ -150,9 +152,11 @@ namespace Hidano.FacialControl.Domain.Services
 
             int layerCount = registry.LayerCount;
             _perLayerOutput = layerCount == 0 ? Array.Empty<float[]>() : new float[layerCount][];
+            _perLayerMask = layerCount == 0 ? Array.Empty<BitArray>() : new BitArray[layerCount];
             for (int l = 0; l < layerCount; l++)
             {
                 _perLayerOutput[l] = blendShapeCount == 0 ? Array.Empty<float>() : new float[blendShapeCount];
+                _perLayerMask[l] = new BitArray(blendShapeCount);
             }
             _emptyLayerWarned = layerCount == 0 ? Array.Empty<bool>() : new bool[layerCount];
             _layerInputScratch = layerCount == 0
@@ -287,7 +291,9 @@ namespace Hidano.FacialControl.Domain.Services
             for (int l = 0; l < layerCount; l++)
             {
                 var layerOutput = _perLayerOutput[l];
+                var layerMask = _perLayerMask[l];
                 Array.Clear(layerOutput, 0, layerOutput.Length);
+                layerMask.SetAll(false);
 
                 int layerSnapshotStart = snapshotWritten;
                 float layerWeightSum = 0f;
@@ -312,6 +318,7 @@ namespace Hidano.FacialControl.Domain.Services
                     if (sourceIsValid)
                     {
                         hasAnyValidSource = true;
+                        layerMask.Or(source.ContributeMask);
                         layerWeightSum += w;
                         if (w > 0f)
                         {
@@ -382,7 +389,10 @@ namespace Hidano.FacialControl.Domain.Services
                     int priority = useCustomPriorities ? priorities[l] : l;
                     float layerWeight = useCustomWeights ? layerWeights[l] : 1f;
                     outputPerLayer[l] = new LayerBlender.LayerInput(
-                        priority: priority, weight: layerWeight, blendShapeValues: layerOutput);
+                        priority: priority,
+                        weight: layerWeight,
+                        blendShapeValues: layerOutput,
+                        contributeMask: layerMask);
                 }
             }
 
