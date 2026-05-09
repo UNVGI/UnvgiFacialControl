@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
@@ -36,6 +37,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
         private readonly IReadOnlyDictionary<string, IAnalogInputSource> _sources;
         private readonly ResolvedBinding[] _resolvedBindings;
+        private readonly BitArray _contributeMask;
         private readonly float[] _outputCache;
 
         /// <summary>
@@ -68,6 +70,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
             }
 
             _sources = sources;
+            _contributeMask = new BitArray(blendShapeCount);
             _outputCache = blendShapeCount == 0 ? Array.Empty<float>() : new float[blendShapeCount];
 
             // BlendShape 名 → index の逆引きマップを 1 度だけ構築する。
@@ -113,12 +116,16 @@ namespace Hidano.FacialControl.Adapters.InputSources
                 }
 
                 resolvedList.Add(new ResolvedBinding(source, entry.SourceAxis, bsIndex, entry.Scale, entry.Direction));
+                _contributeMask[bsIndex] = true;
             }
 
             _resolvedBindings = resolvedList.Count == 0
                 ? Array.Empty<ResolvedBinding>()
                 : resolvedList.ToArray();
         }
+
+        /// <inheritdoc />
+        public override BitArray ContributeMask => _contributeMask;
 
         /// <inheritdoc />
         public override bool TryWriteValues(Span<float> output)
