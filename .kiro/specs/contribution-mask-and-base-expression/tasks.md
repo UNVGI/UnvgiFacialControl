@@ -111,7 +111,7 @@
 
 ## 5. Adapters: BaseExpression データモデル (SO + Serializable + Snapshot 流用)
 
-- [ ] 5.1 (P) BaseExpression の SO round-trip red テストを追加する
+- [x] 5.1 (P) BaseExpression の SO round-trip red テストを追加する
   - `FacialCharacterProfileSO_BaseExpressionTests` (新設、 EditMode) に「`_baseExpression` 未設定 → BaseExpression が空 (cachedSnapshot.blendShapes が空) として扱われる」「`_baseExpression` の AnimationClip + cachedSnapshot を設定 → 再ロード後も値が保持される」「null セーフ getter が例外を投げない」 を red で追加する
   - 観測可能な完了条件: 追加テストが現実装で red になる
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
