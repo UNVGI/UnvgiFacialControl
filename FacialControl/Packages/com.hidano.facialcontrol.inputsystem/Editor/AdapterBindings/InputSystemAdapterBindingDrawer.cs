@@ -64,22 +64,60 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
 
             var assetField = AddInputActionAssetField(root, property);
             var actionMapDropdown = AddActionMapDropdown(root, property);
-            var expressionBindingsList = AddExpressionBindingsList(root, property);
 
-            // _inputActionAsset 変更時に ActionMap / Action 候補と list rows を再構築する。
+            var expressionIndexProxy = new List<int>();
+            var expressionBindingsList = AddExpressionBindingsList(
+                root, property, expressionIndexProxy);
+
+            var gazeIndexProxy = new List<int>();
+            var gazeBindingsList = AddGazeInputBindingsList(
+                root, property, gazeIndexProxy);
+
+            // _inputActionAsset / ActionMap 変更時に候補と list rows を再構築する。
+            // SerializedProperty 側の array は変わっていなくても、ObjectField の rebind 経由で
+            // ListView の controller が想定外に reset されるケースを潰すため、
+            // itemsSource を毎回明示的に再代入する（Req: 再現バグ "InputActionAsset 差し替えで
+            // Add/Remove が "source is not defined" 例外で失敗" の修正）。
             assetField?.RegisterValueChangedCallback(_ =>
             {
                 RefreshActionMapChoices(actionMapDropdown, property);
-                expressionBindingsList?.Rebuild();
+                ReassignItemsSource(expressionBindingsList, property, ExpressionBindingsFieldName, expressionIndexProxy);
+                ReassignItemsSource(gazeBindingsList, property, GazeInputBindingsFieldName, gazeIndexProxy);
             });
             actionMapDropdown?.RegisterValueChangedCallback(_ =>
             {
-                expressionBindingsList?.Rebuild();
+                // Action 候補は ActionMap に紐付くため、両 list の row UI を refresh する。
+                ReassignItemsSource(expressionBindingsList, property, ExpressionBindingsFieldName, expressionIndexProxy);
+                ReassignItemsSource(gazeBindingsList, property, GazeInputBindingsFieldName, gazeIndexProxy);
             });
 
-            AddGazeInputBindingsList(root, property);
-
             return root;
+        }
+
+        /// <summary>
+        /// SerializedProperty の現在の array 状態から index proxy を再構築し、
+        /// ListView の <see cref="BaseVerticalCollectionView.itemsSource"/> に再代入したうえで rows を refresh する。
+        /// </summary>
+        /// <remarks>
+        /// UnityCsReference の <c>BaseVerticalCollectionView.itemsSource</c> ゲッターは
+        /// <c>viewController?.itemsSource</c> を返す実装で、controller を差し替える/リセットするタイミングで
+        /// 新 controller の <c>m_ItemsSource</c> が null になることがある。Add ボタン押下時に
+        /// <c>BaseListViewController.EnsureItemSourceCanBeResized</c> が null を検出し
+        /// "Unable to add or remove items because the source is not defined" 例外を投げる事象を回避するため、
+        /// 値変更コールバック内で itemsSource を毎回張り直す。
+        /// </remarks>
+        private static void ReassignItemsSource(
+            ListView listView,
+            SerializedProperty bindingProperty,
+            string arrayFieldName,
+            List<int> indexProxy)
+        {
+            if (listView == null) return;
+
+            var arr = bindingProperty.FindPropertyRelative(arrayFieldName);
+            RebuildIndexProxy(indexProxy, arr);
+            listView.itemsSource = indexProxy;
+            listView.RefreshItems();
         }
 
         // ----------------------------------------------------------------
@@ -134,7 +172,8 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             return dropdown;
         }
 
-        private ListView AddExpressionBindingsList(VisualElement root, SerializedProperty property)
+        private ListView AddExpressionBindingsList(
+            VisualElement root, SerializedProperty property, List<int> indexProxy)
         {
             var listProp = property.FindPropertyRelative(ExpressionBindingsFieldName);
             if (listProp == null)
@@ -143,14 +182,18 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 return null;
             }
 
-            var indexProxy = new List<int>();
             RebuildIndexProxy(indexProxy, listProp);
 
+            // NOTE: itemsSource は SetViewController の "後" に設定する。
+            // UnityCsReference の BaseVerticalCollectionView.SetViewController は
+            // 旧 controller を Dispose して新 controller を SetView する実装で、
+            // ListView.itemsSource ゲッターは viewController.itemsSource を直接返すため、
+            // 初期化子で itemsSource を渡すと差し替え後に null 化されてしまい、
+            // Add ボタンで EnsureItemSourceCanBeResized が例外を投げる。
             var listView = new ListView
             {
                 name = ExpressionBindingsListName,
                 fixedItemHeight = 84f,
-                itemsSource = indexProxy,
                 showAddRemoveFooter = true,
                 showBorder = true,
                 showFoldoutHeader = true,
@@ -164,6 +207,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             listView.style.marginTop = 4;
             listView.style.minHeight = 80f;
             listView.SetViewController(new SafeListViewController());
+            listView.itemsSource = indexProxy;
 
             listView.itemsAdded += indices =>
             {
@@ -212,7 +256,8 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             for (int i = 0; i < arrayProperty.arraySize; i++) indexProxy.Add(i);
         }
 
-        private static ListView AddGazeInputBindingsList(VisualElement root, SerializedProperty property)
+        private static ListView AddGazeInputBindingsList(
+            VisualElement root, SerializedProperty property, List<int> indexProxy)
         {
             var listProp = property.FindPropertyRelative(GazeInputBindingsFieldName);
             if (listProp == null)
@@ -221,14 +266,14 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 return null;
             }
 
-            var indexProxy = new List<int>();
             RebuildIndexProxy(indexProxy, listProp);
 
+            // NOTE: itemsSource は SetViewController の "後" に設定する（理由は
+            // AddExpressionBindingsList のコメント参照）。
             var listView = new ListView
             {
                 name = GazeInputBindingsListName,
                 fixedItemHeight = 56f,
-                itemsSource = indexProxy,
                 showAddRemoveFooter = true,
                 showBorder = true,
                 showFoldoutHeader = true,
@@ -241,6 +286,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             listView.style.marginTop = 4;
             listView.style.minHeight = 72f;
             listView.SetViewController(new SafeListViewController());
+            listView.itemsSource = indexProxy;
 
             listView.itemsAdded += indices =>
             {
