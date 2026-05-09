@@ -1,87 +1,87 @@
 # HANDOVER
 
+- 生成日時: 2026-05-08
+- 本セッションは `ulipsync-adapter-package` spec の Validation 後 hotfix と GUID 衝突解消を扱った
+
 ## 今回やったこと
 
-- InputSystem パッケージのアーキテクチャ監査と Gaze サブシステム分割リファクタ
-- core / inputsystem 間の責務再分配を実施
-  - Gaze 関連 4 ファイルを inputsystem → core へ移動（`GazeBlendShapeSampleEntry`, `GazeBonePoseProvider`, `GazeClipBlendShapeSampler` + 派生元の `GazeBindingConfig` 新設）
-  - `GazeBonePoseProvider` のコンストラクタ API を再設計（sourceId 解決責務を呼出側へ）
-  - `FacialCharacterSOAutoExporter` の汎用部分を core の `FacialCharacterProfileExporter` に抽出
-  - `FacialCharacterSOInspector` (2067 行) を分割：core に基底 `FacialCharacterProfileSOInspector` (1803 行)、inputsystem に派生 `FacialCharacterSOInspector` (439 行、-79%)
-- テスト結果：EditMode 936/937、PlayMode 299/299 通過（残 1 件は既知 flaky GC テスト）
-- 両パッケージの CHANGELOG.md にエントリ追記
+- `/kiro:validate-impl ulipsync-adapter-package` を実行 → **NO-GO** 判定（Critical 3 件）
+- Critical 修正を 3 タスクで対応
+  - **P0-1**: 既定 `uLipSync.Profile` を `Packages/com.hidano.facialcontrol.lipsync/Runtime/Resources/FacialControl/LipSync/Default uLipSync Profile.asset` に新規配置。Sample 側 Analyzer Profile（Mic / AnimationClip 各 1 個）は削除し、Sample DemoProfile の `_analyzerProfile` を `{fileID: 0}` に変更（`Resources.Load` フォールバック経由）
+  - **P0-2**: `FacialControl/Assets/Samples/com.hidano.facialcontrol.lipsync/` 配下を全削除。パッケージ README の「Samples の二重管理」節を「Samples~ のみ正本」に書き換え
+  - **P1**: `tasks.md` の `[ ]` 29 件を実装存在確認のうえ全件 `[x]` 化。1.1（コア側に配置パス相違）と 10.2（方針変更で廃止）に注記追加
+- Unity 起動後、別系統のエラー 2 件を切り分け
+  - **エラー 1（SchemaVersion mismatch）**: dev project の `Assets/StreamingAssets/FacialControl/MicLipSyncDemoProfile/profile.json`（`schemaVersion: "2.0"`）が parser strict（`"1.0"`）に拒否されていた。当該フォルダごと削除して対処
+  - **エラー 2（uLipSync の audio thread 違反）**: forked uLipSync 側修正用のプロンプトを起票（ユーザーが別セッションで対処予定）
+- GUID 衝突対応
+  - 衝突原因: inputsystem `Tests/PlayMode/Adapters/InputSources.meta` の GUID `a1b2c3d4e5f6...` と uLipSync-asio パッケージ側の同 GUID
+  - inputsystem 側 + 私が今回 P0-1 で作った 4 つの連番風 GUID（a3 / b4 / c5 / d6 接頭）を計 5 個、`[guid]::NewGuid().ToString("N")` で再生成した完全ランダム値に置換。Sample Import 結果の `_analyzerProfile` 参照も同期更新
 
 ## 決定事項
 
-- `GazeExpressionConfig` は **継承方式**で分割（`GazeBindingConfig` ← `GazeExpressionConfig + InputActionReference`）。既存フィールドアクセス互換のまま
-- `GazeBonePoseProvider` は `IReadOnlyList<GazeBoneBinding>` を受け取る形に変更。`GazeBoneBinding` は `(GazeBindingConfig, IAnalogInputSource)` の readonly struct
-- Inspector は `[CustomEditor(typeof(FacialCharacterProfileSO), editorForChildClasses: true)]` 基底 + `[CustomEditor(typeof(FacialCharacterSO))]` 派生で Unity の specificity 解決を利用
-- 派生 inspector の virtual hook を 6 個用意：`OnResolveDerivedSerializedProperties` / `OnBuildPreLayersSections` / `OnBuildAnalogExpressionInputSourceFields` / `FindGazeConfigsProperty` / `ResolveAnalogSourceIdChoices` / `FlushAutoExport`（+ `ValidateAnalogExpression`）
-- AutoExporter は core 側に profile.json 出力を抽出、inputsystem は analog_bindings.json と Gaze clip サンプリングのみ担当
-- `FacialCharacterSOInspectorTests` は reflection で完全修飾型名参照のため inputsystem に残置（互換維持）
-- file move 時は `.cs` と `.cs.meta` を一緒に移動して GUID を保持
+- **既定 Profile の配布形態**: パッケージに `Resources/FacialControl/LipSync/Default uLipSync Profile.asset` を同梱。Sample に Analyzer Profile を二重持ちしない（DRY）。Sample 側で `_analyzerProfile` 未指定なら `Resources.Load` で自動フォールバック
+- **Samples の管理方針**: `com.hidano.facialcontrol.lipsync` のみ「Samples~ 正本のみ、Assets/Samples ミラーは作らない」運用に変更。dev 確認は Package Manager の Sample Import 機能経由で `Assets/Samples/FacialControl uLipSync Adapter/<ver>/<sample>/` へ展開して行う
+- **Unity .meta GUID 規約**: CLAUDE.md（global）に追記済み。`[guid]::NewGuid().ToString('N')` または `uuidgen` で必ずランダム生成。連続パターン・1 文字シフト系列・既存 GUID コピーは禁止
+- **コアパッケージは触らない**: SchemaVersion 関連の API 命名混乱（`SchemaVersionV2 = "1.0"`、`ParseProfileSnapshotV2Internal`）は別 issue 案件。今回スコープ外
 
 ## 捨てた選択肢と理由
 
-- **`GazeExpressionConfig` を core に丸ごと移す**: ボツ。`InputActionReference` フィールドが `UnityEngine.InputSystem` に依存するため、core が InputSystem に依存してしまう
-- **composition で分割（`GazeExpressionConfig { binding; inputAction }`）**: ボツ。既存フィールドアクセスが `cfg.binding.leftEyeBonePath` に変わって全 caller を破壊する。継承の方が侵襲が小さい
-- **`FacialCharacterProfileSO` に `virtual GazeConfigs` プロパティを追加**: ボツ。`List<T>` invariant のため override で型変更が困難。代わりに `protected virtual SerializedProperty FindGazeConfigsProperty()` で派生クラスが `_gazeConfigs` プロパティを返す方式を採用
-- **AutoExporter の Gaze 部分も core へ移行**: ボツ。`SampleGazeClipsIntoConfigs` は `FacialCharacterSO` キャストを要求するため inputsystem 固有のまま。core 側は `FacialCharacterProfileExporter` で profile.json + AnimationClip サンプリングのみに留める
-- **`FacialCharacterSOInspectorTests` を core 側へ分離**: ボツ。reflection で型名文字列参照しているため移動するとテストが壊れる。inputsystem の派生 inspector が core 基底を継承しているので間接的に基底もカバーされる（preview.2 以降で再考の余地）
+- **既定 Profile を Sample 側に残し複製する案 (P0-1 (a))**: Sample が Import 後単体完結する利点はあるが、二重管理コストとファイル drift リスク → 却下。Resources.Load フォールバックの方が DRY
+- **Assets/Samples ミラーを `AnimationClipLipSyncDemo` 分も追加する案**: 二重管理が紛らわしいとユーザー判断 → ミラー全廃の方針へ転換
+- **エラー 1 を `schemaVersion: "1.0"` に書き換えて対処**: JSON 中身が SO YAML 内蔵データと等価のため、JSON 自体を削除して SO 側 fallback で動作させる方が将来の drift を防げる → 削除を選択
+- **GUID 連番回避を「先頭文字だけ被らないように」する案**: ローテーション系列（a3 / b4 / c5 / d6）も衝突リスクが残る → CLAUDE.md ルールとして「完全ランダム生成」を強制
 
 ## ハマりどころ
 
-- GC アロケーションテスト 2 種が batchmode で flaky
-  - `OscControllerBlendingIntegrationTests.Pipeline_AggregateAndBlendLoop_AllocatesZeroManagedMemory`
-  - `LayerInputSourceAggregatorTests.TryWriteSnapshot_SteadyStateCalls_DoNotAllocate`
-  - 個別再実行で通る。リファクタ起因ではない（事実: Wave 2 で 937/937、Wave 3-A で 1 件失敗、1 件再実行で通過、Wave 5 で別の 1 件失敗）
-- inputsystem/Runtime/Adapters/Bone, Editor/Sampling, Tests/EditMode/Editor/Sampling の各ディレクトリは中身が空になったので `.meta` 込みで削除。`.meta` だけ残すと Unity warning、ディレクトリだけ残すと Unity が新 GUID を生成して Scene 参照壊れる可能性
-- `FacialCharacterSOAutoExporter` の test seam (`SamplerOverride` など public static state) はテストが直接参照しているため、core へ移管せず inputsystem 側に残置
-- 旧 inputsystem inspector は約 2067 行（subagent 計測）で、私が読んだ時点での 1500 行は表示制限。subagent 委譲で正確な分量が判明
+- **`SchemaVersionV2 = "1.0"` の命名混乱**: 定数名が `V2` なのに値が `"1.0"`。SO YAML の `_schemaVersion: 2.0`（SO 自身のレイアウト ver）と JSON の `"schemaVersion": "1.0"`（parser strict ver）が別系統で、コードを読まないと取り違える
+- **`a1b2c3d4...` 衝突の検出経路**: Unity Console の警告で初めて発覚。GUID 衝突は静かに ignore されることもあるので CLAUDE.md ルール化が必要だった
+- **Sample Import 結果に旧 GUID 参照が残存**: ユーザーが Inspector で手動再設定した結果が保存されており、`_analyzerProfile: {fileID: 0}` ではなく `d6a1f4b8...` への参照に書き戻っていた。GUID 差し替え時に同期忘れると broken reference になる
+- **immutable folder の GUID 衝突**: `Packages/com.hidano.ulipsync-asio/Plugins/Windows` 側は immutable で Unity が auto-reassign 不可。衝突相手（mutable 側）を修正するしかない
 
 ## 学び
 
-- `IReadOnlyList<T>` は covariant (`out T`) なので `List<DerivedClass>` を `IReadOnlyList<BaseClass>` として渡せる。`List<T>` は invariant
-- Unity の `[Serializable]` クラス継承は非ポリモーフィック (`List<DerivedT>` の T が固定) なら inspector 表示・YAML 互換ともに問題なし
-- Unity の `[CustomEditor(BaseT, editorForChildClasses: true)]` と `[CustomEditor(DerivedT)]` を併用すると、より specific な型に対しては DerivedT の inspector が優先される
-- 大規模ファイル refactor (1500+ 行) は subagent 委譲が有効。明確な仕様 + virtual hook 設計 + テスト実行責任を渡せば、ヘッドレスで完遂できる
-- file move 時に GUID 保持で `.cs.meta` 同行移動すれば Unity 側の参照は壊れない（git からは delete+add に見えるが Unity は move として認識）
+- **Unity 6 で audio thread 制約が厳格化**: `AudioSettings.outputSampleRate` 等の main-thread-only API を `OnAudioFilterRead` から呼ぶと UnityException 化。以前は警告だけだった
+- **Sample Import 結果は dev に永続化される**: Package Manager で Sample を Import すると `Assets/Samples/<displayName>/<version>/<sampleName>/` にコピーされる。ユーザーが Inspector 編集した内容もそこに保存される。GUID 系修正時はパッケージ側 Samples~ と Assets/Samples 両方の参照を確認する
+- **`StreamingAssetsProfilePath` は SO 名から自動構築**: `FacialCharacterProfileSO.CharacterAssetName => name` なので、SO 名と同名のフォルダが StreamingAssets 配下にあると自動的に読みに行く。古い JSON が残っていると無関係な SO の挙動を壊す
+- **テンプレ系 GUID の検出パターン**: 連続文字（`0123456789abcdef`）・magic number（`deadbeef`）・同一文字 16 文字以上連続・1 文字シフト系列（`a1b2... → b2c3...`）。`grep -E '^guid: ([0-9a-f])\1{15,}'` 等で機械検出可能
 
 ## 次にやること
 
-### 優先度 高（preview.1 リリース前）
-- なし（コア refactor は完了、リリース判定可能な状態）
+### 優先度: 高
+- **forked uLipSync の audio thread 違反修正**: `com.hidano.ulipsync-asio` リポジトリで `OnAudioFilterRead` から `AudioSettings.outputSampleRate` 直接呼びを排除。ユーザー作成済みプロンプトで別セッション実行予定。完了後 `com.hidano.ulipsync-asio` の patch version を上げ、`com.hidano.facialcontrol.lipsync/package.json` の peer dependency バージョンを追従
+- **MicLipSyncDemo Sample の最終動作確認**: uLipSync 修正後、Sample Scene で Default Profile が `Resources.Load` 経由で読まれ、口形状が動くことを目視確認
+- **`/kiro:validate-impl ulipsync-adapter-package` 再実行**: GO 判定取得を目指す
 
-### 優先度 中（preview.2 以降）
-- core 基底 inspector (1803 行) のセクション別ファイル分割（LayersSection, ExpressionsSection 等の partial class）
-- `FacialCharacterSOInspectorTests` の汎用部分を core 側 `FacialCharacterProfileSOInspectorTests` として切り出し
-- GC flaky テストの安定化（warmup イテレーションを増やす、または個別 fixture に分離）
+### 優先度: 中
+- **コアの `SchemaVersionV2 = "1.0"` 命名整理**: `ParseProfileSnapshotV2Internal` と定数値の不一致を別 issue で起票し、命名統一 or コメント追記
+- **コア `FacialCharacterProfileSO.CharacterAssetName` の挙動見直し**: SO 名から自動 path 生成は古い JSON が残ると壊れる。明示的な opt-in field（`_useStreamingAssets: bool` など）に変える検討。`docs/backlog.md` に追加候補
 
-### 優先度 低（backlog）
-- OSC / ARKit からの目線駆動実装時に `GazeBonePoseProvider` を再利用（API は既に整備済）
-- Inspector の partial class 化または別ファイル分割
+### 優先度: 低
+- **Phase 0 Spike テスト（タスク 1.1）の本パッケージ移送**: 現状コアパッケージ側 `com.hidano.facialcontrol/Tests/EditMode/Adapters/PhonemeEntrySerializeReferenceSmokeTests.cs` に配置されているが、本来の指定パスは本パッケージ側。preview.2 以降で検討
+- **CLAUDE.md / steering の二重管理ルール記述見直し**: lipsync パッケージのみ例外なので「dev で必要なパッケージのみミラー」と緩めるか、明示的なリスト化を検討
 
 ## 関連ファイル
 
-### 新規作成（core）
-- `Packages/com.hidano.facialcontrol/Runtime/Adapters/ScriptableObject/GazeBindingConfig.cs`
-- `Packages/com.hidano.facialcontrol/Runtime/Adapters/Bone/GazeBoneBinding.cs`
-- `Packages/com.hidano.facialcontrol/Editor/AutoExport/FacialCharacterProfileExporter.cs`
-- `Packages/com.hidano.facialcontrol/Editor/Inspector/FacialCharacterProfileSOInspector.cs`
+### 新規追加 / 大きな変更
+- `FacialControl/Packages/com.hidano.facialcontrol.lipsync/Runtime/Resources/FacialControl/LipSync/Default uLipSync Profile.asset` (+ `.meta`)
+- `FacialControl/Packages/com.hidano.facialcontrol.lipsync/Runtime/Resources.meta`（+ 中間 2 フォルダ meta）
+- `FacialControl/Packages/com.hidano.facialcontrol.lipsync/CHANGELOG.md`（既定 Profile エントリ追加）
+- `FacialControl/Packages/com.hidano.facialcontrol.lipsync/README.md`（Samples 構成節を書き換え）
+- `FacialControl/Packages/com.hidano.facialcontrol.lipsync/Samples~/MicLipSyncDemo/README.md`、`AnimationClipLipSyncDemo/README.md`（Resources.Load フォールバック注記）
+- `.kiro/specs/ulipsync-adapter-package/tasks.md`（チェックボックス全件更新 + 1.1 / 10.2 注記）
+- `C:\Users\Hidano\.claude\CLAUDE.md`（Unity .meta GUID 規約追記、ユーザーによる）
 
-### 移動（inputsystem → core、GUID 保持）
-- `.../Runtime/Adapters/ScriptableObject/GazeBlendShapeSampleEntry.cs`
-- `.../Runtime/Adapters/Bone/GazeBonePoseProvider.cs`
-- `.../Editor/Sampling/GazeClipBlendShapeSampler.cs`
-- `.../Tests/EditMode/Editor/Sampling/GazeClipBlendShapeSamplerTests.cs`
+### Sample DemoProfile（参照書き換え）
+- `FacialControl/Packages/com.hidano.facialcontrol.lipsync/Samples~/MicLipSyncDemo/Profiles/MicLipSyncDemoProfile.asset`
+- `FacialControl/Packages/com.hidano.facialcontrol.lipsync/Samples~/AnimationClipLipSyncDemo/Profiles/AnimationClipLipSyncDemoProfile.asset`
+- `FacialControl/Assets/Samples/FacialControl uLipSync Adapter/0.1.0-preview.1/MicLipSyncDemo/Profiles/MicLipSyncDemoProfile.asset`（Sample Import 結果側の `_analyzerProfile` 同期更新）
 
-### 大幅修正
-- `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/ScriptableObject/GazeExpressionConfig.cs`（派生クラス化、5 行）
-- `Packages/com.hidano.facialcontrol.inputsystem/Editor/Inspector/FacialCharacterSOInspector.cs`（439 行）
-- `Packages/com.hidano.facialcontrol.inputsystem/Editor/AutoExport/FacialCharacterSOAutoExporter.cs`（core delegate 化）
-- `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/Input/FacialCharacterInputExtension.cs`（GazeBoneBinding 構築）
-- `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/ScriptableObject/FacialCharacterSO.cs`（using 追加）
+### 削除
+- `FacialControl/Packages/com.hidano.facialcontrol.lipsync/Samples~/MicLipSyncDemo/Profiles/MicLipSyncAnalyzerProfile.asset`（+ `.meta`）
+- `FacialControl/Packages/com.hidano.facialcontrol.lipsync/Samples~/AnimationClipLipSyncDemo/Profiles/AnimationClipLipSyncAnalyzerProfile.asset`（+ `.meta`）
+- `FacialControl/Assets/Samples/com.hidano.facialcontrol.lipsync/`（フォルダごと、`.meta` 含む）
+- `FacialControl/Assets/StreamingAssets/FacialControl/MicLipSyncDemoProfile/profile.json`（+ フォルダごと）
 
-### CHANGELOG
-- `Packages/com.hidano.facialcontrol/CHANGELOG.md`
-- `Packages/com.hidano.facialcontrol.inputsystem/CHANGELOG.md`
+### GUID 差し替え meta
+- `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Tests/PlayMode/Adapters/InputSources.meta`（衝突解消）
+- `FacialControl/Packages/com.hidano.facialcontrol.lipsync/Runtime/Resources.meta` ほか lipsync 側 meta 計 4 つ
