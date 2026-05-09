@@ -1,39 +1,15 @@
 {
-  "scopedRegistries": [
-    {
-      "name": "npmjs",
-      "url": "https://registry.npmjs.org",
-      "scopes": [
-        "com.hidano"
-      ]
-    },
-    {
-      "name": "package.openupm.com",
-      "url": "https://package.openupm.com",
-      "scopes": [
-        "jp.hadashikick.vcontainer"
-      ]
-    }
-  ],
   "dependencies": {
-    "com.hidano.facialcontrol": "file:com.hidano.facialcontrol",
-    "com.hidano.facialcontrol.osc": "file:com.hidano.facialcontrol.osc",
-    "com.hidano.facialcontrol.inputsystem": "file:com.hidano.facialcontrol.inputsystem",
-    "com.hidano.facialcontrol.lipsync": "file:com.hidano.facialcontrol.lipsync",
-    "jp.hadashikick.vcontainer": "1.17.0",
-    "com.hidano.scene-view-style-camera-controller": "1.0.0",
-    "com.hidano.ulipsync-asio": "3.1.5-custom.0",
-    "com.mikunote.hatsunemiku-sample": "git+ssh://git@github.com/NHidano/Mikunote_Models.git?path=/Mikunote_Models/Assets/HatsuneMiku_Sample",
-    "com.mikunote.magica-cloth-2": "git+ssh://git@github.com/NHidano/Mikunote_Models.git?path=/Mikunote_Models/Assets/MagicaCloth2",
+    "jp.co.unvgi.external.hadashikick.vcontainer": "1.17.0",
+    "jp.co.unvgi.scene-view-style-camera-controller": "1.0.0",
+    "jp.co.unvgi.ulipsync-asio": "3.1.5-custom.0",
     "com.unity.ai.assistant": "2.6.0-pre.1",
-    "com.unity.ide.rider": "3.0.38",
-    "com.unity.ide.visualstudio": "2.0.25",
+    "com.unity.ide.rider": "3.0.40",
     "com.unity.inputsystem": "1.17.0",
     "com.unity.render-pipelines.universal": "17.3.0",
     "com.unity.test-framework": "1.6.0",
     "com.unity.timeline": "1.8.9",
     "com.unity.ugui": "2.0.0",
-    "jp.lilxyzw.liltoon": "git+ssh://git@github.com/NHidano/Mikunote_Models.git?path=/Mikunote_Models/Packages/jp.lilxyzw.liltoon",
     "com.unity.modules.accessibility": "1.0.0",
     "com.unity.modules.adaptiveperformance": "1.0.0",
     "com.unity.modules.ai": "1.0.0",
@@ -68,5 +44,14 @@
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
     "com.unity.modules.xr": "1.0.0"
-  }
+  },
+  "scopedRegistries": [
+    {
+      "name": "UNVGI",
+      "url": "https://npm.unvgi.com",
+      "scopes": [
+        "jp.co.unvgi"
+      ]
+    }
+  ]
 }

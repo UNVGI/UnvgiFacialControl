@@ -1,17 +1,17 @@
 {
-  "name": "com.hidano.facialcontrol.lipsync",
+  "name": "jp.co.unvgi.facialcontrol.lipsync",
   "version": "0.1.0-preview.1",
   "displayName": "FacialControl uLipSync Adapter",
-  "description": "FacialControl の uLipSync 連携アダプタ。Windows 環境で com.hidano.facialcontrol と com.hidano.ulipsync-asio を橋渡しし、uLipSync 解析結果を FacialControl の lipsync 入力ソースへ変換します。",
+  "description": "FacialControl の uLipSync 連携アダプタ。Windows 環境で jp.co.unvgi.facialcontrol と jp.co.unvgi.ulipsync-asio を橋渡しし、uLipSync 解析結果を FacialControl の lipsync 入力ソースへ変換します。",
   "unity": "6000.3",
   "unityRelease": "2f1",
   "license": "MIT",
   "author": {
-    "name": "Hidano"
+    "name": "UNVGI Inc."
   },
   "dependencies": {
-    "com.hidano.facialcontrol": "0.1.0-preview.2",
-    "com.hidano.ulipsync-asio": "3.1.5-custom.2"
+    "jp.co.unvgi.facialcontrol": "0.1.0-preview.14",
+    "jp.co.unvgi.ulipsync-asio": "3.1.5-custom.2"
   },
   "keywords": [
     "facial",
