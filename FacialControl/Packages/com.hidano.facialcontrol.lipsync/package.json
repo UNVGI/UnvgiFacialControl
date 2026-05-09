@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "com.hidano.facialcontrol": "0.1.0-preview.2",
-    "com.hidano.ulipsync-asio": "3.1.5-custom.0"
+    "com.hidano.ulipsync-asio": "3.1.5-custom.2"
   },
   "keywords": [
     "facial",
