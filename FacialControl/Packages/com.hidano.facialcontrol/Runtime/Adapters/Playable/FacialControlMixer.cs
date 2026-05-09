@@ -50,14 +50,7 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         private void InitializeOutputBuffer()
         {
-            if (_baseExpressionValues != null && _baseExpressionValues.Length >= _blendShapeCount)
-            {
-                Array.Copy(_baseExpressionValues, _outputBuffer, _blendShapeCount);
-            }
-            else
-            {
-                Array.Clear(_outputBuffer, 0, _blendShapeCount);
-            }
+            Array.Copy(_baseExpressionValues, _outputBuffer, _blendShapeCount);
         }
 
         private void CopyOutputBufferToNativeArray()
@@ -389,13 +382,12 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         private void BuildBaseExpressionValues()
         {
-            _baseExpressionValues = null;
+            _baseExpressionValues = new float[_blendShapeCount];
             if (_characterProfile == null || _blendShapeCount == 0)
             {
                 return;
             }
 
-            _baseExpressionValues = new float[_blendShapeCount];
             var baseExpression = _characterProfile.BaseExpression;
             if (baseExpression == null || baseExpression.animationClip == null)
             {
