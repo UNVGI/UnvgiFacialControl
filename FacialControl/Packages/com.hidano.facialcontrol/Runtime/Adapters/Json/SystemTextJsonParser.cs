@@ -110,6 +110,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 dto.rendererPaths = new List<string>();
             if (dto.gazeConfigs == null)
                 dto.gazeConfigs = new List<GazeBindingConfigDto>();
+            dto.baseExpression = NormalizeExpressionSnapshotDto(dto.baseExpression);
 
             for (int i = 0; i < dto.expressions.Count; i++)
             {
@@ -120,28 +121,31 @@ namespace Hidano.FacialControl.Adapters.Json
                 if (expr.layerOverrideMask == null)
                     expr.layerOverrideMask = new List<string>();
 
-                if (expr.snapshot == null)
-                {
-                    expr.snapshot = new ExpressionSnapshotDto
-                    {
-                        transitionDuration = Expression.DefaultTransitionDuration,
-                        transitionCurvePreset = "Linear",
-                        blendShapes = new List<BlendShapeSnapshotDto>(),
-                        bones = new List<BoneSnapshotDto>(),
-                        rendererPaths = new List<string>(),
-                    };
-                    continue;
-                }
-
-                if (string.IsNullOrEmpty(expr.snapshot.transitionCurvePreset))
-                    expr.snapshot.transitionCurvePreset = "Linear";
-                if (expr.snapshot.blendShapes == null)
-                    expr.snapshot.blendShapes = new List<BlendShapeSnapshotDto>();
-                if (expr.snapshot.bones == null)
-                    expr.snapshot.bones = new List<BoneSnapshotDto>();
-                if (expr.snapshot.rendererPaths == null)
-                    expr.snapshot.rendererPaths = new List<string>();
+                expr.snapshot = NormalizeExpressionSnapshotDto(expr.snapshot);
             }
+        }
+
+        private static ExpressionSnapshotDto NormalizeExpressionSnapshotDto(ExpressionSnapshotDto snapshot)
+        {
+            if (snapshot == null)
+            {
+                snapshot = new ExpressionSnapshotDto
+                {
+                    transitionDuration = Expression.DefaultTransitionDuration,
+                    transitionCurvePreset = "Linear",
+                };
+            }
+
+            if (string.IsNullOrEmpty(snapshot.transitionCurvePreset))
+                snapshot.transitionCurvePreset = "Linear";
+            if (snapshot.blendShapes == null)
+                snapshot.blendShapes = new List<BlendShapeSnapshotDto>();
+            if (snapshot.bones == null)
+                snapshot.bones = new List<BoneSnapshotDto>();
+            if (snapshot.rendererPaths == null)
+                snapshot.rendererPaths = new List<string>();
+
+            return snapshot;
         }
 
         // preview 破壊的変更 (D-5, Req 3.2): inputSources は必須フィールド。欠落 / 空配列はエラー。
@@ -234,6 +238,7 @@ namespace Hidano.FacialControl.Adapters.Json
         public string SerializeProfile(FacialProfile profile)
         {
             var dto = ConvertToProfileSnapshotDto(profile);
+            NormalizeProfileSnapshotDto(dto);
             var raw = JsonUtility.ToJson(dto, true);
             return PostprocessInputSourceOptions(PostprocessGazeConfigsKey(raw));
         }
@@ -250,6 +255,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 throw new ArgumentNullException(nameof(dto));
             if (string.IsNullOrEmpty(dto.schemaVersion))
                 dto.schemaVersion = SchemaVersionV2;
+            NormalizeProfileSnapshotDto(dto);
             var raw = JsonUtility.ToJson(dto, true);
             return PostprocessInputSourceOptions(PostprocessGazeConfigsKey(raw));
         }
