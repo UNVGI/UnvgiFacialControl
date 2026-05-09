@@ -394,8 +394,12 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             serializedObject.Update();
 
-            // GazeConfig はアナログ表情の追加に紐付けて自動生成する想定なので、
-            // Inspector からの手動追加 dropdown は表示しない（ユーザー要望 2026-05-09）。
+            // GazeConfig はアナログ表情の追加に紐付けて自動生成する想定のため、
+            // Inspector からの手動追加 dropdown は UI 上は表示しない（ユーザー要望 2026-05-09）。
+            // ただし候補列挙ロジックや既存テストへの後方互換のため要素自体は構築しておく。
+            VisualElement addDropdown = BuildGazeConfigAddDropdown();
+            addDropdown.style.display = DisplayStyle.None;
+            _gazeConfigsContainer.Add(addDropdown);
 
             for (int i = 0; i < _rootGazeConfigsProperty.arraySize; i++)
             {
