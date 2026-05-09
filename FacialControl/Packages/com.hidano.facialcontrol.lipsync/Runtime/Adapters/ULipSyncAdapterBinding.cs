@@ -12,8 +12,10 @@ namespace Hidano.FacialControl.LipSync.Adapters
 {
     [Serializable]
     [FacialAdapterBinding(displayName: "uLipSync")]
-    public sealed class ULipSyncAdapterBinding : AdapterBindingBase
+    public sealed class ULipSyncAdapterBinding : AdapterBindingBase, IAdapterBindingInitialDefaults
     {
+        private static readonly string[] DefaultPhonemeIds = { "A", "I", "U", "E", "O" };
+
         private const string DefaultSlug = "ulipsync";
         private const string DefaultProfileResourcePath =
             "FacialControl/LipSync/Default uLipSync Profile";
@@ -87,6 +89,32 @@ namespace Hidano.FacialControl.LipSync.Adapters
         public ULipSyncAdapterBinding()
         {
             Slug = DefaultSlug;
+        }
+
+        /// <summary>
+        /// Inspector で binding を新規追加した直後に呼ばれ、
+        /// AIUEO 5 音素分の <see cref="BlendShapePhonemeEntry"/> をプリセットする。
+        /// </summary>
+        public void ApplyInitialDefaults()
+        {
+            if (_phonemeEntries == null)
+            {
+                _phonemeEntries = new List<PhonemeEntryBase>(DefaultPhonemeIds.Length);
+            }
+
+            if (_phonemeEntries.Count > 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < DefaultPhonemeIds.Length; i++)
+            {
+                _phonemeEntries.Add(new BlendShapePhonemeEntry
+                {
+                    PhonemeId = DefaultPhonemeIds[i],
+                    MaxWeight = 100f,
+                });
+            }
         }
 
         public uLipSync.uLipSync Analyzer => _analyzer;
@@ -370,7 +398,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
                     if (entry is AnimationClipPhonemeEntry animationEntry
                         && TryFillAnimationClipSnapshot(
                             animationEntry,
-                            targetRenderer,
+                            renderers,
                             savedWeights,
                             ctx,
                             weights))
@@ -415,7 +443,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
         private bool TryFillAnimationClipSnapshot(
             AnimationClipPhonemeEntry entry,
-            SkinnedMeshRenderer targetRenderer,
+            SkinnedMeshRenderer[] renderers,
             SavedBlendShapeWeights[] savedWeights,
             in AdapterBuildContext ctx,
             float[] weights)
@@ -427,7 +455,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 return false;
             }
 
-            if (targetRenderer == null || targetRenderer.sharedMesh == null)
+            if (renderers == null || renderers.Length == 0)
             {
                 Debug.LogWarning(
                     $"[ULipSyncAdapterBinding] No SkinnedMeshRenderer was found for phoneme '{entry.PhonemeId}'.");
@@ -437,14 +465,25 @@ namespace Hidano.FacialControl.LipSync.Adapters
             ClearBlendShapeWeights(savedWeights);
             entry.Clip.SampleAnimation(ctx.HostGameObject, 0f);
 
-            Mesh mesh = targetRenderer.sharedMesh;
             float scale = NormalizeWeight(entry.MaxWeight);
             for (int i = 0; i < ctx.BlendShapeNames.Count; i++)
             {
-                int meshIndex = mesh.GetBlendShapeIndex(ctx.BlendShapeNames[i]);
-                if (meshIndex >= 0)
+                string bsName = ctx.BlendShapeNames[i];
+                for (int r = 0; r < renderers.Length; r++)
                 {
-                    weights[i] = Mathf.Clamp01((targetRenderer.GetBlendShapeWeight(meshIndex) / 100f) * scale);
+                    SkinnedMeshRenderer renderer = renderers[r];
+                    if (renderer == null || renderer.sharedMesh == null)
+                    {
+                        continue;
+                    }
+
+                    int meshIndex = renderer.sharedMesh.GetBlendShapeIndex(bsName);
+                    if (meshIndex >= 0)
+                    {
+                        weights[i] = Mathf.Clamp01(
+                            (renderer.GetBlendShapeWeight(meshIndex) / 100f) * scale);
+                        break;
+                    }
                 }
             }
 

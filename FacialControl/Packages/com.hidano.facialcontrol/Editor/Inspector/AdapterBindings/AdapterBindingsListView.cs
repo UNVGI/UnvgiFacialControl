@@ -108,6 +108,10 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
 
             var instance = (AdapterBindingBase)Activator.CreateInstance(descriptor.Type);
             instance.Slug = AdapterSlug.FromDisplayName(descriptor.OriginalDisplayName).Value;
+            if (instance is IAdapterBindingInitialDefaults initial)
+            {
+                initial.ApplyInitialDefaults();
+            }
 
             var list = ResolveUnderlyingList();
             if (list == null) return;

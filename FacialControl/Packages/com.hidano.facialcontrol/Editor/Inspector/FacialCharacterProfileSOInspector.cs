@@ -150,6 +150,10 @@ namespace Hidano.FacialControl.Editor.Inspector
                 root.styleSheets.Add(styleSheet);
             }
 
+            // BuildLayersSection は内部で MaskField の choices を _layerNameChoices から構築する。
+            // そのため先に RefreshLayerNameChoices() を呼んで候補を確定させてから section を構築する。
+            RefreshLayerNameChoices();
+
             BuildSaveStatusBar(root);
             BuildReferenceModelSection(root);
             BuildLayersSection(root);
@@ -158,7 +162,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             BuildAdapterBindingsSection(root);
             BuildDebugSection(root);
 
-            RefreshLayerNameChoices();
             UpdateValidation();
             UpdateDebugLabels();
             RebuildExpressionIdMapping();
@@ -391,7 +394,8 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             serializedObject.Update();
 
-            _gazeConfigsContainer.Add(BuildGazeConfigAddDropdown());
+            // GazeConfig はアナログ表情の追加に紐付けて自動生成する想定なので、
+            // Inspector からの手動追加 dropdown は表示しない（ユーザー要望 2026-05-09）。
 
             for (int i = 0; i < _rootGazeConfigsProperty.arraySize; i++)
             {
@@ -465,7 +469,11 @@ namespace Hidano.FacialControl.Editor.Inspector
             header.style.alignItems = Align.Center;
             header.style.marginBottom = 4;
 
-            var expressionNameLabel = new Label(FindExpressionNameById(expressionId))
+            string resolvedName = FindExpressionNameById(expressionId);
+            string headerLabelText = string.IsNullOrEmpty(resolvedName)
+                ? "Expression 名: <未設定>"
+                : $"Expression 名: {resolvedName}";
+            var expressionNameLabel = new Label(headerLabelText)
             {
                 name = GazeConfigExpressionNameLabelName,
                 tooltip = expressionId,
@@ -973,6 +981,9 @@ namespace Hidano.FacialControl.Editor.Inspector
             {
                 var nameField = new TextField("名前");
                 nameField.SetValueWithoutNotify(nameProp.stringValue ?? string.Empty);
+                // 1 文字ごとに RebuildLayersUI を呼ぶとフォーカスが外れるため、
+                // SerializedProperty の更新だけ value change で行い、候補リスト同期と
+                // UI 再構築はフォーカスアウト時にまとめて実施する。
                 nameField.RegisterValueChangedCallback(evt =>
                 {
                     serializedObject.Update();
@@ -981,10 +992,13 @@ namespace Hidano.FacialControl.Editor.Inspector
                     {
                         p.stringValue = evt.newValue ?? string.Empty;
                         serializedObject.ApplyModifiedProperties();
-                        // レイヤー名は他レイヤーの「上書き対象」候補にも影響するため全体を再構築する
-                        RefreshLayerNameChoices();
-                        RebuildLayersUI();
                     }
+                });
+                nameField.RegisterCallback<BlurEvent>(_ =>
+                {
+                    // レイヤー名は他レイヤーの「上書き対象」候補にも影響するため全体を再構築する
+                    RefreshLayerNameChoices();
+                    RebuildLayersUI();
                 });
                 card.Add(nameField);
             }
@@ -1014,22 +1028,23 @@ namespace Hidano.FacialControl.Editor.Inspector
                 card.Add(modeField);
             }
 
+            // LayerOverrideMask: このレイヤーがアクティブな間に上書きする他レイヤー
+            // 「排他モード」と一緒に管理する設定なので、入力源より上に配置する。
+            var maskHelp = MakeHelpBox(
+                "このレイヤーがアクティブな間、合成時に上書き対象とするレイヤーを選択します。"
+                + "Nothing を選んだ場合はこのレイヤーは他レイヤーに何も上書きしません。");
+            card.Add(maskHelp);
+
+            var maskContainer = new VisualElement { name = $"layer-mask-container-{layerIndex}" };
+            card.Add(maskContainer);
+            RebuildLayerOverrideMaskFieldInto(maskContainer, layerIndex);
+
             if (inputSourcesProp != null)
             {
                 var inputSourcesField = new PropertyField(inputSourcesProp, "入力源");
                 inputSourcesField.Bind(serializedObject);
                 card.Add(inputSourcesField);
             }
-
-            // LayerOverrideMask: このレイヤーがアクティブな間に上書きする他レイヤー
-            var maskHelp = MakeHelpBox(
-                "このレイヤーがアクティブな間、合成時に上書き対象とするレイヤーを選択します。"
-                + "通常は自レイヤーを必ず含めます。");
-            card.Add(maskHelp);
-
-            var maskContainer = new VisualElement { name = $"layer-mask-container-{layerIndex}" };
-            card.Add(maskContainer);
-            RebuildLayerOverrideMaskFieldInto(maskContainer, layerIndex);
 
             // 表情リスト
             var expressionHeader = new Label("表情");
@@ -1809,21 +1824,8 @@ namespace Hidano.FacialControl.Editor.Inspector
                 }
             }
 
-            // 各 Layer のマスク空チェック
-            if (_layersProperty != null)
-            {
-                for (int i = 0; i < _layersProperty.arraySize; i++)
-                {
-                    var l = _layersProperty.GetArrayElementAtIndex(i);
-                    var maskP = l.FindPropertyRelative("layerOverrideMask");
-                    if (maskP != null && maskP.isArray && maskP.arraySize == 0)
-                    {
-                        var nameP = l.FindPropertyRelative("name");
-                        var lname = nameP != null ? nameP.stringValue : $"layer{i}";
-                        errors.Add($"レイヤー '{lname}' の上書き対象が未設定です。");
-                    }
-                }
-            }
+            // layerOverrideMask が空（= Nothing）はユーザーの明示的な選択として
+            // 「このレイヤーは他レイヤーに何も上書きしない」と扱うため、警告にしない。
 
             // AnimationClip null タリー (kind=Digital のみ。Analog は AnimationClip 任意)
             int nullClipCount = 0;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Hidano.FacialControl.Editor.Common;
 using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -36,6 +37,22 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             AnimationClipLabel,
         };
 
+        private static readonly List<string> PhonemeIdChoices = new List<string>
+        {
+            "A",
+            "I",
+            "U",
+            "E",
+            "O",
+        };
+
+        private const string PhonemeIdTooltip =
+            "uLipSync が出力する音素 ID。AIUEO の 5 候補から選択します。";
+
+        private const string MaxWeightTooltip =
+            "音素の最大ウェイト (0〜100)。BlendShape 値の最大値に対する % スケールとして適用され、"
+            + "100 で frame 0 のフル値、50 で半量となります。";
+
         private readonly SerializedProperty _listProperty;
         private readonly List<int> _indexProxy = new List<int>();
         private readonly ListView _listView;
@@ -71,6 +88,7 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             };
             _listView.style.marginTop = 4;
             _listView.style.minHeight = 96f;
+            _listView.SetViewController(new SafeListViewController());
             _listView.overridingAddButtonBehavior = (_, button) => OpenAddMenu(button);
             _listView.itemsAdded += OnItemsAdded;
             _listView.itemsRemoved += OnItemsRemoved;
@@ -256,8 +274,57 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
 
         private static void AddCommonFields(VisualElement row, SerializedProperty entryProperty)
         {
-            AddTextField(row, entryProperty, PhonemeIdFieldName, "音素 ID");
-            AddFloatField(row, entryProperty, MaxWeightFieldName, "Max Weight");
+            AddPhonemeIdDropdown(row, entryProperty);
+            AddMaxWeightField(row, entryProperty);
+        }
+
+        private static void AddPhonemeIdDropdown(VisualElement row, SerializedProperty entryProperty)
+        {
+            SerializedProperty property = entryProperty.FindPropertyRelative(PhonemeIdFieldName);
+            if (property == null)
+            {
+                row.Add(new Label($"<missing field: {PhonemeIdFieldName}>"));
+                return;
+            }
+
+            string current = property.stringValue ?? string.Empty;
+            var choices = new List<string>(PhonemeIdChoices.Count + 1) { string.Empty };
+            choices.AddRange(PhonemeIdChoices);
+            // 既存値が一覧外の場合は失わないよう末尾に追加して選択保持する。
+            if (!string.IsNullOrEmpty(current) && !choices.Contains(current))
+            {
+                choices.Add(current);
+            }
+
+            var field = new DropdownField("音素 ID", choices, current)
+            {
+                tooltip = PhonemeIdTooltip,
+            };
+            field.RegisterValueChangedCallback(evt =>
+            {
+                SerializedObject so = property.serializedObject;
+                so.Update();
+                property.stringValue = evt.newValue ?? string.Empty;
+                so.ApplyModifiedProperties();
+            });
+            row.Add(field);
+        }
+
+        private static void AddMaxWeightField(VisualElement row, SerializedProperty entryProperty)
+        {
+            SerializedProperty property = entryProperty.FindPropertyRelative(MaxWeightFieldName);
+            if (property == null)
+            {
+                row.Add(new Label($"<missing field: {MaxWeightFieldName}>"));
+                return;
+            }
+
+            var field = new FloatField("Max Weight")
+            {
+                tooltip = MaxWeightTooltip,
+            };
+            field.BindProperty(property);
+            row.Add(field);
         }
 
         private static void AddBlendShapeFields(VisualElement row, SerializedProperty entryProperty)
@@ -345,7 +412,6 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             foreach (int index in indices)
             {
                 AddEntry(EntryKind.BlendShape, index);
-                break;
             }
         }
 
@@ -375,7 +441,29 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
 
             serializedObject.Update();
             RebuildIndexProxy(_indexProxy, GetListProperty());
+            ClampSelection();
             _listView?.Rebuild();
+        }
+
+        private void ClampSelection()
+        {
+            if (_listView == null)
+            {
+                return;
+            }
+
+            int count = _indexProxy.Count;
+            if (count == 0)
+            {
+                _listView.ClearSelection();
+                return;
+            }
+
+            int selected = _listView.selectedIndex;
+            if (selected < 0 || selected >= count)
+            {
+                _listView.ClearSelection();
+            }
         }
 
         private SerializedProperty GetListProperty()
