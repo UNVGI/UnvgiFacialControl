@@ -61,6 +61,29 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         }
 
         [Test]
+        public void ContributeMask_Length_MatchesBlendShapeCount()
+        {
+            IInputSource source = new NoOpInvalidInputSource("input", InputSourceType.ExpressionTrigger, 52);
+
+            Assert.IsNotNull(source.ContributeMask);
+            Assert.AreEqual(source.BlendShapeCount, source.ContributeMask.Length);
+        }
+
+        [Test]
+        public void ContributeMask_Length_RemainsStableForSameSource()
+        {
+            IInputSource source = new NoOpInvalidInputSource("input", InputSourceType.ValueProvider, 4);
+            int initialLength = source.ContributeMask.Length;
+            Span<float> output = stackalloc float[4];
+
+            source.Tick(0.016f);
+            source.TryWriteValues(output);
+
+            Assert.AreEqual(source.BlendShapeCount, initialLength);
+            Assert.AreEqual(initialLength, source.ContributeMask.Length);
+        }
+
+        [Test]
         public void Tick_IsInvocableWithZeroDeltaTime()
         {
             var fake = new NoOpInvalidInputSource("osc", InputSourceType.ValueProvider, 4);

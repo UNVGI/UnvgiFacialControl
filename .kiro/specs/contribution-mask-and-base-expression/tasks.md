@@ -223,7 +223,7 @@
 
 ## 10. Validation: emotion + lipsync 統合テストと契約テスト追補
 
-- [ ] 10.1 IInputSource 契約テストに ContributeMask の不変条件を追加する
+- [x] 10.1 IInputSource 契約テストに ContributeMask の不変条件を追加する
   - `IInputSourceContractTests` に「`ContributeMask.Length == BlendShapeCount`」「同一 source の `ContributeMask` Length は不変」 を追加する
   - 観測可能な完了条件: 契約テストが green、 違反する fake は失敗する形で検出可能になる
   - _Requirements: 1.1, 1.7, 1.8_
