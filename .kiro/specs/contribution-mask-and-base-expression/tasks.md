@@ -135,7 +135,7 @@
 
 ## 6. Adapters: Playable 経路再配線と Mixer base 初期化
 
-- [ ] 6.1 Mixer の BaseExpression 初期化を red テストで定義する
+- [x] 6.1 Mixer の BaseExpression 初期化を red テストで定義する
   - `FacialControlMixerBaseExpressionTests` (新設、 EditMode) に「BaseExpression の AnimationClip null → 出力バッファが全 0 で初期化 (現状互換)」「BaseExpression に値あり → 出力バッファが per-blendshape weight で初期化」「全 layer mask が false の index は base 値が出力に残る」 を red で追加する (R10.4, R10.5)
   - 観測可能な完了条件: 追加テストが現実装で red になる
   - _Requirements: 5.1, 5.2, 5.3, 10.4, 10.5_
