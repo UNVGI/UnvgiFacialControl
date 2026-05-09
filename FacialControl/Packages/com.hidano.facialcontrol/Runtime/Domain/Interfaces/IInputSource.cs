@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using Hidano.FacialControl.Domain.Models;
 
 namespace Hidano.FacialControl.Domain.Interfaces
@@ -56,5 +57,15 @@ namespace Hidano.FacialControl.Domain.Interfaces
         /// <param name="output">書込先バッファ。<c>Length &gt; 0</c>。長さ不足時は overlap のみ書込む。</param>
         /// <returns>有効なら true、無効/未接続なら false（false の場合 <paramref name="output"/> は変更されない）。</returns>
         bool TryWriteValues(Span<float> output);
+
+        /// <summary>
+        /// この入力源が contribute する BlendShape index 集合。
+        /// </summary>
+        /// <remarks>
+        /// 返される <see cref="BitArray"/> は事前確保済み参照であり、<see cref="BitArray.Length"/> は
+        /// <see cref="BlendShapeCount"/> と一致する。UnityEngine 型を含めず、実行中に新規確保しない。
+        /// <see cref="TryWriteValues"/> が false を返す場合でも、構造上の contribute 集合として返す。
+        /// </remarks>
+        BitArray ContributeMask { get; }
     }
 }
