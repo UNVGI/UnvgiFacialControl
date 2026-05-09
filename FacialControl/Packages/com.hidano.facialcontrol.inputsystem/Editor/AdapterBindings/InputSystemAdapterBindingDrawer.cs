@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Hidano.FacialControl.Adapters.AdapterBindings.InputSystem;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Editor.Common;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine.InputSystem;
@@ -162,6 +163,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             };
             listView.style.marginTop = 4;
             listView.style.minHeight = 80f;
+            listView.SetViewController(new SafeListViewController());
 
             listView.itemsAdded += indices =>
             {
@@ -174,6 +176,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 arr.arraySize += addCount;
                 so.ApplyModifiedProperties();
                 RebuildIndexProxy(indexProxy, arr);
+                listView.ClearSelection();
                 listView.Rebuild();
             };
             listView.itemsRemoved += indices =>
@@ -194,6 +197,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 }
                 so.ApplyModifiedProperties();
                 RebuildIndexProxy(indexProxy, arr);
+                listView.ClearSelection();
                 listView.Rebuild();
             };
 
@@ -236,6 +240,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             };
             listView.style.marginTop = 4;
             listView.style.minHeight = 72f;
+            listView.SetViewController(new SafeListViewController());
 
             listView.itemsAdded += indices =>
             {
@@ -255,6 +260,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
 
                 so.ApplyModifiedProperties();
                 RebuildIndexProxy(indexProxy, arr);
+                listView.ClearSelection();
                 listView.Rebuild();
             };
             listView.itemsRemoved += indices =>
@@ -275,6 +281,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 }
                 so.ApplyModifiedProperties();
                 RebuildIndexProxy(indexProxy, arr);
+                listView.ClearSelection();
                 listView.Rebuild();
             };
 
@@ -354,6 +361,11 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 var safeChoices = BuildSafeChoices(expressionChoices, expressionIdProp.stringValue);
                 expressionDropdown.choices = safeChoices;
                 expressionDropdown.SetValueWithoutNotify(expressionIdProp.stringValue ?? string.Empty);
+                // 内部値は expressionId（hash 文字列）のままで保存し、表示だけ Expression.name に変換する。
+                expressionDropdown.formatListItemCallback =
+                    id => FormatExpressionDropdownLabel(bindingProperty, id);
+                expressionDropdown.formatSelectedValueCallback =
+                    id => FormatExpressionDropdownLabel(bindingProperty, id);
                 expressionDropdown.RegisterValueChangedCallback(evt =>
                 {
                     var so = bindingProperty.serializedObject;
@@ -541,6 +553,47 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 if (!string.IsNullOrEmpty(id)) result.Add(id);
             }
             return result;
+        }
+
+        /// <summary>
+        /// dropdown の表示ラベルを「表情名 (なければ id 短縮)」に整形する。
+        /// 内部に保存される値は expressionId（hash 文字列）のままで触らない。
+        /// </summary>
+        private static string FormatExpressionDropdownLabel(
+            SerializedProperty bindingProperty, string expressionId)
+        {
+            if (string.IsNullOrEmpty(expressionId))
+            {
+                return string.Empty;
+            }
+
+            var so = bindingProperty.serializedObject;
+            if (!(so.targetObject is FacialCharacterProfileSO profileSo))
+            {
+                return expressionId;
+            }
+
+            var expressions = profileSo.Expressions;
+            if (expressions == null)
+            {
+                return expressionId;
+            }
+
+            for (int i = 0; i < expressions.Count; i++)
+            {
+                var e = expressions[i];
+                if (e == null) continue;
+                if (!string.Equals(e.id, expressionId, StringComparison.Ordinal)) continue;
+
+                if (!string.IsNullOrEmpty(e.name))
+                {
+                    return e.name;
+                }
+                break;
+            }
+
+            // 名前が空 / 候補から外れた id は判別性のため短縮表示。
+            return expressionId.Length <= 8 ? expressionId : expressionId.Substring(0, 8) + "…";
         }
 
         private static List<string> CollectGazeConfigExpressionIds(SerializedProperty bindingProperty)

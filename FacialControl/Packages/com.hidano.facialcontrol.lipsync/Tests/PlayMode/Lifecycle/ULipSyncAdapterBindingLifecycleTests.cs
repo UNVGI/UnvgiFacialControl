@@ -233,27 +233,26 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
         }
 
         [Test]
-        public void OnStart_AnalyzerProfileMissing_LogsErrorAndRollsBack()
+        public void OnStart_AnalyzerProfileMissing_UsesPackagedDefaultProfile()
         {
             _binding = CreateBinding(MicDeviceName, null);
             AdapterBuildContext ctx = CreateContext();
 
-            LogAssert.Expect(
-                LogType.Error,
-                new Regex("ULipSyncAdapterBinding.*Analyzer profile.*default profile.*could not be loaded"));
             _binding.OnStart(in ctx);
+            _bindingStarted = true;
 
-            Assert.That(_binding.IsStarted, Is.False);
-            Assert.That(_binding.Provider, Is.Null);
-            Assert.That(_binding.InputSource, Is.Null);
-            Assert.That(_binding.Analyzer, Is.Null);
-            Assert.That(_hostGameObject.GetComponent<AudioSource>(), Is.Null);
-            Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSync>(), Is.Null);
-            Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncMicrophone>(), Is.Null);
+            Assert.That(_binding.IsStarted, Is.True);
+            Assert.That(_binding.Provider, Is.Not.Null);
+            Assert.That(_binding.InputSource, Is.Not.Null);
+            Assert.That(_binding.Analyzer, Is.Not.Null);
+            Assert.That(_binding.Analyzer.profile, Is.Not.Null);
+            Assert.That(_binding.Analyzer.profile.name, Is.EqualTo("Default uLipSync Profile"));
+            Assert.That(_hostGameObject.GetComponent<AudioSource>(), Is.Not.Null);
+            Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSync>(), Is.Not.Null);
+            Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncMicrophone>(), Is.Not.Null);
             Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncAsioInput>(), Is.Null);
-            Assert.That(_registry.TryResolve(Slug, out var source), Is.False);
-            Assert.That(source, Is.Null);
-            CollectionAssert.DoesNotContain(_registry.RegisteredIds, Slug);
+            Assert.That(_registry.TryResolve(Slug, out IInputSource source), Is.True);
+            Assert.That(source, Is.SameAs(_binding.InputSource));
         }
 
         [Test]

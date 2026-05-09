@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
@@ -37,6 +38,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             {
                 Id = id;
                 BlendShapeCount = blendShapeCount;
+                ContributeMask = ContributeMaskTestHelper.AllSetContributeMask(blendShapeCount);
                 _value = value;
                 _isValid = isValid;
             }
@@ -44,6 +46,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             public string Id { get; }
             public InputSourceType Type => InputSourceType.ValueProvider;
             public int BlendShapeCount { get; }
+            public BitArray ContributeMask { get; }
 
             public int TickCallCount { get; private set; }
 
@@ -269,6 +272,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             {
                 Id = id;
                 BlendShapeCount = blendShapeCount;
+                ContributeMask = ContributeMaskTestHelper.AllSetContributeMask(blendShapeCount);
                 _writeLength = writeLength;
                 _value = value;
             }
@@ -276,6 +280,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             public string Id { get; }
             public InputSourceType Type => InputSourceType.ValueProvider;
             public int BlendShapeCount { get; }
+            public BitArray ContributeMask { get; }
 
             public void Tick(float deltaTime) { }
 
@@ -569,6 +574,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             {
                 Id = id;
                 BlendShapeCount = blendShapeCount;
+                ContributeMask = ContributeMaskTestHelper.AllSetContributeMask(blendShapeCount);
                 _value = value;
                 IsValid = initialValid;
             }
@@ -576,6 +582,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             public string Id { get; }
             public InputSourceType Type => InputSourceType.ValueProvider;
             public int BlendShapeCount { get; }
+            public BitArray ContributeMask { get; }
             public bool IsValid { get; set; }
 
             public void Tick(float deltaTime) { }

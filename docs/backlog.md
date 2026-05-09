@@ -46,6 +46,18 @@
 - **トリガ**: preview.1 リリース前の最終レビュー
 - **影響範囲**: 動作確認のみ（コード変更なし）
 
+### S-8: AdapterBinding Slug 編集 UI のドロップダウン化検討
+- **出典**: ユーザー報告（2026-05-09）「Slugも選択肢が限られるならテキストボックスではなくドロップダウンに変更」
+- **内容**: ULipSync など 1 binding type に対しては基本 1 つ slug があれば足りるが、同 binding type を複数装着するケースでは slug が重複してはいけないため、固定候補ドロップダウンに置き換えると衝突回避が困難になる。「default 値（"ulipsync" など）を candidate に持つドロップダウン + 任意入力できる手動 override テキスト」の二段 UI（DeviceDescriptorPopup と同じパターン）に揃えるのが落とし所。
+- **トリガ**: 複数 ULipSyncAdapterBinding を 1 SO に同時搭載する利用シナリオが発生したとき / Inspector UX 全体の整理タイミング
+- **影響範囲**: `Editor/Inspector/ULipSyncAdapterBindingDrawer.cs`、他 adapter binding drawer
+
+### S-7: アナログ入力 Weight 値による Expression Lerp 駆動
+- **出典**: ユーザー報告（2026-05-09）「目線操作以外のアナログ操作のExpressionが意図した動作になっていない」
+- **内容**: 現状、`ExpressionInputSourceAdapter` は Hold/Toggle 二値で Expression を on/off するため、controller のアナログトリガー（0.0〜1.0）を握っても expression weight は遷移時間ベースで一定速度進行してしまう。ユーザー要求は「InputAction の analog value がそのまま無入力↔押し切りの Lerp 値になる」挙動。実装には (1) `ExpressionTriggerInputSource` への continuous-weight API 追加、(2) `InputSystemAdapterBinding` に gaze 用とは別の "analog expression bindings" リスト追加、(3) `InputSystemAdapterBindingDrawer` の対応 UI、(4) `OnLateTick` での毎フレーム value→weight 反映、が必要で 1 PR の規模を超える。
+- **トリガ**: コントローラー操作のテストでアナログ表情を扱うシナリオが必須になったとき / preview.1 リリース前の機能完成度レビュー
+- **影響範囲**: `Runtime/Adapters/InputSources/ExpressionInputSourceAdapter.cs`, `ExpressionTriggerInputSource.cs`, `InputSystemAdapterBinding.cs`, `Editor/AdapterBindings/InputSystemAdapterBindingDrawer.cs`, 対応 EditMode/PlayMode テスト
+
 ### S-6: core package.json への VContainer dependency 宣言検討
 - **出典**: [`.kiro/specs/adapter-binding-architecture/spec.json`](../.kiro/specs/adapter-binding-architecture/spec.json) `completion_summary.follow_ups_in_backlog`
 - **内容**: `Packages/com.hidano.facialcontrol/package.json` の `dependencies` に `jp.hadashikick.vcontainer` が宣言されていない。dev project の `manifest.json` 経由でのみ scoped registry 解決されている状態。UPM 経由で core を install するエンジニアの環境では VContainer が自動で入らないため、README / package.json のいずれかでサイドバイサイド導入手順を明示する必要がある。npmjs publish 直前にやり方を確定（package.json `dependencies` に追加 vs README の手動 OpenUPM 設定説明）する。

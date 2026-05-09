@@ -110,7 +110,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             var row = root.Q<VisualElement>(FacialCharacterProfileSOInspector.GazeConfigRowName);
 
             Assert.That(row, Is.Not.Null);
-            Assert.That(row.Q<Label>(FacialCharacterProfileSOInspector.GazeConfigExpressionNameLabelName)?.text, Is.EqualTo("Analog One"));
+            Assert.That(row.Q<Label>(FacialCharacterProfileSOInspector.GazeConfigExpressionNameLabelName)?.text, Is.EqualTo("Expression 名: Analog One"));
             Assert.That(row.Q<TextField>(FacialCharacterProfileSOInspector.GazeConfigLeftBonePathFieldName), Is.Not.Null);
             Assert.That(row.Q<TextField>(FacialCharacterProfileSOInspector.GazeConfigRightBonePathFieldName), Is.Not.Null);
             Assert.That(row.Q<FloatField>(FacialCharacterProfileSOInspector.GazeConfigLookUpAngleFieldName), Is.Not.Null);

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
@@ -32,6 +33,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
         public const float SilenceThreshold = 1e-4f;
 
         private readonly ILipSyncProvider _provider;
+        private readonly BitArray _contributeMask;
         private readonly float[] _scratch;
 
         /// <summary>
@@ -50,8 +52,12 @@ namespace Hidano.FacialControl.Adapters.InputSources
             }
 
             _provider = provider;
+            _contributeMask = ResolveContributeMask(provider, blendShapeCount);
             _scratch = new float[blendShapeCount];
         }
+
+        /// <inheritdoc />
+        public override BitArray ContributeMask => _contributeMask;
 
         /// <summary>
         /// provider からリップシンク値を取得し、無音でなければ <paramref name="output"/> に書込む。
@@ -83,6 +89,29 @@ namespace Hidano.FacialControl.Adapters.InputSources
             }
 
             return true;
+        }
+
+        private BitArray ResolveContributeMask(ILipSyncProvider provider, int blendShapeCount)
+        {
+            if (provider is not ILipSyncContributeMaskProvider maskProvider)
+            {
+                return base.ContributeMask;
+            }
+
+            BitArray mask = maskProvider.ContributeMask;
+            if (mask == null)
+            {
+                throw new ArgumentException("provider の ContributeMask は null にできません。", nameof(provider));
+            }
+
+            if (mask.Length != blendShapeCount)
+            {
+                throw new ArgumentException(
+                    "provider の ContributeMask.Length は blendShapeCount と一致する必要があります。",
+                    nameof(provider));
+            }
+
+            return mask;
         }
     }
 }

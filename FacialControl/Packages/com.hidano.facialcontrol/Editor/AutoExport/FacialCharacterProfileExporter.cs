@@ -28,6 +28,8 @@ namespace Hidano.FacialControl.Editor.AutoExport
     /// </remarks>
     public static class FacialCharacterProfileExporter
     {
+        private const string BaseExpressionSnapshotId = "base-expression";
+
         /// <summary>
         /// 指定 SO 配下の各 Expression について、AnimationClip があれば sampler で時刻 0 サンプリングを行い、
         /// 結果を <see cref="ExpressionSerializable.cachedSnapshot"/> に書き戻す。
@@ -43,23 +45,45 @@ namespace Hidano.FacialControl.Editor.AutoExport
             if (sampler == null) throw new ArgumentNullException(nameof(sampler));
 
             var expressions = so.Expressions;
-            if (expressions == null) return;
-
-            for (int i = 0; i < expressions.Count; i++)
+            if (expressions != null)
             {
-                var expr = expressions[i];
-                if (expr == null || expr.animationClip == null)
+                for (int i = 0; i < expressions.Count; i++)
                 {
-                    continue;
+                    var expr = expressions[i];
+                    if (expr == null || expr.animationClip == null)
+                    {
+                        continue;
+                    }
+                    var snapshotId = string.IsNullOrEmpty(expr.id) ? string.Empty : expr.id;
+                    var snapshot = sampler.SampleSnapshot(snapshotId, expr.animationClip);
+                    var dto = ConvertSnapshotToDto(snapshot);
+                    // Inspector スライダー (expr.transitionDuration) を cachedSnapshot 側にも反映し、
+                    // 後続の JSON 出力経路と SO 直読み経路で値を一致させる。
+                    dto.transitionDuration = expr.transitionDuration;
+                    expr.cachedSnapshot = dto;
                 }
-                var snapshotId = string.IsNullOrEmpty(expr.id) ? string.Empty : expr.id;
-                var snapshot = sampler.SampleSnapshot(snapshotId, expr.animationClip);
-                var dto = ConvertSnapshotToDto(snapshot);
-                // Inspector スライダー (expr.transitionDuration) を cachedSnapshot 側にも反映し、
-                // 後続の JSON 出力経路と SO 直読み経路で値を一致させる。
-                dto.transitionDuration = expr.transitionDuration;
-                expr.cachedSnapshot = dto;
             }
+
+            BakeBaseExpressionSnapshot(so.BaseExpression, sampler);
+        }
+
+        private static void BakeBaseExpressionSnapshot(
+            BaseExpressionSerializable baseExpression,
+            IExpressionAnimationClipSampler sampler)
+        {
+            if (baseExpression == null)
+            {
+                return;
+            }
+
+            if (baseExpression.animationClip == null)
+            {
+                baseExpression.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                return;
+            }
+
+            var snapshot = sampler.SampleSnapshot(BaseExpressionSnapshotId, baseExpression.animationClip);
+            baseExpression.cachedSnapshot = ConvertSnapshotToDto(snapshot);
         }
 
         /// <summary>

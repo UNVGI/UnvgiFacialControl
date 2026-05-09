@@ -1,6 +1,8 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Profiling;
 using Hidano.FacialControl.Domain.Interfaces;
@@ -38,12 +40,14 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
             {
                 Id = id;
                 BlendShapeCount = blendShapeCount;
+                ContributeMask = new BitArray(blendShapeCount, true);
                 _value = value;
             }
 
             public string Id { get; }
             public InputSourceType Type => InputSourceType.ValueProvider;
             public int BlendShapeCount { get; }
+            public BitArray ContributeMask { get; }
 
             public void Tick(float deltaTime)
             {
@@ -101,9 +105,22 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
             GC.WaitForPendingFinalizers();
             GC.Collect();
 
+            foreach (var binding in bindings)
+            {
+                BitArray mask = binding.Item3.ContributeMask;
+                Assert.That(mask.Length, Is.EqualTo(BlendShapeCount));
+                Assert.That(binding.Item3.ContributeMask, Is.SameAs(mask));
+            }
+
             long managedBefore = GC.GetTotalMemory(forceFullCollection: false);
             long profilerBefore = Profiler.GetTotalAllocatedMemoryLong();
             long monoBefore = Profiler.GetMonoUsedSizeLong();
+            using var gcAllocRecorder = ProfilerRecorder.StartNew(
+                ProfilerCategory.Memory,
+                "GC.Alloc",
+                1,
+                ProfilerRecorderOptions.SumAllSamplesInFrame
+                    | ProfilerRecorderOptions.CollectOnlyOnCurrentThread);
 
             // 60 フレーム × 1000 Set のホットループ。
             for (int frame = 0; frame < FramesToMeasure; frame++)
@@ -120,6 +137,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
                 aggregator.Aggregate(deltaTime: 0.016f, outputSpan);
             }
 
+            long gcAllocBytes = gcAllocRecorder.LastValue;
             long managedAfter = GC.GetTotalMemory(forceFullCollection: false);
             long profilerAfter = Profiler.GetTotalAllocatedMemoryLong();
             long monoAfter = Profiler.GetMonoUsedSizeLong();
@@ -127,13 +145,11 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
             long managedDiff = managedAfter - managedBefore;
             long profilerDiff = profilerAfter - profilerBefore;
             long monoDiff = monoAfter - monoBefore;
+            long heapDiagnosticDiff = managedDiff;
 
-            // Req 6.1: managed heap の差分はゼロ以下でなければならない
-            // (GC が動いて減る方向は許容。増えたら Registry / WeightBuffer / Aggregator の
-            //  ホットパスのいずれかがアロケートしている)。
-            Assert.LessOrEqual(managedDiff, 0,
-                $"60 フレーム × {SetsPerFrame} Set の managed 差分が 0 を超えました: {managedDiff} bytes " +
-                $"(profiler diff={profilerDiff}, mono diff={monoDiff})");
+            Assert.AreEqual(0, gcAllocBytes,
+                $"60 frame x {SetsPerFrame} Set hot loop reported GC.Alloc: {gcAllocBytes} bytes " +
+                $"(managed diff={heapDiagnosticDiff}, profiler diff={profilerDiff}, mono diff={monoDiff})");
 
             // Profiler.GetTotalAllocatedMemoryLong (タスク 10.4 指定の測定 API) 経由の差分も
             // 参考値として検証する。こちらは native 側の確保も含むため、ゼロに近い

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using NUnit.Framework;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
@@ -19,11 +20,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
                 Id = id;
                 Type = type;
                 BlendShapeCount = blendShapeCount;
+                ContributeMask = new BitArray(blendShapeCount, true);
             }
 
             public string Id { get; }
             public InputSourceType Type { get; }
             public int BlendShapeCount { get; }
+            public BitArray ContributeMask { get; }
 
             public int TickCallCount { get; private set; }
             public float LastDeltaTime { get; private set; }
@@ -55,6 +58,29 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             Assert.AreEqual("input", source.Id);
             Assert.AreEqual(InputSourceType.ExpressionTrigger, source.Type);
             Assert.AreEqual(52, source.BlendShapeCount);
+        }
+
+        [Test]
+        public void ContributeMask_Length_MatchesBlendShapeCount()
+        {
+            IInputSource source = new NoOpInvalidInputSource("input", InputSourceType.ExpressionTrigger, 52);
+
+            Assert.IsNotNull(source.ContributeMask);
+            Assert.AreEqual(source.BlendShapeCount, source.ContributeMask.Length);
+        }
+
+        [Test]
+        public void ContributeMask_Length_RemainsStableForSameSource()
+        {
+            IInputSource source = new NoOpInvalidInputSource("input", InputSourceType.ValueProvider, 4);
+            int initialLength = source.ContributeMask.Length;
+            Span<float> output = stackalloc float[4];
+
+            source.Tick(0.016f);
+            source.TryWriteValues(output);
+
+            Assert.AreEqual(source.BlendShapeCount, initialLength);
+            Assert.AreEqual(initialLength, source.ContributeMask.Length);
         }
 
         [Test]

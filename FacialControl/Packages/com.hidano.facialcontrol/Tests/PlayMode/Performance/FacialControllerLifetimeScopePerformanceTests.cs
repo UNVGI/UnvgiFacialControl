@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Hidano.FacialControl.Adapters.DependencyInjection;
 using Hidano.FacialControl.Domain.Adapters;
@@ -209,11 +210,13 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
             public FixedValueInputSource(string id)
             {
                 Id = id;
+                ContributeMask = ContributeMaskTestHelper.AllSetContributeMask(BlendShapeCount);
             }
 
             public string Id { get; }
             public InputSourceType Type => InputSourceType.ValueProvider;
             public int BlendShapeCount => 3;
+            public BitArray ContributeMask { get; }
 
             public void Tick(float deltaTime)
             {

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using NUnit.Framework;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Domain.Interfaces;
@@ -26,13 +27,14 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
         /// 固定長バッファに指定値を供給するフェイク <see cref="ILipSyncProvider"/>。
         /// GC フリー契約を崩さないよう内部バッファは構築時に 1 度だけ確保する。
         /// </summary>
-        private sealed class FakeLipSyncProvider : ILipSyncProvider
+        private sealed class FakeLipSyncProvider : ILipSyncProvider, ILipSyncContributeMaskProvider
         {
             private readonly float[] _values;
 
-            public FakeLipSyncProvider(float[] values)
+            public FakeLipSyncProvider(float[] values, BitArray contributeMask = null)
             {
                 _values = values;
+                ContributeMask = contributeMask ?? new BitArray(values.Length, true);
             }
 
             public void GetLipSyncValues(Span<float> output)
@@ -45,6 +47,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
             }
 
             public ReadOnlySpan<string> BlendShapeNames => ReadOnlySpan<string>.Empty;
+
+            public BitArray ContributeMask { get; }
         }
 
         [Test]
@@ -206,6 +210,23 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
             Assert.AreEqual(0.2f, output[1], 1e-5f);
             Assert.AreEqual(7f, output[2], 1e-5f, "残余は呼出側責務で保持 (IInputSource 契約)。");
             Assert.AreEqual(7f, output[3], 1e-5f);
+        }
+
+        [Test]
+        public void ContributeMask_WhenProviderExposesMask_ReturnsSameReference()
+        {
+            var mask = new BitArray(4, false);
+            mask[1] = true;
+            mask[3] = true;
+            var provider = new FakeLipSyncProvider(new float[] { 0f, 0f, 0f, 0f }, mask);
+
+            var source = new LipSyncInputSource(provider, blendShapeCount: 4);
+
+            Assert.That(source.ContributeMask, Is.SameAs(mask));
+            Assert.That(source.ContributeMask[0], Is.False);
+            Assert.That(source.ContributeMask[1], Is.True);
+            Assert.That(source.ContributeMask[2], Is.False);
+            Assert.That(source.ContributeMask[3], Is.True);
         }
     }
 }

@@ -1,9 +1,11 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Tests.Shared;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -43,11 +45,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
                 Id = id;
                 Type = InputSourceType.ValueProvider;
                 BlendShapeCount = 0;
+                ContributeMask = ContributeMaskTestHelper.AllSetContributeMask(BlendShapeCount);
             }
 
             public string Id { get; }
             public InputSourceType Type { get; }
             public int BlendShapeCount { get; }
+            public BitArray ContributeMask { get; }
 
             public void Tick(float deltaTime) { }
             public bool TryWriteValues(Span<float> output) => false;

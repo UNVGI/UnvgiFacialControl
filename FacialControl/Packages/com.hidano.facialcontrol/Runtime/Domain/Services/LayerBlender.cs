@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using Hidano.FacialControl.Domain.Models;
 
 namespace Hidano.FacialControl.Domain.Services
@@ -36,11 +37,22 @@ namespace Hidano.FacialControl.Domain.Services
             /// </summary>
             public ReadOnlyMemory<float> BlendShapeValues { get; }
 
+            /// <summary>
+            /// 繝ｬ繧､繝､繝ｼ縺・荳頑嶌縺阪☆繧・BlendShape index 髮・粋縲ら怐逡･譎ゅ・蜈ｨ index 繧貢献蟇ｾ雎｡縺ｨ縺吶ｋ縲・
+            /// </summary>
+            public BitArray ContributeMask { get; }
+
             public LayerInput(int priority, float weight, float[] blendShapeValues)
+                : this(priority, weight, blendShapeValues, contributeMask: null)
+            {
+            }
+
+            public LayerInput(int priority, float weight, float[] blendShapeValues, BitArray contributeMask)
             {
                 Priority = priority;
                 Weight = weight;
                 BlendShapeValues = blendShapeValues ?? Array.Empty<float>();
+                ContributeMask = contributeMask;
             }
         }
 
@@ -84,11 +96,25 @@ namespace Hidano.FacialControl.Domain.Services
             int firstIdx = indices[0];
             float firstWeight = Clamp01(layers[firstIdx].Weight);
             var firstValues = layers[firstIdx].BlendShapeValues.Span;
+            var firstMask = layers[firstIdx].ContributeMask;
             int blendLength = Math.Min(output.Length, firstValues.Length);
 
-            for (int i = 0; i < blendLength; i++)
+            if (firstMask == null)
             {
-                output[i] = Clamp01(firstValues[i] * firstWeight);
+                for (int i = 0; i < blendLength; i++)
+                {
+                    output[i] = Clamp01(firstValues[i] * firstWeight);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < blendLength; i++)
+                {
+                    if (firstMask[i])
+                    {
+                        output[i] = Clamp01(output[i] + (firstValues[i] - output[i]) * firstWeight);
+                    }
+                }
             }
 
             // 残りのレイヤーを優先度順に上書きブレンド
@@ -97,10 +123,16 @@ namespace Hidano.FacialControl.Domain.Services
                 int idx = indices[layerIdx];
                 float weight = Clamp01(layers[idx].Weight);
                 var values = layers[idx].BlendShapeValues.Span;
+                var mask = layers[idx].ContributeMask;
                 int len = Math.Min(output.Length, values.Length);
 
                 for (int i = 0; i < len; i++)
                 {
+                    if (mask != null && !mask[i])
+                    {
+                        continue;
+                    }
+
                     // 線形補間: output[i] = lerp(output[i], values[i], weight)
                     output[i] = Clamp01(output[i] + (values[i] - output[i]) * weight);
                 }

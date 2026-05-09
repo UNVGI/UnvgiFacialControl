@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
@@ -45,6 +46,7 @@ namespace Hidano.FacialControl.Samples.MultiSourceBlendBasicSample
             {
                 Id = id;
                 BlendShapeCount = blendShapeCount;
+                ContributeMask = new BitArray(blendShapeCount, true);
                 _scale = Clamp01(scale);
                 _blink = Clamp01(blink);
                 _smile = Clamp01(smile);
@@ -54,6 +56,7 @@ namespace Hidano.FacialControl.Samples.MultiSourceBlendBasicSample
             public string Id { get; }
             public InputSourceType Type => InputSourceType.ValueProvider;
             public int BlendShapeCount { get; }
+            public BitArray ContributeMask { get; }
 
             public void Tick(float deltaTime) { }
 

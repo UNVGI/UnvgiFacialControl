@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
@@ -431,6 +432,7 @@ namespace Hidano.FacialControl.Application.UseCases
             public string Id => "input";
             public InputSourceType Type => InputSourceType.ExpressionTrigger;
             public int BlendShapeCount { get; }
+            public BitArray ContributeMask { get; }
 
             public bool HasBeenActive { get; private set; }
 
@@ -446,6 +448,7 @@ namespace Hidano.FacialControl.Application.UseCases
             public LayerExpressionSource(int blendShapeCount)
             {
                 BlendShapeCount = blendShapeCount;
+                ContributeMask = new BitArray(blendShapeCount, true);
                 _snapshotValues = new float[blendShapeCount];
                 _targetValues = new float[blendShapeCount];
                 _currentValues = new float[blendShapeCount];

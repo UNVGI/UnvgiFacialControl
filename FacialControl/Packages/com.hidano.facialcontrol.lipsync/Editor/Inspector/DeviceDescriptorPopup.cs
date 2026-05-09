@@ -72,6 +72,11 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             {
                 name = DevicePopupName,
             };
+            // PopupField は GenericMenu を使うため、選択肢に '/' が含まれると階層メニューになる
+            // （AG06/AG03 等のオーディオ I/F 名で発生）。表示用にだけ全角スラッシュへ置換する。
+            _devicePopup.formatListItemCallback = item =>
+                item == null ? string.Empty : item.Replace('/', '／');
+            _devicePopup.formatSelectedValueCallback = item => item ?? string.Empty;
             _devicePopup.SetValueWithoutNotify(currentDeviceName);
             _devicePopup.RegisterValueChangedCallback(evt =>
             {
@@ -94,6 +99,9 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             {
                 name = DisambiguatorIndexFieldName,
                 value = disambiguatorProperty.intValue,
+                tooltip = "同名のデバイス（USB マイク 2 本など）が複数接続されている場合の選択順。"
+                    + "0 を指定すると最初に見つかった候補、1 を指定すると 2 番目の候補が選ばれます。"
+                    + "通常は 0 のままで問題ありません。",
             };
             _disambiguatorIndexField.RegisterValueChangedCallback(evt =>
             {

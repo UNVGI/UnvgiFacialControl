@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Hidano.FacialControl.Domain.Models;
 using UnityEditor;
@@ -147,6 +148,73 @@ namespace Hidano.FacialControl.Editor.Sampling
                 blendShapeNames,
                 transitionDuration,
                 transitionCurve);
+        }
+
+        public bool TryResolveContributeIndices(
+            AnimationClip clip,
+            IReadOnlyList<string> blendShapeNames,
+            BitArray output)
+        {
+            if (blendShapeNames == null)
+            {
+                throw new ArgumentNullException(nameof(blendShapeNames));
+            }
+            if (output == null)
+            {
+                throw new ArgumentNullException(nameof(output));
+            }
+            if (output.Length != blendShapeNames.Count)
+            {
+                throw new ArgumentException(
+                    "Output mask length must match blendShapeNames count.",
+                    nameof(output));
+            }
+            if (clip == null || blendShapeNames.Count == 0)
+            {
+                return false;
+            }
+
+            var nameToIndex = new Dictionary<string, int>(blendShapeNames.Count, StringComparer.Ordinal);
+            for (int i = 0; i < blendShapeNames.Count; i++)
+            {
+                var name = blendShapeNames[i];
+                if (!string.IsNullOrEmpty(name) && !nameToIndex.ContainsKey(name))
+                {
+                    nameToIndex.Add(name, i);
+                }
+            }
+            if (nameToIndex.Count == 0)
+            {
+                return false;
+            }
+
+            var indices = new List<int>();
+            var bindings = AnimationUtility.GetCurveBindings(clip);
+            for (int i = 0; i < bindings.Length; i++)
+            {
+                if (!TryParseBlendShape(bindings[i], out var blendShapeName))
+                {
+                    continue;
+                }
+
+                if (nameToIndex.TryGetValue(blendShapeName, out int index))
+                {
+                    indices.Add(index);
+                }
+            }
+
+            if (indices.Count == 0)
+            {
+                return false;
+            }
+
+            output.SetAll(false);
+            for (int i = 0; i < indices.Count; i++)
+            {
+                output.Set(indices[i], true);
+            }
+
+            return true;
         }
 
         private static void ExtractTransitionMetadata(

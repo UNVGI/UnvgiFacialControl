@@ -23,6 +23,9 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
         /// <summary>表情エントリ配列（<see cref="ExpressionSnapshotDto"/> を含む snapshot 形式）。</summary>
         public List<ExpressionDto> expressions;
 
+        /// <summary>ベース表情 snapshot。AnimationClip 参照は JSON に含めない。</summary>
+        public ExpressionSnapshotDto baseExpression;
+
         /// <summary>
         /// プロファイル全体で参照される SkinnedMeshRenderer Transform 階層パスの集合。
         /// 各 <see cref="ExpressionSnapshotDto.rendererPaths"/> はこの集合の subset である必要がある（Req 9.7）。

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
@@ -332,6 +333,67 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             Assert.AreEqual(1.0f, buffer[1], 1e-5f, "angry should be 1 under Blend");
         }
 
+        // ----- 3.1 ExpressionTrigger の transition union mask (Req 1.2, 1.3, 10.9) -----
+
+        [Test]
+        public void ContributeMask_DuringExpressionTransition_ReturnsOutgoingAndIncomingUnion()
+        {
+            var source = CreateSource(exclusionMode: ExclusionMode.LastWins);
+            source.TriggerOn("smile");
+            source.Tick(1.0f);
+
+            source.TriggerOn("angry");
+
+            AssertMaskBits(
+                source.ContributeMask,
+                true,  // smile: outgoing expression
+                true,  // angry: incoming expression
+                false,
+                false);
+        }
+
+        [Test]
+        public void ContributeMask_AfterExpressionTransitionCompletes_ReturnsIncomingExpressionOnly()
+        {
+            var source = CreateSource(exclusionMode: ExclusionMode.LastWins);
+            source.TriggerOn("smile");
+            source.Tick(1.0f);
+
+            source.TriggerOn("angry");
+            source.Tick(1.0f);
+
+            AssertMaskBits(
+                source.ContributeMask,
+                false,
+                true,  // angry only after transition completion
+                false,
+                false);
+        }
+
+        [Test]
+        public void ContributeMask_SameExpressionActivatedAgain_ReturnsStableMaskReference()
+        {
+            var source = CreateSource(exclusionMode: ExclusionMode.LastWins);
+            source.TriggerOn("smile");
+            source.Tick(1.0f);
+            BitArray firstSmileMask = source.ContributeMask;
+
+            AssertMaskBits(firstSmileMask, true, false, false, false);
+
+            source.TriggerOn("angry");
+            AssertMaskBits(source.ContributeMask, true, true, false, false);
+
+            source.Tick(1.0f);
+            AssertMaskBits(firstSmileMask, true, false, false, false);
+
+            source.TriggerOff("angry");
+            source.Tick(1.0f);
+
+            Assert.That(source.ContributeMask, Is.SameAs(firstSmileMask),
+                "同一 Expression の mask 参照は構築後不変で、再アクティブ化時も同じ参照を返す必要がある。");
+            AssertMaskBits(source.ContributeMask, true, false, false, false);
+        }
+
         [Test]
         public void StackDepthExceeded_DropsOldestAndCallsHook()
         {
@@ -460,6 +522,17 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             Assert.IsTrue(wrote);
             Assert.AreEqual(1.0f, shortBuffer[0], 1e-5f);
             Assert.AreEqual(0.0f, shortBuffer[1], 1e-5f);
+        }
+
+        private static void AssertMaskBits(BitArray mask, params bool[] expected)
+        {
+            Assert.That(mask, Is.Not.Null);
+            Assert.That(mask.Length, Is.EqualTo(expected.Length));
+            for (int i = 0; i < expected.Length; i++)
+            {
+                Assert.That(mask[i], Is.EqualTo(expected[i]),
+                    $"ContributeMask[{i}] ({BlendShapeNames[i]}) が期待値と一致しません。");
+            }
         }
     }
 }

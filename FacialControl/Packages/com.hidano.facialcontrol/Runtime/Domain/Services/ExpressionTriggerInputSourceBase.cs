@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
@@ -44,6 +45,9 @@ namespace Hidano.FacialControl.Domain.Services
         /// <summary>本入力源が書込む BlendShape の個数 (構築後不変)。</summary>
         public int BlendShapeCount { get; }
 
+        /// <inheritdoc />
+        public virtual BitArray ContributeMask => _activeMaskRef;
+
         /// <summary>内部スタックの最大深度 (構築時指定)。</summary>
         protected int MaxStackDepth { get; }
 
@@ -53,10 +57,16 @@ namespace Hidano.FacialControl.Domain.Services
         private readonly string[] _blendShapeNames;
         private readonly FacialProfile _profile;
         private readonly List<string> _activeExpressionIds;
+        private readonly Dictionary<string, BitArray> _expressionMasks;
+        private readonly BitArray _emptyMask;
+        private readonly BitArray _unionMask;
 
         private readonly float[] _snapshotValues;
         private readonly float[] _targetValues;
         private readonly float[] _currentValues;
+        private BitArray _activeMaskRef;
+        private BitArray _targetMaskRef;
+        private bool _targetMaskUsesUnionBuffer;
         private float _elapsedTime;
         private float _duration;
         private TransitionCurve _curve;
@@ -128,6 +138,12 @@ namespace Hidano.FacialControl.Domain.Services
 
             _profile = profile;
             _activeExpressionIds = new List<string>(maxStackDepth);
+            _expressionMasks = BuildExpressionMasks(profile);
+            _emptyMask = new BitArray(blendShapeCount, false);
+            _unionMask = new BitArray(blendShapeCount, false);
+            _activeMaskRef = _emptyMask;
+            _targetMaskRef = _emptyMask;
+            _targetMaskUsesUnionBuffer = false;
 
             _snapshotValues = new float[blendShapeCount];
             _targetValues = new float[blendShapeCount];
@@ -155,6 +171,8 @@ namespace Hidano.FacialControl.Domain.Services
                 throw new ArgumentNullException(nameof(expressionId));
             }
 
+            BitArray outgoingMask = _activeMaskRef;
+
             _activeExpressionIds.Remove(expressionId);
 
             while (_activeExpressionIds.Count >= MaxStackDepth)
@@ -165,7 +183,7 @@ namespace Hidano.FacialControl.Domain.Services
             }
 
             _activeExpressionIds.Add(expressionId);
-            StartTransition();
+            StartTransition(outgoingMask);
         }
 
         /// <summary>
@@ -182,9 +200,11 @@ namespace Hidano.FacialControl.Domain.Services
                 throw new ArgumentNullException(nameof(expressionId));
             }
 
+            BitArray outgoingMask = _activeMaskRef;
+
             if (_activeExpressionIds.Remove(expressionId))
             {
-                StartTransition();
+                StartTransition(outgoingMask);
             }
         }
 
@@ -212,6 +232,12 @@ namespace Hidano.FacialControl.Domain.Services
             if (_duration <= 0f || _elapsedTime >= _duration)
             {
                 Array.Copy(_targetValues, _currentValues, BlendShapeCount);
+                if (_targetMaskUsesUnionBuffer)
+                {
+                    RefreshActiveUnionMask();
+                }
+                _activeMaskRef = _targetMaskRef;
+                _targetMaskUsesUnionBuffer = false;
                 _isComplete = true;
             }
         }
@@ -260,10 +286,11 @@ namespace Hidano.FacialControl.Domain.Services
                 "This warning is emitted only once per instance.");
         }
 
-        private void StartTransition()
+        private void StartTransition(BitArray outgoingMask)
         {
             Array.Copy(_currentValues, _snapshotValues, BlendShapeCount);
             Array.Clear(_targetValues, 0, BlendShapeCount);
+            PrepareTargetMask(outgoingMask);
 
             if (_activeExpressionIds.Count == 0)
             {
@@ -312,6 +339,108 @@ namespace Hidano.FacialControl.Domain.Services
 
             _elapsedTime = 0f;
             _isComplete = false;
+        }
+
+        private void PrepareTargetMask(BitArray outgoingMask)
+        {
+            if (ShouldUseActiveUnionTargetMask())
+            {
+                _targetMaskRef = _unionMask;
+                _targetMaskUsesUnionBuffer = true;
+                PrepareUnionMask(outgoingMask);
+                OrActiveExpressionMasksInto(_unionMask);
+                _activeMaskRef = _unionMask;
+                return;
+            }
+
+            _targetMaskRef = ResolveSingleTargetMask();
+            _targetMaskUsesUnionBuffer = false;
+            PrepareUnionMask(outgoingMask);
+            if (!ReferenceEquals(_targetMaskRef, _unionMask))
+            {
+                _unionMask.Or(_targetMaskRef);
+            }
+            _activeMaskRef = _unionMask;
+        }
+
+        private bool ShouldUseActiveUnionTargetMask()
+        {
+            return ExclusionMode == ExclusionMode.Blend && _activeExpressionIds.Count > 1;
+        }
+
+        private BitArray ResolveSingleTargetMask()
+        {
+            if (_activeExpressionIds.Count == 0)
+            {
+                return _emptyMask;
+            }
+
+            string expressionId = _activeExpressionIds[_activeExpressionIds.Count - 1];
+            return GetExpressionMask(expressionId);
+        }
+
+        private void PrepareUnionMask(BitArray outgoingMask)
+        {
+            if (ReferenceEquals(outgoingMask, _unionMask))
+            {
+                return;
+            }
+
+            _unionMask.SetAll(false);
+            _unionMask.Or(outgoingMask ?? _emptyMask);
+        }
+
+        private void RefreshActiveUnionMask()
+        {
+            _unionMask.SetAll(false);
+            OrActiveExpressionMasksInto(_unionMask);
+        }
+
+        private void OrActiveExpressionMasksInto(BitArray target)
+        {
+            for (int i = 0; i < _activeExpressionIds.Count; i++)
+            {
+                target.Or(GetExpressionMask(_activeExpressionIds[i]));
+            }
+        }
+
+        private BitArray GetExpressionMask(string expressionId)
+        {
+            if (expressionId != null && _expressionMasks.TryGetValue(expressionId, out var mask))
+            {
+                return mask;
+            }
+
+            return _emptyMask;
+        }
+
+        private Dictionary<string, BitArray> BuildExpressionMasks(FacialProfile profile)
+        {
+            var masks = new Dictionary<string, BitArray>(StringComparer.Ordinal);
+            var expressions = profile.Expressions.Span;
+            for (int i = 0; i < expressions.Length; i++)
+            {
+                var expression = expressions[i];
+                if (masks.ContainsKey(expression.Id))
+                {
+                    continue;
+                }
+
+                var mask = new BitArray(BlendShapeCount, false);
+                var bsSpan = expression.BlendShapeValues.Span;
+                for (int v = 0; v < bsSpan.Length; v++)
+                {
+                    int idx = FindBlendShapeIndex(bsSpan[v].Name);
+                    if (idx >= 0)
+                    {
+                        mask[idx] = true;
+                    }
+                }
+
+                masks.Add(expression.Id, mask);
+            }
+
+            return masks;
         }
 
         private void MapBlendShapeValues(Expression expression, float[] target)
