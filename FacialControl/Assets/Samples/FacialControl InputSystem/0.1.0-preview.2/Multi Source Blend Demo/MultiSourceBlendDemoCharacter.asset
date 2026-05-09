@@ -21,6 +21,9 @@ MonoBehaviour:
     - id: input
       weight: 1.0
       optionsJson: '{"maxStackDepth":4}'
+    - id: input:analog-expression
+      weight: 1.0
+      optionsJson: ''
     layerOverrideMask:
     - emotion
   _expressions:
@@ -41,10 +44,10 @@ MonoBehaviour:
       blendShapes:
       - rendererPath: Body
         name: 笑い
-        value: 100
+        value: 1.0
       - rendererPath: Body
         name: 口角上げ
-        value: 60
+        value: 0.6
       bones: []
       rendererPaths:
       - Body
@@ -65,13 +68,13 @@ MonoBehaviour:
       blendShapes:
       - rendererPath: Body
         name: 怒り
-        value: 100
+        value: 1.0
       - rendererPath: Body
         name: 左眉下げ
-        value: 50
+        value: 0.5
       - rendererPath: Body
         name: 右眉下げ
-        value: 50
+        value: 0.5
       bones: []
       rendererPaths:
       - Body
@@ -92,10 +95,10 @@ MonoBehaviour:
       blendShapes:
       - rendererPath: Body
         name: びっくり
-        value: 100
+        value: 1.0
       - rendererPath: Body
         name: ▲
-        value: 80
+        value: 0.8
       bones: []
       rendererPaths:
       - Body
@@ -116,7 +119,7 @@ MonoBehaviour:
       blendShapes:
       - rendererPath: Body
         name: あ
-        value: 100
+        value: 1.0
       bones: []
       rendererPaths:
       - Body
@@ -189,3 +192,10 @@ MonoBehaviour:
         _gazeInputBindings:
         - expressionId: eye_look
           actionName: Look
+        _analogExpressionBindings:
+        - actionName: LeftTrigger
+          expressionId: smile
+          scale: 1.0
+        - actionName: RightTrigger
+          expressionId: anger
+          scale: 1.0

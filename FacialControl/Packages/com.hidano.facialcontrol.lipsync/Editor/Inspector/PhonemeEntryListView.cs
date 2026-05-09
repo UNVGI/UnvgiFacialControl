@@ -70,10 +70,16 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             AddToClassList(RootClassName);
 
             RebuildIndexProxy(_indexProxy, GetListProperty());
+
+            // NOTE: itemsSource は SetViewController の "後" に設定する。
+            // BaseVerticalCollectionView.SetViewController は旧 controller を Dispose して
+            // 新 controller を SetView する実装で、ListView.itemsSource ゲッターは
+            // viewController.itemsSource を直接返すため、初期化子で itemsSource を渡すと
+            // 差し替え後に null 化されてしまい、Add ボタンで EnsureItemSourceCanBeResized が
+            // "source is not defined" 例外を投げる。InputSystemAdapterBindingDrawer と同型の修正。
             _listView = new ListView
             {
                 name = ListViewName,
-                itemsSource = _indexProxy,
                 fixedItemHeight = 132f,
                 showAddRemoveFooter = true,
                 showBorder = true,
@@ -89,6 +95,7 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             _listView.style.marginTop = 4;
             _listView.style.minHeight = 96f;
             _listView.SetViewController(new SafeListViewController());
+            _listView.itemsSource = _indexProxy;
             _listView.overridingAddButtonBehavior = (_, button) => OpenAddMenu(button);
             _listView.itemsAdded += OnItemsAdded;
             _listView.itemsRemoved += OnItemsRemoved;

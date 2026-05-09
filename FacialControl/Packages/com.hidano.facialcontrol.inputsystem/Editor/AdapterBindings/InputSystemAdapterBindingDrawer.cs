@@ -43,6 +43,9 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
         private const string ActionMapNameFieldName = "_actionMapName";
         private const string ExpressionBindingsFieldName = "_expressionBindings";
         private const string GazeInputBindingsFieldName = "_gazeInputBindings";
+        private const string AnalogExpressionBindingsFieldName = "_analogExpressionBindings";
+
+        public const string AnalogExpressionBindingsFieldUiName = "input-system-binding-analog-expression-bindings-field";
 
         public const string RootClassName = "facial-control-input-system-adapter-binding";
         public const string ActionMapDropdownName = "input-system-binding-action-map-dropdown";
@@ -72,6 +75,8 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             var gazeIndexProxy = new List<int>();
             var gazeBindingsList = AddGazeInputBindingsList(
                 root, property, gazeIndexProxy);
+
+            AddAnalogExpressionBindingsField(root, property);
 
             // _inputActionAsset / ActionMap 変更時に候補と list rows を再構築する。
             // SerializedProperty 側の array は変わっていなくても、ObjectField の rebind 経由で
@@ -527,6 +532,28 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             }
 
             var field = new PropertyField(child, label);
+            root.Add(field);
+        }
+
+        /// <summary>
+        /// Analog Expression Bindings のリストを Unity 標準 PropertyField で表示する。
+        /// 専用 ListView は preview.2 以降で導入する想定で、現状は最小実装として Unity 既定の
+        /// 配列描画 (Add/Remove ボタン + 折りたたみ) を利用する (Req: アナログ表情精密操作)。
+        /// </summary>
+        private static void AddAnalogExpressionBindingsField(VisualElement root, SerializedProperty property)
+        {
+            var listProp = property.FindPropertyRelative(AnalogExpressionBindingsFieldName);
+            if (listProp == null)
+            {
+                root.Add(new Label($"<missing field: {AnalogExpressionBindingsFieldName}>"));
+                return;
+            }
+
+            var field = new PropertyField(listProp, "Analog Expression Bindings")
+            {
+                name = AnalogExpressionBindingsFieldUiName,
+            };
+            field.style.marginTop = 4;
             root.Add(field);
         }
 

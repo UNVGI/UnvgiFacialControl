@@ -48,11 +48,16 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
         [SerializeField]
         private List<InputSystemGazeBinding> _gazeInputBindings = new List<InputSystemGazeBinding>();
 
+        [Tooltip("Scalar 連続値 (LT/RT 等) で Expression weight を 0..1 連続駆動するバインディング一覧。")]
+        [SerializeField]
+        private List<AnalogExpressionBindingEntry> _analogExpressionBindings = new List<AnalogExpressionBindingEntry>();
+
         [NonSerialized] private InputActionAsset _runtimeActionAsset;
         [NonSerialized] private InputActionMap _runtimeActionMap;
         [NonSerialized] private ExpressionTriggerInputSource _triggerSink;
         [NonSerialized] private ExpressionInputSourceAdapter _adapter;
         [NonSerialized] private List<InputActionAnalogSource> _analogSources;
+        [NonSerialized] private AnalogExpressionInputSource _analogExpressionSink;
         [NonSerialized] private GazeBonePoseProvider _gazeBoneProvider;
         [NonSerialized] private IReadOnlyList<GazeBindingConfig> _injectedGazeConfigs;
         [NonSerialized] private bool _isStarted;
@@ -91,6 +96,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             string actionMapName,
             IReadOnlyList<ExpressionBindingEntry> expressionBindings,
             IReadOnlyList<InputSystemGazeBinding> gazeInputBindings = null,
+            IReadOnlyList<AnalogExpressionBindingEntry> analogExpressionBindings = null,
+            // 注: FacialController 側の reflection-based gaze 注入器
+            // (FacialController.FindGazeConfigureMethod) は "末尾パラメータが
+            // IReadOnlyList<GazeBindingConfig> である Configure" を検索するため、
+            // 必ず injectedGazeConfigs を最後の位置に維持する。順序変更は core 側との
+            // ABI 契約破壊につながる。
             IReadOnlyList<GazeBindingConfig> injectedGazeConfigs = null)
         {
             _inputActionAsset = asset;
@@ -101,6 +112,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             _gazeInputBindings = gazeInputBindings == null
                 ? new List<InputSystemGazeBinding>()
                 : new List<InputSystemGazeBinding>(gazeInputBindings);
+            _analogExpressionBindings = analogExpressionBindings == null
+                ? new List<AnalogExpressionBindingEntry>()
+                : new List<AnalogExpressionBindingEntry>(analogExpressionBindings);
             _injectedGazeConfigs = injectedGazeConfigs;
         }
 
@@ -157,6 +171,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
 
             _analogSources = new List<InputActionAnalogSource>();
             BuildAnalogSources(ctx, slug);
+
+            BuildAnalogExpressionSink(ctx, slug, blendShapeCount, blendShapeNames);
 
             BuildGazeProvider(ctx);
 
@@ -216,6 +232,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                 _analogSources = null;
             }
 
+            _analogExpressionSink = null;
             _triggerSink = null;
 
             if (_runtimeActionMap != null)
@@ -262,41 +279,128 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
 
         private void BuildAnalogSources(in AdapterBuildContext ctx, AdapterSlug slug)
         {
-            if (_gazeInputBindings == null || _gazeInputBindings.Count == 0)
+            // gaze バインディングと analog expression バインディングの両方で参照される actionName を 1 度だけ登録する。
+            var registered = new HashSet<string>(StringComparer.Ordinal);
+
+            if (_gazeInputBindings != null)
+            {
+                for (int i = 0; i < _gazeInputBindings.Count; i++)
+                {
+                    var binding = _gazeInputBindings[i];
+                    if (binding == null) continue;
+                    TryRegisterAnalogSource(ctx, slug, binding.actionName, registered);
+                }
+            }
+
+            if (_analogExpressionBindings != null)
+            {
+                for (int i = 0; i < _analogExpressionBindings.Count; i++)
+                {
+                    var binding = _analogExpressionBindings[i];
+                    if (binding == null) continue;
+                    TryRegisterAnalogSource(ctx, slug, binding.actionName, registered);
+                }
+            }
+        }
+
+        private void TryRegisterAnalogSource(
+            in AdapterBuildContext ctx,
+            AdapterSlug slug,
+            string actionName,
+            HashSet<string> registered)
+        {
+            if (string.IsNullOrWhiteSpace(actionName)) return;
+            if (registered.Contains(actionName)) return;
+
+            var action = _runtimeActionMap.FindAction(actionName);
+            if (action == null)
+            {
+                Debug.LogWarning(
+                    $"[InputSystemAdapterBinding] Analog 経路の Action '{actionName}' が ActionMap '{_runtimeActionMap.name}' に見つかりません。skip します。");
+                return;
+            }
+
+            AnalogInputShape shape = DetermineShape(action);
+
+            if (!InputSourceId.TryParse(actionName, out var srcId))
+            {
+                Debug.LogWarning(
+                    $"[InputSystemAdapterBinding] Action 名 '{actionName}' が InputSourceId 規約に合致しません。analog source の登録を skip します。");
+                return;
+            }
+
+            var src = new InputActionAnalogSource(srcId, action, shape);
+            _analogSources.Add(src);
+            ctx.InputSourceRegistry.Register(slug, actionName, new AnalogInputSourceWrapper(src));
+            registered.Add(actionName);
+        }
+
+        private void BuildAnalogExpressionSink(
+            in AdapterBuildContext ctx,
+            AdapterSlug slug,
+            int blendShapeCount,
+            IReadOnlyList<string> blendShapeNames)
+        {
+            if (_analogExpressionBindings == null || _analogExpressionBindings.Count == 0)
             {
                 return;
             }
 
-            for (int i = 0; i < _gazeInputBindings.Count; i++)
+            // actionName → IAnalogInputSource の辞書を _analogSources から組み立てる。
+            var sources = new Dictionary<string, IAnalogInputSource>(StringComparer.Ordinal);
+            for (int i = 0; i < _analogSources.Count; i++)
             {
-                var binding = _gazeInputBindings[i];
-                if (binding == null || string.IsNullOrWhiteSpace(binding.actionName))
-                {
-                    continue;
-                }
-                string actionName = binding.actionName;
-
-                var action = _runtimeActionMap.FindAction(actionName);
-                if (action == null)
-                {
-                    Debug.LogWarning(
-                        $"[InputSystemAdapterBinding] Analog 経路の Action '{actionName}' が ActionMap '{_runtimeActionMap.name}' に見つかりません。skip します。");
-                    continue;
-                }
-
-                AnalogInputShape shape = DetermineShape(action);
-
-                if (!InputSourceId.TryParse(actionName, out var srcId))
-                {
-                    Debug.LogWarning(
-                        $"[InputSystemAdapterBinding] Action 名 '{actionName}' が InputSourceId 規約に合致しません。analog source の登録を skip します。");
-                    continue;
-                }
-
-                var src = new InputActionAnalogSource(srcId, action, shape);
-                _analogSources.Add(src);
-                ctx.InputSourceRegistry.Register(slug, actionName, new AnalogInputSourceWrapper(src));
+                var s = _analogSources[i];
+                if (s == null) continue;
+                sources[s.Id] = s;
             }
+
+            // Inspector のエントリを Domain 値型に変換する。
+            var bindings = new List<AnalogExpressionBinding>(_analogExpressionBindings.Count);
+            for (int i = 0; i < _analogExpressionBindings.Count; i++)
+            {
+                var entry = _analogExpressionBindings[i];
+                if (entry == null
+                    || string.IsNullOrWhiteSpace(entry.actionName)
+                    || string.IsNullOrWhiteSpace(entry.expressionId))
+                {
+                    continue;
+                }
+
+                bindings.Add(new AnalogExpressionBinding(
+                    sourceId: entry.actionName,
+                    sourceAxis: 0,
+                    expressionId: entry.expressionId,
+                    scale: entry.scale > 0f ? entry.scale : 1f));
+            }
+
+            if (bindings.Count == 0)
+            {
+                return;
+            }
+
+            // 予約 id を slug の sub に組み合わせて registry に登録する。
+            // (例: slug='input', sub='analog-expression' → 'input:analog-expression')
+            // 対応する SO の _layers[].inputSources[].id は同じキー文字列で宣言されている必要がある。
+            if (!InputSourceId.TryParse(AnalogExpressionInputSource.ReservedId, out var sinkId))
+            {
+                Debug.LogWarning(
+                    $"[InputSystemAdapterBinding] AnalogExpressionInputSource の予約 id 解決に失敗しました。analog expression の登録を skip します。");
+                return;
+            }
+
+            _analogExpressionSink = new AnalogExpressionInputSource(
+                id: sinkId,
+                blendShapeCount: blendShapeCount,
+                blendShapeNames: blendShapeNames,
+                profile: ctx.Profile,
+                sources: sources,
+                bindings: bindings);
+
+            ctx.InputSourceRegistry.Register(
+                slug,
+                AnalogExpressionInputSource.ReservedId,
+                _analogExpressionSink);
         }
 
         private void BuildGazeProvider(in AdapterBuildContext ctx)

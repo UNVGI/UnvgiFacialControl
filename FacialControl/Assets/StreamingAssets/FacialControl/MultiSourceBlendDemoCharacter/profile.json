@@ -10,6 +10,10 @@
                     "id": "input",
                     "weight": 1.0,
                     "options":{"maxStackDepth":8}
+                },
+                {
+                    "id": "input:analog-expression",
+                    "weight": 1.0
                 }
             ]
         }
@@ -29,12 +33,12 @@
                     {
                         "rendererPath": "Body",
                         "name": "笑い",
-                        "value": 100.0
+                        "value": 1.0
                     },
                     {
                         "rendererPath": "Body",
                         "name": "口角上げ",
-                        "value": 60.0
+                        "value": 0.6
                     }
                 ],
                 "bones": [],
@@ -57,17 +61,17 @@
                     {
                         "rendererPath": "Body",
                         "name": "怒り",
-                        "value": 100.0
+                        "value": 1.0
                     },
                     {
                         "rendererPath": "Body",
                         "name": "左眉下げ",
-                        "value": 50.0
+                        "value": 0.5
                     },
                     {
                         "rendererPath": "Body",
                         "name": "右眉下げ",
-                        "value": 50.0
+                        "value": 0.5
                     }
                 ],
                 "bones": [],
@@ -90,12 +94,12 @@
                     {
                         "rendererPath": "Body",
                         "name": "びっくり",
-                        "value": 100.0
+                        "value": 1.0
                     },
                     {
                         "rendererPath": "Body",
                         "name": "▲",
-                        "value": 80.0
+                        "value": 0.8
                     }
                 ],
                 "bones": [],
@@ -118,7 +122,7 @@
                     {
                         "rendererPath": "Body",
                         "name": "あ",
-                        "value": 100.0
+                        "value": 1.0
                     }
                 ],
                 "bones": [],
