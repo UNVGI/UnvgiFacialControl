@@ -174,6 +174,9 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 selectionType = SelectionType.Single,
                 makeItem = CreateExpressionBindingRow,
                 bindItem = (element, index) => BindExpressionBindingRow(element, index, property),
+                // unbindItem: 行が再利用される際に古い RegisterValueChangedCallback を持ち越さないように
+                // 子要素を毎回破棄する。bindItem 側は element.Clear() 済み前提で組み立てる。
+                unbindItem = (element, _) => element.Clear(),
             };
             listView.style.marginTop = 4;
             listView.style.minHeight = 120f;
@@ -247,40 +250,28 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
 
         private static VisualElement CreateExpressionBindingRow()
         {
+            // makeItem は空の container だけを返し、内部要素は BindExpressionBindingRow で毎回再構築する。
+            // 旧実装のように子要素を makeItem で作って bindItem で再 bind する形だと、再 bind の度に
+            // RegisterValueChangedCallback がスタックして同 evt で複数回 ApplyModifiedProperties が走り、
+            // SerializedProperty / arraySize が想定外に変動する → 別 row の bindItem が範囲外 index で
+            // GetArrayElementAtIndex を呼んで ArgumentOutOfRangeException、という連鎖を起こしていた。
             var container = new VisualElement();
             container.style.flexDirection = FlexDirection.Column;
             container.style.marginBottom = 4;
-
-            container.Add(new EnumField("動作モード", BindingMode.Normal)
-            {
-                name = BindingModeFieldName,
-                tooltip = "Normal: 通常キー押下による Expression。"
-                    + " Gaze: Vector2 入力で目線駆動。"
-                    + " Analog: Scalar 連続値で expression weight を 0..1 駆動。",
-            });
-            container.Add(new DropdownField("Action 名")
-            {
-                name = ActionDropdownName,
-            });
-            container.Add(new DropdownField("表情 ID")
-            {
-                name = ExpressionDropdownName,
-            });
-            container.Add(new EnumField("トリガモード", TriggerMode.Hold)
-            {
-                name = TriggerModeFieldName,
-                tooltip = "Normal モード時のみ有効。"
-                    + " Hold: 押している間だけ ON。Toggle: 押すたびに ON/OFF が切替わる。",
-            });
             return container;
         }
 
         private static void BindExpressionBindingRow(
             VisualElement element, int index, SerializedProperty bindingProperty)
         {
+            // unbindItem だけでは itemsRemoved → bindItem 直行のケースで element に旧子要素が残る場合があるため、
+            // 防御的に bindItem 先頭でも Clear する。これにより RegisterValueChangedCallback の二重登録を防ぐ。
+            element.Clear();
+
             var listProp = bindingProperty.FindPropertyRelative(ExpressionBindingsFieldName);
             if (listProp == null || index < 0 || index >= listProp.arraySize)
             {
+                // index が範囲外 (削除直後にレンダリングがズレた等) の場合は何も bind しない。
                 return;
             }
 
@@ -293,76 +284,96 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             var expressionIdProp = entryProp.FindPropertyRelative("expressionId");
             var triggerModeProp = entryProp.FindPropertyRelative("triggerMode");
 
-            var triggerModeField = element.Q<EnumField>(TriggerModeFieldName);
-
-            var bindingModeField = element.Q<EnumField>(BindingModeFieldName);
-            if (bindingModeField != null && bindingModeProp != null)
+            // BindingMode field
+            var bindingModeField = new EnumField("動作モード", BindingMode.Normal)
             {
-                bindingModeField.Unbind();
+                name = BindingModeFieldName,
+                tooltip = "Normal: 通常キー押下による Expression。"
+                    + " Gaze: Vector2 入力で目線駆動。"
+                    + " Analog: Scalar 連続値で expression weight を 0..1 駆動。",
+            };
+            if (bindingModeProp != null)
+            {
                 bindingModeField.BindProperty(bindingModeProp);
-                BindingMode currentMode = (BindingMode)bindingModeProp.enumValueIndex;
-                UpdateTriggerModeVisibility(triggerModeField, currentMode);
-                bindingModeField.RegisterValueChangedCallback(evt =>
-                {
-                    if (!(evt.newValue is BindingMode mode)) return;
-                    UpdateTriggerModeVisibility(triggerModeField, mode);
-                });
             }
+            element.Add(bindingModeField);
 
-            var actionDropdown = element.Q<DropdownField>(ActionDropdownName);
-            if (actionDropdown != null && actionNameProp != null)
+            // Action dropdown
+            var actionDropdown = new DropdownField("Action 名")
             {
-                var actionChoices = CollectActionNames(bindingProperty);
-                var safeChoices = BuildSafeChoices(actionChoices, actionNameProp.stringValue);
-                actionDropdown.choices = safeChoices;
-                actionDropdown.SetValueWithoutNotify(actionNameProp.stringValue ?? string.Empty);
-                actionDropdown.RegisterValueChangedCallback(evt =>
+                name = ActionDropdownName,
+            };
+            string actionNameValue = actionNameProp != null ? actionNameProp.stringValue ?? string.Empty : string.Empty;
+            var actionChoices = CollectActionNames(bindingProperty);
+            actionDropdown.choices = BuildSafeChoices(actionChoices, actionNameValue);
+            actionDropdown.SetValueWithoutNotify(actionNameValue);
+            actionDropdown.RegisterValueChangedCallback(evt =>
+            {
+                var so = bindingProperty.serializedObject;
+                so.Update();
+                var list = bindingProperty.FindPropertyRelative(ExpressionBindingsFieldName);
+                if (list == null || index < 0 || index >= list.arraySize) return;
+                var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("actionName");
+                if (prop != null)
                 {
-                    var so = bindingProperty.serializedObject;
-                    so.Update();
-                    var list = bindingProperty.FindPropertyRelative(ExpressionBindingsFieldName);
-                    if (list == null || index >= list.arraySize) return;
-                    var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("actionName");
-                    if (prop != null)
-                    {
-                        prop.stringValue = evt.newValue ?? string.Empty;
-                        so.ApplyModifiedProperties();
-                    }
-                });
-            }
+                    prop.stringValue = evt.newValue ?? string.Empty;
+                    so.ApplyModifiedProperties();
+                }
+            });
+            element.Add(actionDropdown);
 
-            var expressionDropdown = element.Q<DropdownField>(ExpressionDropdownName);
-            if (expressionDropdown != null && expressionIdProp != null)
+            // Expression dropdown
+            var expressionDropdown = new DropdownField("表情 ID")
             {
-                var expressionChoices = CollectExpressionIds(bindingProperty);
-                var safeChoices = BuildSafeChoices(expressionChoices, expressionIdProp.stringValue);
-                expressionDropdown.choices = safeChoices;
-                expressionDropdown.SetValueWithoutNotify(expressionIdProp.stringValue ?? string.Empty);
-                // 内部値は expressionId（hash 文字列）のままで保存し、表示だけ Expression.name に変換する。
-                expressionDropdown.formatListItemCallback =
-                    id => FormatExpressionDropdownLabel(bindingProperty, id);
-                expressionDropdown.formatSelectedValueCallback =
-                    id => FormatExpressionDropdownLabel(bindingProperty, id);
-                expressionDropdown.RegisterValueChangedCallback(evt =>
+                name = ExpressionDropdownName,
+            };
+            string expressionIdValue = expressionIdProp != null ? expressionIdProp.stringValue ?? string.Empty : string.Empty;
+            var expressionChoices = CollectExpressionIds(bindingProperty);
+            expressionDropdown.choices = BuildSafeChoices(expressionChoices, expressionIdValue);
+            expressionDropdown.SetValueWithoutNotify(expressionIdValue);
+            // 内部値は expressionId（hash 文字列）のままで保存し、表示だけ Expression.name に変換する。
+            expressionDropdown.formatListItemCallback =
+                id => FormatExpressionDropdownLabel(bindingProperty, id);
+            expressionDropdown.formatSelectedValueCallback =
+                id => FormatExpressionDropdownLabel(bindingProperty, id);
+            expressionDropdown.RegisterValueChangedCallback(evt =>
+            {
+                var so = bindingProperty.serializedObject;
+                so.Update();
+                var list = bindingProperty.FindPropertyRelative(ExpressionBindingsFieldName);
+                if (list == null || index < 0 || index >= list.arraySize) return;
+                var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("expressionId");
+                if (prop != null)
                 {
-                    var so = bindingProperty.serializedObject;
-                    so.Update();
-                    var list = bindingProperty.FindPropertyRelative(ExpressionBindingsFieldName);
-                    if (list == null || index >= list.arraySize) return;
-                    var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("expressionId");
-                    if (prop != null)
-                    {
-                        prop.stringValue = evt.newValue ?? string.Empty;
-                        so.ApplyModifiedProperties();
-                    }
-                });
-            }
+                    prop.stringValue = evt.newValue ?? string.Empty;
+                    so.ApplyModifiedProperties();
+                }
+            });
+            element.Add(expressionDropdown);
 
-            if (triggerModeField != null && triggerModeProp != null)
+            // TriggerMode field
+            var triggerModeField = new EnumField("トリガモード", TriggerMode.Hold)
             {
-                triggerModeField.Unbind();
+                name = TriggerModeFieldName,
+                tooltip = "Normal モード時のみ有効。"
+                    + " Hold: 押している間だけ ON。Toggle: 押すたびに ON/OFF が切替わる。",
+            };
+            if (triggerModeProp != null)
+            {
                 triggerModeField.BindProperty(triggerModeProp);
             }
+            BindingMode currentMode = bindingModeProp != null
+                ? (BindingMode)bindingModeProp.enumValueIndex
+                : BindingMode.Normal;
+            UpdateTriggerModeVisibility(triggerModeField, currentMode);
+            bindingModeField.RegisterValueChangedCallback(evt =>
+            {
+                if (evt.newValue is BindingMode mode)
+                {
+                    UpdateTriggerModeVisibility(triggerModeField, mode);
+                }
+            });
+            element.Add(triggerModeField);
         }
 
         private static void UpdateTriggerModeVisibility(EnumField triggerModeField, BindingMode mode)

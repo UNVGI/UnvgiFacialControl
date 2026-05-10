@@ -22,6 +22,7 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
         public const string RowClassName = "ulipsync-phoneme-entry-row";
         public const string EntryTypeSelectorName = "ulipsync-phoneme-entry-type-selector";
         public const string BlendShapeWarningName = "ulipsync-phoneme-entry-blend-shape-warning";
+        public const string AnimationClipWarningName = "ulipsync-phoneme-entry-animation-clip-warning";
         public const string BlendShapeLabel = "BlendShape 形式";
         public const string AnimationClipLabel = "AnimationClip 形式";
 
@@ -376,6 +377,26 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             };
             field.BindProperty(clipProperty);
             row.Add(field);
+
+            // AnimationClip 未割り当てだと OnStart 時に snapshot が空になり、リップシンクが何も
+            // 出力しない (= ユーザー視点で「動かない」状態) になる。視覚的に未割り当てを伝えるための警告。
+            var warning = new HelpBox(
+                "AnimationClip 未割り当てです。リップシンクを動かすには、この音素用の口形状クリップを割り当ててください。",
+                HelpBoxMessageType.Warning)
+            {
+                name = AnimationClipWarningName,
+            };
+            ApplyAnimationClipWarningVisibility(warning, clipProperty.objectReferenceValue);
+            field.RegisterValueChangedCallback(evt =>
+            {
+                ApplyAnimationClipWarningVisibility(warning, evt.newValue);
+            });
+            row.Add(warning);
+        }
+
+        private static void ApplyAnimationClipWarningVisibility(HelpBox warning, UnityEngine.Object clip)
+        {
+            warning.style.display = clip == null ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         private static void AddTextField(

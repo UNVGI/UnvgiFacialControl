@@ -12,11 +12,29 @@ namespace Hidano.FacialControl.LipSync.Adapters
 {
     [Serializable]
     [FacialAdapterBinding(displayName: "uLipSync")]
-    public sealed class ULipSyncAdapterBinding : AdapterBindingBase, IAdapterBindingInitialDefaults
+    public sealed class ULipSyncAdapterBinding
+        : AdapterBindingBase, IAdapterBindingInitialDefaults, IAdapterBindingDefaultLayer
     {
         private static readonly string[] DefaultPhonemeIds = { "A", "I", "U", "E", "O" };
 
         private const string DefaultSlug = "ulipsync";
+        private const string DefaultLayerNameValue = "lipsync";
+
+        /// <inheritdoc />
+        public string DefaultLayerName => DefaultLayerNameValue;
+
+        /// <inheritdoc />
+        /// <remarks>
+        /// LipSyncInputSource は AdapterSlug と同じ slug を InputSourceId として登録するため、
+        /// 既定 Layer の入力源 ID も binding の Slug をそのまま採用する。
+        /// </remarks>
+        public string DefaultLayerInputSourceId => string.IsNullOrEmpty(Slug) ? DefaultSlug : Slug;
+
+        /// <inheritdoc />
+        /// <remarks>
+        /// AIUEO の各音素ウェイトは独立に加算されるため、レイヤー内では Blend (加算 + clamp) が自然。
+        /// </remarks>
+        public ExclusionMode DefaultLayerExclusionMode => ExclusionMode.Blend;
         private const string DefaultProfileResourcePath =
             "FacialControl/LipSync/Default uLipSync Profile";
 
@@ -471,6 +489,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
             entry.Clip.SampleAnimation(ctx.HostGameObject, sampleTime);
 
             float scale = NormalizeWeight(entry.MaxWeight);
+            bool anyNonZero = false;
             for (int i = 0; i < ctx.BlendShapeNames.Count; i++)
             {
                 string bsName = ctx.BlendShapeNames[i];
@@ -485,11 +504,30 @@ namespace Hidano.FacialControl.LipSync.Adapters
                     int meshIndex = renderer.sharedMesh.GetBlendShapeIndex(bsName);
                     if (meshIndex >= 0)
                     {
-                        weights[i] = Mathf.Clamp01(
+                        float w = Mathf.Clamp01(
                             (renderer.GetBlendShapeWeight(meshIndex) / 100f) * scale);
+                        weights[i] = w;
+                        if (w > 0f)
+                        {
+                            anyNonZero = true;
+                        }
                         break;
                     }
                 }
+            }
+
+            if (!anyNonZero)
+            {
+                // sample 後に 1 つも BlendShape weight が立たないクリップは、リップシンク中に何も
+                // 出力しない (= ContributeMask が空のまま) ため、ユーザーが「リップシンクが動かない」
+                // と感じる元になる。Clip 自体に BlendShape カーブが無いか、HostGameObject の
+                // SkinnedMeshRenderer 構造と Clip 内の rendererPath が一致しない可能性が高い。
+                Debug.LogWarning(
+                    $"[ULipSyncAdapterBinding] AnimationClip '{entry.Clip.name}' (phoneme '{entry.PhonemeId}') の "
+                    + $"sample 結果が全 BlendShape で 0 でした (sampleTime={sampleTime}). "
+                    + "Clip が BlendShape カーブを持たない、または HostGameObject ('"
+                    + ctx.HostGameObject.name
+                    + "') の SkinnedMeshRenderer 構造と Clip の rendererPath が一致していない可能性があります。");
             }
 
             return true;
