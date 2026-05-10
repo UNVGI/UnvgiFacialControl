@@ -66,6 +66,7 @@ namespace Hidano.FacialControl.Adapters.Json
             if (string.IsNullOrWhiteSpace(json))
                 throw new ArgumentException("JSON 文字列を空にすることはできません。", nameof(json));
 
+            LegacyOverlayFieldDetector.RejectLegacyExpressionIdInOverlays(json);
             preprocessed = PreprocessInputSourceOptions(PreprocessGazeConfigsKey(json));
 
             ProfileSnapshotDto dto;
