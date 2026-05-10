@@ -88,20 +88,21 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
             _removeButton = new Button(RemoveSelected)
             {
                 name = FooterRemoveButtonName,
-                text = "−",
+                text = "− 選択中を削除",
                 tooltip = "選択中の Adapter Binding を削除",
             };
-            _removeButton.style.minWidth = 28;
+            _removeButton.style.minWidth = 120;
+            _removeButton.style.marginRight = 4;
             _removeButton.SetEnabled(false);
             _footer.Add(_removeButton);
 
             var addButton = new Button(OpenAddDropdown)
             {
                 name = FooterAddButtonName,
-                text = "+",
+                text = "+ Adapter Binding を追加",
                 tooltip = "Adapter Binding を追加",
             };
-            addButton.style.minWidth = 28;
+            addButton.style.minWidth = 180;
             _footer.Add(addButton);
 
             Add(_footer);
