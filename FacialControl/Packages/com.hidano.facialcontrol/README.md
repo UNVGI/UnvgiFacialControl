@@ -22,15 +22,27 @@
 
 ## インストール
 
-`Packages/manifest.json` に以下を追加する (他のサブパッケージや scopedRegistries の設定はリポジトリルートの README を参照)。
+本パッケージは [VContainer](https://github.com/hadashiA/VContainer) (`jp.hadashikick.vcontainer`) に依存する。VContainer は npmjs / Unity Asset Store に publish されていないため、利用側で OpenUPM 等の scoped registry をあらかじめ追加しておく必要がある。`Packages/manifest.json` に以下のように追記する (他のサブパッケージや scopedRegistries の追加分はリポジトリルートの README を参照)。
 
 ```json
 {
+    "scopedRegistries": [
+        {
+            "name": "OpenUPM",
+            "url": "https://package.openupm.com",
+            "scopes": [
+                "jp.hadashikick.vcontainer"
+            ]
+        }
+    ],
     "dependencies": {
+        "jp.hadashikick.vcontainer": "1.16.6",
         "com.hidano.facialcontrol": "0.1.0-preview.1"
     }
 }
 ```
+
+> **Note**: VContainer のバージョンは本パッケージ作成時点で動作確認済みのものを記載している。後方互換性のあるパッチアップデートは利用側で自由に上げてよい。
 
 ## クイックスタート
 
@@ -76,9 +88,10 @@ Editor/             # Editor 拡張 (UI Toolkit)
 
 ## 依存パッケージ
 
-| パッケージ | バージョン | 用途 |
-|-----------|-----------|------|
-| `com.hidano.scene-view-style-camera-controller` | 1.0.0 | Editor プレビューウィンドウのシーンビュー操作 |
+| パッケージ | バージョン | 用途 | 取得元 |
+|-----------|-----------|------|--------|
+| `jp.hadashikick.vcontainer` | 1.16.6 以上 | per-FC LifetimeScope による DI 解決 | OpenUPM (scoped registry を `Packages/manifest.json` に追加) |
+| `com.hidano.scene-view-style-camera-controller` | 1.0.0 | Editor プレビューウィンドウのシーンビュー操作 | npm (npmjs.com) |
 
 ## 対応フォーマット
 

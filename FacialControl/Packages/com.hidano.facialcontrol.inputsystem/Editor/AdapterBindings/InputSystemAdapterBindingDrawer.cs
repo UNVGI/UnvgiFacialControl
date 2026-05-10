@@ -5,6 +5,7 @@ using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.Common;
+using Hidano.FacialControl.Editor.Inspector.AdapterBindings;
 using Hidano.FacialControl.InputSystem.Adapters.ScriptableObject;
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -52,7 +53,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             var root = new VisualElement();
             root.AddToClassList(RootClassName);
 
-            AddBoundField(root, property, SlugFieldName, "Slug");
+            AddSlugField(root, property);
 
             var assetField = AddInputActionAssetField(root, property);
             var actionMapDropdown = AddActionMapDropdown(root, property);
@@ -485,6 +486,17 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
         // ----------------------------------------------------------------
         // Helpers
         // ----------------------------------------------------------------
+
+        private static void AddSlugField(VisualElement root, SerializedProperty property)
+        {
+            var slugProp = property.FindPropertyRelative(SlugFieldName);
+            if (slugProp == null)
+            {
+                root.Add(new Label($"<missing field: {SlugFieldName}>"));
+                return;
+            }
+            root.Add(new AdapterBindingSlugField(slugProp, typeof(InputSystemAdapterBinding)));
+        }
 
         private static void AddBoundField(
             VisualElement root, SerializedProperty property, string relativePath, string label)

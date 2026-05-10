@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using Hidano.FacialControl.Editor.Inspector.AdapterBindings;
 using Hidano.FacialControl.LipSync.Adapters;
 using Hidano.FacialControl.LipSync.Adapters.Devices;
 using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
@@ -73,7 +74,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
 
             Assert.That(root.ClassListContains(ULipSyncAdapterBindingDrawer.RootClassName), Is.True);
             Assert.That(
-                root.Q<PropertyField>(ULipSyncAdapterBindingDrawer.SlugPropertyFieldName),
+                root.Q<AdapterBindingSlugField>(ULipSyncAdapterBindingDrawer.SlugPropertyFieldName),
                 Is.Not.Null);
             Assert.That(root.Q<DeviceDescriptorPopup>(), Is.Not.Null);
             Assert.That(

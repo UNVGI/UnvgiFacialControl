@@ -44,7 +44,10 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject
 
         // ----------------- ボーン制御 (主) -----------------
 
-        [Tooltip("左目ボーンの Transform 名 (参照モデル配下から名前一致で解決)。空なら無効。")]
+        [Tooltip("左目ボーンの Transform 名または参照モデル相対 path。"
+            + " 単純名 (\"LeftEye\") を指定した場合は階層全体を再帰探索し、複数候補があれば警告する。"
+            + " 同名ボーン衝突を確実に回避したい場合は相対 path (\"Hips/Spine/Head/LeftEye\") を指定する。"
+            + " 空なら無効。")]
         public string leftEyeBonePath;
 
         [Tooltip("左目ボーンの初期回転 (Euler 度)。アナログ入力 0 のときに保つ姿勢。アナログ入力はこの姿勢に加算される。")]
@@ -58,7 +61,9 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject
             + " 上下 (pitch) 回転に使われる。「参照モデルから自動設定」ボタンで初期姿勢から自動算出される。")]
         public Vector3 leftEyePitchAxisLocal = Vector3.right;
 
-        [Tooltip("右目ボーンの Transform 名。空なら無効。")]
+        [Tooltip("右目ボーンの Transform 名または参照モデル相対 path。"
+            + " leftEyeBonePath と同じ規約 (単純名は階層全体探索 / 重複時警告、"
+            + " path はスラッシュ区切りで一意指定)。空なら無効。")]
         public string rightEyeBonePath;
 
         [Tooltip("右目ボーンの初期回転 (Euler 度)。")]
