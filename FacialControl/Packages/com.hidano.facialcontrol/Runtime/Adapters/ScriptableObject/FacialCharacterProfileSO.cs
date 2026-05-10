@@ -21,6 +21,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
         [SerializeField] protected BaseExpressionSerializable _baseExpression = new BaseExpressionSerializable();
         [SerializeField] protected List<string> _rendererPaths = new List<string>();
         [SerializeField] protected List<GazeBindingConfig> _gazeConfigs = new List<GazeBindingConfig>();
+        [SerializeField] private List<string> _slots = new();
         [SerializeField] protected List<OverlaySlotBindingSerializable> _defaultOverlays = new List<OverlaySlotBindingSerializable>();
         [SerializeReference] protected List<AdapterBindingBase> _adapterBindings = new List<AdapterBindingBase>();
 
@@ -49,6 +50,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 
         public List<string> RendererPaths => _rendererPaths;
         public IReadOnlyList<GazeBindingConfig> GazeConfigs => _gazeConfigs ?? (_gazeConfigs = new List<GazeBindingConfig>());
+        public IReadOnlyList<string> Slots => _slots ?? (_slots = new List<string>());
         public List<OverlaySlotBindingSerializable> DefaultOverlays
             => _defaultOverlays ?? (_defaultOverlays = new List<OverlaySlotBindingSerializable>());
         public IReadOnlyList<AdapterBindingBase> AdapterBindings => _adapterBindings;
@@ -56,7 +58,12 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
         public virtual FacialProfile BuildFallbackProfile()
         {
             return FacialCharacterProfileConverter.ToFacialProfile(
-                _schemaVersion, _layers, _expressions, _rendererPaths, DefaultOverlays);
+                schemaVersion: _schemaVersion,
+                layers: _layers,
+                expressions: _expressions,
+                rendererPaths: _rendererPaths,
+                defaultOverlays: DefaultOverlays,
+                slots: Slots);
         }
 
         public static string GetStreamingAssetsProfilePath(string assetName)
