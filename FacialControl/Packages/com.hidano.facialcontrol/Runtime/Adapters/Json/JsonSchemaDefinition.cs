@@ -36,6 +36,9 @@ namespace Hidano.FacialControl.Adapters.Json
             /// <summary>rendererPaths フィールド名</summary>
             public const string RendererPaths = "rendererPaths";
 
+            /// <summary>defaultOverlays フィールド名（profile root、Overlay 機能の slot 別 fallback 宣言）</summary>
+            public const string DefaultOverlays = "defaultOverlays";
+
             /// <summary>
             /// bonePoses フィールド名（Req 7.1, 7.2）。
             /// 後方互換のため optional フィールド：欠落 / null / 空配列はすべて空 BonePoses 扱い（Req 7.3, 10.2）。
@@ -129,6 +132,23 @@ namespace Hidano.FacialControl.Adapters.Json
                 /// で旧 <c>layerSlots</c> 配列を撤去し、本フィールドで他レイヤーへのオーバーライド対象を表現する。
                 /// </summary>
                 public const string LayerOverrideMask = "layerOverrideMask";
+
+                /// <summary>
+                /// snapshot 内の overlays フィールド名（slot 別 overlay binding）。
+                /// </summary>
+                public const string Overlays = "overlays";
+            }
+
+            /// <summary>
+            /// OverlaySlotBinding (overlays / defaultOverlays の各エントリ) のフィールド名。
+            /// </summary>
+            public static class OverlaySlot
+            {
+                /// <summary>slot 識別子</summary>
+                public const string Slot = "slot";
+
+                /// <summary>発火させる overlay Expression ID（空文字で suppress）</summary>
+                public const string ExpressionId = "expressionId";
             }
 
             /// <summary>

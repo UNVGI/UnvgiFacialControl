@@ -23,9 +23,17 @@ MonoBehaviour:
       optionsJson: '{"maxStackDepth":4}'
     - id: input:analog-expression
       weight: 1
-      optionsJson: 
+      optionsJson:
     layerOverrideMask:
     - emotion
+  - name: overlay
+    priority: 1
+    exclusionMode: 0
+    inputSources:
+    - id: input:overlay:blink
+      weight: 1
+      optionsJson:
+    layerOverrideMask: []
   _expressions:
   - id: smile
     name: Smile
@@ -210,6 +218,36 @@ MonoBehaviour:
       bones: []
       rendererPaths:
       - Body
+  - id: smile_closed_eye
+    name: SmileClosedEye
+    layer: emotion
+    isGaze: 0
+    animationClip: {fileID: 0}
+    transitionDuration: 0.1
+    transitionCurve:
+      type: 0
+      keys: []
+    blendShapeValues: []
+    layerOverrideMask: []
+    cachedSnapshot:
+      transitionDuration: 0.1
+      transitionCurvePreset: Linear
+      blendShapes:
+      - rendererPath: Body
+        name: "\u7B11\u3044"
+        value: 100
+      - rendererPath: Body
+        name: "\u30A6\u30A3\u30F3\u30AF"
+        value: 100
+      - rendererPath: Body
+        name: "\u30A6\u30A3\u30F3\u30AF\u53F3"
+        value: 100
+      bones: []
+      rendererPaths:
+      - Body
+    overlays:
+    - slot: blink
+      expressionId:
   - id: eye_look
     name: "\u76EE\u7DDA"
     layer: emotion
@@ -259,6 +297,9 @@ MonoBehaviour:
     lookRightSamples: []
     lookUpSamples: []
     lookDownSamples: []
+  _defaultOverlays:
+  - slot: blink
+    expressionId: blink_overlay
   _adapterBindings:
   - rid: 8000000000000000001
   _referenceModel: {fileID: 919132149155446097, guid: 9c07cd4e1ef6a2a49a1c212c15237ef8, type: 3}
@@ -288,6 +329,10 @@ MonoBehaviour:
           actionName: Trigger4
           expressionId: lipsync_a
           triggerMode: 0
+        - bindingMode: 0
+          actionName: Trigger5
+          expressionId: smile_closed_eye
+          triggerMode: 0
         - bindingMode: 1
           actionName: Look
           expressionId: eye_look
@@ -296,7 +341,9 @@ MonoBehaviour:
           actionName: LeftTrigger
           expressionId: smile
           triggerMode: 0
-        - bindingMode: 2
+        - bindingMode: 3
           actionName: RightTrigger
-          expressionId: blink_overlay
+          expressionId:
           triggerMode: 0
+          overlaySlot: blink
+          overlayTargetLayer: overlay

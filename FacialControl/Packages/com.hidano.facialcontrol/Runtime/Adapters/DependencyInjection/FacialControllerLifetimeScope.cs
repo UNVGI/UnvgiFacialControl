@@ -70,7 +70,8 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
             IReadOnlyList<string> blendShapeNames,
             IReadOnlyList<AdapterBindingBase> bindings,
             GameObject hostGameObject,
-            string childScopeName = null)
+            string childScopeName = null,
+            IActiveExpressionProvider activeExpressionProvider = null)
         {
             if (appScope == null)
             {
@@ -95,6 +96,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
             IReadOnlyList<string> capturedBlendShapeNames = blendShapeNames;
             IReadOnlyList<AdapterBindingBase> capturedBindings = bindings;
             GameObject capturedHostGameObject = hostGameObject;
+            IActiveExpressionProvider capturedActiveProvider = activeExpressionProvider;
 
             LifetimeScope childScope = appScope.CreateChild(
                 (Action<IContainerBuilder>)(builder =>
@@ -111,7 +113,8 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
                         registry,
                         timeProvider,
                         capturedHostGameObject,
-                        lipSyncProvider);
+                        lipSyncProvider,
+                        capturedActiveProvider);
 
                     for (int i = 0; i < capturedBindings.Count; i++)
                     {

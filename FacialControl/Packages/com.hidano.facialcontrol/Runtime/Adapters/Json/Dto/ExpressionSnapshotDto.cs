@@ -35,5 +35,11 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
         /// トップレベル <see cref="ProfileSnapshotDto.rendererPaths"/> の subset である必要がある（Req 9.7）。
         /// </summary>
         public List<string> rendererPaths;
+
+        /// <summary>
+        /// この Expression が宣言する slot 別 overlay binding。
+        /// <see cref="OverlaySlotBindingDto.expressionId"/> が空なら明示 suppress。
+        /// </summary>
+        public List<OverlaySlotBindingDto> overlays;
     }
 }

@@ -280,7 +280,8 @@ namespace Hidano.FacialControl.Adapters.Playable
                     blendShapeNames,
                     bindings,
                     gameObject,
-                    childScopeName: name);
+                    childScopeName: name,
+                    activeExpressionProvider: _expressionUseCase);
             }
             catch (Exception ex)
             {
@@ -643,6 +644,28 @@ namespace Hidano.FacialControl.Adapters.Playable
             }
 
             _layerUseCase.SetInputSourceWeight(layerIdx, sourceIdx, weight);
+        }
+
+        /// <summary>
+        /// 指定レイヤーの inter-layer weight を 0〜1 にクランプして書込む。
+        /// Overlay 機能で「Trigger 押し量 = overlay レイヤー weight」を毎フレーム反映するために
+        /// adapter binding (<see cref="Hidano.FacialControl.Adapters.AdapterBindings.InputSystem.InputSystemAdapterBinding"/> 等) から呼ばれる。
+        /// 未初期化の場合は no-op。
+        /// </summary>
+        /// <param name="layerName">対象レイヤー名（profile.layers の name と一致）。</param>
+        /// <param name="weight">レイヤー weight（範囲外は silent clamp）。</param>
+        public void SetLayerWeight(string layerName, float weight)
+        {
+            if (!_isInitialized || _layerUseCase == null)
+            {
+                return;
+            }
+            if (string.IsNullOrEmpty(layerName))
+            {
+                return;
+            }
+
+            _layerUseCase.SetLayerWeight(layerName, weight);
         }
 
         /// <summary>

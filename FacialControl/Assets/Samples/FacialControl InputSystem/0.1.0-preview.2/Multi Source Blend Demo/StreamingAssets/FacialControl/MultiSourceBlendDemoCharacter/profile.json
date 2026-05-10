@@ -9,6 +9,14 @@
                 {"id": "input", "weight": 1.0, "options": {"maxStackDepth": 8}},
                 {"id": "input:analog-expression", "weight": 1.0}
             ]
+        },
+        {
+            "name": "overlay",
+            "priority": 1,
+            "exclusionMode": "lastWins",
+            "inputSources": [
+                {"id": "input:overlay:blink", "weight": 1.0}
+            ]
         }
     ],
     "expressions": [
@@ -92,6 +100,26 @@
             }
         },
         {
+            "id": "smile_closed_eye",
+            "name": "SmileClosedEye",
+            "layer": "emotion",
+            "layerOverrideMask": ["emotion"],
+            "snapshot": {
+                "transitionDuration": 0.1,
+                "transitionCurvePreset": "Linear",
+                "blendShapes": [
+                    {"rendererPath": "Body", "name": "笑い", "value": 1.0},
+                    {"rendererPath": "Body", "name": "ウィンク", "value": 1.0},
+                    {"rendererPath": "Body", "name": "ウィンク右", "value": 1.0}
+                ],
+                "bones": [],
+                "rendererPaths": ["Body"],
+                "overlays": [
+                    {"slot": "blink", "expressionId": ""}
+                ]
+            }
+        },
+        {
             "id": "eye_look",
             "name": "目線",
             "layer": "emotion",
@@ -106,6 +134,9 @@
         }
     ],
     "rendererPaths": ["Body"],
+    "defaultOverlays": [
+        {"slot": "blink", "expressionId": "blink_overlay"}
+    ],
     "gaze_configs": [
         {
             "expressionId": "eye_look",

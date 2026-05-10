@@ -68,6 +68,16 @@ namespace Hidano.FacialControl.Domain.Models
         public ReadOnlyMemory<BlendShapeMapping> BlendShapeValues { get; }
 
         /// <summary>
+        /// Trigger / Analog 入力で重ね合わせる overlay Expression を slot 単位で宣言する。
+        /// 各要素の <see cref="OverlaySlotBinding.ExpressionId"/> が空の場合は当該 slot を明示的に suppress する。
+        /// </summary>
+        /// <remarks>
+        /// 解決経路 (<c>OverlayInputSource</c>) は本フィールドを優先し、未宣言 slot のみ
+        /// <see cref="FacialProfile.DefaultOverlays"/> に fallback する。
+        /// </remarks>
+        public ReadOnlyMemory<OverlaySlotBinding> Overlays { get; }
+
+        /// <summary>
         /// SnapshotId 参照型コンストラクタ（Phase 3.1 新 API）。
         /// Bridge field（TransitionDuration / TransitionCurve / BlendShapeValues）は default 値で初期化される。
         /// </summary>
@@ -81,7 +91,8 @@ namespace Hidano.FacialControl.Domain.Models
             string name,
             string layer,
             LayerOverrideMask overrideMask,
-            string snapshotId)
+            string snapshotId,
+            OverlaySlotBinding[] overlays = null)
         {
             if (id == null)
                 throw new ArgumentNullException(nameof(id));
@@ -109,6 +120,7 @@ namespace Hidano.FacialControl.Domain.Models
             TransitionDuration = DefaultTransitionDuration;
             TransitionCurve = default;
             BlendShapeValues = Array.Empty<BlendShapeMapping>();
+            Overlays = CopyOverlays(overlays);
         }
 
         /// <summary>
@@ -128,7 +140,8 @@ namespace Hidano.FacialControl.Domain.Models
             string layer,
             float transitionDuration = DefaultTransitionDuration,
             TransitionCurve transitionCurve = default,
-            BlendShapeMapping[] blendShapeValues = null)
+            BlendShapeMapping[] blendShapeValues = null,
+            OverlaySlotBinding[] overlays = null)
         {
             if (id == null)
                 throw new ArgumentNullException(nameof(id));
@@ -161,6 +174,45 @@ namespace Hidano.FacialControl.Domain.Models
             {
                 BlendShapeValues = Array.Empty<BlendShapeMapping>();
             }
+
+            Overlays = CopyOverlays(overlays);
+        }
+
+        private static ReadOnlyMemory<OverlaySlotBinding> CopyOverlays(OverlaySlotBinding[] source)
+        {
+            if (source == null || source.Length == 0)
+            {
+                return Array.Empty<OverlaySlotBinding>();
+            }
+            var copy = new OverlaySlotBinding[source.Length];
+            Array.Copy(source, copy, source.Length);
+            return copy;
+        }
+
+        /// <summary>
+        /// 指定 slot の <see cref="OverlaySlotBinding"/> を検索する。
+        /// </summary>
+        /// <param name="slot">検索対象 slot 名。null / 空文字なら false。</param>
+        /// <param name="binding">見つかった binding。見つからなければ default。</param>
+        /// <returns>当該 slot を宣言していれば true（suppress を含む）、未宣言なら false。</returns>
+        public bool TryGetOverlay(string slot, out OverlaySlotBinding binding)
+        {
+            binding = default;
+            if (string.IsNullOrEmpty(slot))
+            {
+                return false;
+            }
+
+            var span = Overlays.Span;
+            for (int i = 0; i < span.Length; i++)
+            {
+                if (string.Equals(span[i].Slot, slot, StringComparison.Ordinal))
+                {
+                    binding = span[i];
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>

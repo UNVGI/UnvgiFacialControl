@@ -33,5 +33,10 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
         public List<string> rendererPaths;
 
         public List<GazeBindingConfigDto> gazeConfigs;
+
+        /// <summary>
+        /// active 表情に slot 宣言が無い場合の fallback 用 default overlay 一覧。
+        /// </summary>
+        public List<OverlaySlotBindingDto> defaultOverlays;
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
 
@@ -9,7 +10,7 @@ namespace Hidano.FacialControl.Application.UseCases
     /// レイヤーの排他モード（LastWins / Blend）に基づいて
     /// アクティブな Expression リストを管理する。
     /// </summary>
-    public class ExpressionUseCase
+    public class ExpressionUseCase : IActiveExpressionProvider
     {
         private FacialProfile _profile;
         private readonly Dictionary<string, List<Expression>> _activeByLayer;
@@ -109,6 +110,20 @@ namespace Hidano.FacialControl.Application.UseCases
                 result.AddRange(layerExpressions);
             }
             return result;
+        }
+
+        /// <inheritdoc />
+        public Expression? TryGetTopActiveExpression(string layerName)
+        {
+            if (string.IsNullOrEmpty(layerName))
+            {
+                return null;
+            }
+            if (!_activeByLayer.TryGetValue(layerName, out var list) || list == null || list.Count == 0)
+            {
+                return null;
+            }
+            return list[list.Count - 1];
         }
 
         /// <summary>

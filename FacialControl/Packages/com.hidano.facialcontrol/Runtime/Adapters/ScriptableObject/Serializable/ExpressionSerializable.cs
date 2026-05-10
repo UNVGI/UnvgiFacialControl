@@ -55,5 +55,8 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 
         [Tooltip("[Phase 5.3] AutoExporter がベイクした AnimationClip サンプリング結果のキャッシュ。Runtime fallback 経路で参照される (Req 9.2, 9.3)。")]
         public ExpressionSnapshotDto cachedSnapshot;
+
+        [Tooltip("Trigger / Analog 入力で重ね合わせる overlay Expression を slot 単位で宣言する。expressionId 空文字で当該 slot を suppress。")]
+        public List<OverlaySlotBindingSerializable> overlays = new List<OverlaySlotBindingSerializable>();
     }
 }

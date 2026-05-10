@@ -18,5 +18,12 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
 
         /// <summary>Scalar 連続値で Expression weight を 0..1 駆動する Analog モード。</summary>
         Analog = 2,
+
+        /// <summary>
+        /// Scalar 連続値で overlay slot を駆動する Overlay モード。
+        /// active 表情の <c>overlays[overlaySlot]</c>、または profile の <c>defaultOverlays[overlaySlot]</c> を
+        /// 解決して別レイヤー (typically priority 上位) に重ね合わせる。
+        /// </summary>
+        Overlay = 3,
     }
 }

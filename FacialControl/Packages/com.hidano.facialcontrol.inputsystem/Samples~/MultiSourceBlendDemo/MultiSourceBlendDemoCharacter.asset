@@ -26,6 +26,14 @@ MonoBehaviour:
       optionsJson: ''
     layerOverrideMask:
     - emotion
+  - name: overlay
+    priority: 1
+    exclusionMode: 0
+    inputSources:
+    - id: input:overlay:blink
+      weight: 1.0
+      optionsJson: ''
+    layerOverrideMask: []
   _expressions:
   - id: smile
     name: Smile
@@ -144,6 +152,36 @@ MonoBehaviour:
       bones: []
       rendererPaths:
       - Body
+  - id: smile_closed_eye
+    name: SmileClosedEye
+    layer: emotion
+    isGaze: 0
+    animationClip: {fileID: 0}
+    transitionDuration: 0.1
+    transitionCurve:
+      type: 0
+      keys: []
+    blendShapeValues: []
+    layerOverrideMask: []
+    cachedSnapshot:
+      transitionDuration: 0.1
+      transitionCurvePreset: Linear
+      blendShapes:
+      - rendererPath: Body
+        name: 笑い
+        value: 1.0
+      - rendererPath: Body
+        name: ウィンク
+        value: 1.0
+      - rendererPath: Body
+        name: ウィンク右
+        value: 1.0
+      bones: []
+      rendererPaths:
+      - Body
+    overlays:
+    - slot: blink
+      expressionId:
   - id: eye_look
     name: 目線
     layer: emotion
@@ -185,6 +223,9 @@ MonoBehaviour:
     lookRightSamples: []
     lookUpSamples: []
     lookDownSamples: []
+  _defaultOverlays:
+  - slot: blink
+    expressionId: blink_overlay
   _adapterBindings:
   - rid: 8000000000000000001
   _referenceModel: {fileID: 0}
@@ -214,6 +255,10 @@ MonoBehaviour:
           actionName: Trigger4
           expressionId: lipsync_a
           triggerMode: 0
+        - bindingMode: 0
+          actionName: Trigger5
+          expressionId: smile_closed_eye
+          triggerMode: 0
         - bindingMode: 1
           actionName: Look
           expressionId: eye_look
@@ -222,7 +267,9 @@ MonoBehaviour:
           actionName: LeftTrigger
           expressionId: smile
           triggerMode: 0
-        - bindingMode: 2
+        - bindingMode: 3
           actionName: RightTrigger
-          expressionId: blink_overlay
+          expressionId:
           triggerMode: 0
+          overlaySlot: blink
+          overlayTargetLayer: overlay

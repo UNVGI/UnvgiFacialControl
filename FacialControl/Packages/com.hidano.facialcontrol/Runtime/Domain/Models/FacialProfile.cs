@@ -39,6 +39,12 @@ namespace Hidano.FacialControl.Domain.Models
         public ReadOnlyMemory<InputSourceDeclaration[]> LayerInputSources { get; }
 
         /// <summary>
+        /// active 表情に slot 宣言が無い場合の fallback 用 default overlay。
+        /// 各要素の <see cref="OverlaySlotBinding.ExpressionId"/> が空なら当該 slot は default でも no-op となる。
+        /// </summary>
+        public ReadOnlyMemory<OverlaySlotBinding> DefaultOverlays { get; }
+
+        /// <summary>
         /// 表情設定プロファイルを生成する。配列パラメータは防御的コピーされる。
         /// </summary>
         /// <param name="schemaVersion">JSON スキーマバージョン（空文字不可）</param>
@@ -54,7 +60,8 @@ namespace Hidano.FacialControl.Domain.Models
             LayerDefinition[] layers = null,
             Expression[] expressions = null,
             string[] rendererPaths = null,
-            InputSourceDeclaration[][] layerInputSources = null)
+            InputSourceDeclaration[][] layerInputSources = null,
+            OverlaySlotBinding[] defaultOverlays = null)
         {
             if (schemaVersion == null)
                 throw new ArgumentNullException(nameof(schemaVersion));
@@ -120,6 +127,43 @@ namespace Hidano.FacialControl.Domain.Models
             {
                 LayerInputSources = Array.Empty<InputSourceDeclaration[]>();
             }
+
+            if (defaultOverlays != null && defaultOverlays.Length > 0)
+            {
+                var doCopy = new OverlaySlotBinding[defaultOverlays.Length];
+                Array.Copy(defaultOverlays, doCopy, defaultOverlays.Length);
+                DefaultOverlays = doCopy;
+            }
+            else
+            {
+                DefaultOverlays = Array.Empty<OverlaySlotBinding>();
+            }
+        }
+
+        /// <summary>
+        /// 指定 slot の <see cref="OverlaySlotBinding"/> を <see cref="DefaultOverlays"/> から検索する。
+        /// </summary>
+        /// <param name="slot">検索対象 slot 名。</param>
+        /// <param name="binding">見つかった binding。見つからなければ default。</param>
+        /// <returns>当該 slot の default が宣言されていれば true（suppress を含む）。</returns>
+        public bool TryGetDefaultOverlay(string slot, out OverlaySlotBinding binding)
+        {
+            binding = default;
+            if (string.IsNullOrEmpty(slot))
+            {
+                return false;
+            }
+
+            var span = DefaultOverlays.Span;
+            for (int i = 0; i < span.Length; i++)
+            {
+                if (string.Equals(span[i].Slot, slot, StringComparison.Ordinal))
+                {
+                    binding = span[i];
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
