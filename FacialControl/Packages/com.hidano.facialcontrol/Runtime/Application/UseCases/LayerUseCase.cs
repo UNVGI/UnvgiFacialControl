@@ -18,6 +18,18 @@ namespace Hidano.FacialControl.Application.UseCases
     {
         private static readonly List<Expression> EmptyExpressionList = new List<Expression>(0);
 
+        /// <summary>
+        /// [TEMP DEBUG] true にすると毎フレーム per-layer 出力 + 最終ブレンドを Console に出力する。
+        /// リップシンクと表情のブレンド調査用に preview 段階で残しているフラグ。preview.2 以降で除去予定。
+        /// </summary>
+        public static bool DebugBlendLog { get; set; } = true;
+
+        /// <summary>[TEMP DEBUG] ログ出力レート (秒)。</summary>
+        public static float DebugBlendLogIntervalSeconds { get; set; } = 0.5f;
+
+        // 直近のログ出力時刻 (Time.unscaledTimeAsDouble)。
+        private double _debugLastLogTime;
+
         private FacialProfile _profile;
         private readonly ExpressionUseCase _expressionUseCase;
         private string[] _blendShapeNames;
@@ -175,6 +187,67 @@ namespace Hidano.FacialControl.Application.UseCases
                     new ReadOnlySpan<LayerBlender.LayerInput>(_filteredLayerInputs, 0, activeCount),
                     new Span<float>(_finalOutput));
             }
+
+            if (DebugBlendLog)
+            {
+                EmitDebugBlendLog(layerSpan, activeCount);
+            }
+        }
+
+        // [TEMP DEBUG] レイヤー別の非ゼロ BlendShape 出力と最終ブレンド結果をレート制限つきで Console に出力する。
+        // リップシンク/表情のブレンドが期待通りに合成されているかを目視確認するために使う。
+        private void EmitDebugBlendLog(ReadOnlySpan<LayerDefinition> layerSpan, int activeCount)
+        {
+            double now = UnityEngine.Time.unscaledTimeAsDouble;
+            if (now - _debugLastLogTime < DebugBlendLogIntervalSeconds)
+            {
+                return;
+            }
+            _debugLastLogTime = now;
+
+            var sb = new System.Text.StringBuilder(256);
+            sb.Append("[FacialControl Blend] ");
+            for (int l = 0; l < _layerInputScratch.Length && l < layerSpan.Length; l++)
+            {
+                var input = _layerInputScratch[l];
+                var values = input.BlendShapeValues.Span;
+                var mask = input.ContributeMask;
+                int nonZero = 0;
+                int maskTrue = 0;
+                for (int i = 0; i < values.Length; i++)
+                {
+                    if (values[i] > 1e-4f || values[i] < -1e-4f) nonZero++;
+                }
+                if (mask != null)
+                {
+                    for (int i = 0; i < mask.Length; i++)
+                    {
+                        if (mask[i]) maskTrue++;
+                    }
+                }
+                bool included = false;
+                for (int f = 0; f < activeCount; f++)
+                {
+                    if (ReferenceEquals(_filteredLayerInputs[f].BlendShapeValues, input.BlendShapeValues))
+                    {
+                        included = true;
+                        break;
+                    }
+                }
+                sb.Append("L").Append(l).Append('(').Append(layerSpan[l].Name).Append(')');
+                sb.Append(":pri=").Append(input.Priority);
+                sb.Append(",w=").Append(input.Weight.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
+                sb.Append(",nz=").Append(nonZero);
+                sb.Append(",mask=").Append(maskTrue);
+                sb.Append(included ? ",inc " : ",skp ");
+            }
+            int finalNonZero = 0;
+            for (int i = 0; i < _finalOutput.Length; i++)
+            {
+                if (_finalOutput[i] > 1e-4f) finalNonZero++;
+            }
+            sb.Append("| final.nz=").Append(finalNonZero).Append('/').Append(_finalOutput.Length);
+            UnityEngine.Debug.Log(sb.ToString());
         }
 
         /// <summary>
@@ -429,13 +502,18 @@ namespace Hidano.FacialControl.Application.UseCases
         /// </summary>
         private sealed class LayerExpressionSource : IInputSource
         {
+            // 値を「触っていない」とみなす閾値。これ未満は ContributeMask に乗せない。
+            // LipSyncProvider の ContributeThreshold と同値で整合させる。
+            private const float ContributeThreshold = 1e-4f;
+
             public string Id => "input";
             public InputSourceType Type => InputSourceType.ExpressionTrigger;
             public int BlendShapeCount { get; }
-            public BitArray ContributeMask { get; }
+            public BitArray ContributeMask => _contributeMask;
 
             public bool HasBeenActive { get; private set; }
 
+            private readonly BitArray _contributeMask;
             private readonly float[] _snapshotValues;
             private readonly float[] _targetValues;
             private readonly float[] _currentValues;
@@ -448,7 +526,9 @@ namespace Hidano.FacialControl.Application.UseCases
             public LayerExpressionSource(int blendShapeCount)
             {
                 BlendShapeCount = blendShapeCount;
-                ContributeMask = new BitArray(blendShapeCount, true);
+                // 初期状態は「何も触らない」: 表情未活性のレイヤーが他レイヤーを上書きするのを防ぐ。
+                // UpdateExpressions / Tick で snapshot/target/current の非ゼロ index に応じて動的に再計算する。
+                _contributeMask = new BitArray(blendShapeCount, false);
                 _snapshotValues = new float[blendShapeCount];
                 _targetValues = new float[blendShapeCount];
                 _currentValues = new float[blendShapeCount];
@@ -488,6 +568,9 @@ namespace Hidano.FacialControl.Application.UseCases
                     _isComplete = false;
 
                     UpdateActiveIds(currentExpressions);
+                    // snapshot ∪ target で遷移中に触る index を mask に乗せる。
+                    // 直前 active から target 0 へ抜けるケースでも snapshot 側で拾える。
+                    RebuildContributeMaskForTransition();
                 }
 
                 HasBeenActive = true;
@@ -505,17 +588,64 @@ namespace Hidano.FacialControl.Application.UseCases
                 if (_elapsedTime >= _duration)
                 {
                     _isComplete = true;
+                    // 遷移が完了したら mask を current 値で再評価する。
+                    // 表情が完全に rest (全 0) に戻ったレイヤーはここで mask が空になり、
+                    // 上位レイヤーが下位レイヤーを上書き潰す問題が止まる (= リップシンクと表情のブレンド維持)。
+                    RebuildContributeMaskFromCurrent();
                 }
             }
 
             public bool TryWriteValues(Span<float> output)
             {
+                // mask が空 (= 触る index がない) のときは無効ソース扱いにし、
+                // aggregator 側で layerMask への OR 集約をスキップさせる。
+                // これにより「表情未活性レイヤー」が下位レイヤーを 0 で上書きしなくなる。
+                if (!HasAnyContributeIndex())
+                {
+                    return false;
+                }
+
                 int len = output.Length < _currentValues.Length ? output.Length : _currentValues.Length;
                 for (int i = 0; i < len; i++)
                 {
                     output[i] = _currentValues[i];
                 }
                 return true;
+            }
+
+            private void RebuildContributeMaskForTransition()
+            {
+                int n = _contributeMask.Length;
+                for (int i = 0; i < n; i++)
+                {
+                    float s = _snapshotValues[i];
+                    float t = _targetValues[i];
+                    float c = _currentValues[i];
+                    bool any = (s > ContributeThreshold || s < -ContributeThreshold)
+                        || (t > ContributeThreshold || t < -ContributeThreshold)
+                        || (c > ContributeThreshold || c < -ContributeThreshold);
+                    _contributeMask[i] = any;
+                }
+            }
+
+            private void RebuildContributeMaskFromCurrent()
+            {
+                int n = _contributeMask.Length;
+                for (int i = 0; i < n; i++)
+                {
+                    float c = _currentValues[i];
+                    _contributeMask[i] = c > ContributeThreshold || c < -ContributeThreshold;
+                }
+            }
+
+            private bool HasAnyContributeIndex()
+            {
+                int n = _contributeMask.Length;
+                for (int i = 0; i < n; i++)
+                {
+                    if (_contributeMask[i]) return true;
+                }
+                return false;
             }
 
             private bool DetectExpressionChange(List<Expression> currentExpressions)

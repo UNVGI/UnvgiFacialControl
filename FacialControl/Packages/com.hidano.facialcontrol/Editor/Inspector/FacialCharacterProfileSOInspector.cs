@@ -1457,6 +1457,12 @@ namespace Hidano.FacialControl.Editor.Inspector
             RebuildGazeConfigsUI();
             RebuildExpressionIdMapping();
             UpdateValidation();
+
+            // 表情タブから目線設定を自動入力した場合、目線タブの「未確認」アスタリスクは
+            // ユーザーがすでに参照モデルに紐づく設定を当てはめた状態を表すため除去する。
+            // (アスタリスクは「目線タブを開いて値を確認しろ」という注意マーカーであり、
+            //  自動入力で値を当てはめた以上は確認済みとみなす)
+            ClearGazeTabAttention();
         }
 
         private void ChangeExpressionIsGaze(int exprIndex, bool newIsGaze)

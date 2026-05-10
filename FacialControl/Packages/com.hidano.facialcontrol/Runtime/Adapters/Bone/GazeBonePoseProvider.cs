@@ -131,17 +131,18 @@ namespace Hidano.FacialControl.Adapters.Bone
                 float yawDeg;
                 if (b.IsLeftEye)
                 {
-                    // 左目: input.x > 0 (右へ視線) は内側方向、input.x < 0 (左へ視線) は外側方向。
-                    yawDeg = ix >= 0f
-                        ? ix * b.InnerYawAngle
-                        : ix * b.OuterYawAngle;
-                }
-                else
-                {
-                    // 右目: input.x > 0 (右へ視線) は外側方向、input.x < 0 (左へ視線) は内側方向。
+                    // 左目: 後段の `yawDeg = -yawDeg` 反転と Unity 既定 (+Y/+X) 軸配置の組合せを踏まえ、
+                    // input.x > 0 のとき左目は外側、input.x < 0 のとき内側方向に振れる。
                     yawDeg = ix >= 0f
                         ? ix * b.OuterYawAngle
                         : ix * b.InnerYawAngle;
+                }
+                else
+                {
+                    // 右目: 同様に input.x > 0 のとき内側、input.x < 0 のとき外側に振れる。
+                    yawDeg = ix >= 0f
+                        ? ix * b.InnerYawAngle
+                        : ix * b.OuterYawAngle;
                 }
 
                 float pitchDeg = iy >= 0f

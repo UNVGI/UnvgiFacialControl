@@ -41,9 +41,10 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
         public const string ActionDropdownName = "input-system-binding-action-dropdown";
         public const string ExpressionDropdownName = "input-system-binding-expression-dropdown";
         public const string TriggerModeFieldName = "input-system-binding-trigger-mode-field";
+        public const string ModeMismatchHelpName = "input-system-binding-mode-mismatch-help";
 
-        // 1 行の高さ (BindingMode + Action + Expression + TriggerMode)
-        private const float RowHeight = 116f;
+        // 1 行の高さ (Action + Expression + BindingMode + TriggerMode + ヒントボックス分の余裕)
+        private const float RowHeight = 156f;
 
         /// <inheritdoc />
         public override VisualElement CreatePropertyGUI(SerializedProperty property)
@@ -284,21 +285,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             var expressionIdProp = entryProp.FindPropertyRelative("expressionId");
             var triggerModeProp = entryProp.FindPropertyRelative("triggerMode");
 
-            // BindingMode field
-            var bindingModeField = new EnumField("動作モード", BindingMode.Normal)
-            {
-                name = BindingModeFieldName,
-                tooltip = "Normal: 通常キー押下による Expression。"
-                    + " Gaze: Vector2 入力で目線駆動。"
-                    + " Analog: Scalar 連続値で expression weight を 0..1 駆動。",
-            };
-            if (bindingModeProp != null)
-            {
-                bindingModeField.BindProperty(bindingModeProp);
-            }
-            element.Add(bindingModeField);
-
-            // Action dropdown
+            // 1) Action dropdown
             var actionDropdown = new DropdownField("Action 名")
             {
                 name = ActionDropdownName,
@@ -307,22 +294,9 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             var actionChoices = CollectActionNames(bindingProperty);
             actionDropdown.choices = BuildSafeChoices(actionChoices, actionNameValue);
             actionDropdown.SetValueWithoutNotify(actionNameValue);
-            actionDropdown.RegisterValueChangedCallback(evt =>
-            {
-                var so = bindingProperty.serializedObject;
-                so.Update();
-                var list = bindingProperty.FindPropertyRelative(ExpressionBindingsFieldName);
-                if (list == null || index < 0 || index >= list.arraySize) return;
-                var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("actionName");
-                if (prop != null)
-                {
-                    prop.stringValue = evt.newValue ?? string.Empty;
-                    so.ApplyModifiedProperties();
-                }
-            });
             element.Add(actionDropdown);
 
-            // Expression dropdown
+            // 2) Expression dropdown
             var expressionDropdown = new DropdownField("表情 ID")
             {
                 name = ExpressionDropdownName,
@@ -351,7 +325,21 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             });
             element.Add(expressionDropdown);
 
-            // TriggerMode field
+            // 3) BindingMode field
+            var bindingModeField = new EnumField("動作モード", BindingMode.Normal)
+            {
+                name = BindingModeFieldName,
+                tooltip = "Normal: 通常キー押下による Expression。"
+                    + " Gaze: Vector2 入力で目線駆動。"
+                    + " Analog: Scalar 連続値で expression weight を 0..1 駆動。",
+            };
+            if (bindingModeProp != null)
+            {
+                bindingModeField.BindProperty(bindingModeProp);
+            }
+            element.Add(bindingModeField);
+
+            // 4) TriggerMode field
             var triggerModeField = new EnumField("トリガモード", TriggerMode.Hold)
             {
                 name = TriggerModeFieldName,
@@ -366,14 +354,124 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 ? (BindingMode)bindingModeProp.enumValueIndex
                 : BindingMode.Normal;
             UpdateTriggerModeVisibility(triggerModeField, currentMode);
+            element.Add(triggerModeField);
+
+            // 5) Mode と Action の expectedControlType の不一致を検知するヒントボックス。
+            //    Normal モードで連続値 Action (Axis/Vector2) を選んでいる、
+            //    あるいは Analog モードで Button Action を選んでいるケースで警告を出す。
+            var modeMismatchHelp = new HelpBox(string.Empty, HelpBoxMessageType.Warning)
+            {
+                name = ModeMismatchHelpName,
+            };
+            modeMismatchHelp.style.display = DisplayStyle.None;
+            element.Add(modeMismatchHelp);
+
+            // Action と BindingMode の整合チェックを実行 (初期表示 + 値変更時)。
+            void RefreshModeMismatchHint()
+            {
+                BindingMode m = bindingModeProp != null
+                    ? (BindingMode)bindingModeProp.enumValueIndex
+                    : BindingMode.Normal;
+                string aName = actionNameProp != null ? actionNameProp.stringValue ?? string.Empty : string.Empty;
+                UpdateModeMismatchHint(modeMismatchHelp, bindingProperty, aName, m);
+            }
+            RefreshModeMismatchHint();
+
+            // Action 変更時のコールバックは validation 更新を含むため、ここで一括登録する。
+            actionDropdown.RegisterValueChangedCallback(evt =>
+            {
+                var so = bindingProperty.serializedObject;
+                so.Update();
+                var list = bindingProperty.FindPropertyRelative(ExpressionBindingsFieldName);
+                if (list == null || index < 0 || index >= list.arraySize) return;
+                var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("actionName");
+                if (prop != null)
+                {
+                    prop.stringValue = evt.newValue ?? string.Empty;
+                    so.ApplyModifiedProperties();
+                }
+                RefreshModeMismatchHint();
+            });
             bindingModeField.RegisterValueChangedCallback(evt =>
             {
                 if (evt.newValue is BindingMode mode)
                 {
                     UpdateTriggerModeVisibility(triggerModeField, mode);
                 }
+                RefreshModeMismatchHint();
             });
-            element.Add(triggerModeField);
+        }
+
+        /// <summary>
+        /// Action の expectedControlType と BindingMode の組合せを評価し、
+        /// 不一致を警告する HelpBox の表示状態を更新する。
+        /// </summary>
+        private static void UpdateModeMismatchHint(
+            HelpBox helpBox,
+            SerializedProperty bindingProperty,
+            string actionName,
+            BindingMode mode)
+        {
+            if (helpBox == null) return;
+
+            // Action 未設定時はヒント無し（Action 自体の未設定エラーは別経路で扱う）。
+            if (string.IsNullOrEmpty(actionName))
+            {
+                helpBox.style.display = DisplayStyle.None;
+                return;
+            }
+
+            var assetProp = bindingProperty.FindPropertyRelative(InputActionAssetFieldName);
+            var asset = assetProp != null ? assetProp.objectReferenceValue as InputActionAsset : null;
+            if (asset == null)
+            {
+                helpBox.style.display = DisplayStyle.None;
+                return;
+            }
+
+            var mapNameProp = bindingProperty.FindPropertyRelative(ActionMapNameFieldName);
+            string mapName = mapNameProp != null ? mapNameProp.stringValue : null;
+            if (string.IsNullOrEmpty(mapName))
+            {
+                helpBox.style.display = DisplayStyle.None;
+                return;
+            }
+
+            var map = asset.FindActionMap(mapName);
+            var action = map?.FindAction(actionName);
+            string controlType = action != null ? action.expectedControlType ?? string.Empty : string.Empty;
+
+            // expectedControlType が空 (= 未指定) の Action は判定不能。
+            if (string.IsNullOrEmpty(controlType))
+            {
+                helpBox.style.display = DisplayStyle.None;
+                return;
+            }
+
+            bool isButton = string.Equals(controlType, "Button", StringComparison.OrdinalIgnoreCase);
+            bool isContinuous = !isButton; // Axis / Vector2 / Stick / Dpad 等は連続値とみなす。
+
+            string message = null;
+            if (mode == BindingMode.Normal && isContinuous)
+            {
+                message = $"動作モードが Normal ですが、Action '{actionName}' の expectedControlType は '{controlType}' (連続値) です。"
+                    + " Analog または Gaze モードに切り替えるとアナログ入力を活用できます。";
+            }
+            else if (mode == BindingMode.Analog && isButton)
+            {
+                message = $"動作モードが Analog ですが、Action '{actionName}' の expectedControlType は 'Button' (ON/OFF) です。"
+                    + " Action を Axis 系に変更するか、動作モードを Normal に戻してください。";
+            }
+
+            if (string.IsNullOrEmpty(message))
+            {
+                helpBox.style.display = DisplayStyle.None;
+            }
+            else
+            {
+                helpBox.text = message;
+                helpBox.style.display = DisplayStyle.Flex;
+            }
         }
 
         private static void UpdateTriggerModeVisibility(EnumField triggerModeField, BindingMode mode)
