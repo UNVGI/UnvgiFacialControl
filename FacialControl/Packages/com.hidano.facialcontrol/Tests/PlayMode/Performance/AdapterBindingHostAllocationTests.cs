@@ -66,9 +66,16 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
 
             InitializeHosts(hosts);
 
+            // Warm Unity TestRunner の log capture pipeline を別 host 群で先に起動し、
+            // 本 fixture の measurement window が log buffer 初期化アロケに巻き込まれないようにする。
+            WarmUpExceptionLogCapture();
+
             throwingBinding.ThrowOnNextTick = true;
-            LogAssert.Expect(LogType.Error, AdapterBindingHostOnTickErrorPattern);
-            ExecuteFrames(hosts, 1);
+            using (new ErrorStackTraceScope(StackTraceLogType.None))
+            {
+                LogAssert.Expect(LogType.Error, AdapterBindingHostOnTickErrorPattern);
+                ExecuteFrames(hosts, 1);
+            }
 
             Assert.That(throwingBinding.OnTickCount, Is.EqualTo(1));
 
