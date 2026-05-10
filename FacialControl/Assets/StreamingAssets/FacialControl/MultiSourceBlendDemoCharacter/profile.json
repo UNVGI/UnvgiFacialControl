@@ -1,5 +1,8 @@
 ﻿{
     "schemaVersion": "1.0",
+    "slots": [
+        "blink"
+    ],
     "layers": [
         {
             "name": "emotion",
@@ -55,6 +58,13 @@
                 "bones": [],
                 "rendererPaths": [
                     "Body"
+                ],
+                "overlays": [
+                    {
+                        "slot": "blink",
+                        "suppress": false,
+                        "snapshot": null
+                    }
                 ]
             }
         },
@@ -143,12 +153,75 @@
             }
         },
         {
-            "id": "blink_overlay",
-            "name": "BlinkOverlay",
+            "id": "smile_closed_eye",
+            "name": "SmileClosedEye",
             "layer": "emotion",
             "layerOverrideMask": [
                 "emotion"
             ],
+            "snapshot": {
+                "transitionDuration": 0.10000000149011612,
+                "transitionCurvePreset": "Linear",
+                "blendShapes": [
+                    {
+                        "rendererPath": "Body",
+                        "name": "笑い",
+                        "value": 100.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "ウィンク",
+                        "value": 100.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "ウィンク右",
+                        "value": 100.0
+                    }
+                ],
+                "bones": [],
+                "rendererPaths": [
+                    "Body"
+                ],
+                "overlays": [
+                    {
+                        "slot": "blink",
+                        "suppress": true,
+                        "snapshot": null
+                    }
+                ]
+            }
+        },
+        {
+            "id": "eye_look",
+            "name": "目線",
+            "layer": "emotion",
+            "layerOverrideMask": [
+                "emotion"
+            ],
+            "snapshot": {
+                "transitionDuration": 0.10000000149011612,
+                "transitionCurvePreset": "Linear",
+                "blendShapes": [],
+                "bones": [],
+                "rendererPaths": []
+            }
+        }
+    ],
+    "baseExpression": {
+        "transitionDuration": 0.06666667014360428,
+        "transitionCurvePreset": "Linear",
+        "blendShapes": [],
+        "bones": [],
+        "rendererPaths": []
+    },
+    "rendererPaths": [
+        "Body"
+    ],
+    "defaultOverlays": [
+        {
+            "slot": "blink",
+            "suppress": false,
             "snapshot": {
                 "transitionDuration": 0.05000000074505806,
                 "transitionCurvePreset": "Linear",
@@ -272,78 +345,9 @@
                 "bones": [],
                 "rendererPaths": [
                     "Body"
-                ]
-            }
-        },
-        {
-            "id": "smile_closed_eye",
-            "name": "SmileClosedEye",
-            "layer": "emotion",
-            "layerOverrideMask": [
-                "emotion"
-            ],
-            "snapshot": {
-                "transitionDuration": 0.10000000149011612,
-                "transitionCurvePreset": "Linear",
-                "blendShapes": [
-                    {
-                        "rendererPath": "Body",
-                        "name": "笑い",
-                        "value": 100.0
-                    },
-                    {
-                        "rendererPath": "Body",
-                        "name": "ウィンク",
-                        "value": 100.0
-                    },
-                    {
-                        "rendererPath": "Body",
-                        "name": "ウィンク右",
-                        "value": 100.0
-                    }
                 ],
-                "bones": [],
-                "rendererPaths": [
-                    "Body"
-                ],
-                "overlays": [
-                    {
-                        "slot": "blink",
-                        "expressionId": ""
-                    }
-                ]
+                "overlays": []
             }
-        },
-        {
-            "id": "eye_look",
-            "name": "目線",
-            "layer": "emotion",
-            "layerOverrideMask": [
-                "emotion"
-            ],
-            "snapshot": {
-                "transitionDuration": 0.10000000149011612,
-                "transitionCurvePreset": "Linear",
-                "blendShapes": [],
-                "bones": [],
-                "rendererPaths": []
-            }
-        }
-    ],
-    "baseExpression": {
-        "transitionDuration": 0.06666667014360428,
-        "transitionCurvePreset": "Linear",
-        "blendShapes": [],
-        "bones": [],
-        "rendererPaths": []
-    },
-    "rendererPaths": [
-        "Body"
-    ],
-    "defaultOverlays": [
-        {
-            "slot": "blink",
-            "expressionId": "blink_overlay"
         }
     ],
     "gaze_configs": [
