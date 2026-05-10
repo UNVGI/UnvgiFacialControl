@@ -4,9 +4,8 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
     /// <summary>
-    /// BlendShapeSnapshot の Red フェーズテスト。
+    /// BlendShapeSnapshot のテスト。
     /// (RendererPath, Name, Value) を保持する readonly struct の振る舞いを検証する。
-    /// _Requirements: 1.5, 2.1, 9.2, 13.1
     /// </summary>
     [TestFixture]
     public class BlendShapeSnapshotTests

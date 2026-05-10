@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
 
@@ -9,7 +10,7 @@ namespace Hidano.FacialControl.Application.UseCases
     /// レイヤーの排他モード（LastWins / Blend）に基づいて
     /// アクティブな Expression リストを管理する。
     /// </summary>
-    public class ExpressionUseCase
+    public class ExpressionUseCase : IActiveExpressionProvider
     {
         private FacialProfile _profile;
         private readonly Dictionary<string, List<Expression>> _activeByLayer;
@@ -33,7 +34,7 @@ namespace Hidano.FacialControl.Application.UseCases
         /// ExpressionUseCase を生成する（<see cref="ExpressionResolver"/> 注入版）。
         /// </summary>
         /// <param name="profile">対象の表情設定プロファイル</param>
-        /// <param name="resolver">SnapshotId → 値解決サービス（null 許容、tasks.md 3.4）</param>
+        /// <param name="resolver">SnapshotId → 値解決サービス（null 許容）</param>
         public ExpressionUseCase(FacialProfile profile, ExpressionResolver resolver)
         {
             _profile = profile;
@@ -42,7 +43,7 @@ namespace Hidano.FacialControl.Application.UseCases
         }
 
         /// <summary>
-        /// <see cref="ExpressionResolver"/> を後付けで注入する（tasks.md 3.4）。
+        /// <see cref="ExpressionResolver"/> を後付けで注入する。
         /// </summary>
         /// <param name="resolver">SnapshotId → 値解決サービス（null で解除）</param>
         public void SetResolver(ExpressionResolver resolver)
@@ -109,6 +110,20 @@ namespace Hidano.FacialControl.Application.UseCases
                 result.AddRange(layerExpressions);
             }
             return result;
+        }
+
+        /// <inheritdoc />
+        public Expression? TryGetTopActiveExpression(string layerName)
+        {
+            if (string.IsNullOrEmpty(layerName))
+            {
+                return null;
+            }
+            if (!_activeByLayer.TryGetValue(layerName, out var list) || list == null || list.Count == 0)
+            {
+                return null;
+            }
+            return list[list.Count - 1];
         }
 
         /// <summary>

@@ -9,7 +9,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.ARKit
 {
     /// <summary>
     /// ARKit / PerfectSync の OSC float 経路を 1 binding に集約した
-    /// <see cref="AdapterBindingBase"/> 具象（Req 6.3、design.md `## ArKitOscAdapterBinding（osc package）`）。
+    /// <see cref="AdapterBindingBase"/> 具象。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -18,8 +18,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.ARKit
     /// <see cref="ArKitOscAnalogSource"/> を helper の <see cref="OscReceiver"/> に subscribe させる。
     /// </para>
     /// <para>
-    /// ARKit 自動検出 (<c>ARKitDetector</c>) は Editor only のため binding には含めない（design.md
-    /// `### Decision: ARKit binding 配置`）。binding はあくまで OSC float 経路の受信を担う。
+    /// ARKit 自動検出 (<c>ARKitDetector</c>) は Editor only のため binding には含めない。binding はあくまで OSC float 経路の受信を担う。
     /// </para>
     /// <para>
     /// <see cref="Dispose"/> で <c>analogSource.Dispose()</c> → <c>Object.Destroy(_helperHost)</c> →
@@ -56,7 +55,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.ARKit
 
         /// <summary>
         /// パラメータレスコンストラクタ。Inspector の Add ドロップダウンで <c>Activator.CreateInstance</c> から
-        /// 生成される必要があるため明示する（Req 2.5）。
+        /// 生成される必要があるため明示する。
         /// </summary>
         public ArKitOscAdapterBinding()
         {
@@ -143,7 +142,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.ARKit
             if (!AdapterSlug.TryParse(Slug, out _))
             {
                 Debug.LogError(
-                    $"[ArKitOscAdapterBinding] Slug '{Slug}' が AdapterSlug 規約を満たしません（Req 12.1）。");
+                    $"[ArKitOscAdapterBinding] Slug '{Slug}' が AdapterSlug 規約を満たしません。");
                 return;
             }
 

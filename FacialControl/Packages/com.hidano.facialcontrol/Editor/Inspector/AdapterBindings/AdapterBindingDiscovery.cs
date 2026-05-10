@@ -14,7 +14,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Req 1.3 / 1.4 / 1.7 に対応。<see cref="InitializeOnLoadAttribute"/> により domain reload 直後に
+    // / 1.4 / 1.7 に対応。<see cref="InitializeOnLoadAttribute"/> により domain reload 直後に
     /// 一度 scan を実行し、以後は <see cref="GetDescriptors"/> がキャッシュを返す。
     /// </para>
     /// <para>

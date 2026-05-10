@@ -16,15 +16,13 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
     ///
     /// 検証項目:
     ///   - Humanoid Animator から <see cref="HumanBodyBones.LeftEye"/> /
-    ///     <see cref="HumanBodyBones.RightEye"/> の bone 名を取得できる（Req 3.1）。
+    ///     <see cref="HumanBodyBones.RightEye"/> の bone 名を取得できる。
     ///   - <see cref="HumanBodyBones.Head"/> を優先し、Head 不在時に
-    ///     <c>useNeckFallback=true</c> で <see cref="HumanBodyBones.Neck"/> を返す（Req 3.2）。
+    ///     <c>useNeckFallback=true</c> で <see cref="HumanBodyBones.Neck"/> を返す。
     ///   - 非 Humanoid Animator または該当スロット未マップの場合に empty 返却 +
-    ///     <see cref="Debug.LogWarning"/> であり throw しない（Req 3.4）。
-    ///   - オプトイン（明示呼出のみ、自動実行されない）であること（Req 3.3）。
-    ///   - Adapters/Bone 配下に配置されていること（Req 3.5）。
-    ///
-    /// _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
+    ///     <see cref="Debug.LogWarning"/> であり throw しない。
+    ///   - オプトイン（明示呼出のみ、自動実行されない）であること。
+    ///   - Adapters/Bone 配下に配置されていること。
     /// </summary>
     [TestFixture]
     public class HumanoidBoneAutoAssignerTests
@@ -48,13 +46,13 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
         }
 
         // ================================================================
-        // ResolveEyeBoneNames: Humanoid + Eyes（Req 3.1）
+        // ResolveEyeBoneNames: Humanoid + Eyes
         // ================================================================
 
         [Test]
         public void ResolveEyeBoneNames_HumanoidWithEyes_ReturnsLeftRightBoneNames()
         {
-            // Eye マップ済 Humanoid から LeftEye / RightEye の bone 名が返ること（Req 3.1）。
+            // Eye マップ済 Humanoid から LeftEye / RightEye の bone 名が返ること。
             BuildHumanoid(includeEyes: true, includeNeck: true);
             var animator = _rootGo.GetComponent<Animator>();
 
@@ -65,13 +63,13 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
         }
 
         // ================================================================
-        // ResolveEyeBoneNames: Humanoid だが Eye 未マップ（Req 3.4）
+        // ResolveEyeBoneNames: Humanoid だが Eye 未マップ
         // ================================================================
 
         [Test]
         public void ResolveEyeBoneNames_HumanoidWithoutEyes_ReturnsEmptyAndWarns()
         {
-            // 該当スロット未マップは empty + Warning（Req 3.4）。
+            // 該当スロット未マップは empty + Warning。
             BuildHumanoid(includeEyes: false, includeNeck: true);
             var animator = _rootGo.GetComponent<Animator>();
 
@@ -81,7 +79,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
 
             HumanoidBoneAutoAssigner.EyeBoneNames result = default;
             Assert.DoesNotThrow(() => result = HumanoidBoneAutoAssigner.ResolveEyeBoneNames(animator),
-                "Eye 未マップでも throw しないこと（Req 3.4）");
+                "Eye 未マップでも throw しないこと");
 
             Assert.That(string.IsNullOrEmpty(result.LeftEye), Is.True,
                 "Eye 未マップの LeftEye は empty を返すこと");
@@ -90,13 +88,13 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
         }
 
         // ================================================================
-        // ResolveEyeBoneNames: 非 Humanoid（Req 3.4）
+        // ResolveEyeBoneNames: 非 Humanoid
         // ================================================================
 
         [Test]
         public void ResolveEyeBoneNames_NonHumanoidAnimator_ReturnsEmptyAndWarns()
         {
-            // 非 Humanoid Animator は empty + Warning（Req 3.4）。
+            // 非 Humanoid Animator は empty + Warning。
             _rootGo = new GameObject("NonHumanoid");
             _rootGo.AddComponent<Animator>(); // avatar 未設定 = 非 Humanoid 扱い
             var animator = _rootGo.GetComponent<Animator>();
@@ -105,7 +103,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
 
             HumanoidBoneAutoAssigner.EyeBoneNames result = default;
             Assert.DoesNotThrow(() => result = HumanoidBoneAutoAssigner.ResolveEyeBoneNames(animator),
-                "非 Humanoid でも throw しないこと（Req 3.4）");
+                "非 Humanoid でも throw しないこと");
 
             Assert.That(string.IsNullOrEmpty(result.LeftEye), Is.True,
                 "非 Humanoid の LeftEye は empty");
@@ -116,7 +114,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
         [Test]
         public void ResolveEyeBoneNames_NullAnimator_ReturnsEmptyAndWarnsWithoutThrow()
         {
-            // null Animator でも throw しない（防御的契約 + Req 3.4）。
+            // null Animator でも throw しない（防御的契約）。
             LogAssert.ignoreFailingMessages = true;
 
             HumanoidBoneAutoAssigner.EyeBoneNames result = default;
@@ -129,13 +127,13 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
         }
 
         // ================================================================
-        // ResolveBasisBoneName: Humanoid Head（Req 3.2）
+        // ResolveBasisBoneName: Humanoid Head
         // ================================================================
 
         [Test]
         public void ResolveBasisBoneName_HumanoidWithHead_ReturnsHeadBoneName()
         {
-            // Head 優先で bone 名を返す（Req 3.2）。
+            // Head 優先で bone 名を返す。
             BuildHumanoid(includeEyes: true, includeNeck: true);
             var animator = _rootGo.GetComponent<Animator>();
 
@@ -147,7 +145,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
         [Test]
         public void ResolveBasisBoneName_HumanoidWithHead_UseNeckFallbackFalse_ReturnsHeadBoneName()
         {
-            // useNeckFallback=false でも Head が存在すれば Head を返す（Req 3.2 / 3.3）。
+            // useNeckFallback=false でも Head が存在すれば Head を返す。
             BuildHumanoid(includeEyes: true, includeNeck: true);
             var animator = _rootGo.GetComponent<Animator>();
 
@@ -157,14 +155,14 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
         }
 
         // ================================================================
-        // ResolveBasisBoneName: Head 不在 → Neck フォールバック（Req 3.2）
+        // ResolveBasisBoneName: Head 不在 → Neck フォールバック
         // ================================================================
 
         [Test]
         public void ResolveBasisBoneName_HeadMissing_UseNeckFallbackTrue_ReturnsNeckBoneName()
         {
             // Head Transform を破棄して GetBoneTransform(Head) が null になる状況を作る。
-            // useNeckFallback=true の場合は Neck の bone 名を返す（Req 3.2）。
+            // useNeckFallback=true の場合は Neck の bone 名を返す。
             BuildHumanoid(includeEyes: false, includeNeck: true);
             var animator = _rootGo.GetComponent<Animator>();
 
@@ -176,13 +174,13 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
             string result = HumanoidBoneAutoAssigner.ResolveBasisBoneName(animator, useNeckFallback: true);
 
             Assert.AreEqual("Neck", result,
-                "Head 不在 + useNeckFallback=true は Neck の bone 名を返すこと（Req 3.2）");
+                "Head 不在 + useNeckFallback=true は Neck の bone 名を返すこと");
         }
 
         [Test]
         public void ResolveBasisBoneName_HeadMissing_UseNeckFallbackFalse_ReturnsEmptyAndWarns()
         {
-            // useNeckFallback=false の場合、Head 不在は empty + Warning（Req 3.2 / 3.4）。
+            // useNeckFallback=false の場合、Head 不在は empty + Warning。
             BuildHumanoid(includeEyes: false, includeNeck: true);
             var animator = _rootGo.GetComponent<Animator>();
 
@@ -200,7 +198,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
         }
 
         // ================================================================
-        // ResolveBasisBoneName: 非 Humanoid（Req 3.4）
+        // ResolveBasisBoneName: 非 Humanoid
         // ================================================================
 
         [Test]
@@ -214,10 +212,10 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
 
             string result = null;
             Assert.DoesNotThrow(() => result = HumanoidBoneAutoAssigner.ResolveBasisBoneName(animator),
-                "非 Humanoid でも throw しないこと（Req 3.4）");
+                "非 Humanoid でも throw しないこと");
 
             Assert.That(string.IsNullOrEmpty(result), Is.True,
-                "非 Humanoid は empty を返すこと（Req 3.4）");
+                "非 Humanoid は empty を返すこと");
         }
 
         [Test]
@@ -234,20 +232,20 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
         }
 
         // ================================================================
-        // オプトイン契約: 静的クラス + 明示呼出のみ（Req 3.3 / 3.5）
+        // オプトイン契約: 静的クラス + 明示呼出のみ
         // ================================================================
 
         [Test]
         public void HumanoidBoneAutoAssigner_IsStaticClassUnderAdaptersBoneNamespace()
         {
-            // Req 3.3 (オプトイン) と Req 3.5 (Adapters/Bone 配下) の構造的保証。
+            // オプトイン契約と Adapters/Bone 配下配置の構造的保証。
             // 静的クラスとして定義されており、明示呼出のみで動作することを型レベルで担保する。
             var type = typeof(HumanoidBoneAutoAssigner);
 
             Assert.IsTrue(type.IsAbstract && type.IsSealed,
-                "HumanoidBoneAutoAssigner は static class（abstract+sealed）であること（Req 3.3 オプトイン）");
+                "HumanoidBoneAutoAssigner は static class（abstract+sealed）であること（オプトイン）");
             Assert.AreEqual("Hidano.FacialControl.Adapters.Bone", type.Namespace,
-                "Adapters.Bone 名前空間に配置されていること（Req 3.5）");
+                "Adapters.Bone 名前空間に配置されていること");
         }
 
         // ================================================================

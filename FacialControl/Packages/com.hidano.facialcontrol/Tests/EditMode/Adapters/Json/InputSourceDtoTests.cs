@@ -6,10 +6,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 {
     /// <summary>
     /// <see cref="InputSourceDto"/> / <see cref="InputSourceOptionsDto"/> 階層の
-    /// EditMode 契約テスト (tasks.md 7.1)。
+    /// EditMode 契約テスト 。
     /// <para>
     /// 観測完了条件: <c>{"stalenessSeconds":2.5}</c> を <see cref="OscOptionsDto"/> に
-    /// 逆シリアライズすると <c>stalenessSeconds == 2.5f</c> となる (Critical 2, Req 3.1, 3.7)。
+    /// 逆シリアライズすると <c>stalenessSeconds == 2.5f</c> となる (Critical 2, 3.7)。
     /// </para>
     /// </summary>
     [TestFixture]

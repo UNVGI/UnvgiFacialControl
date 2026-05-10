@@ -14,11 +14,10 @@ namespace Hidano.FacialControl.Domain.Adapters
     /// <remarks>
     /// <para>
     /// 値型のため stack 渡し。<c>in</c> 修飾で binding の <see cref="AdapterBindingBase.OnStart"/>
-    /// に渡され、boxing なしで field アクセス可能（Req 4.10, 13.1）。
+    /// に渡され、boxing なしで field アクセス可能。
     /// </para>
     /// <para>
-    /// 設計上の Boundary Note: design.md の component 表は本 struct を Adapters/DI 層に置くと
-    /// 記述しているが、<see cref="AdapterBindingBase.OnStart(in AdapterBuildContext)"/> が Domain
+    /// <see cref="AdapterBindingBase.OnStart(in AdapterBuildContext)"/> が Domain
     /// 層から本 struct を参照する都合上、Domain.Adapters 名前空間に配置する。
     /// </para>
     /// </remarks>
@@ -56,6 +55,12 @@ namespace Hidano.FacialControl.Domain.Adapters
         public readonly ILipSyncProvider LipSyncProvider;
 
         /// <summary>
+        /// 指定レイヤーの top active Expression を提供する provider（任意）。
+        /// Overlay 解決経路 (<c>OverlayInputSource</c>) で必要となる。null の場合 overlay 機能は no-op。
+        /// </summary>
+        public readonly IActiveExpressionProvider ActiveExpressionProvider;
+
+        /// <summary>
         /// すべての非 null 必須依存を受け取って中立コンテキストを構築する。
         /// </summary>
         /// <param name="profile">FacialProfile（値型のため null 不可）。</param>
@@ -64,6 +69,7 @@ namespace Hidano.FacialControl.Domain.Adapters
         /// <param name="timeProvider">ITimeProvider（null 不可）。</param>
         /// <param name="hostGameObject">宿主 GameObject（null 不可）。</param>
         /// <param name="lipSyncProvider">ILipSyncProvider（null 許容）。</param>
+        /// <param name="activeExpressionProvider">IActiveExpressionProvider（null 許容、Overlay 経路用）。</param>
         /// <exception cref="ArgumentNullException">
         /// <paramref name="blendShapeNames"/> / <paramref name="inputSourceRegistry"/> /
         /// <paramref name="timeProvider"/> / <paramref name="hostGameObject"/> のいずれかが
@@ -75,7 +81,8 @@ namespace Hidano.FacialControl.Domain.Adapters
             IInputSourceRegistry inputSourceRegistry,
             ITimeProvider timeProvider,
             GameObject hostGameObject,
-            ILipSyncProvider lipSyncProvider)
+            ILipSyncProvider lipSyncProvider,
+            IActiveExpressionProvider activeExpressionProvider = null)
         {
             if (blendShapeNames == null)
             {
@@ -100,6 +107,7 @@ namespace Hidano.FacialControl.Domain.Adapters
             TimeProvider = timeProvider;
             HostGameObject = hostGameObject;
             LipSyncProvider = lipSyncProvider;
+            ActiveExpressionProvider = activeExpressionProvider;
         }
     }
 }

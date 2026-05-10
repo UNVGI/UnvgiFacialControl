@@ -18,14 +18,14 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
 {
     /// <summary>
     /// <see cref="InputSystemAdapterBinding"/> の inline UI を提供する UI Toolkit ベースの
-    /// <see cref="PropertyDrawer"/>（Req 3.1, 3.2, 3.3, 6.5, 7.4, 7.5, 11.4、design.md `## Adapter PropertyDrawers`）。
+    /// <see cref="PropertyDrawer"/>。
     /// </summary>
     /// <remarks>
-    /// preview.1 の破壊的変更により、Trigger / Gaze / Analog の 3 リストを単一の
+    /// Trigger / Gaze / Analog の 3 リストを単一の
     /// 「キーバインディング」リスト (<c>_expressionBindings</c>) に統合し、各行で
-    /// <see cref="BindingMode"/> を選択する形に集約した。
+    /// <see cref="BindingMode"/> を選択する形に集約する。
     /// <c>[CustomPropertyDrawer(typeof(InputSystemAdapterBinding))]</c> を付与し、core の
-    /// <see cref="UnityEditor.UIElements.PropertyField"/> から自動解決される（Req 3.3）。
+    /// <see cref="UnityEditor.UIElements.PropertyField"/> から自動解決される。
     /// </remarks>
     [CustomPropertyDrawer(typeof(InputSystemAdapterBinding))]
     public sealed class InputSystemAdapterBindingDrawer : PropertyDrawer
@@ -285,6 +285,8 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             var actionNameProp = entryProp.FindPropertyRelative("actionName");
             var expressionIdProp = entryProp.FindPropertyRelative("expressionId");
             var triggerModeProp = entryProp.FindPropertyRelative("triggerMode");
+            var overlaySlotProp = entryProp.FindPropertyRelative("overlaySlot");
+            var overlayTargetLayerProp = entryProp.FindPropertyRelative("overlayTargetLayer");
 
             // 1) Action dropdown
             var actionDropdown = new DropdownField("Action 名")
@@ -357,6 +359,21 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             UpdateTriggerModeVisibility(triggerModeField, currentMode);
             element.Add(triggerModeField);
 
+            // 4b) Overlay モード時のみ表示する overlaySlot / overlayTargetLayer。
+            var overlaySlotField = new PropertyField(overlaySlotProp, "Overlay slot")
+            {
+                tooltip = "Overlay モード時のみ有効。駆動する slot 識別子（例: blink）。",
+            };
+            element.Add(overlaySlotField);
+
+            var overlayTargetLayerField = new PropertyField(overlayTargetLayerProp, "Overlay 対象レイヤー")
+            {
+                tooltip = "Overlay モード時のみ有効。Action 押し量で weight を更新する対象レイヤー名（typically \"overlay\"）。",
+            };
+            element.Add(overlayTargetLayerField);
+
+            UpdateOverlayFieldVisibility(overlaySlotField, overlayTargetLayerField, currentMode);
+
             // 5) Mode と Action の expectedControlType の不一致を検知するヒントボックス。
             //    Normal モードで連続値 Action (Axis/Vector2) を選んでいる、
             //    あるいは Analog モードで Button Action を選んでいるケースで警告を出す。
@@ -398,9 +415,18 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 if (evt.newValue is BindingMode mode)
                 {
                     UpdateTriggerModeVisibility(triggerModeField, mode);
+                    UpdateOverlayFieldVisibility(overlaySlotField, overlayTargetLayerField, mode);
                 }
                 RefreshModeMismatchHint();
             });
+        }
+
+        private static void UpdateOverlayFieldVisibility(
+            VisualElement overlaySlotField, VisualElement overlayTargetLayerField, BindingMode mode)
+        {
+            DisplayStyle d = mode == BindingMode.Overlay ? DisplayStyle.Flex : DisplayStyle.None;
+            if (overlaySlotField != null) overlaySlotField.style.display = d;
+            if (overlayTargetLayerField != null) overlayTargetLayerField.style.display = d;
         }
 
         /// <summary>
@@ -504,7 +530,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             var child = property.FindPropertyRelative(relativePath);
             if (child == null)
             {
-                // 該当フィールドが見つからない場合でも他フィールドの描画を止めない（Req 3.6 と同思想）。
+                // 該当フィールドが見つからない場合でも他フィールドの描画を止めない。
                 root.Add(new Label($"<missing field: {relativePath}>"));
                 return;
             }

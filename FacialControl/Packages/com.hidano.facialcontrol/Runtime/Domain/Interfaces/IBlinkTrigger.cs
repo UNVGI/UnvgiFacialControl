@@ -5,7 +5,6 @@ namespace Hidano.FacialControl.Domain.Interfaces
     /// <summary>
     /// 自動まばたきのトリガー判定インターフェース。
     /// ユーザーが独自の実装を提供可能。
-    /// 実装は preview.2 で提供予定。
     /// </summary>
     public interface IBlinkTrigger
     {

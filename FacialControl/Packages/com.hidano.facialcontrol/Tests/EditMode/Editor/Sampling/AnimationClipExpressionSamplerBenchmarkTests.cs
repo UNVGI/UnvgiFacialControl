@@ -9,9 +9,8 @@ using UnityEngine;
 namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
 {
     /// <summary>
-    /// Phase 2.4: <see cref="AnimationClipExpressionSampler"/> のパフォーマンス保証。
+    /// <see cref="AnimationClipExpressionSampler"/> のパフォーマンス保証。
     /// 1 Expression あたり 50ms 以内（典型 ~10 BlendShapes）でサンプリング完了することを確認する。
-    /// _Requirements: 9.4, 11.2, 13.2
     /// </summary>
     [TestFixture]
     public class AnimationClipExpressionSamplerBenchmarkTests

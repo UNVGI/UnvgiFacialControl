@@ -7,7 +7,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
     /// <see cref="InputSourceId"/> の規約テスト。
     /// </summary>
     /// <remarks>
-    /// 旧 reserved id 体系（<c>osc</c> / <c>lipsync</c> / <c>input</c> 等）は D-13 / Req 12.5 で
+    /// 旧 reserved id 体系（<c>osc</c> / <c>lipsync</c> / <c>input</c> 等）は D-13 で
     /// 廃止済みのため、識別子の意味付けは <see cref="AdapterSlug"/> 側のテストでカバーされる。
     /// 本ファイルは識別子文字列としての validation 契約（regex / 長さ / legacy 拒否 / 等価性）のみを保持する。
     /// </remarks>

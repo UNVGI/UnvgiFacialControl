@@ -19,7 +19,7 @@ namespace Hidano.FacialControl.Domain.Services
     /// 各 (layer, source) について <c>source.Tick(deltaTime)</c> +
     /// <c>source.TryWriteValues(scratch)</c> を呼び出し、
     /// <c>output[k] = clamp01(Σ wᵢ · values_i[k])</c> を per-layer float バッファに書込む
-    /// (Req 2.2 / 2.3 / 6.3)。
+    /// 。
     /// </para>
     /// <para>
     /// 出力は <see cref="LayerBlender.LayerInput"/> の <see cref="Span{T}"/> として受け取る。
@@ -28,37 +28,37 @@ namespace Hidano.FacialControl.Domain.Services
     /// <c>float[]</c> を使い回すため GC アロケーションは発生しない (Design §Output semantics)。
     /// </para>
     /// <para>
-    /// 本タスク時点での責務: per-layer 加重和 + 最終クランプ (5.1)、
-    /// 長さ不一致時の overlap-only 処理 + 無効ソース (TryWriteValues=false) のゼロ寄与 (5.2、Req 1.3 / 1.4)、
-    /// 空レイヤー検出 + per-layer per-session 1 回 warning (5.3、Req 2.4)、
+    /// 責務: per-layer 加重和 + 最終クランプ、
+    /// 長さ不一致時の overlap-only 処理 + 無効ソース (TryWriteValues=false) のゼロ寄与、
+    /// 空レイヤー検出 + per-layer per-session 1 回 warning、
     /// および既存 <see cref="LayerBlender.Blend(System.ReadOnlySpan{LayerBlender.LayerInput}, System.Span{float})"/>
-    /// との 2 段パイプライン接続 (5.4、Req 2.6 / 2.7 / 6.4 / 7.1)。
+    /// との 2 段パイプライン接続。
     /// </para>
     /// <para>
     /// overlap-only 契約: 各 <c>source.TryWriteValues(scratch)</c> の直前に scratch を
     /// <see cref="Span{T}.Clear"/> でゼロ初期化し、source が BlendShape 個数未満しか書込まない場合も
     /// 未書込インデックスはゼロ寄与として加算されるようにする (前フレームの値が leak しない)。
     /// 無効ソース (戻り値 false) は scratch が全ゼロのまま加算ループを <c>continue</c> でスキップし、
-    /// 例外を出さず寄与 0 として扱う (Req 1.4)。
+    /// 例外を出さず寄与 0 として扱う 。
     /// </para>
     /// <para>
-    /// 空レイヤー契約 (Req 2.4): 当該レイヤーに登録された source が 0 本、または全 source が
+    /// 空レイヤー契約 : 当該レイヤーに登録された source が 0 本、または全 source が
     /// <see cref="Hidano.FacialControl.Domain.Interfaces.IInputSource.TryWriteValues"/> で
     /// false を返した場合、そのレイヤーの出力はゼロに保たれ、<see cref="UnityEngine.Debug.LogWarning(object)"/>
     /// がそのレイヤーについてセッション (= Aggregator インスタンス) あたり 1 回だけ発火する。
-    /// weight=0 の valid source は「空レイヤー」とはみなさない (IsValid が基準、Req 2.4 / design §Edge Cases)。
+    /// weight=0 の valid source は「空レイヤー」とはみなさない (IsValid が基準 / design §Edge Cases)。
     /// 一度 warning を出したレイヤーは、以後 valid に戻って再び空になっても warning は再発しない。
     /// </para>
     /// <para>
-    /// 2 段パイプライン (5.4、Req 2.6 / 2.7): intra-layer の加重和 + クランプ (source weight による合成)
+    /// 2 段パイプライン: intra-layer の加重和 + クランプ (source weight による合成)
     /// と inter-layer の <see cref="LayerBlender.LayerInput.Weight"/> による優先度ブレンドは独立に適用される。
     /// Aggregator は source weight を per-layer float バッファに畳み込んだうえで、呼出側から渡された
     /// inter-layer weight をそのまま <see cref="LayerBlender.LayerInput"/> の <c>weight</c> に載せる
-    /// (乗算しない、Req 2.7 / D-4)。<see cref="AggregateAndBlend"/> を使えば per-layer バッファから
+    /// (乗算しない / D-4)。<see cref="AggregateAndBlend"/> を使えば per-layer バッファから
     /// 最終 BlendShape 配列までの経路を 1 呼出しで回せる。
     /// </para>
     /// <para>
-    /// 診断 snapshot API (5.5、Req 8.1 / 8.3):
+    /// 診断 snapshot API (5.5 / 8.3):
     /// <see cref="TryWriteSnapshot"/> は呼出側が確保した
     /// <see cref="Span{T}"/> (<see cref="LayerSourceWeightEntry"/>) に、直近の
     /// <see cref="Aggregate"/> で観測された (layer, source) ウェイトを 0-alloc でコピーする。
@@ -71,14 +71,14 @@ namespace Hidano.FacialControl.Domain.Services
     /// が true を返した source の weight 合計) の場合に true となる。
     /// </para>
     /// <para>
-    /// verbose log rate-limit (5.6、Req 8.5): <see cref="SetVerboseLogging(bool)"/> を true にした場合、
+    /// verbose log rate-limit: <see cref="SetVerboseLogging(bool)"/> を true にした場合、
     /// 各レイヤーの現在 per-source weight を <see cref="UnityEngine.Debug.Log(object)"/> に出力するが、
     /// 同一レイヤーの出力は <see cref="Hidano.FacialControl.Domain.Interfaces.ITimeProvider.UnscaledTimeSeconds"/>
     /// ベースで 1 秒あたり最大 1 回にレート制限される。
     /// <see cref="Hidano.FacialControl.Domain.Interfaces.ITimeProvider"/>
     /// をコンストラクタで注入することでテストから決定論的に時刻を前進できる (既定では
     /// <see cref="UnityEngine.Time.unscaledTimeAsDouble"/> を参照する内部プロバイダが使われる)。
-    /// verbose OFF 時は文字列生成経路に入らないため GC ゼロ契約 (Req 6.1) を壊さない。
+    /// verbose OFF 時は文字列生成経路に入らないため GC ゼロ契約  を壊さない。
     /// </para>
     /// </remarks>
     public sealed class LayerInputSourceAggregator
@@ -91,7 +91,7 @@ namespace Hidano.FacialControl.Domain.Services
         private readonly bool[] _emptyLayerWarned;
         private readonly LayerBlender.LayerInput[] _layerInputScratch;
 
-        // 診断 snapshot (Req 8.1 / 8.3) 用の事前確保バッファと
+        // 診断 snapshot  用の事前確保バッファと
         // InputSourceId の slot 単位キャッシュ (regex 再評価を避ける)。
         private readonly LayerSourceWeightEntry[] _snapshotBuffer;
         private int _snapshotWritten;
@@ -100,7 +100,7 @@ namespace Hidano.FacialControl.Domain.Services
         private readonly List<LayerSourceWeightEntry> _snapshotList;
         private readonly int _snapshotMaxSourcesPerLayer;
 
-        // verbose logging (Req 8.5、タスク 5.6) の状態。
+        // verbose logging  の状態。
         // per-layer "次に出力可能な時刻" を秒単位で保持し、
         // ITimeProvider.UnscaledTimeSeconds がこの値以上であれば出力する。
         // StringBuilder は verbose 有効時のみ生成し、disabled 時の GC ゼロ契約を壊さない。
@@ -120,7 +120,7 @@ namespace Hidano.FacialControl.Domain.Services
         /// <param name="weightBuffer">入力源ウェイトのダブルバッファ。非 null。</param>
         /// <param name="blendShapeCount">1 レイヤーの出力 BlendShape 個数。0 以上。</param>
         /// <param name="timeProvider">
-        /// verbose log rate-limit (Req 8.5) で使用する時刻源。省略または null の場合は
+        /// verbose log rate-limit で使用する時刻源。省略または null の場合は
         /// <see cref="UnityEngine.Time.unscaledTimeAsDouble"/> を参照する内部実装にフォールバックする。
         /// EditMode テストでは <c>Tests.Shared.ManualTimeProvider</c> を注入することで
         /// 1 秒ウィンドウを決定論的に検証できる。
@@ -218,12 +218,12 @@ namespace Hidano.FacialControl.Domain.Services
         /// priorities / layerWeights をレイヤー単位で指定する <see cref="Aggregate(float, Span{LayerBlender.LayerInput})"/>
         /// の overload。2 段パイプラインの前段として使い、後段 (inter-layer blend) に渡す
         /// <see cref="LayerBlender.LayerInput.Priority"/> / <see cref="LayerBlender.LayerInput.Weight"/> を
-        /// 呼出側が決めたい場合に用いる (Req 2.6 / 2.7 / 5.4)。
+        /// 呼出側が決めたい場合に用いる 。
         /// </summary>
         /// <param name="deltaTime">前フレームからの経過秒数 (>= 0)。</param>
         /// <param name="priorities">レイヤー毎の優先度。長さは <c>registry.LayerCount</c> 以上。</param>
         /// <param name="layerWeights">レイヤー毎の inter-layer weight (0〜1 想定。<see cref="LayerBlender"/> 側で clamp)。
-        /// 長さは <c>registry.LayerCount</c> 以上。source weight とは独立適用される (Req 2.7 / D-4)。</param>
+        /// 長さは <c>registry.LayerCount</c> 以上。source weight とは独立適用される 。</param>
         /// <param name="outputPerLayer">書込先。長さは <c>registry.LayerCount</c> と一致する必要がある。</param>
         public void Aggregate(
             float deltaTime,
@@ -249,7 +249,7 @@ namespace Hidano.FacialControl.Domain.Services
         }
 
         /// <summary>
-        /// 2 段パイプラインを 1 呼出しで回すエントリポイント (5.4)。
+        /// 2 段パイプラインを 1 呼出しで回すエントリポイント。
         /// per-layer 加重和 + クランプを行った後、事前確保済みの
         /// <see cref="LayerBlender.LayerInput"/> スクラッチ経由で
         /// <see cref="LayerBlender.Blend(ReadOnlySpan{LayerBlender.LayerInput}, Span{float})"/>
@@ -257,10 +257,10 @@ namespace Hidano.FacialControl.Domain.Services
         /// </summary>
         /// <remarks>
         /// source weight は intra-layer 段でのみ適用され、inter-layer 段には持ち越さない
-        /// (Req 2.7 / D-4)。<paramref name="layerWeights"/> は <see cref="LayerBlender.LayerInput.Weight"/>
+        /// 。<paramref name="layerWeights"/> は <see cref="LayerBlender.LayerInput.Weight"/>
         /// としてそのまま載せられ、後段 <see cref="LayerBlender.Blend(ReadOnlySpan{LayerBlender.LayerInput}, Span{float})"/>
         /// が優先度ブレンドを行う。内部スクラッチはコンストラクタで 1 度だけ確保され、本メソッドは
-        /// <see cref="LayerBlender"/> のシグネチャを一切変更しない (Req 7.1)。
+        /// <see cref="LayerBlender"/> のシグネチャを一切変更しない 。
         /// </remarks>
         public void AggregateAndBlend(
             float deltaTime,
@@ -348,7 +348,7 @@ namespace Hidano.FacialControl.Domain.Services
                     }
                 }
 
-                // Σwᵢ > 1 のレイヤーの全エントリに Saturated=true を焼き付ける (Req 8.1)。
+                // Σwᵢ > 1 のレイヤーの全エントリに Saturated=true を焼き付ける 。
                 if (layerWeightSum > 1f)
                 {
                     for (int i = layerSnapshotStart; i < snapshotWritten; i++)
@@ -404,7 +404,7 @@ namespace Hidano.FacialControl.Domain.Services
         /// <summary>
         /// (layer, source) slot に対する <see cref="InputSourceId"/> を返す。
         /// 同一 source 参照が連続で観測される限りは regex 検証を繰返さずキャッシュを返す
-        /// (Aggregate 経路の per-frame 0-alloc 契約、Req 6.1 への寄与)。
+        /// (Aggregate 経路の per-frame 0-alloc 契約 への寄与)。
         /// </summary>
         /// <remarks>
         /// 構築時点の MaxSourcesPerLayer を超える slot (registry が TryAddSource で拡張)
@@ -433,7 +433,7 @@ namespace Hidano.FacialControl.Domain.Services
 
         /// <summary>
         /// 直近 <see cref="Aggregate"/> で観測された (layer, source) ウェイトを
-        /// 呼出側の <see cref="Span{T}"/> にコピーする (Req 8.1)。
+        /// 呼出側の <see cref="Span{T}"/> にコピーする 。
         /// </summary>
         /// <param name="buffer">書込先。<paramref name="written"/> 個以上の長さが必要。</param>
         /// <param name="written">書込まれたエントリ数。<paramref name="buffer"/> 不足時は 0。</param>
@@ -462,7 +462,7 @@ namespace Hidano.FacialControl.Domain.Services
 
         /// <summary>
         /// 直近 <see cref="Aggregate"/> で観測された (layer, source) ウェイトを
-        /// <see cref="IReadOnlyList{T}"/> として返す (Req 8.3)。
+        /// <see cref="IReadOnlyList{T}"/> として返す 。
         /// </summary>
         /// <remarks>
         /// Editor / デバッグ用途向けで GC 許容。内部 <see cref="List{T}"/> を再利用するため
@@ -496,7 +496,7 @@ namespace Hidano.FacialControl.Domain.Services
         }
 
         /// <summary>
-        /// verbose 診断ログの ON/OFF を切替える (Req 8.5、タスク 5.6)。
+        /// verbose 診断ログの ON/OFF を切替える 。
         /// </summary>
         /// <param name="enabled">
         /// true にすると <see cref="Aggregate(float, System.Span{LayerBlender.LayerInput})"/> 呼出しごとに
@@ -530,7 +530,7 @@ namespace Hidano.FacialControl.Domain.Services
         }
 
         /// <summary>
-        /// verbose log が有効な場合に呼ばれる per-layer レート制限つきログ出力 (Req 8.5)。
+        /// verbose log が有効な場合に呼ばれる per-layer レート制限つきログ出力 。
         /// </summary>
         /// <remarks>
         /// 1 秒あたり最大 1 回契約。<see cref="Hidano.FacialControl.Domain.Interfaces.ITimeProvider.UnscaledTimeSeconds"/>
@@ -582,7 +582,7 @@ namespace Hidano.FacialControl.Domain.Services
         /// 既定実装。<see cref="UnityEngine.Time.unscaledTimeAsDouble"/> を直接参照する。
         /// </summary>
         /// <remarks>
-        /// Adapters 層 <c>UnityTimeProvider</c> とほぼ同義だが、Domain 層 Aggregator 単体テスト (5.6) で
+        /// Adapters 層 <c>UnityTimeProvider</c> とほぼ同義だが、Domain 層 Aggregator 単体テストで
         /// Adapters 依存を避けるために Domain 層内部に同梱する。本番コード (FacialController 初期化経路) では
         /// Adapters 層の <c>UnityTimeProvider</c> を明示的に注入し、プロセス内で単一時刻源を共有する運用を推奨する。
         /// </remarks>

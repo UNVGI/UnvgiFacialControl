@@ -5,14 +5,14 @@ namespace Hidano.FacialControl.Adapters.Bone
 {
     /// <summary>
     /// 名前または参照モデル相対 path から <see cref="UnityEngine.Transform"/> を解決し、
-    /// 結果をキャッシュするサービス (Req 2.1, 2.2, 2.3, 2.4, 2.5)。
+    /// 結果をキャッシュするサービス 。
     /// </summary>
     /// <remarks>
     /// <para>
     /// 解決対象文字列が <c>'/'</c> を含む場合は <see cref="Transform.Find(string)"/> 互換の
     /// 相対 path として扱い、含まない場合は階層全体を再帰探索する単純名解決として扱う。
     /// 単純名解決のとき同名 Transform が複数ヒットすると最初の発見を採用しつつ警告を 1 回だけ出す
-    /// (M-7、preview.2 で導入)。曖昧性を避けたい場合は相対 path を指定する。
+    /// 曖昧性を避けたい場合は相対 path を指定する。
     /// </para>
     /// <para>
     /// 解決失敗時は <see cref="Debug.LogWarning"/> + null 返却（throw しない）。

@@ -12,8 +12,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ser
     /// 一時的な Mock <c>AdapterBindingBase</c> 派生型 2 種を Tests/EditMode 内に閉じて定義し、
     /// <c>AssetDatabase.CreateAsset</c> → <c>LoadAssetAtPath</c> による具象型 identity の保存と
     /// <c>SerializedProperty.managedReferenceFullTypename</c> の挙動を assert する。
-    /// fail した場合は Phase 1 全体を停止して <c>[SerializeReference]</c> 仕様を再調査する判断材料となる。
-    /// _Requirements: 2.3, 2.7, 10.2_
+    /// fail した場合は <c>[SerializeReference]</c> 仕様を再調査する判断材料となる。
     /// </summary>
     [TestFixture]
     public class SerializeReferenceRoundTripSmokeTests
@@ -93,7 +92,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ser
         [Test]
         public void SerializeReference_SameTypeMultipleInstances_PreserveIndependentFieldValues()
         {
-            // Req 2.4: 同型 binding が複数登録できる（slug 違いの OSC を 2 個など）。
+            // 同型 binding が複数登録できる（slug 違いの OSC を 2 個など）。
             var so = ScriptableObject.CreateInstance<SerializeReferenceTestProfileStub>();
             so.AdapterBindings.Add(new MockTriggerAdapterBindingStub { slug = "first", triggerThreshold = 1 });
             so.AdapterBindings.Add(new MockTriggerAdapterBindingStub { slug = "second", triggerThreshold = 2 });
@@ -118,7 +117,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ser
         [Test]
         public void SerializeReference_EmptyList_RoundTripsAsEmpty()
         {
-            // Req 2.2: AdapterBindings は zero 個でも許容される。
+            // AdapterBindings は zero 個でも許容される。
             var so = ScriptableObject.CreateInstance<SerializeReferenceTestProfileStub>();
 
             AssetDatabase.CreateAsset(so, _assetPath);
@@ -171,7 +170,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ser
         [Test]
         public void SerializeReference_NullElement_HasEmptyManagedReferenceFullTypename()
         {
-            // Req 2.7 / design.md: null 要素（型欠落 simulation）に対する managedReferenceFullTypename の挙動を確認。
+            // null 要素（型欠落 simulation）に対する managedReferenceFullTypename の挙動を確認。
             // 空文字列の null entry と「型欠落で値だけ null になった entry」の境界を smoke レベルで検証する。
             var so = ScriptableObject.CreateInstance<SerializeReferenceTestProfileStub>();
             so.AdapterBindings.Add(new MockTriggerAdapterBindingStub { slug = "ok", triggerThreshold = 1 });
@@ -184,7 +183,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ser
             var loaded = AssetDatabase.LoadAssetAtPath<SerializeReferenceTestProfileStub>(_assetPath);
 
             Assert.That(loaded, Is.Not.Null,
-                "Req 2.7: null 要素を含んでいても asset 全体の load は中断されない");
+                "null 要素を含んでいても asset 全体の load は中断されない");
             Assert.That(loaded.AdapterBindings.Count, Is.EqualTo(2));
             Assert.That(loaded.AdapterBindings[0], Is.Not.Null);
             Assert.That(loaded.AdapterBindings[1], Is.Null,

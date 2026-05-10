@@ -6,7 +6,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Processors
     /// <summary>
     /// 6 種 stateless アナログ <c>InputProcessor</c>
     /// （DeadZone / Scale / Offset / Clamp / Invert / Curve）の振る舞いを検証する EditMode テスト
-    /// （tasks.md 4.1, 4.2）。
+    /// 。
     /// </summary>
     /// <remarks>
     /// 観測完了条件:

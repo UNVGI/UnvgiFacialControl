@@ -12,9 +12,9 @@ namespace Hidano.FacialControl.Domain.Services
     /// <remarks>
     /// <para>
     /// ランタイム <see cref="SetWeight"/> は任意スレッドから呼出可能であり、
-    /// 値は 0〜1 に silent clamp される (Req 2.5)。書込は次回
+    /// 値は 0〜1 に silent clamp される 。書込は次回
     /// <see cref="SwapIfDirty"/> 以降の <see cref="GetWeight"/> から観測可能になる
-    /// (Req 4.1, 4.2)。
+    /// 。
     /// </para>
     /// <para>
     /// 本クラスは <c>OscDoubleBuffer</c> と同じ 2 本の <see cref="NativeArray{T}"/>
@@ -28,12 +28,12 @@ namespace Hidano.FacialControl.Domain.Services
     /// <para>
     /// <see cref="BeginBulk"/> が返す <see cref="BulkScope"/> 中の書込は
     /// プール化された pending dict に蓄積され、<see cref="BulkScope.Dispose"/>
-    /// (= CommitBulk) で writeBuffer へ一括 flush される (Req 4.5)。
+    /// (= CommitBulk) で writeBuffer へ一括 flush される 。
     /// CommitBulk は <c>_dirtyTick</c> を最大 1 回だけ進めるため、同スコープ内の
     /// 複数書込は atomic に観測される。
     /// 範囲外 (layer, source) への <see cref="SetWeight"/> および
     /// <see cref="BulkScope.SetWeight"/> は <see cref="Debug.LogWarning(object)"/>
-    /// + no-op として扱い、他の weight を一切変更しない (Req 4.3)。
+    /// + no-op として扱い、他の weight を一切変更しない 。
     /// </para>
     /// </remarks>
     public sealed class LayerInputSourceWeightBuffer : IDisposable
@@ -93,10 +93,10 @@ namespace Hidano.FacialControl.Domain.Services
         /// </summary>
         /// <param name="layerIdx">レイヤーインデックス。<see cref="LayerCount"/> 未満を指定。</param>
         /// <param name="sourceIdx">入力源インデックス。<see cref="MaxSourcesPerLayer"/> 未満を指定。</param>
-        /// <param name="weight">ウェイト値。範囲外は silent clamp される (Req 2.5)。</param>
+        /// <param name="weight">ウェイト値。範囲外は silent clamp される 。</param>
         /// <remarks>
         /// (layerIdx, sourceIdx) が範囲外の場合は警告ログを出して no-op とし、
-        /// 他の weight を一切変更しない (Req 4.3)。
+        /// 他の weight を一切変更しない 。
         /// </remarks>
         public void SetWeight(int layerIdx, int sourceIdx, float weight)
         {
@@ -170,7 +170,7 @@ namespace Hidano.FacialControl.Domain.Services
         /// <remarks>
         /// 同スコープ内の書込は <see cref="BulkScope.Dispose"/> 時点で 1 回だけ
         /// <c>_dirtyTick</c> を進めるため、次の <see cref="SwapIfDirty"/> 以降の
-        /// <see cref="GetWeight"/> で atomic に観測される (Req 4.5)。
+        /// <see cref="GetWeight"/> で atomic に観測される 。
         /// Dispose 前のスコープ内書込は外部から観測されない。
         /// pending dict はプールから貸与され、Dispose 時に返却される (GC フリー)。
         /// </remarks>
@@ -233,7 +233,7 @@ namespace Hidano.FacialControl.Domain.Services
         /// <summary>
         /// バルク書込スコープ。<see cref="SetWeight"/> の呼出はプールから借りた
         /// pending dict に蓄積され、<see cref="Dispose"/> (= CommitBulk) 時に
-        /// 親バッファへ一括 flush される (Req 4.5)。
+        /// 親バッファへ一括 flush される 。
         /// </summary>
         public readonly struct BulkScope : IDisposable
         {
@@ -248,7 +248,7 @@ namespace Hidano.FacialControl.Domain.Services
 
             /// <summary>
             /// スコープ内に (layerIdx, sourceIdx) の書込を蓄積する。値は 0〜1 に silent clamp。
-            /// 範囲外キーは警告ログを出して no-op とし、他の書込を一切変更しない (Req 4.3)。
+            /// 範囲外キーは警告ログを出して no-op とし、他の書込を一切変更しない 。
             /// Dispose まで外部からは観測されない。
             /// </summary>
             public void SetWeight(int layerIdx, int sourceIdx, float weight)

@@ -6,9 +6,9 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 {
     /// <summary>
-    /// tasks.md 10.3: <c>inputSources</c> 欠落 JSON の parse が
+    //: <c>inputSources</c> 欠落 JSON の parse が
     /// <see cref="FormatException"/> を投げ、Aggregator が暗黙に既存 Expression パイプラインへ
-    /// フォールバックしないことを保証する契約テスト (Req 3.2, 7.3, 7.4, D-5)。
+    /// フォールバックしないことを保証する契約テスト 。
     /// <para>
     /// 観測完了条件: <see cref="FormatException"/> が発生し、例外メッセージに
     /// 欠落フィールド名 <c>inputSources</c> が含まれる。<c>legacy</c> 予約 ID は廃止済みで
@@ -144,7 +144,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         }
 
         // ================================================================
-        // legacy 予約 ID 廃止 (Req 1.7, D-5) の下位レイヤー契約
+        // legacy 予約 ID 廃止  の下位レイヤー契約
         // ================================================================
 
         [Test]
@@ -163,7 +163,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         public void ParseProfile_InputSourcesDeclaredAsLegacy_SkippedNotAcceptedAsFallback()
         {
             // 仮にユーザーが `"id": "legacy"` を宣言しても、parser は InputSourceId の検証で弾き
-            // 警告 + skip とする (Req 3.3)。これにより legacy 実体は生成されず、
+            // 警告 + skip とする 。これにより legacy 実体は生成されず、
             // Aggregator へ暗黙 Expression フォールバックが挿入されない。
             // 宣言自体は存在するため schema チェックは通り FormatException にはならないが、
             // 有効な input source として扱われることは無い。

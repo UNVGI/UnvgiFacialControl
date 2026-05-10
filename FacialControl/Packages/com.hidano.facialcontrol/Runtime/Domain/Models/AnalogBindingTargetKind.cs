@@ -1,7 +1,7 @@
 namespace Hidano.FacialControl.Domain.Models
 {
     /// <summary>
-    /// アナログバインディングのターゲット種別（Req 6.2）。
+    /// アナログバインディングのターゲット種別。
     /// 列挙値は JSON / 永続化フォーマットの安定性のため固定（BlendShape=0, BonePose=1）。
     /// </summary>
     public enum AnalogBindingTargetKind

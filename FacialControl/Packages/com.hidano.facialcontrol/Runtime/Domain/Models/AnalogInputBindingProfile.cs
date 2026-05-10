@@ -3,7 +3,7 @@ using System;
 namespace Hidano.FacialControl.Domain.Models
 {
     /// <summary>
-    /// アナログ入力バインディング集合の Domain ルート (Req 6.3, 6.7)。
+    /// アナログ入力バインディング集合の Domain ルート 。
     /// </summary>
     /// <remarks>
     /// <para>

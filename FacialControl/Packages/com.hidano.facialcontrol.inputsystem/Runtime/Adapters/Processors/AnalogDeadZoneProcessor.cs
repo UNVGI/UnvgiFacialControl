@@ -6,7 +6,7 @@ namespace Hidano.FacialControl.Adapters.Processors
     /// <summary>
     /// アナログ入力に対するデッドゾーン処理を提供する stateless な <see cref="InputProcessor{TValue}"/> 実装。
     /// 入力絶対値が <see cref="min"/> 以下なら 0、<see cref="max"/> 以上なら ±1 にクランプし、
-    /// 中間値は <c>(abs - min) / (max - min)</c> に正規化する（design.md Topic 3）。
+    /// 中間値は <c>(abs - min) / (max - min)</c> に正規化する。
     /// </summary>
     /// <remarks>
     /// 共通の <see cref="InputProcessor{TValue}"/> 派生定型として、

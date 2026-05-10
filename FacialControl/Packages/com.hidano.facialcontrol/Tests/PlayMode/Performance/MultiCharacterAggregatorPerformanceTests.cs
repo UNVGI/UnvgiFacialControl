@@ -11,9 +11,9 @@ using Hidano.FacialControl.Domain.Services;
 namespace Hidano.FacialControl.Tests.PlayMode.Performance
 {
     /// <summary>
-    /// タスク 10.5: 10 体 × 3 layer × 4 source × 200 BlendShape のフレーム時間が
+    //: 10 体 × 3 layer × 4 source × 200 BlendShape のフレーム時間が
     /// 60 FPS 相当 (16.6ms) のフレームバジェット内に収まることを検証する
-    /// (Req 6.3 / 6.5)。
+    /// 。
     /// </summary>
     /// <remarks>
     /// 観測完了条件: 平均フレーム時間が 16.6ms 以内、スパイクが許容範囲に収まること。
@@ -225,7 +225,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
                     $"[10.5 perf] 10 体 × {LayerCount} layer × {SourcesPerLayer} source × {BlendShapeCount} BS: " +
                     $"avg={avgMs:F3}ms, max={maxFrameMs:F3}ms, budget={FrameBudgetMs}ms (spike<= {SpikeBudgetMs}ms)");
 
-                // Req 6.3 / 6.5: 平均フレーム時間が 60 FPS バジェット (16.6ms) 以内に収まること。
+                // 平均フレーム時間が 60 FPS バジェット (16.6ms) 以内に収まること。
                 Assert.Less(avgMs, FrameBudgetMs,
                     $"10 体同時稼働の平均フレーム時間が {avgMs:F3}ms で 60 FPS バジェット {FrameBudgetMs}ms を超えました " +
                     $"(max={maxFrameMs:F3}ms)");

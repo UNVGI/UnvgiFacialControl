@@ -9,17 +9,17 @@ namespace Hidano.FacialControl.Adapters.Bone
     /// <summary>
     /// アナログバインディングを毎フレーム評価し <see cref="BoneSnapshot"/> 列を構築、
     /// <see cref="IBonePoseProvider.SetActiveBoneSnapshots"/> 経由で注入するアダプタ
-    /// （Req 4.1〜4.9、tasks.md 4.1）。
+    /// 。
     /// </summary>
     /// <remarks>
     /// <para>
     /// 構築時に <see cref="AnalogBindingTargetKind.BonePose"/> の binding を抽出し、
-    /// ユニークな bone 名ごとに <see cref="BoneSnapshot"/> スロットを 1 度だけ確保する（Req 4.7）。
+    /// ユニークな bone 名ごとに <see cref="BoneSnapshot"/> スロットを 1 度だけ確保する。
     /// 毎フレーム <see cref="BuildAndPush"/> で同一スロットの値だけを書換え、
     /// <see cref="ReadOnlyMemory{T}"/> 経由で <see cref="IBonePoseProvider"/> に渡す。
     /// </para>
     /// <para>
-    /// 同一 (bone, axis) への複数 binding は post-mapping 値の sum（Req 4.6）。
+    /// 同一 (bone, axis) への複数 binding は post-mapping 値の sum。
     /// bindings が 0 件 / 全ソースが無効の場合は空 <see cref="ReadOnlyMemory{T}"/> を発行し、
     /// <see cref="UnityEngine.Debug"/> を呼ばない（<see cref="BoneWriter.Apply"/> は空エントリで no-op）。
     /// </para>
@@ -27,7 +27,7 @@ namespace Hidano.FacialControl.Adapters.Bone
     public sealed class AnalogBonePoseProvider : IDisposable
     {
         /// <summary>
-        /// 本アダプタが発行する論理 ID（preview.1 では参照キー未使用、互換目的のみ）。
+        /// 本アダプタが発行する論理 ID（参照キー未使用、互換目的のみ）。
         /// </summary>
         public const string PoseId = "analog-bonepose";
 
@@ -122,7 +122,7 @@ namespace Hidano.FacialControl.Adapters.Bone
 
         /// <summary>
         /// per-frame に呼出され、binding 評価 → <see cref="BoneSnapshot"/> 列構築 →
-        /// <see cref="IBonePoseProvider.SetActiveBoneSnapshots"/> を 1 回行う（Req 4.5）。
+        /// <see cref="IBonePoseProvider.SetActiveBoneSnapshots"/> を 1 回行う。
         /// </summary>
         public void BuildAndPush()
         {
@@ -161,8 +161,8 @@ namespace Hidano.FacialControl.Adapters.Bone
                     continue;
                 }
 
-                // Phase 3.5: Mapping を撤去（dead-zone / scale / offset / curve / invert / clamp の値変換は
-                // Adapters 側 InputProcessor 経路で扱う。Decision 4 / Req 13.3）。生値をそのまま加算する。
+                // dead-zone / scale / offset / curve / invert / clamp の値変換は
+                // Adapters 側 InputProcessor 経路で扱うため、生値をそのまま加算する。
                 ref var slot = ref _slots[rb.SlotIndex];
                 switch (rb.TargetAxis)
                 {

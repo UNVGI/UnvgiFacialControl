@@ -10,9 +10,8 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Adapters.InputSources
 {
     /// <summary>
-    /// tasks.md 4.5: <see cref="ExpressionInputSourceAdapter"/> の dispatch 経路と
-    /// subscribe / unsubscribe 対称性を検証する PlayMode テスト
-    /// (Req 7.2-7.5, 8.1, 8.3, 8.4, 6.6, 11.3)。
+    /// <see cref="ExpressionInputSourceAdapter"/> の dispatch 経路と
+    /// subscribe / unsubscribe 対称性を検証する PlayMode テスト。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -25,7 +24,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Adapters.InputSources
     /// <list type="bullet">
     ///   <item>Keyboard / Gamepad device を <see cref="InputTestFixture"/> 経由で simulate</item>
     ///   <item>2 sink の <see cref="ExpressionTriggerInputSourceBase.ActiveExpressionIds"/> を assert で確認</item>
-    ///   <item>未認識 device は Controller 側 + warning 1 回 (Req 7.5)</item>
+    ///   <item>未認識 device は Controller 側 + warning 1 回 </item>
     ///   <item>OnEnable / OnDisable の繰返しで <see cref="ExpressionInputSourceAdapter.SubscribedBindingCount"/> がリークしないことを保証</item>
     /// </list>
     /// </para>
@@ -112,7 +111,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Adapters.InputSources
 
             // 未認識 device prefix を持つ binding (path 構文として有効だが
             // InputDeviceCategorizer の認識リストに無い <Mouse> を使う)。
-            // 予期される警告 1 回を LogAssert.Expect で許容する (Req 7.5)。
+            // 予期される警告 1 回を LogAssert.Expect で許容する 。
             LogAssert.Expect(LogType.Warning,
                 new Regex(@"\[ExpressionInputSourceAdapter\] unrecognized device category"));
 
@@ -130,7 +129,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Adapters.InputSources
             Press(mouse.leftButton);
 
             CollectionAssert.Contains(_controllerSink.ActiveExpressionIds, "smile",
-                "未認識 device は Controller sink にフォールバックされる必要があります (Req 7.5)。");
+                "未認識 device は Controller sink にフォールバックされる必要があります 。");
             CollectionAssert.DoesNotContain(_keyboardSink.ActiveExpressionIds, "smile",
                 "未認識 device が Keyboard sink に誤って dispatch されています。");
         }

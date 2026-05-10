@@ -8,7 +8,7 @@ namespace Hidano.FacialControl.Domain.Interfaces
     /// D-1 ハイブリッドモデルにおける入力源の共通契約。
     /// Expression トリガー型 / BlendShape 値提供型のいずれのアダプタも本インターフェースを実装し、
     /// 固定長バッファへの書込と自身の有効性申告を提供する。
-    /// Domain 層配置のため Unity API に非依存（Req 1.5）。
+    /// Domain 層配置のため Unity API に非依存。
     /// </summary>
     /// <remarks>
     /// Preconditions:
@@ -30,7 +30,7 @@ namespace Hidano.FacialControl.Domain.Interfaces
     public interface IInputSource
     {
         /// <summary>
-        /// 入力源識別子。<c>[a-zA-Z0-9_.\-:]{1,64}</c> 規約に従う（Req 1.7）。
+        /// 入力源識別子。<c>[a-zA-Z0-9_.\-:]{1,64}</c> 規約に従う。
         /// <c>:</c> は <c>slug:sub</c> 形式の合成キー区切り文字として使われる。
         /// </summary>
         string Id { get; }

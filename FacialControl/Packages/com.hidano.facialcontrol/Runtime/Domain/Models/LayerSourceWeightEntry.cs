@@ -3,7 +3,7 @@ using System;
 namespace Hidano.FacialControl.Domain.Models
 {
     /// <summary>
-    /// 診断スナップショット API (Req 8.1, 8.3) の 1 件分の戻り値を表す readonly value-struct。
+    /// 診断スナップショット API  の 1 件分の戻り値を表す readonly value-struct。
     /// レイヤー × 入力源単位の現在ウェイトと有効性、飽和フラグを持つ。
     /// </summary>
     /// <remarks>

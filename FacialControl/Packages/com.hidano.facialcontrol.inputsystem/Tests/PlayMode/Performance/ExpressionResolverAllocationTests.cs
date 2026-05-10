@@ -8,9 +8,9 @@ using Hidano.FacialControl.Domain.Services;
 namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance
 {
     /// <summary>
-    /// tasks.md 4.8: <see cref="ExpressionResolver"/> の <c>TryResolve</c> ホットパスが
+    //: <see cref="ExpressionResolver"/> の <c>TryResolve</c> ホットパスが
     /// 100 frames 連続呼出で 0-alloc であることを検証する PlayMode/Performance テスト
-    /// （Req 11.1, 11.4, 11.5, 12.7）。
+    /// 。
     /// </summary>
     /// <remarks>
     /// <para>

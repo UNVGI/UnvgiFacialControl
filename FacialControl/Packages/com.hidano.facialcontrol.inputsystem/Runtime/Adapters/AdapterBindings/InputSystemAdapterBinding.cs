@@ -15,12 +15,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
 {
     /// <summary>
     /// InputSystem 結線（Trigger + Analog + Gaze）を 1 binding に集約した
-    /// <see cref="AdapterBindingBase"/> 派生（Req 6.1, 6.8）。
+    /// <see cref="AdapterBindingBase"/> 派生。
     /// </summary>
     /// <remarks>
-    /// preview.1 の破壊的変更により、Trigger / Analog / Gaze の経路を
+    /// Trigger / Analog / Gaze の経路を
     /// <see cref="ExpressionBindingEntry.bindingMode"/> で分別する単一の
-    /// <c>_expressionBindings</c> リストに統合した。
+    /// <c>_expressionBindings</c> リストに統合する。
     /// <list type="bullet">
     ///   <item><see cref="OnStart"/>: <see cref="InputActionAsset.Instantiate()"/> +
     ///         <see cref="InputActionMap.Enable"/> +
@@ -55,6 +55,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
         [NonSerialized] private GazeBonePoseProvider _gazeBoneProvider;
         [NonSerialized] private IReadOnlyList<GazeBindingConfig> _injectedGazeConfigs;
         [NonSerialized] private bool _isStarted;
+
+        // Overlay 経路: slot ごとの OverlayInputSource と、対応する InputAction / 対象レイヤー名のキャッシュ。
+        [NonSerialized] private List<OverlayBindingRuntime> _overlayBindings;
+        [NonSerialized] private Hidano.FacialControl.Adapters.Playable.FacialController _facialController;
 
         /// <summary>キーアサインを定義する InputActionAsset（Inspector / API 用）。</summary>
         public InputActionAsset InputActionAsset
@@ -162,7 +166,17 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
 
             BuildAnalogExpressionSink(ctx, slug, blendShapeCount, blendShapeNames);
 
+            BuildOverlaySources(ctx, slug, blendShapeCount, blendShapeNames);
+
             BuildGazeProvider(ctx);
+
+            // Overlay 経路の OnLateTick で SetLayerWeight するために FacialController をキャッシュ。
+            // ctx.HostGameObject は per-FC LifetimeScope build 時の宿主。
+            if (ctx.HostGameObject != null)
+            {
+                _facialController = ctx.HostGameObject
+                    .GetComponent<Hidano.FacialControl.Adapters.Playable.FacialController>();
+            }
 
             _isStarted = true;
         }
@@ -183,7 +197,40 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                 }
             }
 
+            ApplyOverlayLayerWeights();
+
             _gazeBoneProvider?.Apply();
+        }
+
+        // 各 overlay binding について Action の現在値をレイヤー weight に反映させる。
+        // 同一 layer に複数 binding が紐付いた場合は後勝ち（最後に書込まれた weight が反映される）。
+        private void ApplyOverlayLayerWeights()
+        {
+            if (_overlayBindings == null || _overlayBindings.Count == 0 || _facialController == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < _overlayBindings.Count; i++)
+            {
+                var b = _overlayBindings[i];
+                if (b.AnalogSource == null || string.IsNullOrEmpty(b.TargetLayer))
+                {
+                    continue;
+                }
+                if (!b.AnalogSource.IsValid)
+                {
+                    continue;
+                }
+                if (!b.AnalogSource.TryReadScalar(out float raw))
+                {
+                    continue;
+                }
+                if (raw < 0f) raw = 0f;
+                else if (raw > 1f) raw = 1f;
+
+                _facialController.SetLayerWeight(b.TargetLayer, raw);
+            }
         }
 
         /// <inheritdoc />
@@ -222,6 +269,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
 
             _analogExpressionSink = null;
             _triggerSink = null;
+            _overlayBindings = null;
+            _facialController = null;
 
             if (_runtimeActionMap != null)
             {
@@ -267,7 +316,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             }
         }
 
-        // bindingMode == Gaze または Analog のエントリ参照する actionName を 1 度だけ analog source として登録する。
+        // bindingMode == Gaze / Analog / Overlay のエントリ参照する actionName を 1 度だけ analog source として登録する。
         private void BuildAnalogSources(in AdapterBuildContext ctx, AdapterSlug slug)
         {
             if (_expressionBindings == null) return;
@@ -277,7 +326,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             {
                 var entry = _expressionBindings[i];
                 if (entry == null) continue;
-                if (entry.bindingMode != BindingMode.Gaze && entry.bindingMode != BindingMode.Analog) continue;
+                if (entry.bindingMode != BindingMode.Gaze
+                    && entry.bindingMode != BindingMode.Analog
+                    && entry.bindingMode != BindingMode.Overlay) continue;
                 TryRegisterAnalogSource(ctx, slug, entry.actionName, registered);
             }
         }
@@ -334,7 +385,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                 sources[s.Id] = s;
             }
 
-            // Analog エントリのみ Domain 値型に変換する。scale は preview.1 で廃止し常に 1.0 として扱う。
+            // Analog エントリのみ Domain 値型に変換する。scale は常に 1.0 として扱う。
             var bindings = new List<AnalogExpressionBinding>();
             for (int i = 0; i < _expressionBindings.Count; i++)
             {
@@ -381,6 +432,81 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                 slug,
                 AnalogExpressionInputSource.ReservedId,
                 _analogExpressionSink);
+        }
+
+        // bindingMode == Overlay のエントリで slot ごとに OverlayInputSource を構築する。
+        // 同じ slot が複数 entry にあれば最初の 1 件で OverlayInputSource を 1 個作成し、
+        // 全 entry を _overlayBindings に積み OnLateTick で各 layer weight を駆動する。
+        private void BuildOverlaySources(
+            in AdapterBuildContext ctx,
+            AdapterSlug slug,
+            int blendShapeCount,
+            IReadOnlyList<string> blendShapeNames)
+        {
+            _overlayBindings = new List<OverlayBindingRuntime>();
+            if (_expressionBindings == null || _expressionBindings.Count == 0)
+            {
+                return;
+            }
+
+            // analog source の lookup を Dictionary 化（actionName → InputActionAnalogSource）。
+            var sourceByAction = new Dictionary<string, InputActionAnalogSource>(StringComparer.Ordinal);
+            for (int i = 0; i < _analogSources.Count; i++)
+            {
+                var s = _analogSources[i];
+                if (s == null) continue;
+                sourceByAction[s.Id] = s;
+            }
+
+            // slot 単位に OverlayInputSource を 1 個作成して registry に登録（重複登録は LogError + 後勝ち）。
+            var registeredSlots = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < _expressionBindings.Count; i++)
+            {
+                var entry = _expressionBindings[i];
+                if (entry == null
+                    || entry.bindingMode != BindingMode.Overlay
+                    || string.IsNullOrWhiteSpace(entry.actionName)
+                    || string.IsNullOrWhiteSpace(entry.overlaySlot))
+                {
+                    continue;
+                }
+
+                if (!sourceByAction.TryGetValue(entry.actionName, out var analogSource) || analogSource == null)
+                {
+                    Debug.LogWarning(
+                        $"[InputSystemAdapterBinding] Overlay binding (slot='{entry.overlaySlot}') の Action '{entry.actionName}' が analog source として登録されていません。skip します。");
+                    continue;
+                }
+
+                if (registeredSlots.Add(entry.overlaySlot))
+                {
+                    string reservedId = $"{OverlayInputSource.ReservedIdPrefix}:{entry.overlaySlot}";
+                    if (!InputSourceId.TryParse(reservedId, out var sinkId))
+                    {
+                        Debug.LogWarning(
+                            $"[InputSystemAdapterBinding] Overlay slot '{entry.overlaySlot}' から InputSourceId を生成できません。skip します。");
+                        continue;
+                    }
+
+                    var overlaySource = new OverlayInputSource(
+                        id: sinkId,
+                        slot: entry.overlaySlot,
+                        blendShapeCount: blendShapeCount,
+                        blendShapeNames: blendShapeNames,
+                        profile: ctx.Profile,
+                        activeProvider: ctx.ActiveExpressionProvider,
+                        emotionLayerName: "emotion");
+
+                    ctx.InputSourceRegistry.Register(slug, $"{OverlayInputSource.ReservedIdPrefix}:{entry.overlaySlot}", overlaySource);
+                }
+
+                _overlayBindings.Add(new OverlayBindingRuntime
+                {
+                    Slot = entry.overlaySlot,
+                    AnalogSource = analogSource,
+                    TargetLayer = string.IsNullOrEmpty(entry.overlayTargetLayer) ? "overlay" : entry.overlayTargetLayer,
+                });
+            }
         }
 
         // bindingMode == Gaze のエントリで GazeBonePoseProvider を構築する。
@@ -553,6 +679,18 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             }
 
             return AnalogInputShape.Scalar;
+        }
+
+        /// <summary>
+        /// 1 件の Overlay binding に対応するランタイム情報。OnLateTick で
+        /// AnalogSource の現在値を <see cref="Hidano.FacialControl.Adapters.Playable.FacialController.SetLayerWeight(string, float)"/>
+        /// に流す。
+        /// </summary>
+        private struct OverlayBindingRuntime
+        {
+            public string Slot;
+            public InputActionAnalogSource AnalogSource;
+            public string TargetLayer;
         }
 
         /// <summary>

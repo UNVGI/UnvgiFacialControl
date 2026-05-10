@@ -5,18 +5,16 @@ namespace Hidano.FacialControl.Domain.Models
     /// <summary>
     /// 表情定義。AnimationClip 由来の <see cref="ExpressionSnapshot"/> を <see cref="SnapshotId"/> で参照する不変オブジェクト。
     /// <para>
-    /// Phase 3.1 (inspector-and-data-model-redesign) で派生 5 値の independent field
-    /// (<c>BlendShapeValues</c> / 旧 <c>LayerSlots</c>) を撤去する第一歩として SnapshotId 参照型を導入し、
-    /// Phase 3.2 で 旧 <c>LayerSlots</c> field と旧 <c>LayerSlot</c> 型本体を物理削除した。
-    /// 残る bridge field（<see cref="TransitionDuration"/> / <see cref="TransitionCurve"/> /
-    /// <see cref="BlendShapeValues"/>）は Phase 3.3〜3.6 の連鎖破壊リファクタが完了するまで
-    /// 互換目的で保持され、Domain の primary identity は (Id, Name, Layer, OverrideMask, SnapshotId) の 5 値である。
+    /// Domain の primary identity は (Id, Name, Layer, OverrideMask, SnapshotId) の 5 値。
+    /// Bridge field（<see cref="TransitionDuration"/> / <see cref="TransitionCurve"/> /
+    /// <see cref="BlendShapeValues"/>）は互換目的で保持され、将来的に
+    /// <see cref="ExpressionSnapshot"/> 経路へ移行後に撤去予定。
     /// </para>
     /// </summary>
     public readonly struct Expression
     {
         /// <summary>
-        /// 表情遷移時間の既定値（秒）。1 / 15 秒 ≒ 0.0667 秒（Req 2.5）。
+        /// 表情遷移時間の既定値（秒）。1 / 15 秒 ≒ 0.0667 秒。
         /// SnapshotId / Bridge ctor、<see cref="ExpressionSnapshot"/> の既定値、
         /// <see cref="Hidano.FacialControl.Adapters.ScriptableObject.Serializable.ExpressionSerializable"/>
         /// 等、本値を参照する全箇所で source-of-truth として用いる。
@@ -39,36 +37,46 @@ namespace Hidano.FacialControl.Domain.Models
         public string Layer { get; }
 
         /// <summary>
-        /// 他レイヤーへのオーバーライド対象を示すビットフラグ（Req 3.1, 3.4）。
+        /// 他レイヤーへのオーバーライド対象を示すビットフラグ。
         /// </summary>
         public LayerOverrideMask OverrideMask { get; }
 
         /// <summary>
-        /// AnimationClip 由来の <see cref="ExpressionSnapshot"/> を識別する snapshot id（Req 1.5）。
+        /// AnimationClip 由来の <see cref="ExpressionSnapshot"/> を識別する snapshot id。
         /// 通常は <see cref="Id"/> と同値で運用するが、別 snapshot を参照することも許される。
         /// </summary>
         public string SnapshotId { get; }
 
-        // ===== Bridge fields (Phase 3.3〜3.6 で物理削除予定) =====
+        // ===== Bridge fields (将来撤去予定) =====
 
         /// <summary>
         /// [Bridge] 遷移時間（0〜1 秒、範囲外は自動クランプ）。
-        /// Phase 3.6 で <see cref="ExpressionSnapshot.TransitionDuration"/> 経路へ移行後に撤去予定。
+        /// <see cref="ExpressionSnapshot.TransitionDuration"/> 経路へ移行後に撤去予定。
         /// </summary>
         public float TransitionDuration { get; }
 
         /// <summary>
-        /// [Bridge] 遷移カーブ設定。Phase 3.6 で <see cref="TransitionCurvePreset"/> 経路へ移行後に撤去予定。
+        /// [Bridge] 遷移カーブ設定。<see cref="TransitionCurvePreset"/> 経路へ移行後に撤去予定。
         /// </summary>
         public TransitionCurve TransitionCurve { get; }
 
         /// <summary>
-        /// [Bridge] BlendShape 値の配列。Phase 3.6 で <see cref="ExpressionSnapshot.BlendShapes"/> 経路へ移行後に撤去予定。
+        /// [Bridge] BlendShape 値の配列。<see cref="ExpressionSnapshot.BlendShapes"/> 経路へ移行後に撤去予定。
         /// </summary>
         public ReadOnlyMemory<BlendShapeMapping> BlendShapeValues { get; }
 
         /// <summary>
-        /// SnapshotId 参照型コンストラクタ（Phase 3.1 新 API）。
+        /// Trigger / Analog 入力で重ね合わせる overlay Expression を slot 単位で宣言する。
+        /// 各要素の <see cref="OverlaySlotBinding.ExpressionId"/> が空の場合は当該 slot を明示的に suppress する。
+        /// </summary>
+        /// <remarks>
+        /// 解決経路 (<c>OverlayInputSource</c>) は本フィールドを優先し、未宣言 slot のみ
+        /// <see cref="FacialProfile.DefaultOverlays"/> に fallback する。
+        /// </remarks>
+        public ReadOnlyMemory<OverlaySlotBinding> Overlays { get; }
+
+        /// <summary>
+        /// SnapshotId 参照型コンストラクタ。
         /// Bridge field（TransitionDuration / TransitionCurve / BlendShapeValues）は default 値で初期化される。
         /// </summary>
         /// <param name="id">一意識別子（空文字不可）</param>
@@ -81,7 +89,8 @@ namespace Hidano.FacialControl.Domain.Models
             string name,
             string layer,
             LayerOverrideMask overrideMask,
-            string snapshotId)
+            string snapshotId,
+            OverlaySlotBinding[] overlays = null)
         {
             if (id == null)
                 throw new ArgumentNullException(nameof(id));
@@ -109,10 +118,11 @@ namespace Hidano.FacialControl.Domain.Models
             TransitionDuration = DefaultTransitionDuration;
             TransitionCurve = default;
             BlendShapeValues = Array.Empty<BlendShapeMapping>();
+            Overlays = CopyOverlays(overlays);
         }
 
         /// <summary>
-        /// [Bridge ctor] Phase 3.3〜3.6 で撤去予定の旧 API。
+        /// [Bridge ctor] 撤去予定の旧 API。
         /// 新規コードは SnapshotId 受けの ctor を使用すること。
         /// 配列パラメータは防御的コピーされる。
         /// </summary>
@@ -128,7 +138,8 @@ namespace Hidano.FacialControl.Domain.Models
             string layer,
             float transitionDuration = DefaultTransitionDuration,
             TransitionCurve transitionCurve = default,
-            BlendShapeMapping[] blendShapeValues = null)
+            BlendShapeMapping[] blendShapeValues = null,
+            OverlaySlotBinding[] overlays = null)
         {
             if (id == null)
                 throw new ArgumentNullException(nameof(id));
@@ -161,10 +172,49 @@ namespace Hidano.FacialControl.Domain.Models
             {
                 BlendShapeValues = Array.Empty<BlendShapeMapping>();
             }
+
+            Overlays = CopyOverlays(overlays);
+        }
+
+        private static ReadOnlyMemory<OverlaySlotBinding> CopyOverlays(OverlaySlotBinding[] source)
+        {
+            if (source == null || source.Length == 0)
+            {
+                return Array.Empty<OverlaySlotBinding>();
+            }
+            var copy = new OverlaySlotBinding[source.Length];
+            Array.Copy(source, copy, source.Length);
+            return copy;
         }
 
         /// <summary>
-        /// 表情の人間可読表現を返す（Phase 3.1 Refactor: <c>{Id}:{Name}@{Layer}</c> 形式に統一）。
+        /// 指定 slot の <see cref="OverlaySlotBinding"/> を検索する。
+        /// </summary>
+        /// <param name="slot">検索対象 slot 名。null / 空文字なら false。</param>
+        /// <param name="binding">見つかった binding。見つからなければ default。</param>
+        /// <returns>当該 slot を宣言していれば true（suppress を含む）、未宣言なら false。</returns>
+        public bool TryGetOverlay(string slot, out OverlaySlotBinding binding)
+        {
+            binding = default;
+            if (string.IsNullOrEmpty(slot))
+            {
+                return false;
+            }
+
+            var span = Overlays.Span;
+            for (int i = 0; i < span.Length; i++)
+            {
+                if (string.Equals(span[i].Slot, slot, StringComparison.Ordinal))
+                {
+                    binding = span[i];
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 表情の人間可読表現を返す（<c>{Id}:{Name}@{Layer}</c> 形式）。
         /// </summary>
         public override string ToString()
         {

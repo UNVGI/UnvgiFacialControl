@@ -7,9 +7,8 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.PlayMode.Adapters.OSC
 {
     /// <summary>
-    /// Phase 3.1: <see cref="OscReceiver.RegisterAnalogListener"/> /
-    /// <see cref="OscReceiver.UnregisterAnalogListener"/> の追加 API テスト
-    /// (Req 5.3〜5.5, 9.6 加算的拡張)。
+    /// <see cref="OscReceiver.RegisterAnalogListener"/> /
+    /// <see cref="OscReceiver.UnregisterAnalogListener"/> の追加 API テスト。
     /// </summary>
     [TestFixture]
     public class OscReceiverAnalogListenerTests
@@ -203,7 +202,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.OSC
         [Test]
         public void HandleOscMessage_ExistingMappingPreserved_BufferStillWritten()
         {
-            // 既存の _addressToIndex ルーティングが壊れていないことを保証 (Req 9.6)。
+            // 既存の _addressToIndex ルーティングが壊れていないことを保証 。
             _buffer = new OscDoubleBuffer(1);
             var mappings = new[]
             {

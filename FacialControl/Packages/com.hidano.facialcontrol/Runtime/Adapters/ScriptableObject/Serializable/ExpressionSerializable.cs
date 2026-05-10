@@ -10,16 +10,14 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
     /// Expression 定義 (旧 JSON: expressions[])。
     /// <see cref="Hidano.FacialControl.Domain.Models.Expression"/> の Unity Serializable 投影。
     /// <para>
-    /// Phase 3.2 (inspector-and-data-model-redesign) で旧 <c>layerSlots</c> 配列を撤去し、
     /// レイヤー名配列で永続化される <see cref="layerOverrideMask"/>（Domain
-    /// <see cref="Hidano.FacialControl.Domain.Models.LayerOverrideMask"/> の永続化形式）を導入した。
-    /// 残る <c>transitionDuration / transitionCurve / blendShapeValues</c> は
-    /// Phase 3.6 で snapshot 経路へ移行する bridge field である。
+    /// <see cref="Hidano.FacialControl.Domain.Models.LayerOverrideMask"/> の永続化形式）を持つ。
+    /// <c>transitionDuration / transitionCurve / blendShapeValues</c> は snapshot 経路へ移行する bridge field である。
     /// </para>
     /// <para>
-    /// Phase 5.3: <see cref="cachedSnapshot"/> は AnimationClip サンプリング結果を
+    /// <see cref="cachedSnapshot"/> は AnimationClip サンプリング結果を
     /// キャッシュするフィールド。Runtime fallback 経路から参照可能な永続化形式
-    /// (<see cref="ExpressionSnapshotDto"/>) で保持する (Req 9.2, 9.3)。
+    /// (<see cref="ExpressionSnapshotDto"/>) で保持する。
     /// </para>
     /// </summary>
     [Serializable]
@@ -37,23 +35,26 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
         [Tooltip("目線操作の表情ならば true。AnimationClip による補間は適用されず GazeConfig で駆動する。通常表情は false にして AnimationClip / 遷移時間 を設定する。")]
         public bool isGaze;
 
-        [Tooltip("[Phase 5.1] 表情の AnimationClip。時刻 0 の BlendShape / Bone 値および AnimationEvent メタデータから snapshot をベイクする (Req 1.1, 2.1, 2.4)。")]
+        [Tooltip("表情の AnimationClip。時刻 0 の BlendShape / Bone 値および AnimationEvent メタデータから snapshot をベイクする。")]
         public AnimationClip animationClip;
 
-        [Tooltip("[Bridge] 遷移時間 (秒)。0〜1 範囲外は自動クランプ。Phase 3.6 で snapshot 経路へ移行予定。")]
+        [Tooltip("[Bridge] 遷移時間 (秒)。0〜1 範囲外は自動クランプ。snapshot 経路へ移行予定。")]
         [Range(0f, 1f)]
         public float transitionDuration = Expression.DefaultTransitionDuration;
 
-        [Tooltip("[Bridge] 遷移カーブ。Phase 3.6 で snapshot 経路へ移行予定。")]
+        [Tooltip("[Bridge] 遷移カーブ。snapshot 経路へ移行予定。")]
         public TransitionCurveSerializable transitionCurve = new TransitionCurveSerializable();
 
-        [Tooltip("[Bridge] BlendShape 値の配列。Phase 3.6 で snapshot 経路へ移行予定。")]
+        [Tooltip("[Bridge] BlendShape 値の配列。snapshot 経路へ移行予定。")]
         public List<BlendShapeMappingSerializable> blendShapeValues = new List<BlendShapeMappingSerializable>();
 
         [Tooltip("他レイヤーへのオーバーライド対象を表すレイヤー名配列。Domain の LayerOverrideMask に対応する永続化形式。")]
         public List<string> layerOverrideMask = new List<string>();
 
-        [Tooltip("[Phase 5.3] AutoExporter がベイクした AnimationClip サンプリング結果のキャッシュ。Runtime fallback 経路で参照される (Req 9.2, 9.3)。")]
+        [Tooltip("AutoExporter がベイクした AnimationClip サンプリング結果のキャッシュ。Runtime fallback 経路で参照される。")]
         public ExpressionSnapshotDto cachedSnapshot;
+
+        [Tooltip("Trigger / Analog 入力で重ね合わせる overlay Expression を slot 単位で宣言する。expressionId 空文字で当該 slot を suppress。")]
+        public List<OverlaySlotBindingSerializable> overlays = new List<OverlaySlotBindingSerializable>();
     }
 }

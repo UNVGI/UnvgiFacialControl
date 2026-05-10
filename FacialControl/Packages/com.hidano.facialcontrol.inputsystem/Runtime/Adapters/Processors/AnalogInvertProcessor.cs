@@ -4,7 +4,7 @@ namespace Hidano.FacialControl.Adapters.Processors
 {
     /// <summary>
     /// アナログ入力の符号を反転する stateless な <see cref="InputProcessor{TValue}"/> 実装
-    /// （design.md Topic 3）。
+    /// 。
     /// </summary>
     /// <remarks>
     /// 共通の <see cref="InputProcessor{TValue}"/> 派生定型として、serialize する field は持たない。

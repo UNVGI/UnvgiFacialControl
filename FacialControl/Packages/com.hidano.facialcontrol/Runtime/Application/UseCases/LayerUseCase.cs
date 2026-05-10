@@ -11,8 +11,8 @@ namespace Hidano.FacialControl.Application.UseCases
     /// レイヤーの補間更新と最終 BlendShape 出力の計算を管理するユースケース。
     /// 内部では <see cref="LayerInputSourceAggregator"/> / <see cref="LayerInputSourceWeightBuffer"/> /
     /// <see cref="LayerInputSourceRegistry"/> に委譲し、per-layer Expression 遷移を
-    /// <see cref="IInputSource"/> アダプタとして供給する (8.1)。公開 API シグネチャは非破壊に維持する
-    /// (Req 7.1)。
+    /// <see cref="IInputSource"/> アダプタとして供給する。公開 API シグネチャは非破壊に維持する
+    /// 。
     /// </summary>
     public class LayerUseCase : IDisposable
     {
@@ -205,26 +205,26 @@ namespace Hidano.FacialControl.Application.UseCases
             => _finalOutput == null ? ReadOnlySpan<float>.Empty : new ReadOnlySpan<float>(_finalOutput);
 
         /// <summary>
-        /// (layer, source) スロットの入力源ウェイトをランタイムで書込む (8.3)。
+        /// (layer, source) スロットの入力源ウェイトをランタイムで書込む。
         /// 任意スレッドから呼出可能で、書込は次回 <see cref="UpdateWeights"/>
         /// (内部の <c>Aggregator.Aggregate</c> 入口の <c>SwapIfDirty</c>) 以降に観測される。
-        /// 値は 0〜1 に silent clamp され、範囲外 (layer, source) は警告 + no-op (Req 4.3)。
+        /// 値は 0〜1 に silent clamp され、範囲外 (layer, source) は警告 + no-op 。
         /// 未初期化 (Dispose 済 / 空プロファイル) の場合は no-op。
         /// </summary>
         /// <param name="layerIdx">レイヤーインデックス。</param>
         /// <param name="sourceIdx">入力源インデックス。<c>0</c> は <see cref="LayerExpressionSource"/> の予約枠、
-        /// 追加 <see cref="IInputSource"/> は登録順に <c>1, 2, ...</c> を取る (8.2 と整合)。</param>
-        /// <param name="weight">ウェイト値。範囲外は silent clamp される (Req 2.5)。</param>
+        /// 追加 <see cref="IInputSource"/> は登録順に <c>1, 2, ...</c> を取る。</param>
+        /// <param name="weight">ウェイト値。範囲外は silent clamp される 。</param>
         public void SetInputSourceWeight(int layerIdx, int sourceIdx, float weight)
         {
             _weightBuffer?.SetWeight(layerIdx, sourceIdx, weight);
         }
 
         /// <summary>
-        /// 入力源ウェイトのバルク書込スコープを開始する (8.3)。
+        /// 入力源ウェイトのバルク書込スコープを開始する。
         /// 返された <see cref="LayerInputSourceWeightBuffer.BulkScope"/> の
         /// <c>SetWeight</c> で書いた値はスコープの <c>Dispose</c> (= CommitBulk) 時に
-        /// writeBuffer へ一括 flush される (Req 4.5)。
+        /// writeBuffer へ一括 flush される 。
         /// 未初期化の場合は no-op となる <c>default(BulkScope)</c> を返す
         /// (内部の owner 参照が null のため <c>SetWeight</c> / <c>Dispose</c> は安全)。
         /// </summary>
@@ -240,7 +240,7 @@ namespace Hidano.FacialControl.Application.UseCases
 
         /// <summary>
         /// 直近 <see cref="UpdateWeights"/> で観測された (layer, source) ウェイトの
-        /// 診断スナップショットを返す (Req 8.1, 8.3)。Editor の読取専用ビュー向け (Req 8.6)。
+        /// 診断スナップショットを返す 。Editor の読取専用ビュー向け 。
         /// 未初期化 / Dispose 済 の場合は空リストを返す。
         /// </summary>
         public IReadOnlyList<LayerSourceWeightEntry> GetInputSourceWeightsSnapshot()
@@ -354,7 +354,7 @@ namespace Hidano.FacialControl.Application.UseCases
                 bindings.Add((l, 0, src));
             }
 
-            // 追加の IInputSource を各レイヤー内 sourceIdx=1,2,... に割当 (8.2)。
+            // 追加の IInputSource を各レイヤー内 sourceIdx=1,2,... に割当。
             // sourceIdx=0 は LayerExpressionSource の予約枠。
             var additionalWeights = new List<(int layerIdx, int sourceIdx, float weight)>();
             if (_additionalInputSources != null && _additionalInputSources.Count > 0 && layerCount > 0)

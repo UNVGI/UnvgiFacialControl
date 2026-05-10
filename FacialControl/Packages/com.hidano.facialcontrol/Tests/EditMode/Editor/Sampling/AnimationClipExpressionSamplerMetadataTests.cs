@@ -11,12 +11,11 @@ using UnityEngine.TestTools;
 namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
 {
     /// <summary>
-    /// Phase 2.2: <see cref="AnimationClipExpressionSampler"/> の AnimationEvent 経由
+    /// <see cref="AnimationClipExpressionSampler"/> の AnimationEvent 経由
     /// メタデータ抽出（TransitionDuration / TransitionCurvePreset）を検証する。
     /// 予約 functionName: <c>FacialControlMeta_Set</c>、
     /// stringParameter で key 識別（transitionDuration / transitionCurvePreset）、
     /// floatParameter で値運搬（preset enum 整数も float として）。
-    /// _Requirements: 2.4, 2.5, 2.6
     /// </summary>
     [TestFixture]
     public class AnimationClipExpressionSamplerMetadataTests

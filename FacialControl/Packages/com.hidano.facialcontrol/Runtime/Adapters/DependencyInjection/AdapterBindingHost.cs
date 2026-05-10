@@ -14,14 +14,14 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
     /// 例外 isolation: <c>OnStart</c> / <c>OnTick</c> / <c>OnLateTick</c> / <c>OnFixedTick</c> /
     /// <c>Dispose</c> のいずれかで例外が発生した場合、catch + <c>Debug.LogError</c> + <c>_skipped = true</c>
     /// に遷移する。以降のフレームでは Tick 系を no-op にし、他 binding と core パイプラインの継続を保証する
-    /// （Req 13.4-13.5、D-15）。
+    /// 。
     /// </para>
     /// <para>
     /// <c>Dispose</c> は <c>_skipped</c> の値に関わらず必ず呼ばれる（VContainer 規約）。Dispose 自体の
     /// 例外も catch + LogError し、後続 host の Dispose 継続を妨げない。
     /// </para>
     /// <para>
-    /// DD-3: <c>if (_skipped) return;</c> と通常 dispatch は 0-alloc fast path（Req 9.1）。
+    /// DD-3: <c>if (_skipped) return;</c> と通常 dispatch は 0-alloc fast path。
     /// 例外発生フレーム単発の <c>Debug.LogError</c> 文字列補間アロケは &lt; 1 KB の許容範囲。
     /// </para>
     /// <para>

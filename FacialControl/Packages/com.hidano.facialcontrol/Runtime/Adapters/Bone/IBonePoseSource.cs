@@ -4,10 +4,10 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Adapters.Bone
 {
     /// <summary>
-    /// BoneWriter 自身が実装する内部契約。現在 active な <see cref="BoneSnapshot"/> 列を返す (Req 5.6, 11.1)。
+    /// BoneWriter 自身が実装する内部契約。現在 active な <see cref="BoneSnapshot"/> 列を返す 。
     /// </summary>
     /// <remarks>
-    /// preview.1 ではメインスレッド限定契約。hot path で alloc しない (Req 11.5)。
+    /// メインスレッド限定契約。hot path で alloc しない。
     /// </remarks>
     public interface IBonePoseSource
     {

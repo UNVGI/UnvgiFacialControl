@@ -4,16 +4,14 @@ using System.Text.RegularExpressions;
 namespace Hidano.FacialControl.Domain.Models
 {
     /// <summary>
-    /// 入力源識別子の value-object。Req 12.6 に従い、
+    /// 入力源識別子の value-object。
     /// パターン <c>[a-zA-Z0-9_.\-:]{1,64}</c> を満たす ASCII 文字列のみを受理する。
     /// </summary>
     /// <remarks>
     /// <para>
-    /// 旧 reserved id 体系（<c>osc</c> / <c>lipsync</c> / <c>input</c> / <c>analog-blendshape</c>
-    /// / <c>analog-bonepose</c>）は D-13 / Req 12.5 により撤廃済み。識別子の意味付けは
-    /// <see cref="AdapterSlug"/> 経由で各 binding 側が担う。
-    /// 識別子 <c>legacy</c> は D-5 の legacy フォールバック廃止に伴い受理されない。
-    /// 旧 <c>controller-expr</c> / <c>keyboard-expr</c> は preview 段階で廃止され受理されない。
+    /// 識別子の意味付けは <see cref="AdapterSlug"/> 経由で各 binding 側が担う。
+    /// 識別子 <c>legacy</c> は legacy フォールバック廃止に伴い受理されない。
+    /// 旧 <c>controller-expr</c> / <c>keyboard-expr</c> は廃止され受理されない。
     /// サードパーティ拡張は <c>x-</c> プレフィックス推奨。
     /// </para>
     /// <para>

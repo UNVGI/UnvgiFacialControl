@@ -8,7 +8,7 @@ using Hidano.FacialControl.Tests.Shared;
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
 {
     /// <summary>
-    /// <see cref="OscInputSource"/> の EditMode 契約テスト (tasks.md 6.6)。
+    /// <see cref="OscInputSource"/> の EditMode 契約テスト 。
     /// </summary>
     /// <remarks>
     /// 観測完了条件:

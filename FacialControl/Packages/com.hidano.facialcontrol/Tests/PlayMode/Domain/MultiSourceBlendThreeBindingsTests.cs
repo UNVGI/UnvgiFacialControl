@@ -16,7 +16,7 @@ using DomainLayerInputSourceRegistry = Hidano.FacialControl.Domain.Services.Laye
 namespace Hidano.FacialControl.Tests.PlayMode.Domain
 {
     /// <summary>
-    /// tasks.md 7.3: verifies that three adapter bindings resolved by slug feed the
+    //: verifies that three adapter bindings resolved by slug feed the
     /// unchanged MultiSourceBlend domain pipeline.
     /// </summary>
     [TestFixture]

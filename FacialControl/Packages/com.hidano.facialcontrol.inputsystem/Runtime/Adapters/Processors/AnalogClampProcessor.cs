@@ -5,7 +5,7 @@ namespace Hidano.FacialControl.Adapters.Processors
 {
     /// <summary>
     /// アナログ入力を <see cref="min"/>..<see cref="max"/> の閉区間にクランプする stateless な
-    /// <see cref="InputProcessor{TValue}"/> 実装（design.md Topic 3）。
+    /// <see cref="InputProcessor{TValue}"/> 実装。
     /// </summary>
     /// <remarks>
     /// 共通の <see cref="InputProcessor{TValue}"/> 派生定型として、

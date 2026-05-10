@@ -8,7 +8,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
     /// （<c>managedReferenceValue == null</c>）の placeholder UI Toolkit 要素。
     /// </summary>
     /// <remarks>
-    /// Req 2.7: adapter package がアンロード／削除されたまま SO load された場合や、
+    //: adapter package がアンロード／削除されたまま SO load された場合や、
     /// in-memory list に <c>null</c> 要素が残っている場合に表示される。Remove ボタンで
     /// 当該 row を削除可能。
     /// </remarks>

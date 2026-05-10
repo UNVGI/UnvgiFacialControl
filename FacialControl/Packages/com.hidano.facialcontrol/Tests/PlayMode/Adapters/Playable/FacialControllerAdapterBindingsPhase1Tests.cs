@@ -15,10 +15,8 @@ using GazeBindingConfig = Hidano.FacialControl.Adapters.ScriptableObject.GazeBin
 namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Playable
 {
     /// <summary>
-    /// Phase 2 完了後の <see cref="FacialController"/> + <c>_adapterBindings</c> 経路 PlayMode テスト。
-    /// Phase 1 並走期に存在した「empty-list ゲート」「旧 Extension 経路駆動」「両経路同時検出時の
-    /// dual-path warning」の 3 シナリオは tasks.md 11.1 で全て廃止され、残るのは「無条件
-    /// child scope build → binding lifecycle が VContainer 経由で駆動される」契約のみ。
+    /// <see cref="FacialController"/> + <c>_adapterBindings</c> 経路 PlayMode テスト。
+    /// 「無条件 child scope build → binding lifecycle が VContainer 経由で駆動される」契約を検証する。
     /// </summary>
     [TestFixture]
     public class FacialControllerAdapterBindingsPhase1Tests
@@ -80,7 +78,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Playable
         }
 
         // ---------------------------------------------------------------
-        // _adapterBindings が空でも child scope build は走る（tasks.md 11.1: 無条件 build）。
+        // _adapterBindings が空でも child scope build は走る（無条件 build）。
         // 旧 Extension 経路は完全削除済みのため、空 list でも Initialize は完了する。
         // ---------------------------------------------------------------
 

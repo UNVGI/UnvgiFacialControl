@@ -13,7 +13,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Req 12.3: <see cref="AdapterBindingsListView"/> の row error class + summary banner と
+    //: <see cref="AdapterBindingsListView"/> の row error class + summary banner と
     /// 二段構えで重複を検出し、保存パイプラインから当該 path を除外する。
     /// </para>
     /// <para>

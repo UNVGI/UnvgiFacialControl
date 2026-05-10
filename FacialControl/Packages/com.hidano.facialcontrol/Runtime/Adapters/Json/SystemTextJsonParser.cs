@@ -13,14 +13,14 @@ namespace Hidano.FacialControl.Adapters.Json
     /// プロファイル JSON 専用 DTO 群（<see cref="ProfileSnapshotDto"/> 等）を介して
     /// ドメインモデルとの変換を行う。
     /// <para>
-    /// preview.1 リリース前段階のため、schemaVersion <c>"1.0"</c> 以外を
-    /// <see cref="Debug.LogError(object)"/> + <see cref="NotSupportedException"/> で拒否する（Req 10.1）。
+    /// schemaVersion <c>"1.0"</c> 以外を
+    /// <see cref="Debug.LogError(object)"/> + <see cref="NotSupportedException"/> で拒否する。
     /// </para>
     /// </summary>
     public sealed class SystemTextJsonParser : IJsonParser
     {
         /// <summary>
-        /// プロファイル JSON のサポートバージョン文字列（preview.1 前段階で "1.0" に統一）。
+        /// プロファイル JSON のサポートバージョン文字列（"1.0"）。
         /// </summary>
         public const string SchemaVersionV2 = "1.0";
 
@@ -39,7 +39,7 @@ namespace Hidano.FacialControl.Adapters.Json
 
         /// <summary>
         /// <c>layers[].inputSources[]</c> をパースして、レイヤー順に <see cref="InputSourceDto"/> 配列を返す。
-        /// schemaVersion は <see cref="SchemaVersionV2"/> を要求する（Req 10.1）。
+        /// schemaVersion は <see cref="SchemaVersionV2"/> を要求する。
         /// </summary>
         public InputSourceDto[][] ParseLayerInputSources(string json)
         {
@@ -50,7 +50,7 @@ namespace Hidano.FacialControl.Adapters.Json
         /// <summary>
         /// プロファイル JSON の専用パース経路。
         /// <c>schemaVersion</c> が <see cref="SchemaVersionV2"/> 以外の場合は
-        /// <see cref="Debug.LogError(object)"/> + <see cref="NotSupportedException"/> で拒否する（Req 10.1）。
+        /// <see cref="Debug.LogError(object)"/> + <see cref="NotSupportedException"/> で拒否する。
         /// 欠落 / null の snapshot は既定値（<c>transitionDuration=1/15</c>, <c>transitionCurvePreset="Linear"</c>,
         /// 各配列空）に正規化される。
         /// </summary>
@@ -86,7 +86,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 var actual = string.IsNullOrEmpty(dto.schemaVersion) ? "<missing>" : dto.schemaVersion;
                 Debug.LogError(
                     $"SystemTextJsonParser: プロファイル JSON schema v1.0 の strict チェックに失敗しました。" +
-                    $"期待値 '{SchemaVersionV2}'、実際 '{actual}'。Req 10.1 により未サポートの schema は拒否されます。");
+                    $"期待値 '{SchemaVersionV2}'、実際 '{actual}'。未サポートの schema は拒否されます。");
                 throw new NotSupportedException(
                     $"サポートされていないスキーマバージョンです: '{actual}' (期待値 '{SchemaVersionV2}')。");
             }
@@ -110,6 +110,8 @@ namespace Hidano.FacialControl.Adapters.Json
                 dto.rendererPaths = new List<string>();
             if (dto.gazeConfigs == null)
                 dto.gazeConfigs = new List<GazeBindingConfigDto>();
+            if (dto.defaultOverlays == null)
+                dto.defaultOverlays = new List<OverlaySlotBindingDto>();
             dto.baseExpression = NormalizeExpressionSnapshotDto(dto.baseExpression);
 
             for (int i = 0; i < dto.expressions.Count; i++)
@@ -144,11 +146,13 @@ namespace Hidano.FacialControl.Adapters.Json
                 snapshot.bones = new List<BoneSnapshotDto>();
             if (snapshot.rendererPaths == null)
                 snapshot.rendererPaths = new List<string>();
+            if (snapshot.overlays == null)
+                snapshot.overlays = new List<OverlaySlotBindingDto>();
 
             return snapshot;
         }
 
-        // preview 破壊的変更 (D-5, Req 3.2): inputSources は必須フィールド。欠落 / 空配列はエラー。
+        // preview 破壊的変更 (D-5): inputSources は必須フィールド。欠落 / 空配列はエラー。
         private static void ValidateLayerInputSources(ProfileSnapshotDto dto)
         {
             if (dto.layers == null)
@@ -169,7 +173,7 @@ namespace Hidano.FacialControl.Adapters.Json
             }
         }
 
-        // Req 1.7, 3.3, 3.4 / D-5, D-6: inputSources エントリの識別子検証と重複解決。
+        // inputSources エントリの識別子検証と重複解決。
         private static InputSourceDto[][] ExtractInputSources(ProfileSnapshotDto dto)
         {
             if (dto.layers == null || dto.layers.Count == 0)
@@ -245,7 +249,7 @@ namespace Hidano.FacialControl.Adapters.Json
 
         /// <summary>
         /// 既に組み立て済みの <see cref="ProfileSnapshotDto"/> を schema v1.0 互換 JSON 文字列にシリアライズする。
-        /// AutoExporter が AnimationClip サンプリング結果を直接 JSON へ書き出す経路で使用する（Req 9.1, 9.2）。
+        /// AutoExporter が AnimationClip サンプリング結果を直接 JSON へ書き出す経路で使用する。
         /// </summary>
         /// <param name="dto">トップレベル DTO。<see cref="ProfileSnapshotDto.schemaVersion"/> が空の場合は <see cref="SchemaVersionV2"/> を補完する。</param>
         /// <returns>JsonUtility 整形済み JSON 文字列（<c>options</c> フィールドは生 JSON ブロックへ復元済）。</returns>
@@ -618,7 +622,25 @@ namespace Hidano.FacialControl.Adapters.Json
             var expressions = ConvertExpressions(dto.expressions);
             var rendererPaths = ConvertRendererPaths(dto.rendererPaths);
             var layerInputSources = ConvertLayerInputSources(inputSourceDtos);
-            return new FacialProfile(dto.schemaVersion, layers, expressions, rendererPaths, layerInputSources);
+            var defaultOverlays = ConvertOverlaySlotBindings(dto.defaultOverlays);
+            return new FacialProfile(
+                dto.schemaVersion, layers, expressions, rendererPaths, layerInputSources, defaultOverlays);
+        }
+
+        private static OverlaySlotBinding[] ConvertOverlaySlotBindings(List<OverlaySlotBindingDto> dtos)
+        {
+            if (dtos == null || dtos.Count == 0)
+                return null;
+
+            var list = new List<OverlaySlotBinding>(dtos.Count);
+            for (int i = 0; i < dtos.Count; i++)
+            {
+                var d = dtos[i];
+                if (d == null || string.IsNullOrWhiteSpace(d.slot))
+                    continue;
+                list.Add(new OverlaySlotBinding(d.slot, d.expressionId));
+            }
+            return list.Count == 0 ? null : list.ToArray();
         }
 
         private static InputSourceDeclaration[][] ConvertLayerInputSources(InputSourceDto[][] dtos)
@@ -681,6 +703,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 float duration = snapshot != null ? snapshot.transitionDuration : Expression.DefaultTransitionDuration;
                 var curve = ConvertTransitionCurve(snapshot != null ? snapshot.transitionCurvePreset : "Linear");
                 var blendShapes = ConvertBlendShapeMappings(snapshot != null ? snapshot.blendShapes : null);
+                var overlays = ConvertOverlaySlotBindings(snapshot != null ? snapshot.overlays : null);
 
                 expressions[i] = new Expression(
                     d.id,
@@ -688,7 +711,8 @@ namespace Hidano.FacialControl.Adapters.Json
                     d.layer,
                     duration,
                     curve,
-                    blendShapes);
+                    blendShapes,
+                    overlays);
             }
             return expressions;
         }
@@ -750,7 +774,8 @@ namespace Hidano.FacialControl.Adapters.Json
                 layers = new List<LayerDefinitionDto>(),
                 expressions = new List<ExpressionDto>(),
                 rendererPaths = new List<string>(),
-                gazeConfigs = new List<GazeBindingConfigDto>()
+                gazeConfigs = new List<GazeBindingConfigDto>(),
+                defaultOverlays = BuildOverlaySlotBindingDtoList(profile.DefaultOverlays.Span),
             };
 
             var rendererPathsSpan = profile.RendererPaths.Span;
@@ -796,6 +821,7 @@ namespace Hidano.FacialControl.Adapters.Json
                     blendShapes = new List<BlendShapeSnapshotDto>(),
                     bones = new List<BoneSnapshotDto>(),
                     rendererPaths = new List<string>(),
+                    overlays = BuildOverlaySlotBindingDtoList(expr.Overlays.Span),
                 }
             };
 
@@ -811,6 +837,21 @@ namespace Hidano.FacialControl.Adapters.Json
             }
 
             return dto;
+        }
+
+        private static List<OverlaySlotBindingDto> BuildOverlaySlotBindingDtoList(
+            ReadOnlySpan<OverlaySlotBinding> bindings)
+        {
+            var list = new List<OverlaySlotBindingDto>(bindings.Length);
+            for (int i = 0; i < bindings.Length; i++)
+            {
+                list.Add(new OverlaySlotBindingDto
+                {
+                    slot = bindings[i].Slot,
+                    expressionId = bindings[i].ExpressionId,
+                });
+            }
+            return list;
         }
 
         private static string SerializeExclusionMode(ExclusionMode mode)

@@ -106,7 +106,7 @@ namespace Hidano.FacialControl.Adapters.Input
         }
 
         /// <summary>
-        /// 既登録の <see cref="InputAction"/> に推定された <see cref="DeviceCategory"/> を返す（Req 7.2）。
+        /// 既登録の <see cref="InputAction"/> に推定された <see cref="DeviceCategory"/> を返す。
         /// </summary>
         /// <param name="action">対象 <see cref="InputAction"/>。null は false を返す。</param>
         /// <param name="category">推定 <see cref="DeviceCategory"/>（未登録時は <see cref="DeviceCategory.Controller"/>）。</param>

@@ -46,7 +46,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
         public override VisualElement CreatePropertyGUI(SerializedProperty property)
         {
             throw new InvalidOperationException(
-                "Intentional PropertyDrawer exception from MockListViewThrowingDrawerBindingDrawer for task 5.3 / Req 3.6.");
+                "Intentional PropertyDrawer exception from MockListViewThrowingDrawerBindingDrawer for task 5.3");
         }
     }
 
@@ -56,7 +56,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
     /// Reorder、null 要素時の <see cref="MissingAdapterPlaceholderElement"/>、
     /// 同 SO 内 slug 重複時の error class + summary banner、
     /// PropertyDrawer 例外時の per-element fallback element を行うことを assert する
-    /// （Req 1.4, 2.4, 2.5, 2.6, 2.7, 3.3, 3.5, 3.6, 7.1, 12.2, 12.3）。
+    /// 。
     /// </summary>
     /// <remarks>
     /// 本ファイルは Red 段階のテストであり、
@@ -141,7 +141,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
         }
 
         // ---------------------------------------------------------------
-        // Add ドロップダウン → Activator.CreateInstance + slug auto-populate（Req 2.5, 12.2）
+        // Add ドロップダウン → Activator.CreateInstance + slug auto-populate
         // ---------------------------------------------------------------
 
         [Test]
@@ -161,19 +161,19 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
             Assert.IsNotNull(element.managedReferenceValue,
                 "Add 後の要素は Activator.CreateInstance で生成された concrete instance を持つべき。");
             Assert.IsInstanceOf<MockListViewSimpleBinding>(element.managedReferenceValue,
-                "Add 後の要素は descriptor.Type と同じ concrete type であるべき (Req 2.5)。");
+                "Add 後の要素は descriptor.Type と同じ concrete type であるべき 。");
 
-            // Slug が AdapterSlug.FromDisplayName(descriptor.OriginalDisplayName) 由来であることを確認 (Req 12.2)。
+            // Slug が AdapterSlug.FromDisplayName(descriptor.OriginalDisplayName) 由来であることを確認 。
             var expectedSlug = AdapterSlug.FromDisplayName(descriptor.OriginalDisplayName).Value;
             var added = (MockListViewSimpleBinding)element.managedReferenceValue;
             Assert.AreEqual(expectedSlug, added.Slug,
-                "Slug は AdapterSlug.FromDisplayName(displayName) で auto-populate されるべき (Req 12.2)。");
+                "Slug は AdapterSlug.FromDisplayName(displayName) で auto-populate されるべき 。");
         }
 
         [Test]
         public void AddBindingFromDescriptor_SameTypeTwice_AppendsTwoIndependentInstances()
         {
-            // Req 2.4: 同型 binding を複数追加できる。
+            // 同型 binding を複数追加できる。
             var view = CreateView();
             var descriptor = RequireDescriptor(typeof(MockListViewSimpleBinding));
 
@@ -182,7 +182,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
 
             _serializedObject.Update();
             Assert.AreEqual(2, _listProperty.arraySize,
-                "同型 descriptor を 2 回追加すると _adapterBindings の要素数は 2 になるべき (Req 2.4)。");
+                "同型 descriptor を 2 回追加すると _adapterBindings の要素数は 2 になるべき 。");
 
             var first = _listProperty.GetArrayElementAtIndex(0).managedReferenceValue;
             var second = _listProperty.GetArrayElementAtIndex(1).managedReferenceValue;
@@ -194,7 +194,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
         }
 
         // ---------------------------------------------------------------
-        // Remove ボタン → list から削除 + dirty 化（Req 2.6）
+        // Remove ボタン → list から削除 + dirty 化
         // ---------------------------------------------------------------
 
         [Test]
@@ -216,29 +216,29 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
 
             _serializedObject.Update();
             Assert.AreEqual(1, _listProperty.arraySize,
-                "Remove 後の _adapterBindings の要素数は 1 になるべき (Req 2.6)。");
+                "Remove 後の _adapterBindings の要素数は 1 になるべき 。");
 
             var remaining = _listProperty.GetArrayElementAtIndex(0).managedReferenceValue;
             Assert.IsInstanceOf<MockListViewOtherBinding>(remaining,
                 "index 0 を Remove したら、index 1 だった MockListViewOtherBinding が残るべき。");
 
             Assert.IsTrue(EditorUtility.IsDirty(_so),
-                "Remove 後は SO が dirty 化されているべき (Req 2.6)。");
+                "Remove 後は SO が dirty 化されているべき 。");
         }
 
         // ---------------------------------------------------------------
-        // 並び替え機能は preview.1 の +/- フッター移行で削除された。
+        // 並び替え機能は +/- フッター移行で削除された。
         // 必要になったら別タスクで再導入する。
         // ---------------------------------------------------------------
 
         // ---------------------------------------------------------------
-        // null 要素 → MissingAdapterPlaceholderElement（Req 2.7）
+        // null 要素 → MissingAdapterPlaceholderElement
         // ---------------------------------------------------------------
 
         [Test]
         public void NullElement_RendersMissingAdapterPlaceholderForRow()
         {
-            // Req 2.7: managedReferenceValue が null の要素は型欠落 placeholder で描画される。
+            // managedReferenceValue が null の要素は型欠落 placeholder で描画される。
             // _so.WritableAdapterBindings に null を直接追加し、SerializedObject を再構築する。
             _so.WritableAdapterBindings.Add(null);
             EditorUtility.SetDirty(_so);
@@ -252,11 +252,11 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
             // 検出可能な要素を一つ以上保持しているはず。
             var placeholders = view.Query<MissingAdapterPlaceholderElement>().ToList();
             Assert.GreaterOrEqual(placeholders.Count, 1,
-                "null 要素を含む list では MissingAdapterPlaceholderElement が少なくとも 1 件描画されるべき (Req 2.7)。");
+                "null 要素を含む list では MissingAdapterPlaceholderElement が少なくとも 1 件描画されるべき 。");
         }
 
         // ---------------------------------------------------------------
-        // 同 SO 内 slug 重複（Req 12.3）
+        // 同 SO 内 slug 重複
         // ---------------------------------------------------------------
 
         [Test]
@@ -275,12 +275,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
             // bindItem 後の row VisualElement に対して Q で error class 要素を取得する。
             var errorRows = view.Query(className: AdapterBindingsListView.ErrorRowClassName).ToList();
             Assert.GreaterOrEqual(errorRows.Count, 2,
-                $"slug 重複時は重複している全 row に '{AdapterBindingsListView.ErrorRowClassName}' class が付与されるべき (Req 12.3)。");
+                $"slug 重複時は重複している全 row に '{AdapterBindingsListView.ErrorRowClassName}' class が付与されるべき 。");
 
             // Summary banner が表示されている。
             var banner = view.Q<VisualElement>(name: AdapterBindingsListView.SummaryBannerName);
             Assert.IsNotNull(banner,
-                "slug 重複時は Inspector 上端の summary banner が表示されるべき (Req 12.3)。");
+                "slug 重複時は Inspector 上端の summary banner が表示されるべき 。");
             Assert.IsTrue(banner.resolvedStyle.display != DisplayStyle.None || banner.style.display != DisplayStyle.None,
                 "summary banner は display:none ではなく可視であるべき。");
         }
@@ -312,13 +312,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
         }
 
         // ---------------------------------------------------------------
-        // PropertyDrawer 例外時の per-element fallback（Req 3.6）
+        // PropertyDrawer 例外時の per-element fallback
         // ---------------------------------------------------------------
 
         [Test]
         public void ThrowingPropertyDrawer_RendersFallbackElementWithoutBreakingOtherRows()
         {
-            // Req 3.6: PropertyDrawer 例外を bindItem 内で catch + per-element fallback element 表示。
+            // PropertyDrawer 例外を bindItem 内で catch + per-element fallback element 表示。
             //         他 row の描画が止まらないこと。
             _so.WritableAdapterBindings.Add(new MockListViewSimpleBinding { Slug = "ok-front" });
             _so.WritableAdapterBindings.Add(new MockListViewThrowingDrawerBinding { Slug = "boom" });
@@ -332,12 +332,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
             // fallback element が少なくとも 1 件描画されている。
             var fallbackElements = view.Query(className: AdapterBindingsListView.FallbackRowClassName).ToList();
             Assert.GreaterOrEqual(fallbackElements.Count, 1,
-                $"PropertyDrawer 例外時は '{AdapterBindingsListView.FallbackRowClassName}' class を持つ fallback element が描画されるべき (Req 3.6)。");
+                $"PropertyDrawer 例外時は '{AdapterBindingsListView.FallbackRowClassName}' class を持つ fallback element が描画されるべき 。");
 
             // 他 row の描画が止まっていないこと: 例外を投げない 2 row は通常 PropertyField を持つはず。
             var propertyFields = view.Query<PropertyField>().ToList();
             Assert.GreaterOrEqual(propertyFields.Count, 2,
-                "PropertyDrawer 例外を投げない他 row は通常通り PropertyField で描画されているべき (Req 3.6)。");
+                "PropertyDrawer 例外を投げない他 row は通常通り PropertyField で描画されているべき 。");
         }
     }
 }

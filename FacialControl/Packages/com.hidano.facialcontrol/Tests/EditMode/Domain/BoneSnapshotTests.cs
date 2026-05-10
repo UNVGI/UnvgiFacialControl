@@ -4,9 +4,8 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
     /// <summary>
-    /// BoneSnapshot の Red フェーズテスト。
+    /// BoneSnapshot のテスト。
     /// (BonePath, PositionXYZ, EulerXYZ, ScaleXYZ) の 9 float + 1 string を保持する readonly struct の振る舞いを検証する。
-    /// _Requirements: 1.5, 2.2, 9.2, 13.1
     /// </summary>
     [TestFixture]
     public class BoneSnapshotTests

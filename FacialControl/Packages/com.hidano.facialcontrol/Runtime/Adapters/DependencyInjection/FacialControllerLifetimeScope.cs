@@ -15,7 +15,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
     /// per-<c>FacialController</c> の child <see cref="LifetimeScope"/> を build / dispose する plain C# wrapper。
     /// <see cref="FacialControlAppLifetimeScope"/> を親として <c>CreateChild</c> で動的生成し、
     /// <see cref="InputSourceRegistry"/> と各 <see cref="AdapterBindingHost"/> を <c>Lifetime.Scoped</c>
-    /// で登録する（Req 4.7, 9.1, 9.4, 13.5, D-12）。
+    /// で登録する。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -70,7 +70,8 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
             IReadOnlyList<string> blendShapeNames,
             IReadOnlyList<AdapterBindingBase> bindings,
             GameObject hostGameObject,
-            string childScopeName = null)
+            string childScopeName = null,
+            IActiveExpressionProvider activeExpressionProvider = null)
         {
             if (appScope == null)
             {
@@ -95,6 +96,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
             IReadOnlyList<string> capturedBlendShapeNames = blendShapeNames;
             IReadOnlyList<AdapterBindingBase> capturedBindings = bindings;
             GameObject capturedHostGameObject = hostGameObject;
+            IActiveExpressionProvider capturedActiveProvider = activeExpressionProvider;
 
             LifetimeScope childScope = appScope.CreateChild(
                 (Action<IContainerBuilder>)(builder =>
@@ -111,7 +113,8 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
                         registry,
                         timeProvider,
                         capturedHostGameObject,
-                        lipSyncProvider);
+                        lipSyncProvider,
+                        capturedActiveProvider);
 
                     for (int i = 0; i < capturedBindings.Count; i++)
                     {
@@ -119,7 +122,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
                         if (binding == null)
                         {
                             // 型欠落（[SerializeReference] の null 要素）は warn + skip し、
-                            // 残りの binding は引き続き build する（Req 2.7、design.md FacialController.Implementation Notes）。
+                            // 残りの binding は引き続き build する。
                             Debug.LogWarning(
                                 "[FacialControl] FacialControllerLifetimeScope.Build: skipping null AdapterBinding (missing type).");
                             continue;

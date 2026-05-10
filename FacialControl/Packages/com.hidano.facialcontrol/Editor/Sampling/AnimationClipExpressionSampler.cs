@@ -9,12 +9,12 @@ namespace Hidano.FacialControl.Editor.Sampling
 {
     /// <summary>
     /// <see cref="IExpressionAnimationClipSampler"/> の唯一の実装。
-    /// stateless、同一 clip に対し常に同一結果（Req 12.4）。
+    /// stateless、同一 clip に対し常に同一結果。
     /// <para>
     /// AnimationUtility.GetCurveBindings + GetEditorCurve.Evaluate(0f) で
     /// 時刻 0 の BlendShape / Transform 値を取得する（research.md Topic 5、Decision 2）。
     /// AnimationEvent 経由のメタデータ抽出（<see cref="MetaSetFunctionName"/>）で
-    /// TransitionDuration / TransitionCurvePreset を上書きする（Phase 2.2、Req 2.4-2.6）。
+    /// TransitionDuration / TransitionCurvePreset を上書きする。
     /// 不在時は TransitionDuration=<see cref="Expression.DefaultTransitionDuration"/> (1/15), TransitionCurvePreset=Linear をデフォルトとして返す。
     /// </para>
     /// <para>
@@ -22,13 +22,13 @@ namespace Hidano.FacialControl.Editor.Sampling
     /// Transform: <c>m_LocalPosition.{x,y,z}</c> / <c>m_LocalScale.{x,y,z}</c> /
     /// <c>localEulerAnglesRaw.{x,y,z}</c> / <c>localEulerAngles.{x,y,z}</c> /
     /// <c>m_LocalRotation.{x,y,z,w}</c>（quaternion → euler 変換）で判別。
-    /// それ以外は <c>Debug.LogWarning</c> + skip（Req 2.7）。
+    /// それ以外は <c>Debug.LogWarning</c> + skip。
     /// </para>
     /// </summary>
     public sealed class AnimationClipExpressionSampler : IExpressionAnimationClipSampler
     {
         /// <summary>
-        /// AnimationClip メタデータ運搬用の予約 AnimationEvent functionName（design.md §3 準拠）。
+        /// AnimationClip メタデータ運搬用の予約 AnimationEvent functionName。
         /// stringParameter で key 識別、floatParameter で値運搬する。
         /// </summary>
         public const string MetaSetFunctionName = "FacialControlMeta_Set";

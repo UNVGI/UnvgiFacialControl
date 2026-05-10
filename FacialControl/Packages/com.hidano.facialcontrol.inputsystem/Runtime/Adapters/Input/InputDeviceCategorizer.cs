@@ -7,7 +7,7 @@ namespace Hidano.FacialControl.Adapters.Input
     /// </summary>
     /// <remarks>
     /// Keyboard 以外（Gamepad / Joystick / XRController / Pen / Touchscreen など）は
-    /// 設計上 Controller 扱いで一括する（design.md 4.4 / Req 7.2-7.5）。
+    /// 設計上 Controller 扱いで一括する。
     /// </remarks>
     public enum DeviceCategory
     {
@@ -20,8 +20,7 @@ namespace Hidano.FacialControl.Adapters.Input
 
     /// <summary>
     /// <see cref="UnityEngine.InputSystem.InputBinding.path"/> 文字列から
-    /// <see cref="DeviceCategory"/> を 0-alloc で推定するユーティリティ
-    /// （tasks.md 4.4 / requirements.md Req 7.2-7.5 / design.md「InputDeviceCategorizer」）。
+    /// <see cref="DeviceCategory"/> を 0-alloc で推定するユーティリティ。
     /// </summary>
     /// <remarks>
     /// 判別は path 先頭の <c>&lt;DeviceLayout&gt;</c> プレフィクスで行う:
@@ -30,10 +29,10 @@ namespace Hidano.FacialControl.Adapters.Input
     ///   <item><c>&lt;Gamepad&gt;</c> / <c>&lt;Joystick&gt;</c> / <c>&lt;XRController&gt;</c>
     ///   / <c>&lt;Pen&gt;</c> / <c>&lt;Touchscreen&gt;</c> → <see cref="DeviceCategory.Controller"/></item>
     ///   <item>未認識 prefix / <c>null</c> / 空文字 → <see cref="DeviceCategory.Controller"/> + <c>wasFallback=true</c>
-    ///   （呼出側で <c>Debug.LogWarning</c> を 1 回だけ出す責務: Req 7.5）</item>
+    ///   （呼出側で <c>Debug.LogWarning</c> を 1 回だけ出す責務）</item>
     /// </list>
     /// 0-alloc: <see cref="string.StartsWith(string, StringComparison)"/> を
-    /// <see cref="StringComparison.Ordinal"/> で呼ぶことでヒープ確保を発生させない（Req 11.3）。
+    /// <see cref="StringComparison.Ordinal"/> で呼ぶことでヒープ確保を発生させない。
     /// </remarks>
     public static class InputDeviceCategorizer
     {
@@ -73,7 +72,7 @@ namespace Hidano.FacialControl.Adapters.Input
         /// </param>
         /// <param name="wasFallback">
         /// 未認識 prefix（または <c>null</c>/空文字）で fallback 分類した場合 <c>true</c>。
-        /// 呼出側はこれを見て Req 7.5 の warning を 1 回だけログ出力する。
+        /// 呼出側はこれを見て warning を 1 回だけログ出力する。
         /// </param>
         /// <returns>推定した <see cref="DeviceCategory"/>。</returns>
         public static DeviceCategory Categorize(string bindingPath, out bool wasFallback)

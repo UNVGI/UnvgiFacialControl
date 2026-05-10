@@ -11,7 +11,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
     /// が列挙する <see cref="AdapterBindingDescriptor"/> 群を displayName 順に表示する。
     /// </summary>
     /// <remarks>
-    /// Req 1.4: Add UI は displayName 順 sort + 重複 displayName 警告 + suffix 付与。
+    //: Add UI は displayName 順 sort + 重複 displayName 警告 + suffix 付与。
     /// Sort / 重複処理は <see cref="AdapterBindingDiscovery"/> が事前に行うため、
     /// 本クラスは渡された descriptors をそのまま列挙する。
     /// </remarks>

@@ -10,8 +10,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
     /// <see cref="Hidano.FacialControl.Adapters.ScriptableObject.Serializable.FacialCharacterProfileSO"/>
     /// に追加される <c>[SerializeReference] List&lt;AdapterBindingBase&gt; _adapterBindings</c> field の
     /// round-trip 挙動（具象型 identity / slug / 各 field の保存）を検証する。
-    /// 同型複数登録 (Req 2.4)、空 list (Req 2.2)、null 要素 (Req 2.7) も含む。
-    /// _Requirements: 2.1, 2.2, 2.3, 2.4, 2.7, 10.2_
+    /// 同型複数登録、空 list、null 要素も含む。
     /// </summary>
     [TestFixture]
     public class FacialCharacterProfileSO_AdapterBindingsRoundTripTests
@@ -53,7 +52,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
         [Test]
         public void AdapterBindings_TwoConcreteTypes_RoundTripPreservesTypeAndFieldValues()
         {
-            // Req 2.1, 2.3: 異なる派生型 2 種を _adapterBindings に追加し、
+            // 異なる派生型 2 種を _adapterBindings に追加し、
             // CreateAsset → LoadAssetAtPath → 内容（slug / 各 field）一致を assert する。
             var so = ScriptableObject.CreateInstance<TestFacialCharacterProfileSO>();
             so.WritableAdapterBindings.Add(new MockTriggerAdapterBinding
@@ -93,7 +92,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
         [Test]
         public void AdapterBindings_SameTypeMultipleInstances_RoundTripsIndependently()
         {
-            // Req 2.4: 同型 binding を複数登録できる（OSC × 2 等を想定）。
+            // 同型 binding を複数登録できる（OSC × 2 等を想定）。
             var so = ScriptableObject.CreateInstance<TestFacialCharacterProfileSO>();
             so.WritableAdapterBindings.Add(new MockTriggerAdapterBinding { Slug = "first", TriggerThreshold = 1 });
             so.WritableAdapterBindings.Add(new MockTriggerAdapterBinding { Slug = "second", TriggerThreshold = 2 });
@@ -118,7 +117,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
         [Test]
         public void AdapterBindings_EmptyList_RoundTripsAsEmpty()
         {
-            // Req 2.2: zero 個の binding でも許容され、null ではなく空 collection として復元される。
+            // zero 個の binding でも許容され、null ではなく空 collection として復元される。
             var so = ScriptableObject.CreateInstance<TestFacialCharacterProfileSO>();
 
             AssetDatabase.CreateAsset(so, _assetPath);
@@ -136,7 +135,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
         [Test]
         public void AdapterBindings_NullElementBetweenValidEntries_DoesNotBreakSubsequentLoad()
         {
-            // Req 2.7: null 要素（型欠落 simulation）を含んでいても asset 全体の load は中断されず、
+            // null 要素（型欠落 simulation）を含んでいても asset 全体の load は中断されず、
             // null 要素は null のまま、前後の binding は完全な状態で round-trip する。
             var so = ScriptableObject.CreateInstance<TestFacialCharacterProfileSO>();
             so.WritableAdapterBindings.Add(new MockTriggerAdapterBinding { Slug = "ok-front", TriggerThreshold = 1 });

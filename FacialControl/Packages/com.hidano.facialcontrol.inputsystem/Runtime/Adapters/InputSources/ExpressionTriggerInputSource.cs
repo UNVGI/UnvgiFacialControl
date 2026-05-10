@@ -5,8 +5,8 @@ using Hidano.FacialControl.Domain.Services;
 namespace Hidano.FacialControl.Adapters.InputSources
 {
     /// <summary>
-    /// Expression トリガー型入力源の汎用具象実装 (tasks.md 4.6)。
-    /// device 種別に依存しない 1 個の concrete 実装として提供する (Req 7.1, 8.1, 8.2)。
+    /// Expression トリガー型入力源の汎用具象実装 。
+    /// device 種別に依存しない 1 個の concrete 実装として提供する 。
     /// </summary>
     /// <remarks>
     /// <para>

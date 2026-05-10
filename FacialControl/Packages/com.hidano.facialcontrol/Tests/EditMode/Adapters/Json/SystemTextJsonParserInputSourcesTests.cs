@@ -6,9 +6,9 @@ using Hidano.FacialControl.Adapters.Json.Dto;
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 {
     /// <summary>
-    /// tasks.md 7.2: <see cref="SystemTextJsonParser"/> が
+    //: <see cref="SystemTextJsonParser"/> が
     /// <c>layers[].inputSources</c> を必須フィールドとして parse することの契約テスト
-    /// (Req 3.1, 3.2, 7.3, D-5)。
+    /// 。
     /// <para>
     /// 観測完了条件: <c>inputSources</c> 欠落 / 空配列で <see cref="FormatException"/>、
     /// 正常 JSON は <see cref="InputSourceDto"/>[] に変換され、
@@ -67,7 +67,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         [Test]
         public void ParseProfile_OneLayerMissingInputSourcesAmongMany_ThrowsFormatException()
         {
-            // 1 つでも欠落していればエラーとして扱う (Req 3.2)。
+            // 1 つでも欠落していればエラーとして扱う 。
             var json = @"{
                 ""schemaVersion"":""1.0"",
                 ""layers"":[
@@ -176,7 +176,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         }
 
         // ================================================================
-        // options 抽出 (Critical 2, Req 3.7)
+        // options 抽出 (Critical 2)
         // ================================================================
 
         [Test]

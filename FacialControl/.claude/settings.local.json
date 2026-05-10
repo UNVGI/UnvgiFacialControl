@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(powershell -ExecutionPolicy Bypass -File \"D:/Personal/Repositries/FacialControl/FacialControl/test-results/strip-internal-refs.ps1\")"
+    ]
+  }
+}

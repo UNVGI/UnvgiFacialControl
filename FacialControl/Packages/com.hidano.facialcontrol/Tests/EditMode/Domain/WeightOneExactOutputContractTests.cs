@@ -10,12 +10,12 @@ using Hidano.FacialControl.Tests.Shared;
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
     /// <summary>
-    /// tasks.md 10.2 / Req 7.2 契約テスト:
+    // 契約テスト:
     /// 1 source が weight=1 でその他 source が weight=0 のとき、レイヤー出力が
     /// その source の値と浮動小数点誤差範囲 (<c>Mathf.Approximately</c> 相当) で一致する。
     /// </summary>
     /// <remarks>
-    /// Req 7.2: "When a layer has a mixture of input sources with one source at weight 1
+    //: "When a layer has a mixture of input sources with one source at weight 1
     /// and all others at weight 0, the Layer Input Source Blending Service shall output
     /// exactly that source's values (within floating-point tolerance) for that layer."
     /// </remarks>

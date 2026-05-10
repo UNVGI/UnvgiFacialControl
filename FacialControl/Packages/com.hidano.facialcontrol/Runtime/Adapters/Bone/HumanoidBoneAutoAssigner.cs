@@ -4,7 +4,7 @@ namespace Hidano.FacialControl.Adapters.Bone
 {
     /// <summary>
     /// Humanoid Animator から <see cref="UnityEngine.HumanBodyBones"/> 経由で
-    /// 目・頭・首ボーンの名前を取得するヘルパー (Req 3.1, 3.2, 3.3, 3.4, 3.5)。
+    /// 目・頭・首ボーンの名前を取得するヘルパー 。
     /// </summary>
     /// <remarks>
     /// オプトイン (Editor のボタン押下 / ランタイム明示呼出のみ)、Adapters/Bone 配下に配置する。
@@ -28,7 +28,7 @@ namespace Hidano.FacialControl.Adapters.Bone
         }
 
         /// <summary>
-        /// Humanoid Animator から LeftEye / RightEye の Transform 名を解決する (Req 3.1)。
+        /// Humanoid Animator から LeftEye / RightEye の Transform 名を解決する 。
         /// </summary>
         public static EyeBoneNames ResolveEyeBoneNames(Animator animator)
         {
@@ -64,7 +64,7 @@ namespace Hidano.FacialControl.Adapters.Bone
         }
 
         /// <summary>
-        /// 顔相対回転の basis として用いる bone 名を解決する (Req 3.2)。
+        /// 顔相対回転の basis として用いる bone 名を解決する 。
         /// Head を優先し、Head 不在かつ <paramref name="useNeckFallback"/> が true のとき Neck を返す。
         /// </summary>
         public static string ResolveBasisBoneName(Animator animator, bool useNeckFallback = true)

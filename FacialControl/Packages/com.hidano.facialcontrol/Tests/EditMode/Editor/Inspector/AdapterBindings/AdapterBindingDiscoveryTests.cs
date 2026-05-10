@@ -14,7 +14,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
     // Mock 型定義（namespace scope に置いて FQTN を安定化させる）。
     // 単独 displayName 1 種 + 同名 displayName ペア 1 組 の計 3 種。
     // displayName の "ZZZ_DiscoveryTest_*" prefix は他の concrete binding
-    // （Phase 8.1 の MockTriggerAdapterBinding 等）との sort 衝突を避けるため。
+    // （MockTriggerAdapterBinding 等）との sort 衝突を避けるため。
     // ---------------------------------------------------------------
 
     [Serializable]
@@ -33,7 +33,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
     /// task 5.1 の観測可能完了条件: <see cref="AdapterBindingDiscovery"/> が
     /// <c>[FacialAdapterBinding]</c> 付き具象型を <see cref="UnityEditor.TypeCache"/>
     /// 経由で列挙し、displayName 順 sort + 重複検出 + suffix 付与 + LogWarning を
-    /// 行う挙動を assert する（Req 1.3, 1.4, 1.7）。
+    /// 行う挙動を assert する。
     /// </summary>
     /// <remarks>
     /// 本ファイルは Red 段階のテストであり、
@@ -77,7 +77,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
         {
             var descriptors = AdapterBindingDiscovery.GetDescriptors();
 
-            // 全ての descriptor が DisplayName で OrdinalIgnoreCase 昇順に sort されていること（Req 1.4）。
+            // 全ての descriptor が DisplayName で OrdinalIgnoreCase 昇順に sort されていること。
             var displayNames = descriptors.Select(d => d.DisplayName).ToList();
             var expected = displayNames
                 .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
@@ -120,7 +120,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
         }
 
         // ---------------------------------------------------------------
-        // 重複 displayName の suffix 付与（Req 1.7）
+        // 重複 displayName の suffix 付与
         // ---------------------------------------------------------------
 
         [Test]
@@ -140,7 +140,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
             Assert.AreEqual(DuplicateDisplayName, duplicateAlpha.OriginalDisplayName);
             Assert.AreEqual(DuplicateDisplayName, duplicateBeta.OriginalDisplayName);
 
-            // DisplayName は重複時に "{originalDisplayName} ({FullTypeName})" の形式に suffix 付与される（Req 1.7）。
+            // DisplayName は重複時に "{originalDisplayName} ({FullTypeName})" の形式に suffix 付与される。
             StringAssert.Contains(DuplicateDisplayName, duplicateAlpha.DisplayName,
                 "重複 displayName の DisplayName は元の displayName を含むべき。");
             StringAssert.Contains(DuplicateAlphaType.FullName, duplicateAlpha.DisplayName,
@@ -177,7 +177,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
         [Test]
         public void Refresh_DuplicateDisplayName_LogsWarningListingFullyQualifiedTypeNames()
         {
-            // Req 1.7: 同 displayName が複数あれば Debug.LogWarning で両方の FQTN を列挙する。
+            // 同 displayName が複数あれば Debug.LogWarning で両方の FQTN を列挙する。
             // 静的初期化時の log は test 開始時には既に消費済みなので、
             // 明示的な Refresh() で再 scan + 再警告を起こして LogAssert で捕捉する。
             LogAssert.Expect(LogType.Warning, new Regex(Regex.Escape(DuplicateDisplayName)));

@@ -7,7 +7,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
 {
     /// <summary>
     /// <see cref="InputAction"/> を <see cref="IAnalogInputSource"/> として公開するアダプタ
-    /// (Req 1.6, 5.1, 5.2, 5.6, 5.7, 8.1)。
+    /// 。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -21,7 +21,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
     /// <see cref="Tick"/> 内で形状に応じて <see cref="InputControl{TValue}.ReadValue"/> を 1 回だけ
     /// 呼び、結果をフィールドにキャッシュする。<see cref="InputAction.ReadValue{TValue}"/> 経由は
     /// boxing が発生する場合があるため、可能なら <see cref="InputControl{TValue}"/> を直叩きする
-    /// (Req 8.1, design.md R-5)。fallback として typed control が解決できない場合は
+    /// 。fallback として typed control が解決できない場合は
     /// <see cref="InputAction.ReadValue{TValue}"/> を呼ぶ。
     /// </para>
     /// <para>
@@ -32,7 +32,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
     /// <list type="bullet">
     ///   <item><see cref="InputAction.enabled"/> が false の間は <see cref="IsValid"/> が false。</item>
     ///   <item><see cref="InputAction.controls"/> が空 (unbound) の間は <see cref="IsValid"/> が false。</item>
-    ///   <item>無効状態でも <c>TryRead*</c> は false を返すのみで例外を投げない (Req 5.2)。</item>
+    ///   <item>無効状態でも <c>TryRead*</c> は false を返すのみで例外を投げない 。</item>
     /// </list>
     /// </para>
     /// </remarks>

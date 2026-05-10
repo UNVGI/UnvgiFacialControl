@@ -19,7 +19,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Req 1.4 / 2.4-2.7 / 3.3 / 3.5 / 3.6 / 7.1 / 12.2 / 12.3 を満たす。+ ボタン（種別選択メニュー）→
+    // / 2.4-2.7 / 3.3 / 3.5 / 3.6 / 7.1 / 12.2 / 12.3 を満たす。+ ボタン（種別選択メニュー）→
     /// <see cref="System.Activator.CreateInstance(System.Type)"/> + slug auto-populate、
     /// - ボタンで選択行削除、Reorder、null 要素の <see cref="MissingAdapterPlaceholderElement"/>、
     /// 同 SO 内 slug 重複時の error class + summary banner、PropertyDrawer 例外時の
@@ -117,7 +117,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
         /// <summary>
         /// <see cref="AdapterBindingDiscovery"/> 経由で取得した descriptor から具象を生成し
         /// list に追加する。slug は <see cref="AdapterSlug.FromDisplayName(string)"/> で
-        /// auto-populate される（Req 2.5, 12.2）。
+        /// auto-populate される。
         /// </summary>
         public void AddBindingFromDescriptor(AdapterBindingDescriptor descriptor)
         {
@@ -279,7 +279,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
         }
 
         /// <summary>
-        /// 指定 index の binding を list から削除し、SO を dirty 化する（Req 2.6）。
+        /// 指定 index の binding を list から削除し、SO を dirty 化する。
         /// </summary>
         public void RemoveBindingAt(int index)
         {
@@ -379,7 +379,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
                 {
                     Debug.LogWarning(
                         $"[FacialControl] PropertyDrawer for '{bindingType.FullName}' threw {ex.GetType().Name}: " +
-                        $"{ex.Message}. A fallback element is shown for this row (Req 3.6).");
+                        $"{ex.Message}. A fallback element is shown for this row .");
                     row.Add(BuildFallbackElement(bindingType, index));
                     return row;
                 }
@@ -479,7 +479,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
             {
                 _summaryBanner.Clear();
                 _summaryBanner.Add(new Label(
-                    "[FacialControl] Duplicate adapter binding slugs detected. Save will be blocked until resolved (Req 12.3)."));
+                    "[FacialControl] Duplicate adapter binding slugs detected. Save will be blocked until resolved ."));
                 _summaryBanner.style.display = DisplayStyle.Flex;
             }
             else

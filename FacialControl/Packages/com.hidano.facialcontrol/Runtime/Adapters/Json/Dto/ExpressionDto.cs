@@ -9,7 +9,7 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
     /// JsonUtility 互換のため <see cref="System.SerializableAttribute"/> を付与する。
     /// <para>
     /// 注意: 本クラスは v2.0 schema 専用。v1.0 schema の Expression DTO は
-    /// <see cref="SystemTextJsonParser"/> 内部の private DTO に残されており、Phase 3.6 で物理削除予定。
+    /// <see cref="SystemTextJsonParser"/> 内部の private DTO に残されている（将来物理削除予定）。
     /// </para>
     /// </summary>
     [System.Serializable]
@@ -27,14 +27,14 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
         public string layer;
 
         /// <summary>
-        /// 同時に上書き対象とする layer 名配列（Req 3.1, 3.4）。
+        /// 同時に上書き対象とする layer 名配列。
         /// Domain 側の <see cref="Hidano.FacialControl.Domain.Models.LayerOverrideMask"/> へ
         /// Adapters 層のヘルパーが bit position と layer 名を対応付けて変換する。
         /// </summary>
         public List<string> layerOverrideMask;
 
         /// <summary>
-        /// AnimationClip サンプリング結果の snapshot（Req 9.2）。
+        /// AnimationClip サンプリング結果の snapshot。
         /// 欠落時はパーサが空 snapshot（デフォルト値 + 空配列）に正規化する。
         /// </summary>
         public ExpressionSnapshotDto snapshot;

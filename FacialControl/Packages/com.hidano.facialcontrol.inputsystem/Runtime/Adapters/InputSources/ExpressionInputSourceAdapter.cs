@@ -9,8 +9,7 @@ using Hidano.FacialControl.Domain.Services;
 namespace Hidano.FacialControl.Adapters.InputSources
 {
     /// <summary>
-    /// Keyboard / Controller 統合の Expression トリガー型入力源アダプタ
-    /// (tasks.md 4.5 / Req 7.2-7.5, 8.1, 8.3, 8.4, 6.6, 11.3)。
+    /// Keyboard / Controller 統合の Expression トリガー型入力源アダプタ。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -25,13 +24,13 @@ namespace Hidano.FacialControl.Adapters.InputSources
     /// </para>
     /// <para>
     /// 未認識 device は Controller 側へ dispatch + <see cref="Debug.LogWarning(object)"/> を本インスタンス
-    /// 1 回のみ出力する（Req 7.5）。InputAction の processor チェーンが unsupported な場合は
-    /// raw value で続行 + warning 1 回のみ（Req 6.6）。
+    /// 1 回のみ出力する。InputAction の processor チェーンが unsupported な場合は
+    /// raw value で続行 + warning 1 回のみ。
     /// </para>
     /// <para>
     /// per-frame 0-alloc: 値読取は <see cref="InputAction.CallbackContext.ReadValue{TValue}"/>
     /// を struct context 経由で呼ぶため boxing なし、Dictionary 走査は preallocated。
-    /// 各 <c>BindingEntry</c> はコンストラクタで delegate を 1 回だけ生成しキャッシュする（Req 11.3）。
+    /// 各 <c>BindingEntry</c> はコンストラクタで delegate を 1 回だけ生成しキャッシュする。
     /// </para>
     /// </remarks>
     [DisallowMultipleComponent]

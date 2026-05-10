@@ -210,7 +210,7 @@ namespace Hidano.FacialControl.Editor.Windows
 
         /// <summary>
         /// FacialProfile ドメインモデルを構築する。
-        /// スキーマバージョンは <see cref="SystemTextJsonParser.SchemaVersionV2"/>（preview.1 段階で "1.0" に統一）。
+        /// スキーマバージョンは <see cref="SystemTextJsonParser.SchemaVersionV2"/>。
         /// <see cref="IncludeSampleExpressions"/> が true かつ <see cref="Naming"/> が
         /// <see cref="NamingConvention.None"/> でない場合、雛形 Expression を含める。
         /// </summary>

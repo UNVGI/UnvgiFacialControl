@@ -8,13 +8,13 @@ namespace Hidano.FacialControl.Domain.Adapters
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Domain 層配置のため UnityEngine 参照や VContainer interface は import しない（Req 4.2, 4.10, 11.1, 11.5）。
+    /// Domain 層配置のため UnityEngine 参照や VContainer interface は import しない。
     /// 具象側に <c>[Serializable]</c> を必ず付与しないと <c>[SerializeReference]</c> の round-trip が破綻する。
     /// </para>
     /// <para>
     /// DD-1: <see cref="Slug"/> は <c>public string</c> field として宣言し、
     /// Unity の Script Serialization rule（public non-static field 自動 serialize）に乗せる。
-    /// <c>[UnityEngine.SerializeField]</c> は使用せず Domain 純度を維持する（Req 12.1）。
+    /// <c>[UnityEngine.SerializeField]</c> は使用せず Domain 純度を維持する。
     /// </para>
     /// </remarks>
     [Serializable]
@@ -22,7 +22,7 @@ namespace Hidano.FacialControl.Domain.Adapters
     {
         /// <summary>
         /// Binding を識別する slug 文字列（Editor から auto-populate される）。
-        /// 空 / null も許容（runtime 時点では空 binding は warn 対象、Req 12.3）。
+        /// 空 / null も許容（runtime 時点では空 binding は warn 対象）。
         /// </summary>
         public string Slug;
 

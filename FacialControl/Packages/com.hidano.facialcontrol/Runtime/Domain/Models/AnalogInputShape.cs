@@ -2,7 +2,7 @@ namespace Hidano.FacialControl.Domain.Models
 {
     /// <summary>
     /// アナログ入力ソースの形状種別。<see cref="Hidano.FacialControl.Domain.Interfaces.IAnalogInputSource"/>
-    /// 実装が公開する読取変種を選択するための補助型（Req 1.1）。
+    /// 実装が公開する読取変種を選択するための補助型。
     /// </summary>
     /// <remarks>
     /// N-axis ソース（ARKit 52ch 等）は形状ではなく <see cref="Hidano.FacialControl.Domain.Interfaces.IAnalogInputSource.AxisCount"/>

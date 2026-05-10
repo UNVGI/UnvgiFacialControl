@@ -7,7 +7,7 @@ using Hidano.FacialControl.Domain.Services;
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
     /// <summary>
-    /// ValueProviderInputSourceBase のテスト (tasks.md 4.1)。
+    /// ValueProviderInputSourceBase のテスト 。
     /// </summary>
     /// <remarks>
     /// 観測完了条件:

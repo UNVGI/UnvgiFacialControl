@@ -13,14 +13,14 @@ using Hidano.FacialControl.Tests.Shared;
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
     /// <summary>
-    /// LayerInputSourceAggregator の per-layer 加重和 + 最終クランプテスト (tasks.md 5.1)。
+    /// LayerInputSourceAggregator の per-layer 加重和 + 最終クランプテスト 。
     /// </summary>
     /// <remarks>
     /// 観測完了条件:
     /// <list type="bullet">
     ///   <item><c>w1=0.5, w2=0.5, v1[k]=1, v2[k]=1</c> → <c>output[k]=1.0</c>。</item>
-    ///   <item>Σw·v > 1 の場合でもクランプのみ (Req 2.3)。</item>
-    ///   <item>3 source × 2 layer の固定値入力に対し <c>output[k] = clamp01(Σ wᵢ · values_i[k])</c> が手計算と一致する (Req 2.2)。</item>
+    ///   <item>Σw·v > 1 の場合でもクランプのみ 。</item>
+    ///   <item>3 source × 2 layer の固定値入力に対し <c>output[k] = clamp01(Σ wᵢ · values_i[k])</c> が手計算と一致する 。</item>
     /// </list>
     /// </remarks>
     [TestFixture]
@@ -120,7 +120,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void Aggregate_SumExceedsOne_IsClamped()
         {
-            // Σw·v > 1 でもクランプのみ (Req 2.3)
+            // Σw·v > 1 でもクランプのみ 
             const int blendShapeCount = 3;
             var profile = BuildProfile(layerCount: 1);
 
@@ -298,7 +298,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void Aggregate_SourceWritesShorterSpan_UnwrittenIndicesContributeZero()
         {
-            // Req 1.3 (overlap-only): source が BlendShape 個数未満しか書込まない場合、
+            // overlap-only: source が BlendShape 個数未満しか書込まない場合、
             // Aggregator 側で scratch が事前ゼロクリアされるため、未書込インデックスの
             // 寄与は 0 になり、前フレームの値が残らない契約を検証する。
             const int blendShapeCount = 4;
@@ -335,7 +335,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void Aggregate_InvalidSource_ContributesZeroWithoutException()
         {
-            // Req 1.4 観測完了条件:
+            // 観測完了条件:
             // 3 source のうち 1 source だけ IsValid=false のとき、残り 2 source の
             // 加重和のみが出力され、例外が発生しないこと。
             const int blendShapeCount = 3;
@@ -376,7 +376,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             }
         }
 
-        // ----- 5.3 空レイヤー検出とセッション 1 回 warning (Req 2.4) -----
+        // ----- 5.3 空レイヤー検出とセッション 1 回 warning  -----
 
         [Test]
         public void Aggregate_NoSourcesRegisteredForLayer_WarnsOnceAndOutputsZero()
@@ -674,7 +674,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void Aggregate_SourceWeightAndLayerWeight_AreAppliedIndependently()
         {
-            // Req 2.7 / D-4:
             // source weight は intra-layer の加重和だけに効き、inter-layer weight とは乗算されない。
             // Aggregator の per-layer 出力は source weight だけで決まり、inter-layer weight は
             // LayerInput.Weight にそのまま載るだけであること。
@@ -768,7 +767,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void AggregateAndBlend_SourceWeightDoesNotMultiplyIntoLayerWeight()
         {
-            // Req 2.7: source weight と LayerInput.Weight が乗算されない独立適用を最終出力レベルで検証。
+            // source weight と LayerInput.Weight が乗算されない独立適用を最終出力レベルで検証。
             // レイヤー 1 本構成なら LayerBlender.Blend は basis として values*weight を clamp01 する
             // (LayerBlender.cs:85 "output[i] = Clamp01(firstValues[i] * firstWeight)")。
             //   final = clamp01(perLayer * layerWeight)
@@ -892,7 +891,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             });
         }
 
-        // ----- 5.5 診断スナップショット API (TryWriteSnapshot / GetSnapshot, Req 8.1 / 8.3) -----
+        // ----- 5.5 診断スナップショット API (TryWriteSnapshot / GetSnapshot / 8.3) -----
 
         [Test]
         public void TryWriteSnapshot_AfterAggregate_ReflectsCurrentWeightsAndValidity()
@@ -1167,13 +1166,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
                 $"TryWriteSnapshot は 0-alloc であること (差分: {allocated} bytes)");
         }
 
-        // ----- 5.6 verbose logging の per-layer per-second レートリミッタ (Req 8.5) -----
+        // ----- 5.6 verbose logging の per-layer per-second レートリミッタ  -----
 
         /// <summary>
         /// <see cref="LayerInputSourceAggregator.SetVerboseLogging(bool)"/> を true にしたうえで
         /// 1.0 秒のウィンドウ内に 100 回 <c>Aggregate</c> を回しても、同一レイヤーのログは
-        /// 1 回だけ出力されること (Req 8.5、タスク 5.6 の観測完了条件その 1)。
-        /// 1.0 秒経過後にもう 1 回出力できること (観測完了条件その 2)。
+        /// 1 回だけ出力されること。
+        /// 1.0 秒経過後にもう 1 回出力できること。
         /// </summary>
         [Test]
         public void Aggregate_VerboseLogging_RateLimitsTo_OncePerSecondPerLayer()
@@ -1312,12 +1311,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             }
         }
 
-        // ----- 10.9 診断ログ rate-limiter の長時間安定性の補助テスト (Req 8.5) -----
+        // ----- 10.9 診断ログ rate-limiter の長時間安定性の補助テスト  -----
 
         /// <summary>
         /// verbose ログを 10 分間 ON にした状態で、想定レート
         /// (per-layer per-second) 以上のログが出ないことを検証する補助テスト
-        /// (tasks.md 10.9、Req 8.5 の長時間安定性カバレッジ)。
+        /// (長時間安定性カバレッジ)。
         /// </summary>
         /// <remarks>
         /// <para>

@@ -1,7 +1,7 @@
 namespace Hidano.FacialControl.Domain.Models
 {
     /// <summary>
-    /// BonePose ターゲットでの Euler 軸選択（Req 4.1, 6.2）。
+    /// BonePose ターゲットでの Euler 軸選択。
     /// 列挙値は JSON / 永続化フォーマットの安定性のため固定（X=0, Y=1, Z=2）。
     /// BlendShape ターゲットでは無視される。
     /// </summary>

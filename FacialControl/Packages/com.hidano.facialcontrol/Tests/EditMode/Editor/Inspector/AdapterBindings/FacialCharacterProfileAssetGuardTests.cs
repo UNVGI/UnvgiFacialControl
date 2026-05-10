@@ -22,7 +22,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
     /// <summary>
     /// task 5.5 の観測可能完了条件: <see cref="FacialCharacterProfileAssetGuard"/> が
     /// 重複 slug を持つ <see cref="Adapters.ScriptableObject.Serializable.FacialCharacterProfileSO"/>
-    /// の save をブロックし、修復後は save が通ることを assert する（Req 12.3）。
+    /// の save をブロックし、修復後は save が通ることを assert する。
     /// </summary>
     [TestFixture]
     public class FacialCharacterProfileAssetGuardTests
@@ -95,7 +95,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
 
             Assert.IsNotNull(result, "OnWillSaveAssets は non-null を返すべき。");
             Assert.IsFalse(result.Contains(_assetPath),
-                "重複 slug を持つ SO の path は return 配列から除外されるべき (Req 12.3)。");
+                "重複 slug を持つ SO の path は return 配列から除外されるべき 。");
         }
 
         [Test]

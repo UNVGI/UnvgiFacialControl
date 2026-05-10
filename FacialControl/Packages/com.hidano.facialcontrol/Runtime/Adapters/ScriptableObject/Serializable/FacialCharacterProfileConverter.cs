@@ -9,7 +9,6 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 {
     /// <summary>
     /// SO Serializable → Domain <see cref="FacialProfile"/> 変換器。
-    /// Phase 3.6 (inspector-and-data-model-redesign) で schema v2.0 専用となり、
     /// <see cref="ExpressionSerializable.cachedSnapshot"/> から BlendShape 値 / 遷移メタを
     /// 展開（snapshot 展開ロジック）して Domain Expression を構築する。
     /// </summary>
@@ -21,6 +20,16 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             IReadOnlyList<ExpressionSerializable> expressions,
             IReadOnlyList<string> rendererPaths)
         {
+            return ToFacialProfile(schemaVersion, layers, expressions, rendererPaths, defaultOverlays: null);
+        }
+
+        public static FacialProfile ToFacialProfile(
+            string schemaVersion,
+            IReadOnlyList<LayerDefinitionSerializable> layers,
+            IReadOnlyList<ExpressionSerializable> expressions,
+            IReadOnlyList<string> rendererPaths,
+            IReadOnlyList<OverlaySlotBindingSerializable> defaultOverlays)
+        {
             string version = string.IsNullOrWhiteSpace(schemaVersion)
                 ? SystemTextJsonParser.SchemaVersionV2
                 : schemaVersion;
@@ -28,7 +37,8 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             var inputSourceArr = ConvertLayerInputSources(layers);
             var expressionArr = ConvertExpressions(expressions, layers);
             var rendererArr = ConvertStrings(rendererPaths);
-            return new FacialProfile(version, layerArr, expressionArr, rendererArr, inputSourceArr);
+            var defaultOverlayArr = ConvertOverlays(defaultOverlays);
+            return new FacialProfile(version, layerArr, expressionArr, rendererArr, inputSourceArr, defaultOverlayArr);
         }
 
         /// <summary>
@@ -183,9 +193,23 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
                     blendShapes = ConvertBlendShapes(src.blendShapeValues);
                 }
 
-                result.Add(new Expression(src.id, src.name, src.layer, duration, curve, blendShapes));
+                var overlays = ConvertOverlays(src.overlays);
+                result.Add(new Expression(src.id, src.name, src.layer, duration, curve, blendShapes, overlays));
             }
             return result.ToArray();
+        }
+
+        private static OverlaySlotBinding[] ConvertOverlays(IReadOnlyList<OverlaySlotBindingSerializable> source)
+        {
+            if (source == null || source.Count == 0) return null;
+            var list = new List<OverlaySlotBinding>(source.Count);
+            for (int i = 0; i < source.Count; i++)
+            {
+                var s = source[i];
+                if (s == null || string.IsNullOrWhiteSpace(s.slot)) continue;
+                list.Add(new OverlaySlotBinding(s.slot, s.expressionId));
+            }
+            return list.Count == 0 ? null : list.ToArray();
         }
 
         private static BlendShapeMapping[] ConvertBlendShapes(IReadOnlyList<BlendShapeMappingSerializable> mappings)

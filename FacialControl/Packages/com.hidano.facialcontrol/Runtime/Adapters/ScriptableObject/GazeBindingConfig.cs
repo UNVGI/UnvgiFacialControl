@@ -33,7 +33,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject
     /// <para>
     /// 入力源との結線は、本クラスを派生させず sidecar の結線型で扱う。
     /// InputSystem 経路では <c>ExpressionBindingEntry</c>（bindingMode = Gaze）が expressionId と
-    /// Action 名のみを保持する（preview.1 で旧 <c>InputSystemGazeBinding</c> から統合）。
+    /// Action 名のみを保持する。
     /// </para>
     /// </remarks>
     [Serializable]

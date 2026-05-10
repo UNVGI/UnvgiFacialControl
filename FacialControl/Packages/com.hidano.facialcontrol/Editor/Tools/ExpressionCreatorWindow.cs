@@ -12,7 +12,7 @@ using Hidano.FacialControl.Editor.Sampling;
 namespace Hidano.FacialControl.Editor.Tools
 {
     /// <summary>
-    /// Expression 作成支援ツール（Phase 5.2 改修）。
+    /// Expression 作成支援ツール。
     /// BlendShape スライダーをリアルタイムプレビューしながら AnimationClip にベイクする。
     /// 既存 AnimationClip を割り当てると <see cref="IExpressionAnimationClipSampler.SampleSnapshot"/>
     /// 経由でスライダー値が復元される。

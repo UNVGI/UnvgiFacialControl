@@ -8,8 +8,7 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.PlayMode.Adapters.InputSources
 {
     /// <summary>
-    /// Phase 3.1: <see cref="OscFloatAnalogSource"/> のテスト
-    /// (Req 1.6, 5.3, 5.4, 5.6, 5.7, 8.6)。
+    /// <see cref="OscFloatAnalogSource"/> のテスト。
     /// </summary>
     [TestFixture]
     public class OscFloatAnalogSourceTests
@@ -204,7 +203,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.InputSources
             _receiver.HandleOscMessage(new uOSC.Message(TestAddress, 0.3f));
             source.Tick(0f);
 
-            // staleness=0 のとき経過時間で無効化されてはならない (Req 5.4 last-valid)
+            // staleness=0 のとき経過時間で無効化されてはならない (last-valid)
             source.Tick(60f);
             source.Tick(60f);
 

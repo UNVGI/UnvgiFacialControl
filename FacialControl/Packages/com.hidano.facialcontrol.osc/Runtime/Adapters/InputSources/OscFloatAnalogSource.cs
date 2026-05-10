@@ -8,7 +8,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
 {
     /// <summary>
     /// 単一 OSC アドレス (e.g. <c>/avatar/parameters/jawOpen</c>) を購読する scalar
-    /// <see cref="IAnalogInputSource"/> 実装 (Req 5.3, 5.4, 5.6, 5.7, 8.6)。
+    /// <see cref="IAnalogInputSource"/> 実装 。
     /// </summary>
     /// <remarks>
     /// <para>

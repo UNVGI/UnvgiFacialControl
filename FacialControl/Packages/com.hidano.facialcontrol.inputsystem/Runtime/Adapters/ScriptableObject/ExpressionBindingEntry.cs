@@ -12,8 +12,8 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
     /// <remarks>
     /// device 種別 (Keyboard / Controller) は <c>ExpressionInputSourceAdapter</c> が
     /// <see cref="UnityEngine.InputSystem.InputAction.bindings"/> から自動推定するため、
-    /// 旧 <c>category</c> field は撤去された (Req 7.1, tasks.md 4.6)。
-    /// preview.1 の破壊的変更により、旧 <c>InputSystemGazeBinding</c> と
+    /// 旧 <c>category</c> field は撤去された。
+    /// 旧 <c>InputSystemGazeBinding</c> と
     /// <c>AnalogExpressionBindingEntry</c> 由来の機能を <see cref="bindingMode"/> による
     /// 1 リスト内分別で統合する。
     /// </remarks>
@@ -35,5 +35,16 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
             + " Hold: 押している間だけ ON、ボタンを離すと OFF。"
             + " Toggle: 押すたびに ON/OFF が切替わる。")]
         public TriggerMode triggerMode = TriggerMode.Hold;
+
+        [Tooltip(
+            "Overlay モード時のみ有効: 駆動する overlay slot 識別子（例: blink）。"
+            + " 同じ slot を複数の Action で駆動した場合、最後に書き込まれた weight が反映される。")]
+        public string overlaySlot;
+
+        [Tooltip(
+            "Overlay モード時のみ有効: 重ね合わせを行う対象レイヤー名。"
+            + " このレイヤーの weight を Action 値で毎フレーム更新する。"
+            + " 通常は emotion レイヤーより priority が大きいレイヤーを指定する（typically \"overlay\"）。")]
+        public string overlayTargetLayer = "overlay";
     }
 }

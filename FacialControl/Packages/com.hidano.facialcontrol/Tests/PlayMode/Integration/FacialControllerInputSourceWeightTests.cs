@@ -18,12 +18,12 @@ using Hidano.FacialControl.Domain.Services;
 namespace Hidano.FacialControl.Tests.PlayMode.Integration
 {
     /// <summary>
-    /// タスク 8.3 ランタイム weight 変更 API の PlayMode 統合テスト。
+    // ランタイム weight 変更 API の PlayMode 統合テスト。
     /// </summary>
     /// <remarks>
     /// 観測完了条件: メインスレッド外スレッドから <c>SetInputSourceWeight</c> を呼んでも
     /// 次フレームの <c>Aggregate</c> 観測 (BlendShape 出力) に反映されること
-    /// (Req 4.1 / 4.2 / 4.4 / 4.5)。
+    /// 。
     /// </remarks>
     [TestFixture]
     public class FacialControllerInputSourceWeightTests

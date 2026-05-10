@@ -9,8 +9,7 @@ namespace Hidano.FacialControl.Adapters.Processors
 {
     /// <summary>
     /// 6 種の Analog <see cref="InputProcessor{TValue}"/>（DeadZone / Scale / Offset / Clamp /
-    /// Curve / Invert）を Editor / Runtime 双方の初期化タイミングで一括登録する静的ハブ
-    /// （tasks.md 4.3 / requirements.md Req 6.1 / design.md Topic 3）。
+    /// Curve / Invert）を Editor / Runtime 双方の初期化タイミングで一括登録する静的ハブ。
     /// </summary>
     /// <remarks>
     /// Editor では <c>[InitializeOnLoad]</c> 経由でドメインリロード直後に静的コンストラクタが走り、

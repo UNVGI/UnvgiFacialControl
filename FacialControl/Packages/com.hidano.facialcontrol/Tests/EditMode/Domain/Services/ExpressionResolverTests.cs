@@ -7,10 +7,8 @@ using Hidano.FacialControl.Domain.Services;
 namespace Hidano.FacialControl.Tests.EditMode.Domain.Services
 {
     /// <summary>
-    /// <see cref="ExpressionResolver"/> の Red フェーズテスト。
+    /// <see cref="ExpressionResolver"/> のテスト。
     /// SnapshotId → BlendShape 値 / Bone スナップショット列の preallocated 解決の振る舞いを検証する。
-    /// _Requirements: 3.2, 9.3, 11.1, 11.4
-    /// _tasks.md: 3.4
     /// </summary>
     [TestFixture]
     public class ExpressionResolverTests

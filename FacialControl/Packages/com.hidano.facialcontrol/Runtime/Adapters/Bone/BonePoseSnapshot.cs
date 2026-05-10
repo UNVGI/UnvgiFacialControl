@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Hidano.FacialControl.Adapters.Bone
 {
     /// <summary>
-    /// hot path で再利用する事前確保中間 buffer (Req 6.1, 6.2, 6.3)。
+    /// hot path で再利用する事前確保中間 buffer 。
     /// </summary>
     /// <remarks>
     /// 解決済み <see cref="Transform"/> 配列と中間 quaternion 配列を保持し、

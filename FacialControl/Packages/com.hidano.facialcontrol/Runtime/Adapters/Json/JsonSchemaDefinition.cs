@@ -8,7 +8,7 @@ namespace Hidano.FacialControl.Adapters.Json
     public static class JsonSchemaDefinition
     {
         /// <summary>
-        /// 現在サポートする Profile JSON スキーマバージョン（preview.1 前段階で "1.0" に統一）。
+        /// 現在サポートする Profile JSON スキーマバージョン（"1.0"）。
         /// </summary>
         public const string CurrentSchemaVersion = "1.0";
 
@@ -36,18 +36,21 @@ namespace Hidano.FacialControl.Adapters.Json
             /// <summary>rendererPaths フィールド名</summary>
             public const string RendererPaths = "rendererPaths";
 
+            /// <summary>defaultOverlays フィールド名（profile root、Overlay 機能の slot 別 fallback 宣言）</summary>
+            public const string DefaultOverlays = "defaultOverlays";
+
             /// <summary>
-            /// bonePoses フィールド名（Req 7.1, 7.2）。
-            /// 後方互換のため optional フィールド：欠落 / null / 空配列はすべて空 BonePoses 扱い（Req 7.3, 10.2）。
+            /// bonePoses フィールド名。
+            /// 後方互換のため optional フィールド：欠落 / null / 空配列はすべて空 BonePoses 扱い。
             /// </summary>
             public const string BonePoses = "bonePoses";
 
             /// <summary>
-            /// BonePose のフィールド名（Req 7.1, 7.2）。
+            /// BonePose のフィールド名。
             /// </summary>
             public static class BonePose
             {
-                /// <summary>プロファイル内識別子（preview.1 では参照キー未使用、空文字許容）</summary>
+                /// <summary>プロファイル内識別子（参照キー未使用、空文字許容）</summary>
                 public const string Id = "id";
 
                 /// <summary>姿勢オーバーライドエントリの配列</summary>
@@ -55,14 +58,14 @@ namespace Hidano.FacialControl.Adapters.Json
             }
 
             /// <summary>
-            /// BonePoseEntry のフィールド名（Req 7.1, 7.2）。
+            /// BonePoseEntry のフィールド名。
             /// </summary>
             public static class BonePoseEntry
             {
-                /// <summary>対象ボーン名（多バイト文字を含む任意の文字列、Req 2.2）</summary>
+                /// <summary>対象ボーン名（多バイト文字を含む任意の文字列）</summary>
                 public const string BoneName = "boneName";
 
-                /// <summary>X/Y/Z 軸オイラー角（度、Z-X-Y Tait-Bryan 順、Req 4.2-4.4）</summary>
+                /// <summary>X/Y/Z 軸オイラー角（度、Z-X-Y Tait-Bryan 順-4.4）</summary>
                 public const string EulerXYZ = "eulerXYZ";
             }
 
@@ -81,7 +84,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 public const string ExclusionMode = "exclusionMode";
 
                 /// <summary>
-                /// 入力源ウェイトエントリの配列（必須フィールド、preview 破壊的変更 D-5 / Req 3.1, 3.2）。
+                /// 入力源ウェイトエントリの配列（必須フィールド）。
                 /// </summary>
                 public const string InputSources = "inputSources";
             }
@@ -125,10 +128,27 @@ namespace Hidano.FacialControl.Adapters.Json
                 public const string BlendShapeValues = "blendShapeValues";
 
                 /// <summary>
-                /// LayerOverrideMask の永続化形式（layer 名配列）。Phase 3.2 (inspector-and-data-model-redesign)
-                /// で旧 <c>layerSlots</c> 配列を撤去し、本フィールドで他レイヤーへのオーバーライド対象を表現する。
+                /// LayerOverrideMask の永続化形式（layer 名配列）。
+                /// 本フィールドで他レイヤーへのオーバーライド対象を表現する。
                 /// </summary>
                 public const string LayerOverrideMask = "layerOverrideMask";
+
+                /// <summary>
+                /// snapshot 内の overlays フィールド名（slot 別 overlay binding）。
+                /// </summary>
+                public const string Overlays = "overlays";
+            }
+
+            /// <summary>
+            /// OverlaySlotBinding (overlays / defaultOverlays の各エントリ) のフィールド名。
+            /// </summary>
+            public static class OverlaySlot
+            {
+                /// <summary>slot 識別子</summary>
+                public const string Slot = "slot";
+
+                /// <summary>発火させる overlay Expression ID（空文字で suppress）</summary>
+                public const string ExpressionId = "expressionId";
             }
 
             /// <summary>

@@ -4,7 +4,7 @@ namespace Hidano.FacialControl.Adapters.Processors
 {
     /// <summary>
     /// アナログ入力に定数 <see cref="offset"/> を加算する stateless な
-    /// <see cref="InputProcessor{TValue}"/> 実装（design.md Topic 3）。
+    /// <see cref="InputProcessor{TValue}"/> 実装。
     /// </summary>
     /// <remarks>
     /// 共通の <see cref="InputProcessor{TValue}"/> 派生定型として、

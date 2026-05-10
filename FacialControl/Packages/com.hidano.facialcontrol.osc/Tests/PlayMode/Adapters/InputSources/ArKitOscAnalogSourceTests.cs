@@ -8,8 +8,7 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.PlayMode.Adapters.InputSources
 {
     /// <summary>
-    /// Phase 3.1: <see cref="ArKitOscAnalogSource"/> のテスト
-    /// (Req 5.5, 5.6, 5.7, 8.6)。
+    /// <see cref="ArKitOscAnalogSource"/> のテスト。
     /// </summary>
     [TestFixture]
     public class ArKitOscAnalogSourceTests
