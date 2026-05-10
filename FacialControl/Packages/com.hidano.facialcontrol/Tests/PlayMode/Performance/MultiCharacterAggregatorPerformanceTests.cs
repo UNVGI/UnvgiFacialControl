@@ -225,7 +225,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
                     $"[10.5 perf] 10 体 × {LayerCount} layer × {SourcesPerLayer} source × {BlendShapeCount} BS: " +
                     $"avg={avgMs:F3}ms, max={maxFrameMs:F3}ms, budget={FrameBudgetMs}ms (spike<= {SpikeBudgetMs}ms)");
 
-                / / 6.5: 平均フレーム時間が 60 FPS バジェット (16.6ms) 以内に収まること。
+                // 平均フレーム時間が 60 FPS バジェット (16.6ms) 以内に収まること。
                 Assert.Less(avgMs, FrameBudgetMs,
                     $"10 体同時稼働の平均フレーム時間が {avgMs:F3}ms で 60 FPS バジェット {FrameBudgetMs}ms を超えました " +
                     $"(max={maxFrameMs:F3}ms)");

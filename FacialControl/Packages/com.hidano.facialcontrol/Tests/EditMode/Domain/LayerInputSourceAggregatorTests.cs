@@ -298,7 +298,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void Aggregate_SourceWritesShorterSpan_UnwrittenIndicesContributeZero()
         {
-            / (overlap-only): source が BlendShape 個数未満しか書込まない場合、
+            // overlap-only: source が BlendShape 個数未満しか書込まない場合、
             // Aggregator 側で scratch が事前ゼロクリアされるため、未書込インデックスの
             // 寄与は 0 になり、前フレームの値が残らない契約を検証する。
             const int blendShapeCount = 4;
@@ -335,7 +335,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void Aggregate_InvalidSource_ContributesZeroWithoutException()
         {
-            / 観測完了条件:
+            // 観測完了条件:
             // 3 source のうち 1 source だけ IsValid=false のとき、残り 2 source の
             // 加重和のみが出力され、例外が発生しないこと。
             const int blendShapeCount = 3;
@@ -674,7 +674,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void Aggregate_SourceWeightAndLayerWeight_AreAppliedIndependently()
         {
-            / / D-4:
             // source weight は intra-layer の加重和だけに効き、inter-layer weight とは乗算されない。
             // Aggregator の per-layer 出力は source weight だけで決まり、inter-layer weight は
             // LayerInput.Weight にそのまま載るだけであること。

@@ -104,7 +104,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         [Test]
         public void SummaryLabelFormatConstants_DoNotMentionBonePose()
         {
-            / Refactor: 表示文字列を const 化。
+            // Refactor: 表示文字列を const 化。
             // const 文字列レベルでも旧概念が残っていないことを検証する。
             StringAssert.DoesNotContain("BonePose", FacialControllerEditor.SchemaVersionLabelFormat);
             StringAssert.DoesNotContain("BonePose", FacialControllerEditor.LayerCountLabelFormat);
