@@ -18,18 +18,6 @@ namespace Hidano.FacialControl.Application.UseCases
     {
         private static readonly List<Expression> EmptyExpressionList = new List<Expression>(0);
 
-        /// <summary>
-        /// [TEMP DEBUG] true にすると毎フレーム per-layer 出力 + 最終ブレンドを Console に出力する。
-        /// リップシンクと表情のブレンド調査用に preview 段階で残しているフラグ。preview.2 以降で除去予定。
-        /// </summary>
-        public static bool DebugBlendLog { get; set; } = true;
-
-        /// <summary>[TEMP DEBUG] ログ出力レート (秒)。</summary>
-        public static float DebugBlendLogIntervalSeconds { get; set; } = 0.5f;
-
-        // 直近のログ出力時刻 (Time.unscaledTimeAsDouble)。
-        private double _debugLastLogTime;
-
         private FacialProfile _profile;
         private readonly ExpressionUseCase _expressionUseCase;
         private string[] _blendShapeNames;
@@ -187,67 +175,6 @@ namespace Hidano.FacialControl.Application.UseCases
                     new ReadOnlySpan<LayerBlender.LayerInput>(_filteredLayerInputs, 0, activeCount),
                     new Span<float>(_finalOutput));
             }
-
-            if (DebugBlendLog)
-            {
-                EmitDebugBlendLog(layerSpan, activeCount);
-            }
-        }
-
-        // [TEMP DEBUG] レイヤー別の非ゼロ BlendShape 出力と最終ブレンド結果をレート制限つきで Console に出力する。
-        // リップシンク/表情のブレンドが期待通りに合成されているかを目視確認するために使う。
-        private void EmitDebugBlendLog(ReadOnlySpan<LayerDefinition> layerSpan, int activeCount)
-        {
-            double now = UnityEngine.Time.unscaledTimeAsDouble;
-            if (now - _debugLastLogTime < DebugBlendLogIntervalSeconds)
-            {
-                return;
-            }
-            _debugLastLogTime = now;
-
-            var sb = new System.Text.StringBuilder(256);
-            sb.Append("[FacialControl Blend] ");
-            for (int l = 0; l < _layerInputScratch.Length && l < layerSpan.Length; l++)
-            {
-                var input = _layerInputScratch[l];
-                var values = input.BlendShapeValues.Span;
-                var mask = input.ContributeMask;
-                int nonZero = 0;
-                int maskTrue = 0;
-                for (int i = 0; i < values.Length; i++)
-                {
-                    if (values[i] > 1e-4f || values[i] < -1e-4f) nonZero++;
-                }
-                if (mask != null)
-                {
-                    for (int i = 0; i < mask.Length; i++)
-                    {
-                        if (mask[i]) maskTrue++;
-                    }
-                }
-                bool included = false;
-                for (int f = 0; f < activeCount; f++)
-                {
-                    if (ReferenceEquals(_filteredLayerInputs[f].BlendShapeValues, input.BlendShapeValues))
-                    {
-                        included = true;
-                        break;
-                    }
-                }
-                sb.Append("L").Append(l).Append('(').Append(layerSpan[l].Name).Append(')');
-                sb.Append(":pri=").Append(input.Priority);
-                sb.Append(",w=").Append(input.Weight.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
-                sb.Append(",nz=").Append(nonZero);
-                sb.Append(",mask=").Append(maskTrue);
-                sb.Append(included ? ",inc " : ",skp ");
-            }
-            int finalNonZero = 0;
-            for (int i = 0; i < _finalOutput.Length; i++)
-            {
-                if (_finalOutput[i] > 1e-4f) finalNonZero++;
-            }
-            sb.Append("| final.nz=").Append(finalNonZero).Append('/').Append(_finalOutput.Length);
-            UnityEngine.Debug.Log(sb.ToString());
         }
 
         /// <summary>

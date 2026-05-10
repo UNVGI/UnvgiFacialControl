@@ -22,36 +22,6 @@
 
 ## 短期（別 PR / preview.1 内に拾う候補）
 
-### S-1: ボーン参照の相対 Path 化
-- **出典**: [`HANDOVER.md`](../HANDOVER.md) の「次にやること」優先度低 #5（task #3 として注記）
-- **内容**: `GazeExpressionConfig.leftEyeBonePath` / `rightEyeBonePath` を「ボーン名（`string`）」ではなく「参照モデル root からの相対 path」として保存する。`BoneTransformResolver` は現状 `node.name == name` の完全一致動作のため、同名ボーンが複数ある HumanoidRig 等で「最初の発見」が採用される落とし穴がある。`LeftEye` と `LeftEyeEnd` のような sibling 取り違えも理屈上発生し得る。
-- **トリガ**: 同名ボーン衝突の不具合報告が来た / Humanoid 以外のリグでデモ予定が立った / Inspector で「使用モデル」設定 UX を見直すタイミング
-- **影響範囲**: `Runtime/Adapters/Bone/BoneTransformResolver.cs`、`Runtime/Adapters/ScriptableObject/GazeExpressionConfig.cs`、JSON schema（`leftEyeBonePath` の意味変更 → schema bump 検討）
-
-### S-2: デモ asset の旧スキーマ field 残置確認
-- **出典**: [`HANDOVER.md`](../HANDOVER.md) の「次にやること」優先度中 #3
-- **内容**: `MultiSourceBlendDemoCharacter.asset` に `_gazeConfigs[].leftEyeXBlendShape` 等の旧 field が YAML として残置されている可能性がある。Inspector 経由で 1 回 save すれば消えるはずだが、CI / 手動確認で念のため検証する。
-- **トリガ**: Sample 経路の手動回帰確認時 / Phase 6 完了レビューの残課題消化時
-- **影響範囲**: `FacialControl/Assets/Samples/FacialControl InputSystem/0.1.0-preview.2/Multi Source Blend Demo/`、`Packages/com.hidano.facialcontrol.inputsystem/Samples~/`
-
-### S-3: Activate→Deactivate→ ゼロ復帰の PlayMode 統合テスト
-- **出典**: [`HANDOVER.md`](../HANDOVER.md) の「次にやること」優先度中 #4
-- **内容**: 直近の Bug A 修正（`LayerUseCase.UpdateWeights` の `HasBeenActive` ガード経由ゼロ補間）は EditMode 単体テスト 2 本でカバーしたが、実フレーム同期での挙動は未検証。`LayerExpressionSource.UpdateExpressions(empty)` 経路を MonoBehaviour ライフサイクル + Time.deltaTime 経由で踏む PlayMode テストを追加する。
-- **トリガ**: 同経路の追加リグレッションが発生したとき / preview.1 リリース前の品質ゲート強化時
-- **影響範囲**: `Tests/PlayMode/Integration/`（新規ファイル想定）
-
-### S-4: Sample Scene の手動再生確認 + UPM Import Sample 検証
-- **出典**: [`.kiro/specs/inspector-and-data-model-redesign/RETRY-SUMMARY.md`](../.kiro/specs/inspector-and-data-model-redesign/RETRY-SUMMARY.md) Task 6.5 残課題
-- **内容**: batch retry 範囲外の GUI 操作。Multi Source Blend Demo / Analog Binding Demo を Unity Editor で開いて Play 実行 + UPM Package Manager `Import Sample` 経由で空プロジェクトに import して動作確認する。
-- **トリガ**: preview.1 リリース前の最終レビュー
-- **影響範囲**: 動作確認のみ（コード変更なし）
-
-### S-8: AdapterBinding Slug 編集 UI のドロップダウン化検討
-- **出典**: ユーザー報告（2026-05-09）「Slugも選択肢が限られるならテキストボックスではなくドロップダウンに変更」
-- **内容**: ULipSync など 1 binding type に対しては基本 1 つ slug があれば足りるが、同 binding type を複数装着するケースでは slug が重複してはいけないため、固定候補ドロップダウンに置き換えると衝突回避が困難になる。「default 値（"ulipsync" など）を candidate に持つドロップダウン + 任意入力できる手動 override テキスト」の二段 UI（DeviceDescriptorPopup と同じパターン）に揃えるのが落とし所。
-- **トリガ**: 複数 ULipSyncAdapterBinding を 1 SO に同時搭載する利用シナリオが発生したとき / Inspector UX 全体の整理タイミング
-- **影響範囲**: `Editor/Inspector/ULipSyncAdapterBindingDrawer.cs`、他 adapter binding drawer
-
 ### S-9: LipSync の AnimationClip 形式が動かない件の根本対応
 - **出典**: ユーザー報告（2026-05-10）「LipsyncをAnimationClipで設定できない」/ HANDOVER.md タスク 8 の積み残し
 - **内容**: `ULipSyncAdapterBinding.TryFillAnimationClipSnapshot` は `entry.Clip.SampleAnimation(ctx.HostGameObject, sampleTime)` 経由で口形状クリップを採取するが、ユーザー作成 AnimationClip の rendererPath とキャラ階層が一致しない / クリップが BlendShape カーブを持たない等で snapshot が空になり結果として ContributeMask が空になる → BlendShape 直指定形式（`BlendShapePhonemeEntry`）では動くが AnimationClip 形式（`AnimationClipPhonemeEntry`）では動かない、という挙動になる。
@@ -65,12 +35,6 @@
 - **内容**: 現状、`ExpressionInputSourceAdapter` は Hold/Toggle 二値で Expression を on/off するため、controller のアナログトリガー（0.0〜1.0）を握っても expression weight は遷移時間ベースで一定速度進行してしまう。ユーザー要求は「InputAction の analog value がそのまま無入力↔押し切りの Lerp 値になる」挙動。実装には (1) `ExpressionTriggerInputSource` への continuous-weight API 追加、(2) `InputSystemAdapterBinding` に gaze 用とは別の "analog expression bindings" リスト追加、(3) `InputSystemAdapterBindingDrawer` の対応 UI、(4) `OnLateTick` での毎フレーム value→weight 反映、が必要で 1 PR の規模を超える。
 - **トリガ**: コントローラー操作のテストでアナログ表情を扱うシナリオが必須になったとき / preview.1 リリース前の機能完成度レビュー
 - **影響範囲**: `Runtime/Adapters/InputSources/ExpressionInputSourceAdapter.cs`, `ExpressionTriggerInputSource.cs`, `InputSystemAdapterBinding.cs`, `Editor/AdapterBindings/InputSystemAdapterBindingDrawer.cs`, 対応 EditMode/PlayMode テスト
-
-### S-6: core package.json への VContainer dependency 宣言検討
-- **出典**: [`.kiro/specs/adapter-binding-architecture/spec.json`](../.kiro/specs/adapter-binding-architecture/spec.json) `completion_summary.follow_ups_in_backlog`
-- **内容**: `Packages/com.hidano.facialcontrol/package.json` の `dependencies` に `jp.hadashikick.vcontainer` が宣言されていない。dev project の `manifest.json` 経由でのみ scoped registry 解決されている状態。UPM 経由で core を install するエンジニアの環境では VContainer が自動で入らないため、README / package.json のいずれかでサイドバイサイド導入手順を明示する必要がある。npmjs publish 直前にやり方を確定（package.json `dependencies` に追加 vs README の手動 OpenUPM 設定説明）する。
-- **トリガ**: npmjs.com への initial publish 直前 / UPM install して install error 報告が来たとき
-- **影響範囲**: `Packages/com.hidano.facialcontrol/package.json`, `Packages/com.hidano.facialcontrol/README.md`
 
 ---
 
@@ -112,11 +76,6 @@
 - **出典**: [`.kiro/specs/bone-control/research.md`](../.kiro/specs/bone-control/research.md) §「BonePose は FacialProfileSO 内包」/ [`.kiro/specs/bone-control/gap-analysis.md`](../.kiro/specs/bone-control/gap-analysis.md) §9
 - **内容**: preview.1 では `BonePose` は `FacialProfileSO` に内包する形で確定。複数 FacialProfile 間で同じ BonePose を共有したいユースケースが顕在化したら独立 `BonePoseSO` に切り出す。
 - **トリガ**: 同じ視線設定を複数キャラクター間で使い回したいという要望が発生
-
-### M-7: Bone 名衝突警告（非 Humanoid 対応）
-- **出典**: [`.kiro/specs/bone-control/tasks.md`](../.kiro/specs/bone-control/tasks.md) スコープ外メモ MINOR-2
-- **内容**: preview.1 は Humanoid-first（VTuber/VRM 中心）。非 Humanoid の手入力リグで同名ボーンが複数ヒットした場合、preview.1 は「最初の発見を採用、警告なし」で確定。preview.2 以降で警告 UI を検討。
-- **トリガ**: 非 Humanoid のキャラクターでバグ報告が来た / S-1（相対 Path 化）と一緒に対処すると相性が良い
 
 ### M-8: Burst / IAnimationJob への差替
 - **出典**: [`.kiro/specs/bone-control/research.md`](../.kiro/specs/bone-control/research.md) §「PlayableGraph + LateUpdate」/ [`.kiro/specs/analog-input-binding/design.md`](../.kiro/specs/analog-input-binding/design.md)
@@ -188,3 +147,4 @@
 - 2026-05-06: spec `adapter-binding-architecture` クローズに伴い follow-up 2 件追加（S-5: Sample SO guid 再生成、S-6: VContainer dependency 宣言）。
 - 2026-05-06: spec `gaze-config-promotion` 設計セッションで preview.1 スコープ外と確定した 2 件を追加（M-13: 複数 Vector2 入力源での gaze 同時駆動、M-14: Domain への動的 Expression driver 概念導入）。
 - 2026-05-10: ユーザー指示で「LipSync の AnimationClip 形式が動かない件の根本対応」を S-9 として追加（凌ぎの診断ログ / HelpBox は既に main に入っている）。
+- 2026-05-10: 本セッションで以下を消化して削除: S-1（ボーン参照を相対 path / 単純名併用に拡張）、S-2（旧 schema field 残置なしを確認）、S-3（PlayMode 統合テスト追加）、S-4（Fork 先で確認済みのため不要と判断）、S-6（README に VContainer 依存と OpenUPM 設定例を追記）、S-8（slug 編集 UI を candidate ドロップダウン + 手動 override テキストの 2 段に変更）、M-7（同名ボーン衝突時の警告を追加。S-1 と同 PR で実装）。

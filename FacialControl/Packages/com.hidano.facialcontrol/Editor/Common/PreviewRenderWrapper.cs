@@ -157,7 +157,11 @@ namespace Hidano.FacialControl.Editor.Common
                     _state = PanHandler.Apply(_state, verticalFlippedDelta, PanSensitivity, MinPivotDistance);
                     break;
                 case EventType.ScrollWheel:
-                    _state = DollyHandler.Apply(_state, frame.ScrollDelta.y, DollyScrollSensitivity, MinPivotDistance);
+                    // Unity の ScrollWheel delta.y は「奥にホイール (≒ ズームイン期待)」で負、
+                    // 「手前にホイール (≒ ズームアウト期待)」で正になる。DollyHandler は
+                    // 正の dollyAmount で「カメラを前方に進める = ズームイン」になるため、
+                    // 直感どおりの方向にするには符号を反転して渡す必要がある。
+                    _state = DollyHandler.Apply(_state, -frame.ScrollDelta.y, DollyScrollSensitivity, MinPivotDistance);
                     break;
                 case EventType.MouseDrag when button == 1 && alt:
                     _state = DollyHandler.Apply(_state, -frame.Delta.y, DollyDragSensitivity, MinPivotDistance);

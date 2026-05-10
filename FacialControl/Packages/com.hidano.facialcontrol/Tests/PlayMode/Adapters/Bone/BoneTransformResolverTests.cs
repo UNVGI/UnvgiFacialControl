@@ -21,8 +21,10 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
     ///   - 命名規則を強制しない（任意の prefix/suffix で OK、Req 2.5）。
     ///   - <c>Prime(boneNames)</c> 一括解決後、ホットパスでは辞書ルックアップのみ
     ///     （GC alloc ゼロ）。
-    ///   - 同名 Transform が複数存在する場合は「最初の発見を採用、警告なし」
-    ///     （preview.1 確定挙動、tasks.md スコープ外メモ参照）。
+    ///   - 同名 Transform が複数存在する場合は「最初の発見を採用 + 1 回だけ警告」
+    ///     (M-7 backlog 対応)。曖昧性を避けたいときは相対 path を渡せば警告なしで解決される。
+    ///   - 相対 path (<c>"Hips/Spine/Head"</c> 等) が <see cref="UnityEngine.Transform.Find"/>
+    ///     経由で解決できる (S-1 backlog 対応)。
     ///
     /// _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 5.1
     /// </summary>
@@ -251,11 +253,11 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
         }
 
         // ================================================================
-        // 同名 Transform が複数: 最初の発見を採用、警告なし（preview.1 確定挙動）
+        // 同名 Transform が複数: 最初の発見を採用 + 警告 (M-7)
         // ================================================================
 
         [Test]
-        public void Resolve_DuplicateBoneNames_ReturnsFirstFoundNoWarning()
+        public void Resolve_DuplicateBoneNames_ReturnsFirstFoundAndWarns()
         {
             // 同名 "Eye" を 2 箇所に持つツリー：
             // Root
@@ -276,15 +278,73 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
 
             var resolver = new BoneTransformResolver(_root.transform);
 
-            // preview.1: 同名複数衝突時は warning を出さない（tasks.md スコープ外メモ）。
-            // → LogAssert.Expect は宣言しない。万一警告が出ると LogAssert がエラー化する。
+            // M-7: 同名複数衝突時は警告を 1 回だけ発火する。Eye / 複数 / 2 件 を含むメッセージ。
+            LogAssert.Expect(LogType.Warning, new Regex("Eye.*複数"));
+
             var result = resolver.Resolve("Eye");
 
             Assert.IsNotNull(result, "同名複数でも最初の発見を返すこと");
-            // 最初の発見が LeftBranch 配下であることを確認（深さ優先 or 階層先行のどちらでも
-            // 「LeftBranch が先に登録されている」順を期待）
             Assert.AreSame(leftEye.transform, result,
-                "同名複数の場合、最初に発見された Transform を返すこと（preview.1 確定挙動）");
+                "同名複数の場合、最初に発見された Transform (LeftBranch 配下) を返すこと");
+        }
+
+        // ================================================================
+        // 相対 path 解決 (S-1)
+        // ================================================================
+
+        [Test]
+        public void Resolve_RelativePath_ReturnsCorrectTransform()
+        {
+            // Root/Hips/Spine/Head の階層で、相対 path "Hips/Spine/Head" → Head Transform
+            _root = BuildHierarchy("Root", "Hips", "Spine", "Head");
+            var resolver = new BoneTransformResolver(_root.transform);
+
+            var result = resolver.Resolve("Hips/Spine/Head");
+
+            Assert.IsNotNull(result, "相対 path 'Hips/Spine/Head' が解決できること");
+            Assert.AreEqual("Head", result.name);
+        }
+
+        [Test]
+        public void Resolve_RelativePath_DisambiguatesSameNameWithoutWarning()
+        {
+            // 同名 "Eye" を 2 箇所に持つツリーで、相対 path で右目を一意指定する：
+            // Root
+            //   ├── LeftBranch / Eye
+            //   └── RightBranch / Eye  ← "RightBranch/Eye" で曖昧性なく解決
+            _root = new GameObject("Root");
+            var leftBranch = new GameObject("LeftBranch");
+            leftBranch.transform.SetParent(_root.transform);
+            var leftEye = new GameObject("Eye");
+            leftEye.transform.SetParent(leftBranch.transform);
+
+            var rightBranch = new GameObject("RightBranch");
+            rightBranch.transform.SetParent(_root.transform);
+            var rightEye = new GameObject("Eye");
+            rightEye.transform.SetParent(rightBranch.transform);
+
+            var resolver = new BoneTransformResolver(_root.transform);
+
+            // 相対 path 経路は Transform.Find に委譲され、複数同名警告の対象外。
+            // LogAssert.Expect は宣言しない。万一警告が出ると LogAssert が失敗する。
+            var result = resolver.Resolve("RightBranch/Eye");
+
+            Assert.IsNotNull(result, "相対 path で右目側を解決できること");
+            Assert.AreSame(rightEye.transform, result,
+                "相対 path は LeftBranch 側ではなく RightBranch 側の Eye を返すこと");
+        }
+
+        [Test]
+        public void Resolve_RelativePath_NonExistent_LogsWarning()
+        {
+            _root = BuildHierarchy("Root", "Hips", "Head");
+            var resolver = new BoneTransformResolver(_root.transform);
+
+            LogAssert.Expect(LogType.Warning, new Regex("Hips/MissingChild"));
+
+            var result = resolver.Resolve("Hips/MissingChild");
+
+            Assert.IsNull(result, "存在しない相対 path は null を返すこと");
         }
 
         [Test]

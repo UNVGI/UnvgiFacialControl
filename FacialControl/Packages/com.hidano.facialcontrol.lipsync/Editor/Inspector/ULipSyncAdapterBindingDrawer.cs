@@ -1,3 +1,4 @@
+using Hidano.FacialControl.Editor.Inspector.AdapterBindings;
 using Hidano.FacialControl.LipSync.Adapters;
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -49,7 +50,7 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
                 return;
             }
 
-            var field = new PropertyField(slugProperty, "Slug")
+            var field = new AdapterBindingSlugField(slugProperty, typeof(ULipSyncAdapterBinding))
             {
                 name = SlugPropertyFieldName,
             };

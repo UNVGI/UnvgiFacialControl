@@ -1,4 +1,5 @@
 using Hidano.FacialControl.Adapters.AdapterBindings.ARKit;
+using Hidano.FacialControl.Editor.Inspector.AdapterBindings;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine.UIElements;
@@ -47,13 +48,24 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
             var root = new VisualElement();
             root.AddToClassList(RootClassName);
 
-            AddBoundField(root, property, SlugFieldName, "Slug");
+            AddSlugField(root, property);
             AddBoundField(root, property, EndpointFieldName, "Endpoint");
             AddBoundField(root, property, PortFieldName, "Port");
             AddBoundField(root, property, StalenessFieldName, "Staleness Seconds");
             AddBoundField(root, property, ArKitParameterNamesFieldName, "ARKit Parameter Names");
 
             return root;
+        }
+
+        private static void AddSlugField(VisualElement root, SerializedProperty property)
+        {
+            var slugProp = property.FindPropertyRelative(SlugFieldName);
+            if (slugProp == null)
+            {
+                root.Add(new Label($"<missing field: {SlugFieldName}>"));
+                return;
+            }
+            root.Add(new AdapterBindingSlugField(slugProp, typeof(ArKitOscAdapterBinding)));
         }
 
         private static void AddBoundField(
