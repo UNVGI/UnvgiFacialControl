@@ -471,6 +471,13 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                     continue;
                 }
 
+                if (!ContainsSlot(ctx.Profile.Slots.Span, entry.overlaySlot))
+                {
+                    Debug.LogWarning(
+                        $"[InputSystemAdapterBinding] Overlay binding slot '{entry.overlaySlot}' is not declared in profile.Slots. skip.");
+                    continue;
+                }
+
                 if (!sourceByAction.TryGetValue(entry.actionName, out var analogSource) || analogSource == null)
                 {
                     Debug.LogWarning(
@@ -652,6 +659,19 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                 if (string.Equals(candidate.Id, actionName, StringComparison.Ordinal))
                 {
                     source = candidate;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsSlot(ReadOnlySpan<string> slots, string slot)
+        {
+            for (int i = 0; i < slots.Length; i++)
+            {
+                if (string.Equals(slots[i], slot, StringComparison.Ordinal))
+                {
                     return true;
                 }
             }
