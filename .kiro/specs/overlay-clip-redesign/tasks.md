@@ -198,7 +198,7 @@
   - _Boundary: Tests/EditMode/Application_
   - _Depends: 5.2_
 
-- [ ] 5.7 (P) ExpressionUseCaseActiveProviderTests を新スキーマで書き換える
+- [x] 5.7 (P) ExpressionUseCaseActiveProviderTests を新スキーマで書き換える
   - `Tests/EditMode/Application/ExpressionUseCaseActiveProviderTests.cs` の overlay 経路への参照のみ新型 (`OverlaySlotBinding(slot, suppress, snapshot)`) に置換する
   - 当該 UseCase の overlay 以外のロジックは無変更を維持する
   - 観測可能な完了条件: テストが新スキーマで Green になり、active provider 切り替え時の overlay 解決が期待通りに動くこと
