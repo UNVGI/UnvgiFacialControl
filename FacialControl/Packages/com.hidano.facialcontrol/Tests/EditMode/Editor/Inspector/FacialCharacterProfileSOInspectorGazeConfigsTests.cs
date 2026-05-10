@@ -55,9 +55,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         public void GazeConfigsAddDropdown_ListsOnlyAnalogExpressionsWithoutExistingConfig()
         {
             _so = CreateProfile();
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
-            _so.Expressions.Add(CreateExpression("analog-two", "Analog Two", ExpressionKind.Analog));
-            _so.Expressions.Add(CreateExpression("digital-one", "Digital One", ExpressionKind.Digital));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
+            _so.Expressions.Add(CreateExpression("analog-two", "Analog Two", true));
+            _so.Expressions.Add(CreateExpression("digital-one", "Digital One", false));
             _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "analog-two" });
 
             var root = BuildInspectorRoot();
@@ -71,7 +71,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         public void GazeConfigsAddDropdown_SelectionAppendsConfigForExpressionId()
         {
             _so = CreateProfile();
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
 
             var root = BuildInspectorRoot();
             var dropdown = root.Q<DropdownField>(FacialCharacterProfileSOInspector.GazeConfigAddDropdownName);
@@ -88,7 +88,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         public void GazeConfigsAddDropdown_WhenNoCandidatesRemain_IsDisabledWithLabel()
         {
             _so = CreateProfile();
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
             _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "analog-one" });
 
             var root = BuildInspectorRoot();
@@ -103,7 +103,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         public void GazeConfigsRow_RendersRequiredSingleRowControls()
         {
             _so = CreateProfile();
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
             _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "analog-one" });
 
             var root = BuildInspectorRoot();
@@ -130,7 +130,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         public void GazeConfigResolveButtons_WhenReferenceModelMissing_AreDisabled()
         {
             _so = CreateProfile();
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
             _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "analog-one" });
 
             var root = BuildInspectorRoot();
@@ -148,7 +148,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         {
             _so = CreateProfile();
             _so.ReferenceModel = CreateReferenceModel();
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
             _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "analog-one" });
 
             var root = BuildInspectorRoot();
@@ -166,7 +166,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         {
             _so = CreateProfile();
             _so.ReferenceModel = CreateReferenceModel();
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
             _so.WritableGazeConfigs.Add(new GazeBindingConfig
             {
                 expressionId = "analog-one",
@@ -194,8 +194,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         {
             _so = CreateProfile();
             _so.ReferenceModel = CreateReferenceModel();
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
-            _so.Expressions.Add(CreateExpression("analog-two", "Analog Two", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
+            _so.Expressions.Add(CreateExpression("analog-two", "Analog Two", true));
             _so.WritableGazeConfigs.Add(new GazeBindingConfig
             {
                 expressionId = "analog-one",
@@ -226,9 +226,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         public void ReferenceModelChanged_AutoFillsOnlyEntriesWithBothBonePathsEmpty()
         {
             _so = CreateProfile();
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
-            _so.Expressions.Add(CreateExpression("analog-two", "Analog Two", ExpressionKind.Analog));
-            _so.Expressions.Add(CreateExpression("analog-three", "Analog Three", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
+            _so.Expressions.Add(CreateExpression("analog-two", "Analog Two", true));
+            _so.Expressions.Add(CreateExpression("analog-three", "Analog Three", true));
             _so.WritableGazeConfigs.Add(new GazeBindingConfig
             {
                 expressionId = "analog-one",
@@ -264,7 +264,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         {
             Undo.ClearAll();
             _so = CreateProfile();
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
             _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "analog-one" });
             BuildInspectorRoot();
 
@@ -282,37 +282,37 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         }
 
         [Test]
-        public void ChangeExpressionKind_AnalogToDigital_RemovesMatchingGazeConfigAndUndoRestoresBothInOneStep()
+        public void ChangeExpressionIsGaze_GazeToNonGaze_RemovesMatchingGazeConfigAndUndoRestoresBothInOneStep()
         {
             Undo.ClearAll();
             _so = CreateProfile();
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
             _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "analog-one" });
             BuildInspectorRoot();
 
-            InvokeChangeExpressionKind(0, ExpressionKind.Digital);
+            InvokeChangeExpressionIsGaze(0, false);
 
-            Assert.That(_so.Expressions[0].kind, Is.EqualTo(ExpressionKind.Digital));
+            Assert.That(_so.Expressions[0].isGaze, Is.EqualTo(false));
             Assert.That(_so.GazeConfigs, Is.Empty);
 
             Undo.PerformUndo();
 
-            Assert.That(_so.Expressions[0].kind, Is.EqualTo(ExpressionKind.Analog));
+            Assert.That(_so.Expressions[0].isGaze, Is.EqualTo(true));
             Assert.That(_so.GazeConfigs, Has.Count.EqualTo(1));
             Assert.That(_so.GazeConfigs[0].expressionId, Is.EqualTo("analog-one"));
         }
 
         [Test]
-        public void ChangeExpressionKind_DigitalToDigital_DoesNotRemoveGazeConfig()
+        public void ChangeExpressionIsGaze_NonGazeToNonGaze_DoesNotRemoveGazeConfig()
         {
             _so = CreateProfile();
-            _so.Expressions.Add(CreateExpression("digital-one", "Digital One", ExpressionKind.Digital));
+            _so.Expressions.Add(CreateExpression("digital-one", "Digital One", false));
             _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "digital-one" });
             BuildInspectorRoot();
 
-            InvokeChangeExpressionKind(0, ExpressionKind.Digital);
+            InvokeChangeExpressionIsGaze(0, false);
 
-            Assert.That(_so.Expressions[0].kind, Is.EqualTo(ExpressionKind.Digital));
+            Assert.That(_so.Expressions[0].isGaze, Is.EqualTo(false));
             Assert.That(_so.GazeConfigs, Has.Count.EqualTo(1));
             Assert.That(_so.GazeConfigs[0].expressionId, Is.EqualTo("digital-one"));
         }
@@ -322,7 +322,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         {
             Undo.ClearAll();
             _so = CreateProfile();
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
             _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "analog-one" });
             BuildInspectorRoot();
 
@@ -344,7 +344,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         {
             _so = CreateProfile();
             _so.Layers.Add(CreateLayer("base"));
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
 
             var root = BuildInspectorRoot();
             var layersSection = root.Q<VisualElement>(FacialCharacterProfileSOInspector.LayersFoldoutName);
@@ -368,7 +368,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         {
             _so = CreateProfile();
             _so.Layers.Add(CreateLayer("base"));
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", ExpressionKind.Analog));
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
 
             var root = BuildInspectorRoot();
             var legacyNames = new[]
@@ -397,8 +397,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             _so = CreateProfile();
             _so.Layers.Add(CreateLayer("base"));
             _so.Layers.Add(CreateLayer("eye"));
-            _so.Expressions.Add(CreateExpression("smile", "Smile", ExpressionKind.Digital, "base"));
-            _so.Expressions.Add(CreateExpression("look", "Look", ExpressionKind.Analog, "eye"));
+            _so.Expressions.Add(CreateExpression("smile", "Smile", false, "base"));
+            _so.Expressions.Add(CreateExpression("look", "Look", true, "eye"));
 
             var root = BuildInspectorRoot();
 
@@ -410,7 +410,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             Assert.That(CollectLabelTexts(root, FacialCharacterProfileSOInspector.DebugExpressionIdMappingExpressionIdCellName),
                 Is.EqualTo(new[] { "smile", "look" }));
             Assert.That(CollectLabelTexts(root, FacialCharacterProfileSOInspector.DebugExpressionIdMappingKindCellName),
-                Is.EqualTo(new[] { "Digital", "Analog" }));
+                Is.EqualTo(new[] { "通常", "目線" }));
             Assert.That(CollectLabelTexts(root, FacialCharacterProfileSOInspector.DebugExpressionIdMappingLayerCellName),
                 Is.EqualTo(new[] { "base", "eye" }));
         }
@@ -421,20 +421,20 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             _so = CreateProfile();
             _so.Layers.Add(CreateLayer("base"));
             _so.Layers.Add(CreateLayer("eye"));
-            _so.Expressions.Add(CreateExpression("smile", "Smile", ExpressionKind.Digital, "base"));
+            _so.Expressions.Add(CreateExpression("smile", "Smile", false, "base"));
 
             var root = BuildInspectorRoot();
 
             _so.Expressions[0].name = "Smile Renamed";
-            _so.Expressions[0].kind = ExpressionKind.Analog;
+            _so.Expressions[0].isGaze = true;
             _so.Expressions[0].layer = "eye";
-            _so.Expressions.Add(CreateExpression("blink", "Blink", ExpressionKind.Digital, "base"));
+            _so.Expressions.Add(CreateExpression("blink", "Blink", false, "base"));
             InvokeRebuildExpressionIdMapping();
 
             Assert.That(CollectLabelTexts(root, FacialCharacterProfileSOInspector.DebugExpressionIdMappingNameCellName),
                 Is.EqualTo(new[] { "Smile Renamed", "Blink" }));
             Assert.That(CollectLabelTexts(root, FacialCharacterProfileSOInspector.DebugExpressionIdMappingKindCellName),
-                Is.EqualTo(new[] { "Analog", "Digital" }));
+                Is.EqualTo(new[] { "目線", "通常" }));
             Assert.That(CollectLabelTexts(root, FacialCharacterProfileSOInspector.DebugExpressionIdMappingLayerCellName),
                 Is.EqualTo(new[] { "eye", "base" }));
 
@@ -488,13 +488,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             method.Invoke(_editor, new object[] { index });
         }
 
-        private void InvokeChangeExpressionKind(int index, ExpressionKind kind)
+        private void InvokeChangeExpressionIsGaze(int index, bool isGaze)
         {
             var method = typeof(FacialCharacterProfileSOInspector).GetMethod(
-                "ChangeExpressionKind",
+                "ChangeExpressionIsGaze",
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(method, Is.Not.Null);
-            method.Invoke(_editor, new object[] { index, kind });
+            method.Invoke(_editor, new object[] { index, isGaze });
         }
 
         private void InvokeRemoveGazeConfigAt(int index)
@@ -571,7 +571,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         private static ExpressionSerializable CreateExpression(
             string id,
             string name,
-            ExpressionKind kind,
+            bool isGaze,
             string layer = "base")
         {
             return new ExpressionSerializable
@@ -579,7 +579,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
                 id = id,
                 name = name,
                 layer = layer,
-                kind = kind,
+                isGaze = isGaze,
             };
         }
 

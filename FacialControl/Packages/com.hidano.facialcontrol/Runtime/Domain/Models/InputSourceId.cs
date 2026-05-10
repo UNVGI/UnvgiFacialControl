@@ -5,7 +5,7 @@ namespace Hidano.FacialControl.Domain.Models
 {
     /// <summary>
     /// 入力源識別子の value-object。Req 12.6 に従い、
-    /// パターン <c>[a-zA-Z0-9_.-]{1,64}</c> を満たす ASCII 文字列のみを受理する。
+    /// パターン <c>[a-zA-Z0-9_.\-:]{1,64}</c> を満たす ASCII 文字列のみを受理する。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -17,13 +17,20 @@ namespace Hidano.FacialControl.Domain.Models
     /// サードパーティ拡張は <c>x-</c> プレフィックス推奨。
     /// </para>
     /// <para>
+    /// 文字 <c>:</c> は <see cref="InputSourceRegistry"/> が <c>slug:sub</c> 形式で合成キーを
+    /// 構築するための区切り文字として使われる（例: <c>input:analog-expression</c>）。
+    /// <see cref="AdapterSlug"/> 自身は <c>:</c> を含めない（slug の regex 側で禁止）が、
+    /// レイヤーの <c>inputSources[].id</c> として永続化される文字列は合成済みキーであり
+    /// <c>:</c> を含みうるため、本識別子の regex でのみ <c>:</c> を許容する。
+    /// </para>
+    /// <para>
     /// Invariants: 構築後の <see cref="Value"/> は常にパターンを満たし、<c>legacy</c> ではない。
     /// </para>
     /// </remarks>
     public readonly struct InputSourceId : IEquatable<InputSourceId>
     {
         private static readonly Regex IdPattern =
-            new Regex("^[a-zA-Z0-9_.-]{1,64}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+            new Regex(@"^[a-zA-Z0-9_.\-:]{1,64}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         private const string ForbiddenLegacyId = "legacy";
         private const string ThirdPartyPrefix = "x-";

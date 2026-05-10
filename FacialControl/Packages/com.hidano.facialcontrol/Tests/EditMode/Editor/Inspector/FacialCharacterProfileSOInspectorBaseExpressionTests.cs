@@ -39,21 +39,31 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         }
 
         [Test]
-        public void CreateInspectorGUI_RendersBaseExpressionSectionBetweenLayersAndGazeConfigs()
+        public void CreateInspectorGUI_RendersBaseExpressionInExpressionsTabAfterLayersAndGazeInGazeTab()
         {
             _so = CreateProfile();
 
             var root = BuildInspectorRoot();
-            var layers = root.Q<Foldout>(FacialCharacterProfileSOInspector.LayersFoldoutName);
-            var baseExpression = root.Q<Foldout>(FacialCharacterProfileSOInspector.BaseExpressionFoldoutName);
-            var gaze = root.Q<Foldout>(FacialCharacterProfileSOInspector.GazeConfigsFoldoutName);
+            var expressionsTab = root.Q<VisualElement>(FacialCharacterProfileSOInspector.TabExpressionsName);
+            var gazeTab = root.Q<VisualElement>(FacialCharacterProfileSOInspector.TabGazeName);
+            Assert.That(expressionsTab, Is.Not.Null, "「表情」タブが存在しません。");
+            Assert.That(gazeTab, Is.Not.Null, "「目線」タブが存在しません。");
 
-            Assert.That(layers, Is.Not.Null);
-            Assert.That(baseExpression, Is.Not.Null);
+            var layers = expressionsTab.Q<Foldout>(FacialCharacterProfileSOInspector.LayersFoldoutName);
+            var baseExpression = expressionsTab.Q<Foldout>(FacialCharacterProfileSOInspector.BaseExpressionFoldoutName);
+            var gaze = gazeTab.Q<Foldout>(FacialCharacterProfileSOInspector.GazeConfigsFoldoutName);
+
+            Assert.That(layers, Is.Not.Null, "「表情」タブに Layers Foldout が見つかりません。");
+            Assert.That(baseExpression, Is.Not.Null, "「表情」タブに BaseExpression Foldout が見つかりません。");
             Assert.That(baseExpression.text, Is.EqualTo("ベース表情"));
-            Assert.That(gaze, Is.Not.Null);
-            Assert.That(DirectChildIndex(root, layers), Is.LessThan(DirectChildIndex(root, baseExpression)));
-            Assert.That(DirectChildIndex(root, baseExpression), Is.LessThan(DirectChildIndex(root, gaze)));
+            Assert.That(gaze, Is.Not.Null, "「目線」タブに GazeConfigs Foldout が見つかりません。");
+
+            // Base 表情は Layers の後ろに配置する（同一タブ内の順序）。
+            int layersIndex = DescendantIndex(expressionsTab, layers);
+            int baseIndex = DescendantIndex(expressionsTab, baseExpression);
+            Assert.That(layersIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(baseIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(layersIndex, Is.LessThan(baseIndex));
         }
 
         [Test]
@@ -118,6 +128,32 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             }
 
             return -1;
+        }
+
+        // 子孫の出現順序（DFS）でインデックスを返す。タブの contentContainer 内に foldout が
+        // 入るため、直下インデックスでは取れない順序関係を測るのに使う。
+        private static int DescendantIndex(VisualElement root, VisualElement target)
+        {
+            int counter = 0;
+            return Walk(root);
+
+            int Walk(VisualElement node)
+            {
+                foreach (var child in node.Children())
+                {
+                    if (ReferenceEquals(child, target))
+                    {
+                        return counter;
+                    }
+                    counter++;
+                    int found = Walk(child);
+                    if (found >= 0)
+                    {
+                        return found;
+                    }
+                }
+                return -1;
+            }
         }
 
         private static void AssertNoBakeButton(VisualElement section)

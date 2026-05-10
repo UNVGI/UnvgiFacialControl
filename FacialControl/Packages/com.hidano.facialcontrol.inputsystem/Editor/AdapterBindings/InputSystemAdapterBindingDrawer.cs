@@ -45,17 +45,19 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
         private const string GazeInputBindingsFieldName = "_gazeInputBindings";
         private const string AnalogExpressionBindingsFieldName = "_analogExpressionBindings";
 
-        public const string AnalogExpressionBindingsFieldUiName = "input-system-binding-analog-expression-bindings-field";
-
         public const string RootClassName = "facial-control-input-system-adapter-binding";
         public const string ActionMapDropdownName = "input-system-binding-action-map-dropdown";
         public const string ExpressionBindingsListName = "input-system-binding-expression-bindings-list";
         public const string GazeInputBindingsListName = "input-system-binding-gaze-input-bindings-list";
+        public const string AnalogExpressionBindingsListName = "input-system-binding-analog-expression-bindings-list";
         public const string ActionDropdownName = "input-system-binding-action-dropdown";
         public const string ExpressionDropdownName = "input-system-binding-expression-dropdown";
         public const string TriggerModeFieldName = "input-system-binding-trigger-mode-field";
         public const string GazeExpressionDropdownName = "input-system-binding-gaze-expression-dropdown";
         public const string GazeActionDropdownName = "input-system-binding-gaze-action-dropdown";
+        public const string AnalogActionDropdownName = "input-system-binding-analog-action-dropdown";
+        public const string AnalogExpressionDropdownName = "input-system-binding-analog-expression-dropdown";
+        public const string AnalogScaleFieldName = "input-system-binding-analog-scale-field";
 
         /// <inheritdoc />
         public override VisualElement CreatePropertyGUI(SerializedProperty property)
@@ -76,7 +78,9 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             var gazeBindingsList = AddGazeInputBindingsList(
                 root, property, gazeIndexProxy);
 
-            AddAnalogExpressionBindingsField(root, property);
+            var analogIndexProxy = new List<int>();
+            var analogBindingsList = AddAnalogExpressionBindingsList(
+                root, property, analogIndexProxy);
 
             // _inputActionAsset / ActionMap 変更時に候補と list rows を再構築する。
             // SerializedProperty 側の array は変わっていなくても、ObjectField の rebind 経由で
@@ -88,12 +92,14 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 RefreshActionMapChoices(actionMapDropdown, property);
                 ReassignItemsSource(expressionBindingsList, property, ExpressionBindingsFieldName, expressionIndexProxy);
                 ReassignItemsSource(gazeBindingsList, property, GazeInputBindingsFieldName, gazeIndexProxy);
+                ReassignItemsSource(analogBindingsList, property, AnalogExpressionBindingsFieldName, analogIndexProxy);
             });
             actionMapDropdown?.RegisterValueChangedCallback(_ =>
             {
-                // Action 候補は ActionMap に紐付くため、両 list の row UI を refresh する。
+                // Action 候補は ActionMap に紐付くため、3 list の row UI を refresh する。
                 ReassignItemsSource(expressionBindingsList, property, ExpressionBindingsFieldName, expressionIndexProxy);
                 ReassignItemsSource(gazeBindingsList, property, GazeInputBindingsFieldName, gazeIndexProxy);
+                ReassignItemsSource(analogBindingsList, property, AnalogExpressionBindingsFieldName, analogIndexProxy);
             });
 
             return root;
@@ -536,25 +542,191 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
         }
 
         /// <summary>
-        /// Analog Expression Bindings のリストを Unity 標準 PropertyField で表示する。
-        /// 専用 ListView は preview.2 以降で導入する想定で、現状は最小実装として Unity 既定の
-        /// 配列描画 (Add/Remove ボタン + 折りたたみ) を利用する (Req: アナログ表情精密操作)。
+        /// Analog Expression Bindings を ActionName + Expression ID + Scale 行ドロップダウン UI で編集する ListView を
+        /// 構築する。<see cref="AddExpressionBindingsList"/> と同じ ListView パターンを踏襲し、
+        /// 候補収集も <see cref="CollectActionNames"/> / <see cref="CollectExpressionIds"/> /
+        /// <see cref="FormatExpressionDropdownLabel"/> を再利用する。
         /// </summary>
-        private static void AddAnalogExpressionBindingsField(VisualElement root, SerializedProperty property)
+        private ListView AddAnalogExpressionBindingsList(
+            VisualElement root, SerializedProperty property, List<int> indexProxy)
         {
             var listProp = property.FindPropertyRelative(AnalogExpressionBindingsFieldName);
             if (listProp == null)
             {
                 root.Add(new Label($"<missing field: {AnalogExpressionBindingsFieldName}>"));
+                return null;
+            }
+
+            RebuildIndexProxy(indexProxy, listProp);
+
+            // NOTE: itemsSource は SetViewController の "後" に設定する（理由は
+            // AddExpressionBindingsList のコメント参照）。
+            var listView = new ListView
+            {
+                name = AnalogExpressionBindingsListName,
+                fixedItemHeight = 84f,
+                showAddRemoveFooter = true,
+                showBorder = true,
+                showFoldoutHeader = true,
+                headerTitle = "Analog Expression Bindings",
+                reorderable = true,
+                reorderMode = ListViewReorderMode.Animated,
+                selectionType = SelectionType.Single,
+                makeItem = CreateAnalogExpressionBindingRow,
+                bindItem = (element, index) => BindAnalogExpressionBindingRow(element, index, property),
+            };
+            listView.style.marginTop = 4;
+            listView.style.minHeight = 80f;
+            listView.SetViewController(new SafeListViewController());
+            listView.itemsSource = indexProxy;
+
+            listView.itemsAdded += indices =>
+            {
+                var so = property.serializedObject;
+                so.Update();
+                var arr = property.FindPropertyRelative(AnalogExpressionBindingsFieldName);
+                if (arr == null) return;
+                int oldSize = arr.arraySize;
+                int addCount = 0;
+                foreach (var _ in indices) addCount++;
+                arr.arraySize += addCount;
+                // 新規エントリの scale は 1.0 を既定値とする (raw scalar をそのまま使う想定)。
+                for (int i = oldSize; i < arr.arraySize; i++)
+                {
+                    var entry = arr.GetArrayElementAtIndex(i);
+                    var actionProp = entry.FindPropertyRelative("actionName");
+                    if (actionProp != null) actionProp.stringValue = string.Empty;
+                    var exprProp = entry.FindPropertyRelative("expressionId");
+                    if (exprProp != null) exprProp.stringValue = string.Empty;
+                    var scaleProp = entry.FindPropertyRelative("scale");
+                    if (scaleProp != null) scaleProp.floatValue = 1f;
+                }
+                so.ApplyModifiedProperties();
+                RebuildIndexProxy(indexProxy, arr);
+                listView.ClearSelection();
+                listView.Rebuild();
+            };
+            listView.itemsRemoved += indices =>
+            {
+                var so = property.serializedObject;
+                so.Update();
+                var arr = property.FindPropertyRelative(AnalogExpressionBindingsFieldName);
+                if (arr == null) return;
+                var sorted = new List<int>(indices);
+                sorted.Sort();
+                for (int i = sorted.Count - 1; i >= 0; i--)
+                {
+                    var removeIndex = sorted[i];
+                    if (removeIndex >= 0 && removeIndex < arr.arraySize)
+                    {
+                        arr.DeleteArrayElementAtIndex(removeIndex);
+                    }
+                }
+                so.ApplyModifiedProperties();
+                RebuildIndexProxy(indexProxy, arr);
+                listView.ClearSelection();
+                listView.Rebuild();
+            };
+
+            root.Add(listView);
+            return listView;
+        }
+
+        private static VisualElement CreateAnalogExpressionBindingRow()
+        {
+            var container = new VisualElement();
+            container.style.flexDirection = FlexDirection.Column;
+            container.style.marginBottom = 4;
+
+            container.Add(new DropdownField("Action 名")
+            {
+                name = AnalogActionDropdownName,
+                tooltip = "Value 型 / Pass-Through 型を推奨。Scalar 連続値 (LT/RT 等) を読む。",
+            });
+            container.Add(new DropdownField("表情 ID")
+            {
+                name = AnalogExpressionDropdownName,
+                tooltip = "駆動対象の Expression ID。FacialCharacterProfileSO.Expressions[].id と一致させる。",
+            });
+            container.Add(new FloatField("Scale")
+            {
+                name = AnalogScaleFieldName,
+                tooltip = "raw scalar への倍率。既定 1.0。",
+            });
+            return container;
+        }
+
+        private static void BindAnalogExpressionBindingRow(
+            VisualElement element, int index, SerializedProperty bindingProperty)
+        {
+            var listProp = bindingProperty.FindPropertyRelative(AnalogExpressionBindingsFieldName);
+            if (listProp == null || index < 0 || index >= listProp.arraySize)
+            {
                 return;
             }
 
-            var field = new PropertyField(listProp, "Analog Expression Bindings")
+            var serializedObject = bindingProperty.serializedObject;
+            serializedObject.Update();
+
+            var entryProp = listProp.GetArrayElementAtIndex(index);
+            var actionNameProp = entryProp.FindPropertyRelative("actionName");
+            var expressionIdProp = entryProp.FindPropertyRelative("expressionId");
+            var scaleProp = entryProp.FindPropertyRelative("scale");
+
+            var actionDropdown = element.Q<DropdownField>(AnalogActionDropdownName);
+            if (actionDropdown != null && actionNameProp != null)
             {
-                name = AnalogExpressionBindingsFieldUiName,
-            };
-            field.style.marginTop = 4;
-            root.Add(field);
+                var actionChoices = CollectActionNames(bindingProperty);
+                var safeChoices = BuildSafeChoices(actionChoices, actionNameProp.stringValue);
+                actionDropdown.choices = safeChoices;
+                actionDropdown.SetValueWithoutNotify(actionNameProp.stringValue ?? string.Empty);
+                actionDropdown.RegisterValueChangedCallback(evt =>
+                {
+                    var so = bindingProperty.serializedObject;
+                    so.Update();
+                    var list = bindingProperty.FindPropertyRelative(AnalogExpressionBindingsFieldName);
+                    if (list == null || index >= list.arraySize) return;
+                    var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("actionName");
+                    if (prop != null)
+                    {
+                        prop.stringValue = evt.newValue ?? string.Empty;
+                        so.ApplyModifiedProperties();
+                    }
+                });
+            }
+
+            var expressionDropdown = element.Q<DropdownField>(AnalogExpressionDropdownName);
+            if (expressionDropdown != null && expressionIdProp != null)
+            {
+                var expressionChoices = CollectExpressionIds(bindingProperty);
+                var safeChoices = BuildSafeChoices(expressionChoices, expressionIdProp.stringValue);
+                expressionDropdown.choices = safeChoices;
+                expressionDropdown.SetValueWithoutNotify(expressionIdProp.stringValue ?? string.Empty);
+                expressionDropdown.formatListItemCallback =
+                    id => FormatExpressionDropdownLabel(bindingProperty, id);
+                expressionDropdown.formatSelectedValueCallback =
+                    id => FormatExpressionDropdownLabel(bindingProperty, id);
+                expressionDropdown.RegisterValueChangedCallback(evt =>
+                {
+                    var so = bindingProperty.serializedObject;
+                    so.Update();
+                    var list = bindingProperty.FindPropertyRelative(AnalogExpressionBindingsFieldName);
+                    if (list == null || index >= list.arraySize) return;
+                    var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("expressionId");
+                    if (prop != null)
+                    {
+                        prop.stringValue = evt.newValue ?? string.Empty;
+                        so.ApplyModifiedProperties();
+                    }
+                });
+            }
+
+            var scaleField = element.Q<FloatField>(AnalogScaleFieldName);
+            if (scaleField != null && scaleProp != null)
+            {
+                scaleField.Unbind();
+                scaleField.BindProperty(scaleProp);
+            }
         }
 
         private static void RefreshActionMapChoices(DropdownField dropdown, SerializedProperty property)

@@ -30,7 +30,8 @@ namespace Hidano.FacialControl.Domain.Interfaces
     public interface IInputSource
     {
         /// <summary>
-        /// 入力源識別子。<c>[a-zA-Z0-9_.-]{1,64}</c> 規約に従う（Req 1.7）。
+        /// 入力源識別子。<c>[a-zA-Z0-9_.\-:]{1,64}</c> 規約に従う（Req 1.7）。
+        /// <c>:</c> は <c>slug:sub</c> 形式の合成キー区切り文字として使われる。
         /// </summary>
         string Id { get; }
 

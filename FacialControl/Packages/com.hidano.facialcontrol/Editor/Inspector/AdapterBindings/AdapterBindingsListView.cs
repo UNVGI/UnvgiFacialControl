@@ -37,6 +37,9 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
         public const string FallbackRowClassName = "facial-control-fallback-row";
         public const string SummaryBannerName = "facial-control-adapter-bindings-summary-banner";
         public const string RowClassName = "facial-control-adapter-binding-row";
+        public const string RowBoxClassName = "facial-control-adapter-binding-row-box";
+        public const string BoxTitleClassName = "facial-control-adapter-binding-box-title";
+        public const string BoxTitleLabelClassName = "facial-control-adapter-binding-box-title-label";
         public const string RootClassName = "facial-control-adapter-bindings-list-view";
 
         private const string AdapterBindingsFieldName = "_adapterBindings";
@@ -178,6 +181,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
         {
             var row = new VisualElement { name = $"adapter-binding-row-{index}" };
             row.AddToClassList(RowClassName);
+            row.AddToClassList(RowBoxClassName);
 
             var prop = _listProperty.GetArrayElementAtIndex(index);
             object value = prop.managedReferenceValue;
@@ -194,6 +198,16 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
 
             var bindingType = value.GetType();
             var drawer = TryCreateCustomDrawer(bindingType);
+
+            // Title bar: binding type の表示名を太字 + 右端に Remove ボタン。機能ごとの境界を明確化する。
+            int rowIndexForRemove = index;
+            var titleBar = new VisualElement { name = $"adapter-binding-title-{index}" };
+            titleBar.AddToClassList(BoxTitleClassName);
+            var titleLabel = new Label(GetDisplayName(bindingType));
+            titleLabel.AddToClassList(BoxTitleLabelClassName);
+            titleBar.Add(titleLabel);
+            titleBar.Add(new Button(() => RemoveBindingAt(rowIndexForRemove)) { text = "Remove" });
+            row.Add(titleBar);
 
             if (drawer != null)
             {
@@ -223,10 +237,18 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
                 row.Add(new PropertyField(prop));
             }
 
-            int rowIndexForRemove = index;
-            row.Add(new Button(() => RemoveBindingAt(rowIndexForRemove)) { text = "Remove" });
-
             return row;
+        }
+
+        private static string GetDisplayName(Type bindingType)
+        {
+            if (bindingType == null) return "<unknown>";
+            var attr = bindingType.GetCustomAttribute<FacialAdapterBindingAttribute>(inherit: false);
+            if (attr != null && !string.IsNullOrWhiteSpace(attr.DisplayName))
+            {
+                return attr.DisplayName;
+            }
+            return bindingType.Name;
         }
 
         private VisualElement BuildFallbackElement(Type bindingType, int index)
