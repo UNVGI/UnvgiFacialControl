@@ -55,7 +55,7 @@
 
 - [ ] 2. JSON DTO を新スキーマへ刷新する
 
-- [ ] 2.1 (P) OverlaySlotBindingDto を新 3 フィールド構造に全置換する
+- [x] 2.1 (P) OverlaySlotBindingDto を新 3 フィールド構造に全置換する
   - `Packages/com.hidano.facialcontrol/Runtime/Adapters/Json/Dto/OverlaySlotBindingDto.cs:1-21` から `expressionId: string` を完全削除し、`suppress: bool` と `snapshot: ExpressionSnapshotDto` を追加する
   - `[Serializable]` クラスを維持し、`JsonUtility` で読み書き可能な形に保つ
   - 観測可能な完了条件: 新フィールドのみで `JsonUtility.ToJson` が `{"slot":"blink","suppress":false,"snapshot":{...}}` 形式の文字列を返すこと

@@ -3,7 +3,7 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
     /// <summary>
     /// <c>expressions[].snapshot.overlays[]</c> および <c>defaultOverlays[]</c> の 1 エントリ DTO。
     /// <para>
-    /// <see cref="expressionId"/> が null / 空文字 / 全空白の場合は当該 slot を明示 suppress する。
+    /// <see cref="suppress"/> と <see cref="snapshot"/> で default fallback / suppress / snapshot override を表現する。
     /// JsonUtility 互換のため <see cref="System.SerializableAttribute"/> を付与する。
     /// </para>
     /// </summary>
@@ -14,8 +14,13 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
         public string slot;
 
         /// <summary>
-        /// 発火させる overlay Expression の ID。null / 空文字で suppress。
+        /// 当該 slot の overlay を明示的に抑制する場合 true。
         /// </summary>
-        public string expressionId;
+        public bool suppress;
+
+        /// <summary>
+        /// 個別 override として適用する snapshot。null の場合は default fallback または suppress。
+        /// </summary>
+        public ExpressionSnapshotDto snapshot;
     }
 }
