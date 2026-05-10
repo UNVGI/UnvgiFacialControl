@@ -44,10 +44,21 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string AdapterBindingsFoldoutName = "facial-character-adapter-bindings-foldout";
 
         public const string TabViewName = "facial-character-tabview";
-        public const string TabExpressionsName = "facial-character-tab-expressions";
+        public const string TabExpressionLibraryName = "facial-character-tab-expression-library";
+        public const string TabLayersName = "facial-character-tab-layers";
+        public const string TabBaseExpressionName = "facial-character-tab-base-expression";
         public const string TabGazeName = "facial-character-tab-gaze";
         public const string TabAdapterBindingsName = "facial-character-tab-adapter-bindings";
         public const string TabDebugName = "facial-character-tab-debug";
+        public const string TabExpressionsName = TabExpressionLibraryName;
+
+        public const string SlotsDeclarationFoldoutName = "facial-character-slots-declaration-foldout";
+        public const string DefaultOverlaysFoldoutName = "facial-character-default-overlays-foldout";
+        public const string ExpressionOverlaysSectionName = "expression-row-overlays-section";
+        public const string DefaultOverlaySlotDropdownName = "default-overlay-slot-dropdown";
+        public const string ExpressionOverlayStateRadioName = "expression-overlay-state-radio";
+        public const string ExpressionOverlayAnimationClipFieldName = "expression-overlay-animation-clip-field";
+        public const string ExpressionOverlayUndeclaredSlotHelpName = "expression-overlay-undeclared-slot-help";
 
         /// <summary>「目線」タブの表示文字列（参照モデル変更時にアスタリスクを付与する基準値）。</summary>
         public const string GazeTabBaseLabel = "目線";
@@ -175,15 +186,21 @@ namespace Hidano.FacialControl.Editor.Inspector
             // 参照モデルはタブの上に常時表示する（モデルタブを廃止してアクセス頻度を上げる）。
             BuildReferenceModelDirect(root);
 
-            // 4 タブ構成: 表情 / 目線 / Adapter Bindings / Debug
-            // タブ間で機能の住み分けを明示し、設定漏れを予防する。
+            // 6 タブ構成: 表情ライブラリ / レイヤー / ベース表情 / 目線 / Adapter Bindings / Debug
+            // レイヤー定義とベース表情を独立タブへ分離し、以降の overlay UI 拡張点を確保する。
             var tabView = new TabView { name = TabViewName };
             tabView.style.flexGrow = 1f;
 
-            var expressionsTab = new Tab("表情") { name = TabExpressionsName };
-            BuildLayersSection(expressionsTab.contentContainer);
-            BuildBaseExpressionSection(expressionsTab.contentContainer);
-            tabView.Add(expressionsTab);
+            var expressionLibraryTab = new Tab("表情ライブラリ") { name = TabExpressionLibraryName };
+            tabView.Add(expressionLibraryTab);
+
+            var layersTab = new Tab("レイヤー") { name = TabLayersName };
+            BuildLayersSection(layersTab.contentContainer);
+            tabView.Add(layersTab);
+
+            var baseExpressionTab = new Tab("ベース表情") { name = TabBaseExpressionName };
+            BuildBaseExpressionSection(baseExpressionTab.contentContainer);
+            tabView.Add(baseExpressionTab);
 
             _gazeTab = new Tab(GazeTabBaseLabel) { name = TabGazeName };
             BuildGazeConfigsSection(_gazeTab.contentContainer);

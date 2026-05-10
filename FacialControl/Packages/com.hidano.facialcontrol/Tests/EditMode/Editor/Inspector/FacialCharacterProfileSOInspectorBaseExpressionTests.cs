@@ -39,31 +39,33 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         }
 
         [Test]
-        public void CreateInspectorGUI_RendersBaseExpressionInExpressionsTabAfterLayersAndGazeInGazeTab()
+        public void CreateInspectorGUI_RendersLayersBaseExpressionAndGazeInSeparateTabs()
         {
             _so = CreateProfile();
 
             var root = BuildInspectorRoot();
-            var expressionsTab = root.Q<VisualElement>(FacialCharacterProfileSOInspector.TabExpressionsName);
+            var expressionLibraryTab = root.Q<VisualElement>(FacialCharacterProfileSOInspector.TabExpressionLibraryName);
+            var layersTab = root.Q<VisualElement>(FacialCharacterProfileSOInspector.TabLayersName);
+            var baseExpressionTab = root.Q<VisualElement>(FacialCharacterProfileSOInspector.TabBaseExpressionName);
             var gazeTab = root.Q<VisualElement>(FacialCharacterProfileSOInspector.TabGazeName);
-            Assert.That(expressionsTab, Is.Not.Null, "「表情」タブが存在しません。");
+            Assert.That(expressionLibraryTab, Is.Not.Null, "「表情ライブラリ」タブが存在しません。");
+            Assert.That(layersTab, Is.Not.Null, "「レイヤー」タブが存在しません。");
+            Assert.That(baseExpressionTab, Is.Not.Null, "「ベース表情」タブが存在しません。");
             Assert.That(gazeTab, Is.Not.Null, "「目線」タブが存在しません。");
 
-            var layers = expressionsTab.Q<Foldout>(FacialCharacterProfileSOInspector.LayersFoldoutName);
-            var baseExpression = expressionsTab.Q<Foldout>(FacialCharacterProfileSOInspector.BaseExpressionFoldoutName);
+            var layers = layersTab.Q<Foldout>(FacialCharacterProfileSOInspector.LayersFoldoutName);
+            var baseExpression = baseExpressionTab.Q<Foldout>(FacialCharacterProfileSOInspector.BaseExpressionFoldoutName);
             var gaze = gazeTab.Q<Foldout>(FacialCharacterProfileSOInspector.GazeConfigsFoldoutName);
 
-            Assert.That(layers, Is.Not.Null, "「表情」タブに Layers Foldout が見つかりません。");
-            Assert.That(baseExpression, Is.Not.Null, "「表情」タブに BaseExpression Foldout が見つかりません。");
+            Assert.That(layers, Is.Not.Null, "「レイヤー」タブに Layers Foldout が見つかりません。");
+            Assert.That(baseExpression, Is.Not.Null, "「ベース表情」タブに BaseExpression Foldout が見つかりません。");
             Assert.That(baseExpression.text, Is.EqualTo("ベース表情"));
             Assert.That(gaze, Is.Not.Null, "「目線」タブに GazeConfigs Foldout が見つかりません。");
 
-            // Base 表情は Layers の後ろに配置する（同一タブ内の順序）。
-            int layersIndex = DescendantIndex(expressionsTab, layers);
-            int baseIndex = DescendantIndex(expressionsTab, baseExpression);
-            Assert.That(layersIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(baseIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(layersIndex, Is.LessThan(baseIndex));
+            Assert.That(expressionLibraryTab.Q<Foldout>(FacialCharacterProfileSOInspector.LayersFoldoutName), Is.Null);
+            Assert.That(expressionLibraryTab.Q<Foldout>(FacialCharacterProfileSOInspector.BaseExpressionFoldoutName), Is.Null);
+            Assert.That(layersTab.Q<Foldout>(FacialCharacterProfileSOInspector.BaseExpressionFoldoutName), Is.Null);
+            Assert.That(baseExpressionTab.Q<Foldout>(FacialCharacterProfileSOInspector.LayersFoldoutName), Is.Null);
         }
 
         [Test]
