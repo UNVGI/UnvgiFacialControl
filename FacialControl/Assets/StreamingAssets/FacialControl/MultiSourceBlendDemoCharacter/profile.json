@@ -132,29 +132,6 @@
             }
         },
         {
-            "id": "blink_overlay",
-            "name": "BlinkOverlay",
-            "layer": "emotion",
-            "layerOverrideMask": [
-                "emotion"
-            ],
-            "snapshot": {
-                "transitionDuration": 0.05,
-                "transitionCurvePreset": "Linear",
-                "blendShapes": [
-                    {
-                        "rendererPath": "Body",
-                        "name": "まばたき",
-                        "value": 1.0
-                    }
-                ],
-                "bones": [],
-                "rendererPaths": [
-                    "Body"
-                ]
-            }
-        },
-        {
             "id": "eye_look",
             "name": "目線",
             "layer": "emotion",
