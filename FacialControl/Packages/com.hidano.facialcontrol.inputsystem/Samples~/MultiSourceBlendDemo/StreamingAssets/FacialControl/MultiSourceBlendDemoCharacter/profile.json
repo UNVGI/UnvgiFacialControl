@@ -6,7 +6,8 @@
             "priority": 0,
             "exclusionMode": "lastWins",
             "inputSources": [
-                {"id": "input", "weight": 1.0, "options": {"maxStackDepth": 8}}
+                {"id": "input", "weight": 1.0, "options": {"maxStackDepth": 8}},
+                {"id": "input:analog-expression", "weight": 1.0}
             ]
         }
     ],
@@ -20,8 +21,8 @@
                 "transitionDuration": 0.1,
                 "transitionCurvePreset": "Linear",
                 "blendShapes": [
-                    {"rendererPath": "Body", "name": "笑い", "value": 100},
-                    {"rendererPath": "Body", "name": "口角上げ", "value": 60}
+                    {"rendererPath": "Body", "name": "笑い", "value": 1.0},
+                    {"rendererPath": "Body", "name": "口角上げ", "value": 0.6}
                 ],
                 "bones": [],
                 "rendererPaths": ["Body"]
@@ -36,9 +37,9 @@
                 "transitionDuration": 0.1,
                 "transitionCurvePreset": "Linear",
                 "blendShapes": [
-                    {"rendererPath": "Body", "name": "怒り", "value": 100},
-                    {"rendererPath": "Body", "name": "左眉下げ", "value": 50},
-                    {"rendererPath": "Body", "name": "右眉下げ", "value": 50}
+                    {"rendererPath": "Body", "name": "怒り", "value": 1.0},
+                    {"rendererPath": "Body", "name": "左眉下げ", "value": 0.5},
+                    {"rendererPath": "Body", "name": "右眉下げ", "value": 0.5}
                 ],
                 "bones": [],
                 "rendererPaths": ["Body"]
@@ -53,8 +54,8 @@
                 "transitionDuration": 0.1,
                 "transitionCurvePreset": "Linear",
                 "blendShapes": [
-                    {"rendererPath": "Body", "name": "びっくり", "value": 100},
-                    {"rendererPath": "Body", "name": "▲", "value": 80}
+                    {"rendererPath": "Body", "name": "びっくり", "value": 1.0},
+                    {"rendererPath": "Body", "name": "▲", "value": 0.8}
                 ],
                 "bones": [],
                 "rendererPaths": ["Body"]
@@ -69,7 +70,7 @@
                 "transitionDuration": 0.1,
                 "transitionCurvePreset": "Linear",
                 "blendShapes": [
-                    {"rendererPath": "Body", "name": "あ", "value": 100}
+                    {"rendererPath": "Body", "name": "あ", "value": 1.0}
                 ],
                 "bones": [],
                 "rendererPaths": ["Body"]

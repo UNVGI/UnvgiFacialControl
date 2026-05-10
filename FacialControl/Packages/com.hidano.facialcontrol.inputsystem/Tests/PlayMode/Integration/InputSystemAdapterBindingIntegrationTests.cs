@@ -505,7 +505,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
         {
             var binding = new InputSystemAdapterBinding();
             binding.Slug = slug;
-            binding.Configure(asset, actionMapName, expressionBindings, gazeInputBindings, injectedGazeConfigs);
+            binding.Configure(asset, actionMapName, expressionBindings, gazeInputBindings, injectedGazeConfigs: injectedGazeConfigs);
             return binding;
         }
 
