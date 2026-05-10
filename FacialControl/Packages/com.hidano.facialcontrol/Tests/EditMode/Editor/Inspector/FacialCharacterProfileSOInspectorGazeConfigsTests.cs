@@ -123,7 +123,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             Assert.That(row.Q<ObjectField>(FacialCharacterProfileSOInspector.GazeConfigLookDownClipFieldName), Is.Not.Null);
             Assert.That(row.Q<Button>(FacialCharacterProfileSOInspector.GazeConfigAutoAssignButtonName), Is.Not.Null);
             Assert.That(row.Q<Button>(FacialCharacterProfileSOInspector.GazeConfigRemoveButtonName), Is.Not.Null);
-            Assert.That(root.Q<Button>(FacialCharacterProfileSOInspector.GazeConfigBulkResolveButtonName), Is.Not.Null);
         }
 
         [Test]
@@ -136,11 +135,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             var root = BuildInspectorRoot();
 
             var rowButton = root.Q<Button>(FacialCharacterProfileSOInspector.GazeConfigAutoAssignButtonName);
-            var bulkButton = root.Q<Button>(FacialCharacterProfileSOInspector.GazeConfigBulkResolveButtonName);
             Assert.That(rowButton, Is.Not.Null);
-            Assert.That(bulkButton, Is.Not.Null);
             Assert.That(rowButton.enabledSelf, Is.False);
-            Assert.That(bulkButton.enabledSelf, Is.False);
         }
 
         [Test]
@@ -154,11 +150,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             var root = BuildInspectorRoot();
 
             var rowButton = root.Q<Button>(FacialCharacterProfileSOInspector.GazeConfigAutoAssignButtonName);
-            var bulkButton = root.Q<Button>(FacialCharacterProfileSOInspector.GazeConfigBulkResolveButtonName);
             Assert.That(rowButton, Is.Not.Null);
-            Assert.That(bulkButton, Is.Not.Null);
             Assert.That(rowButton.enabledSelf, Is.True);
-            Assert.That(bulkButton.enabledSelf, Is.True);
         }
 
         [Test]
@@ -190,73 +183,27 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         }
 
         [Test]
-        public void ResolveAllGazeConfigsFromReferenceModel_OverwritesEveryEntry()
+        public void ReferenceModelChanged_DoesNotAutoFillBonePathsAndMarksGazeTabWithAttention()
         {
-            _so = CreateProfile();
-            _so.ReferenceModel = CreateReferenceModel();
-            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
-            _so.Expressions.Add(CreateExpression("analog-two", "Analog Two", true));
-            _so.WritableGazeConfigs.Add(new GazeBindingConfig
-            {
-                expressionId = "analog-one",
-                leftEyeBonePath = "ManualLeftOne",
-                rightEyeBonePath = "ManualRightOne",
-                lookUpAngle = 31f,
-            });
-            _so.WritableGazeConfigs.Add(new GazeBindingConfig
-            {
-                expressionId = "analog-two",
-                leftEyeBonePath = "ManualLeftTwo",
-                rightEyeBonePath = "ManualRightTwo",
-                outerYawAngle = 32f,
-            });
-            BuildInspectorRoot();
-
-            InvokeResolveAllGazeConfigs();
-
-            Assert.That(_so.GazeConfigs[0].leftEyeBonePath, Is.EqualTo("LeftEye"));
-            Assert.That(_so.GazeConfigs[0].rightEyeBonePath, Is.EqualTo("RightEye"));
-            Assert.That(_so.GazeConfigs[1].leftEyeBonePath, Is.EqualTo("LeftEye"));
-            Assert.That(_so.GazeConfigs[1].rightEyeBonePath, Is.EqualTo("RightEye"));
-            Assert.That(_so.GazeConfigs[0].lookUpAngle, Is.EqualTo(15f));
-            Assert.That(_so.GazeConfigs[1].outerYawAngle, Is.EqualTo(15f));
-        }
-
-        [Test]
-        public void ReferenceModelChanged_AutoFillsOnlyEntriesWithBothBonePathsEmpty()
-        {
+            // 仕様変更 (preview.1): 参照モデル変更時に GazeConfig を自動入力しない。
+            // 代わりに目線タブにアスタリスクを付けてユーザーに「ボーン設定を確認しろ」と促す。
+            // 前回の値が残ると未設定との区別がつかなくなる事象への対応。
             _so = CreateProfile();
             _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
-            _so.Expressions.Add(CreateExpression("analog-two", "Analog Two", true));
-            _so.Expressions.Add(CreateExpression("analog-three", "Analog Three", true));
             _so.WritableGazeConfigs.Add(new GazeBindingConfig
             {
                 expressionId = "analog-one",
                 lookUpAngle = 42f,
-            });
-            _so.WritableGazeConfigs.Add(new GazeBindingConfig
-            {
-                expressionId = "analog-two",
-                leftEyeBonePath = "ManualLeft",
-            });
-            _so.WritableGazeConfigs.Add(new GazeBindingConfig
-            {
-                expressionId = "analog-three",
-                leftEyeBonePath = "ManualLeftThree",
-                rightEyeBonePath = "ManualRightThree",
             });
             BuildInspectorRoot();
 
             AssignReferenceModel(CreateReferenceModel());
             InvokeReferenceModelChanged();
 
-            Assert.That(_so.GazeConfigs[0].leftEyeBonePath, Is.EqualTo("LeftEye"));
-            Assert.That(_so.GazeConfigs[0].rightEyeBonePath, Is.EqualTo("RightEye"));
+            // GazeConfig は自動入力されない (空欄のまま)。
+            Assert.That(_so.GazeConfigs[0].leftEyeBonePath, Is.Null.Or.Empty);
+            Assert.That(_so.GazeConfigs[0].rightEyeBonePath, Is.Null.Or.Empty);
             Assert.That(_so.GazeConfigs[0].lookUpAngle, Is.EqualTo(42f));
-            Assert.That(_so.GazeConfigs[1].leftEyeBonePath, Is.EqualTo("ManualLeft"));
-            Assert.That(_so.GazeConfigs[1].rightEyeBonePath, Is.Null.Or.Empty);
-            Assert.That(_so.GazeConfigs[2].leftEyeBonePath, Is.EqualTo("ManualLeftThree"));
-            Assert.That(_so.GazeConfigs[2].rightEyeBonePath, Is.EqualTo("ManualRightThree"));
         }
 
         [Test]
@@ -468,15 +415,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(method, Is.Not.Null);
             method.Invoke(_editor, new object[] { index });
-        }
-
-        private void InvokeResolveAllGazeConfigs()
-        {
-            var method = typeof(FacialCharacterProfileSOInspector).GetMethod(
-                "ResolveAllGazeConfigsFromReferenceModel",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.That(method, Is.Not.Null);
-            method.Invoke(_editor, null);
         }
 
         private void InvokeRemoveExpression(int index)

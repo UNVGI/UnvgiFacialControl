@@ -18,17 +18,14 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Req 1.4 / 2.4-2.7 / 3.3 / 3.5 / 3.6 / 7.1 / 12.2 / 12.3 を満たす。Add ドロップダウン →
+    /// Req 1.4 / 2.4-2.7 / 3.3 / 3.5 / 3.6 / 7.1 / 12.2 / 12.3 を満たす。+ ボタン（種別選択メニュー）→
     /// <see cref="System.Activator.CreateInstance(System.Type)"/> + slug auto-populate、
-    /// Remove で dirty 化、Reorder、null 要素の <see cref="MissingAdapterPlaceholderElement"/>、
+    /// - ボタンで選択行削除、Reorder、null 要素の <see cref="MissingAdapterPlaceholderElement"/>、
     /// 同 SO 内 slug 重複時の error class + summary banner、PropertyDrawer 例外時の
     /// per-element fallback element を提供する。
     /// </para>
     /// <para>
-    /// 通常時は <see cref="UnityEditor.UIElements.PropertyField"/> を委譲し、Adapter package が
-    /// 提供する <c>[CustomPropertyDrawer]</c> を core 側で参照せずに自動解決する（Req 3.1, 3.3）。
-    /// PropertyDrawer の <see cref="UnityEditor.PropertyDrawer.CreatePropertyGUI"/> 例外は
-    /// 行単位の fallback element で吸収し、他 row の描画継続を保証する（Req 3.6）。
+    /// 行は大きめのカード表示（タイトル + 内容）で、追加/削除はリスト末尾の +/- フッター操作に統一する。
     /// </para>
     /// </remarks>
     public sealed class AdapterBindingsListView : VisualElement
@@ -42,13 +39,18 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
         public const string BoxTitleLabelClassName = "facial-control-adapter-binding-box-title-label";
         public const string RootClassName = "facial-control-adapter-bindings-list-view";
 
+        public const string FooterAddButtonName = "facial-control-adapter-bindings-add";
+        public const string FooterRemoveButtonName = "facial-control-adapter-bindings-remove";
+
         private const string AdapterBindingsFieldName = "_adapterBindings";
 
         private readonly SerializedProperty _listProperty;
         private readonly VisualElement _summaryBanner;
         private readonly VisualElement _rowsContainer;
-        private readonly ListView _listView;
+        private readonly VisualElement _footer;
+        private readonly Button _removeButton;
         private AdvancedDropdownState _addDropdownState;
+        private int _selectedIndex = -1;
 
         public AdapterBindingsListView(SerializedProperty listProperty)
         {
@@ -66,29 +68,35 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
             _summaryBanner.style.display = DisplayStyle.None;
             Add(_summaryBanner);
 
-            var header = new VisualElement();
-            header.style.flexDirection = FlexDirection.Row;
-            header.style.alignItems = Align.Center;
-            header.Add(new Label("Adapter Bindings"));
-            var addButton = new Button(OpenAddDropdown) { text = "+ Add" };
-            header.Add(addButton);
-            Add(header);
-
             _rowsContainer = new VisualElement { name = "facial-control-adapter-bindings-rows" };
             Add(_rowsContainer);
 
-            _listView = new ListView
+            // +/- フッター。+ 押下で binding 種別 dropdown、- 押下で選択中の行を削除。
+            _footer = new VisualElement();
+            _footer.style.flexDirection = FlexDirection.Row;
+            _footer.style.justifyContent = Justify.FlexEnd;
+            _footer.style.marginTop = 4;
+
+            _removeButton = new Button(RemoveSelected)
             {
-                bindingPath = AdapterBindingsFieldName,
-                reorderable = true,
-                reorderMode = ListViewReorderMode.Animated,
-                showAddRemoveFooter = false,
-                makeItem = () => new VisualElement(),
-                bindItem = (element, index) => { },
+                name = FooterRemoveButtonName,
+                text = "−",
+                tooltip = "選択中の Adapter Binding を削除",
             };
-            _listView.itemIndexChanged += OnListViewIndexChanged;
-            _listView.style.display = DisplayStyle.None;
-            Add(_listView);
+            _removeButton.style.minWidth = 28;
+            _removeButton.SetEnabled(false);
+            _footer.Add(_removeButton);
+
+            var addButton = new Button(OpenAddDropdown)
+            {
+                name = FooterAddButtonName,
+                text = "+",
+                tooltip = "Adapter Binding を追加",
+            };
+            addButton.style.minWidth = 28;
+            _footer.Add(addButton);
+
+            Add(_footer);
 
             Rebuild();
         }
@@ -133,29 +141,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
             if (index < 0 || index >= list.Count) return;
 
             list.RemoveAt(index);
-            CommitMutation();
-        }
-
-        /// <summary>
-        /// <paramref name="fromIndex"/> の要素を <paramref name="toIndex"/> に移動する（Reorder）。
-        /// </summary>
-        public void MoveBinding(int fromIndex, int toIndex)
-        {
-            var list = ResolveUnderlyingList();
-            if (list == null) return;
-            if (fromIndex < 0 || fromIndex >= list.Count) return;
-
-            if (toIndex < 0) toIndex = 0;
-            if (toIndex >= list.Count) toIndex = list.Count - 1;
-            if (fromIndex == toIndex) return;
-
-            var item = list[fromIndex];
-            list.RemoveAt(fromIndex);
-
-            int insertIndex = toIndex;
-            if (insertIndex > list.Count) insertIndex = list.Count;
-            list.Insert(insertIndex, item);
-
+            if (_selectedIndex >= list.Count) _selectedIndex = list.Count - 1;
             CommitMutation();
         }
 
@@ -174,7 +160,9 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
                 _rowsContainer.Add(row);
             }
 
+            ApplySelectionMarkers();
             ApplyDuplicateSlugMarkers();
+            UpdateRemoveButtonState();
         }
 
         private VisualElement BuildRow(int index)
@@ -182,13 +170,31 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
             var row = new VisualElement { name = $"adapter-binding-row-{index}" };
             row.AddToClassList(RowClassName);
             row.AddToClassList(RowBoxClassName);
+            // 大きめのカード表示。クリックで選択して - フッターでの削除対象にする。
+            row.style.marginTop = 2;
+            row.style.marginBottom = 4;
+            row.style.paddingTop = 6;
+            row.style.paddingBottom = 6;
+            row.style.paddingLeft = 8;
+            row.style.paddingRight = 8;
+            row.style.borderTopWidth = 1;
+            row.style.borderBottomWidth = 1;
+            row.style.borderLeftWidth = 1;
+            row.style.borderRightWidth = 1;
+
+            int capturedIndex = index;
+            row.RegisterCallback<PointerDownEvent>(_ =>
+            {
+                _selectedIndex = capturedIndex;
+                ApplySelectionMarkers();
+                UpdateRemoveButtonState();
+            });
 
             var prop = _listProperty.GetArrayElementAtIndex(index);
             object value = prop.managedReferenceValue;
 
             if (value == null)
             {
-                int capturedIndex = index;
                 var placeholder = new MissingAdapterPlaceholderElement(
                     prop.managedReferenceFullTypename,
                     () => RemoveBindingAt(capturedIndex));
@@ -199,14 +205,13 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
             var bindingType = value.GetType();
             var drawer = TryCreateCustomDrawer(bindingType);
 
-            // Title bar: binding type の表示名を太字 + 右端に Remove ボタン。機能ごとの境界を明確化する。
-            int rowIndexForRemove = index;
+            // Title bar: binding type の表示名を太字で見せる。Remove ボタンはフッター側に集約した。
             var titleBar = new VisualElement { name = $"adapter-binding-title-{index}" };
             titleBar.AddToClassList(BoxTitleClassName);
             var titleLabel = new Label(GetDisplayName(bindingType));
             titleLabel.AddToClassList(BoxTitleLabelClassName);
+            titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             titleBar.Add(titleLabel);
-            titleBar.Add(new Button(() => RemoveBindingAt(rowIndexForRemove)) { text = "Remove" });
             row.Add(titleBar);
 
             if (drawer != null)
@@ -240,6 +245,44 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
             return row;
         }
 
+        private void ApplySelectionMarkers()
+        {
+            int count = _rowsContainer.childCount;
+            for (int i = 0; i < count; i++)
+            {
+                var row = _rowsContainer[i];
+                if (i == _selectedIndex)
+                {
+                    row.style.borderTopColor = new StyleColor(new Color(0.45f, 0.7f, 0.95f));
+                    row.style.borderBottomColor = new StyleColor(new Color(0.45f, 0.7f, 0.95f));
+                    row.style.borderLeftColor = new StyleColor(new Color(0.45f, 0.7f, 0.95f));
+                    row.style.borderRightColor = new StyleColor(new Color(0.45f, 0.7f, 0.95f));
+                }
+                else
+                {
+                    var dim = new StyleColor(new Color(0.35f, 0.35f, 0.35f, 0.5f));
+                    row.style.borderTopColor = dim;
+                    row.style.borderBottomColor = dim;
+                    row.style.borderLeftColor = dim;
+                    row.style.borderRightColor = dim;
+                }
+            }
+        }
+
+        private void UpdateRemoveButtonState()
+        {
+            int count = _listProperty.arraySize;
+            bool enabled = _selectedIndex >= 0 && _selectedIndex < count;
+            _removeButton.SetEnabled(enabled);
+        }
+
+        private void RemoveSelected()
+        {
+            if (_selectedIndex < 0) return;
+            int target = _selectedIndex;
+            RemoveBindingAt(target);
+        }
+
         private static string GetDisplayName(Type bindingType)
         {
             if (bindingType == null) return "<unknown>";
@@ -257,8 +300,6 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
             fallback.AddToClassList(FallbackRowClassName);
             fallback.Add(new Label(
                 $"PropertyDrawer threw for '{bindingType?.FullName ?? "<unknown>"}'. See console for details."));
-            int capturedIndex = index;
-            fallback.Add(new Button(() => RemoveBindingAt(capturedIndex)) { text = "Remove" });
             return fallback;
         }
 
@@ -357,14 +398,6 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
                 t = t.BaseType;
             }
             return null;
-        }
-
-        private void OnListViewIndexChanged(int fromIndex, int toIndex)
-        {
-            // ListView 由来の reorder を underlying list に反映してから rebuild する。
-            // ListView は既に itemsSource を並び替えた後にコールバックするため、
-            // ここでは MoveBinding を再呼び出さず CommitMutation のみ行う。
-            CommitMutation();
         }
 
         private void OpenAddDropdown()

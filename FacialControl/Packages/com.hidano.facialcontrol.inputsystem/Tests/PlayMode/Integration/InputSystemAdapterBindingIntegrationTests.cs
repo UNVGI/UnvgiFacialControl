@@ -217,15 +217,16 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
         [Test]
         public void OnStart_AnalogPath_RegistersAnalogSourceUnderCompositeSlug()
         {
-            // D-8 集約: Analog 経路は InputSystemGazeBinding.actionName を sub-id とした composite slug 登録となる
+            // D-8 集約: Analog 経路は ExpressionBindingEntry(bindingMode=Gaze).actionName を sub-id とした composite slug 登録となる
             // （InputActionAnalogSource 構築相当）。
             const string slug = "input-system-analog-path";
             _sourceAsset = CreateGazeActionAsset(
                 actionMapName: "Expression",
                 gazeActionName: "GazeLook");
 
-            var gazeInputBinding = new InputSystemGazeBinding
+            var gazeBinding = new ExpressionBindingEntry
             {
+                bindingMode = BindingMode.Gaze,
                 expressionId = "expr-gaze",
                 actionName = "GazeLook",
             };
@@ -234,8 +235,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
                 slug: slug,
                 asset: _sourceAsset,
                 actionMapName: "Expression",
-                expressionBindings: null,
-                gazeInputBindings: new List<InputSystemGazeBinding> { gazeInputBinding });
+                expressionBindings: new List<ExpressionBindingEntry> { gazeBinding });
 
             AdapterBuildContext ctx = CreateContext();
 
@@ -256,19 +256,14 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
                 actionMapName: "Expression",
                 gazeActionName: "GazeLook");
 
-            var gazeInputBinding = CreateGazeInputBinding(
-                _sourceAsset,
-                "Expression",
-                "GazeLook",
-                "expr-gaze");
+            var gazeBinding = CreateGazeBindingEntry("GazeLook", "expr-gaze");
             var gazeConfig = CreateGazeConfig("expr-gaze");
 
             _binding = CreateBinding(
                 slug: "input-system-gaze-pairing-match",
                 asset: _sourceAsset,
                 actionMapName: "Expression",
-                expressionBindings: null,
-                gazeInputBindings: new List<InputSystemGazeBinding> { gazeInputBinding },
+                expressionBindings: new List<ExpressionBindingEntry> { gazeBinding },
                 injectedGazeConfigs: new List<GazeBindingConfig> { gazeConfig });
 
             AdapterBuildContext ctx = CreateContext();
@@ -277,7 +272,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             _bindingStarted = true;
 
             Assert.IsTrue(_binding.HasGazeProvider,
-                "OnStart は expressionId が一致する GazeBindingConfig と InputSystemGazeBinding から gaze provider を構築するべき。");
+                "OnStart は expressionId が一致する GazeBindingConfig と Gaze モードの ExpressionBindingEntry から gaze provider を構築するべき。");
         }
 
         [Test]
@@ -287,18 +282,13 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
                 actionMapName: "Expression",
                 gazeActionName: "GazeLook");
 
-            var gazeInputBinding = CreateGazeInputBinding(
-                _sourceAsset,
-                "Expression",
-                "GazeLook",
-                "missing-gaze");
+            var gazeBinding = CreateGazeBindingEntry("GazeLook", "missing-gaze");
 
             _binding = CreateBinding(
                 slug: "input-system-gaze-pairing-missing-config",
                 asset: _sourceAsset,
                 actionMapName: "Expression",
-                expressionBindings: null,
-                gazeInputBindings: new List<InputSystemGazeBinding> { gazeInputBinding },
+                expressionBindings: new List<ExpressionBindingEntry> { gazeBinding },
                 injectedGazeConfigs: new List<GazeBindingConfig> { CreateGazeConfig("expr-gaze") });
 
             LogAssert.Expect(
@@ -311,7 +301,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             _bindingStarted = true;
 
             Assert.IsFalse(_binding.HasGazeProvider,
-                "対応する SO ルート GazeBindingConfig がない InputSystemGazeBinding は warn + skip されるべき。");
+                "対応する SO ルート GazeBindingConfig がない Gaze モード ExpressionBindingEntry は warn + skip されるべき。");
         }
 
         [Test]
@@ -325,8 +315,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
                 slug: "input-system-gaze-pairing-missing-binding",
                 asset: _sourceAsset,
                 actionMapName: "Expression",
-                expressionBindings: null,
-                gazeInputBindings: new List<InputSystemGazeBinding>(),
+                expressionBindings: new List<ExpressionBindingEntry>(),
                 injectedGazeConfigs: new List<GazeBindingConfig> { CreateGazeConfig("expr-gaze") });
 
             AdapterBuildContext ctx = CreateContext();
@@ -335,7 +324,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             _bindingStarted = true;
 
             Assert.IsFalse(_binding.HasGazeProvider,
-                "対応する InputSystemGazeBinding がない GazeBindingConfig は warn なしで skip されるべき。");
+                "対応する Gaze モード ExpressionBindingEntry がない GazeBindingConfig は warn なしで skip されるべき。");
             LogAssert.NoUnexpectedReceived();
         }
 
@@ -500,12 +489,11 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             InputActionAsset asset,
             string actionMapName,
             IReadOnlyList<ExpressionBindingEntry> expressionBindings,
-            IReadOnlyList<InputSystemGazeBinding> gazeInputBindings = null,
             IReadOnlyList<GazeBindingConfig> injectedGazeConfigs = null)
         {
             var binding = new InputSystemAdapterBinding();
             binding.Slug = slug;
-            binding.Configure(asset, actionMapName, expressionBindings, gazeInputBindings, injectedGazeConfigs: injectedGazeConfigs);
+            binding.Configure(asset, actionMapName, expressionBindings, injectedGazeConfigs);
             return binding;
         }
 
@@ -543,16 +531,13 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             return asset;
         }
 
-        private static InputSystemGazeBinding CreateGazeInputBinding(
-            InputActionAsset asset,
-            string actionMapName,
+        private static ExpressionBindingEntry CreateGazeBindingEntry(
             string gazeActionName,
             string expressionId)
         {
-            _ = asset;
-            _ = actionMapName;
-            return new InputSystemGazeBinding
+            return new ExpressionBindingEntry
             {
+                bindingMode = BindingMode.Gaze,
                 expressionId = expressionId,
                 actionName = gazeActionName,
             };

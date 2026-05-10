@@ -18,7 +18,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
     /// <see cref="AdapterBindingBase"/> 派生（Req 6.1, 6.8）。
     /// </summary>
     /// <remarks>
-    /// Trigger / Analog / Gaze 経路を 1 binding に集約する（D-8）。
+    /// preview.1 の破壊的変更により、Trigger / Analog / Gaze の経路を
+    /// <see cref="ExpressionBindingEntry.bindingMode"/> で分別する単一の
+    /// <c>_expressionBindings</c> リストに統合した。
     /// <list type="bullet">
     ///   <item><see cref="OnStart"/>: <see cref="InputActionAsset.Instantiate()"/> +
     ///         <see cref="InputActionMap.Enable"/> +
@@ -40,17 +42,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
         [SerializeField]
         private string _actionMapName = "Expression";
 
-        [Tooltip("InputAction 名と Expression ID の対応一覧。")]
+        [Tooltip("InputAction 名と Expression ID の対応一覧。動作モード (Normal/Gaze/Analog) はエントリ毎に指定。")]
         [SerializeField]
         private List<ExpressionBindingEntry> _expressionBindings = new List<ExpressionBindingEntry>();
-
-        [Tooltip("Vector2 gaze 入力を駆動する InputAction と Expression ID の対応一覧。")]
-        [SerializeField]
-        private List<InputSystemGazeBinding> _gazeInputBindings = new List<InputSystemGazeBinding>();
-
-        [Tooltip("Scalar 連続値 (LT/RT 等) で Expression weight を 0..1 連続駆動するバインディング一覧。")]
-        [SerializeField]
-        private List<AnalogExpressionBindingEntry> _analogExpressionBindings = new List<AnalogExpressionBindingEntry>();
 
         [NonSerialized] private InputActionAsset _runtimeActionAsset;
         [NonSerialized] private InputActionMap _runtimeActionMap;
@@ -91,17 +85,17 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
         /// <summary>
         /// テスト / プログラムからの構成注入。Inspector 経由で設定される値と同等の効果を持つ。
         /// </summary>
+        /// <remarks>
+        /// FacialController 側の reflection-based gaze 注入器
+        /// (FacialController.FindGazeConfigureMethod) は「末尾パラメータが
+        /// IReadOnlyList&lt;GazeBindingConfig&gt; である Configure」を検索するため、
+        /// 必ず <paramref name="injectedGazeConfigs"/> を最後の位置に維持すること。
+        /// 順序変更は core 側との ABI 契約破壊につながる。
+        /// </remarks>
         public void Configure(
             InputActionAsset asset,
             string actionMapName,
             IReadOnlyList<ExpressionBindingEntry> expressionBindings,
-            IReadOnlyList<InputSystemGazeBinding> gazeInputBindings = null,
-            IReadOnlyList<AnalogExpressionBindingEntry> analogExpressionBindings = null,
-            // 注: FacialController 側の reflection-based gaze 注入器
-            // (FacialController.FindGazeConfigureMethod) は "末尾パラメータが
-            // IReadOnlyList<GazeBindingConfig> である Configure" を検索するため、
-            // 必ず injectedGazeConfigs を最後の位置に維持する。順序変更は core 側との
-            // ABI 契約破壊につながる。
             IReadOnlyList<GazeBindingConfig> injectedGazeConfigs = null)
         {
             _inputActionAsset = asset;
@@ -109,12 +103,6 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             _expressionBindings = expressionBindings == null
                 ? new List<ExpressionBindingEntry>()
                 : new List<ExpressionBindingEntry>(expressionBindings);
-            _gazeInputBindings = gazeInputBindings == null
-                ? new List<InputSystemGazeBinding>()
-                : new List<InputSystemGazeBinding>(gazeInputBindings);
-            _analogExpressionBindings = analogExpressionBindings == null
-                ? new List<AnalogExpressionBindingEntry>()
-                : new List<AnalogExpressionBindingEntry>(analogExpressionBindings);
             _injectedGazeConfigs = injectedGazeConfigs;
         }
 
@@ -167,7 +155,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             _adapter = ctx.HostGameObject.AddComponent<ExpressionInputSourceAdapter>();
             _adapter.Initialize(_triggerSink, _triggerSink);
 
-            BindExpressionEntries();
+            BindNormalEntries();
 
             _analogSources = new List<InputActionAnalogSource>();
             BuildAnalogSources(ctx, slug);
@@ -248,7 +236,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             }
         }
 
-        private void BindExpressionEntries()
+        // bindingMode == Normal のみを ExpressionInputSourceAdapter に結線する。
+        private void BindNormalEntries()
         {
             if (_expressionBindings == null || _expressionBindings.Count == 0)
             {
@@ -259,6 +248,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             {
                 var entry = _expressionBindings[i];
                 if (entry == null
+                    || entry.bindingMode != BindingMode.Normal
                     || string.IsNullOrWhiteSpace(entry.actionName)
                     || string.IsNullOrWhiteSpace(entry.expressionId))
                 {
@@ -277,29 +267,18 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             }
         }
 
+        // bindingMode == Gaze または Analog のエントリ参照する actionName を 1 度だけ analog source として登録する。
         private void BuildAnalogSources(in AdapterBuildContext ctx, AdapterSlug slug)
         {
-            // gaze バインディングと analog expression バインディングの両方で参照される actionName を 1 度だけ登録する。
+            if (_expressionBindings == null) return;
+
             var registered = new HashSet<string>(StringComparer.Ordinal);
-
-            if (_gazeInputBindings != null)
+            for (int i = 0; i < _expressionBindings.Count; i++)
             {
-                for (int i = 0; i < _gazeInputBindings.Count; i++)
-                {
-                    var binding = _gazeInputBindings[i];
-                    if (binding == null) continue;
-                    TryRegisterAnalogSource(ctx, slug, binding.actionName, registered);
-                }
-            }
-
-            if (_analogExpressionBindings != null)
-            {
-                for (int i = 0; i < _analogExpressionBindings.Count; i++)
-                {
-                    var binding = _analogExpressionBindings[i];
-                    if (binding == null) continue;
-                    TryRegisterAnalogSource(ctx, slug, binding.actionName, registered);
-                }
+                var entry = _expressionBindings[i];
+                if (entry == null) continue;
+                if (entry.bindingMode != BindingMode.Gaze && entry.bindingMode != BindingMode.Analog) continue;
+                TryRegisterAnalogSource(ctx, slug, entry.actionName, registered);
             }
         }
 
@@ -335,18 +314,18 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             registered.Add(actionName);
         }
 
+        // bindingMode == Analog のエントリで AnalogExpressionInputSource を構築する。
         private void BuildAnalogExpressionSink(
             in AdapterBuildContext ctx,
             AdapterSlug slug,
             int blendShapeCount,
             IReadOnlyList<string> blendShapeNames)
         {
-            if (_analogExpressionBindings == null || _analogExpressionBindings.Count == 0)
+            if (_expressionBindings == null || _expressionBindings.Count == 0)
             {
                 return;
             }
 
-            // actionName → IAnalogInputSource の辞書を _analogSources から組み立てる。
             var sources = new Dictionary<string, IAnalogInputSource>(StringComparer.Ordinal);
             for (int i = 0; i < _analogSources.Count; i++)
             {
@@ -355,12 +334,13 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                 sources[s.Id] = s;
             }
 
-            // Inspector のエントリを Domain 値型に変換する。
-            var bindings = new List<AnalogExpressionBinding>(_analogExpressionBindings.Count);
-            for (int i = 0; i < _analogExpressionBindings.Count; i++)
+            // Analog エントリのみ Domain 値型に変換する。scale は preview.1 で廃止し常に 1.0 として扱う。
+            var bindings = new List<AnalogExpressionBinding>();
+            for (int i = 0; i < _expressionBindings.Count; i++)
             {
-                var entry = _analogExpressionBindings[i];
+                var entry = _expressionBindings[i];
                 if (entry == null
+                    || entry.bindingMode != BindingMode.Analog
                     || string.IsNullOrWhiteSpace(entry.actionName)
                     || string.IsNullOrWhiteSpace(entry.expressionId))
                 {
@@ -371,7 +351,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                     sourceId: entry.actionName,
                     sourceAxis: 0,
                     expressionId: entry.expressionId,
-                    scale: entry.scale > 0f ? entry.scale : 1f));
+                    scale: 1f));
             }
 
             if (bindings.Count == 0)
@@ -403,6 +383,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                 _analogExpressionSink);
         }
 
+        // bindingMode == Gaze のエントリで GazeBonePoseProvider を構築する。
         private void BuildGazeProvider(in AdapterBuildContext ctx)
         {
             _gazeBoneProvider = null;
@@ -411,8 +392,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
 
             if (_injectedGazeConfigs == null
                 || _injectedGazeConfigs.Count == 0
-                || _gazeInputBindings == null
-                || _gazeInputBindings.Count == 0)
+                || _expressionBindings == null
+                || _expressionBindings.Count == 0)
             {
                 return;
             }
@@ -426,13 +407,13 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                     continue;
                 }
 
-                InputSystemGazeBinding binding = FindGazeInputBinding(config.expressionId);
+                ExpressionBindingEntry binding = FindGazeBinding(config.expressionId);
                 if (binding == null)
                 {
                     continue;
                 }
 
-                if (!TryFindAnalogSource(binding, out InputActionAnalogSource source))
+                if (!TryFindAnalogSource(binding.actionName, out InputActionAnalogSource source))
                 {
                     continue;
                 }
@@ -449,24 +430,24 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             _gazeBoneProvider = new GazeBonePoseProvider(resolver, gazeBoneBindings);
         }
 
-        private InputSystemGazeBinding FindGazeInputBinding(string expressionId)
+        private ExpressionBindingEntry FindGazeBinding(string expressionId)
         {
-            if (_gazeInputBindings == null || string.IsNullOrWhiteSpace(expressionId))
+            if (_expressionBindings == null || string.IsNullOrWhiteSpace(expressionId))
             {
                 return null;
             }
 
-            for (int i = 0; i < _gazeInputBindings.Count; i++)
+            for (int i = 0; i < _expressionBindings.Count; i++)
             {
-                InputSystemGazeBinding binding = _gazeInputBindings[i];
-                if (binding == null)
+                ExpressionBindingEntry entry = _expressionBindings[i];
+                if (entry == null || entry.bindingMode != BindingMode.Gaze)
                 {
                     continue;
                 }
 
-                if (string.Equals(binding.expressionId, expressionId, StringComparison.Ordinal))
+                if (string.Equals(entry.expressionId, expressionId, StringComparison.Ordinal))
                 {
-                    return binding;
+                    return entry;
                 }
             }
 
@@ -475,26 +456,26 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
 
         private void WarnForGazeBindingsWithoutConfig()
         {
-            if (_gazeInputBindings == null || _gazeInputBindings.Count == 0)
+            if (_expressionBindings == null || _expressionBindings.Count == 0)
             {
                 return;
             }
 
-            for (int i = 0; i < _gazeInputBindings.Count; i++)
+            for (int i = 0; i < _expressionBindings.Count; i++)
             {
-                InputSystemGazeBinding binding = _gazeInputBindings[i];
-                if (binding == null)
+                ExpressionBindingEntry entry = _expressionBindings[i];
+                if (entry == null || entry.bindingMode != BindingMode.Gaze)
                 {
                     continue;
                 }
 
-                if (HasInjectedGazeConfig(binding.expressionId))
+                if (HasInjectedGazeConfig(entry.expressionId))
                 {
                     continue;
                 }
 
                 Debug.LogWarning(
-                    $"[InputSystemAdapterBinding] Gaze binding expressionId '{FormatExpressionId(binding.expressionId)}' に対応する GazeBindingConfig が SO ルートに存在しません。skip します。");
+                    $"[InputSystemAdapterBinding] Gaze binding expressionId '{FormatExpressionId(entry.expressionId)}' に対応する GazeBindingConfig が SO ルートに存在しません。skip します。");
             }
         }
 
@@ -525,18 +506,14 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
         }
 
         private bool TryFindAnalogSource(
-            InputSystemGazeBinding binding,
+            string actionName,
             out InputActionAnalogSource source)
         {
             source = null;
-            if (binding == null
-                || string.IsNullOrWhiteSpace(binding.actionName)
-                || _analogSources == null)
+            if (string.IsNullOrWhiteSpace(actionName) || _analogSources == null)
             {
                 return false;
             }
-
-            string actionName = binding.actionName;
 
             for (int i = 0; i < _analogSources.Count; i++)
             {

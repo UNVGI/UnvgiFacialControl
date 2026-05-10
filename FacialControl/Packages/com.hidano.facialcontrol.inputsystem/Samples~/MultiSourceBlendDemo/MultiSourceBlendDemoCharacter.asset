@@ -177,25 +177,31 @@ MonoBehaviour:
         _inputActionAsset: {fileID: -944628639613478452, guid: 5e2f7a9c1b3d4e6f8a0b2c4d5e6f7a8b, type: 3}
         _actionMapName: Expression
         _expressionBindings:
-        - actionName: Trigger1
+        - bindingMode: 0
+          actionName: Trigger1
           expressionId: smile
           triggerMode: 0
-        - actionName: Trigger2
+        - bindingMode: 0
+          actionName: Trigger2
           expressionId: anger
           triggerMode: 0
-        - actionName: Trigger3
+        - bindingMode: 0
+          actionName: Trigger3
           expressionId: surprise
           triggerMode: 0
-        - actionName: Trigger4
+        - bindingMode: 0
+          actionName: Trigger4
           expressionId: lipsync_a
           triggerMode: 0
-        _gazeInputBindings:
-        - expressionId: eye_look
+        - bindingMode: 1
           actionName: Look
-        _analogExpressionBindings:
-        - actionName: LeftTrigger
+          expressionId: eye_look
+          triggerMode: 0
+        - bindingMode: 2
+          actionName: LeftTrigger
           expressionId: smile
-          scale: 1.0
-        - actionName: RightTrigger
+          triggerMode: 0
+        - bindingMode: 2
+          actionName: RightTrigger
           expressionId: anger
-          scale: 1.0
+          triggerMode: 0

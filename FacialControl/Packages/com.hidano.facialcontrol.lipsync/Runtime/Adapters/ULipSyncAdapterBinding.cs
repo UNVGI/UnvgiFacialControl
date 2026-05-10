@@ -93,7 +93,8 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
         /// <summary>
         /// Inspector で binding を新規追加した直後に呼ばれ、
-        /// AIUEO 5 音素分の <see cref="BlendShapePhonemeEntry"/> をプリセットする。
+        /// AIUEO 5 音素分の <see cref="AnimationClipPhonemeEntry"/> をプリセットする。
+        /// (Clip = null の状態で追加され、ユーザーが各音素に AnimationClip を割り当てる前提)。
         /// </summary>
         public void ApplyInitialDefaults()
         {
@@ -109,7 +110,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
             for (int i = 0; i < DefaultPhonemeIds.Length; i++)
             {
-                _phonemeEntries.Add(new BlendShapePhonemeEntry
+                _phonemeEntries.Add(new AnimationClipPhonemeEntry
                 {
                     PhonemeId = DefaultPhonemeIds[i],
                     MaxWeight = 100f,
@@ -463,7 +464,11 @@ namespace Hidano.FacialControl.LipSync.Adapters
             }
 
             ClearBlendShapeWeights(savedWeights);
-            entry.Clip.SampleAnimation(ctx.HostGameObject, 0f);
+            // AnimationClip の "終端" を採取することで、frame 0 (初期状態 = 口閉じ等) ではなく
+            // 表情完成時点の BlendShape weight をスナップショットに格納する。
+            // Clip.length が 0 の場合は frame 0 にフォールバックする。
+            float sampleTime = entry.Clip.length > 0f ? entry.Clip.length : 0f;
+            entry.Clip.SampleAnimation(ctx.HostGameObject, sampleTime);
 
             float scale = NormalizeWeight(entry.MaxWeight);
             for (int i = 0; i < ctx.BlendShapeNames.Count; i++)

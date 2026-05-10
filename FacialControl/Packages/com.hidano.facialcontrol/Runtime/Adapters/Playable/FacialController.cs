@@ -405,8 +405,6 @@ namespace Hidano.FacialControl.Adapters.Playable
                     return TryReadMemberValue(binding, "ActionMapName", "_actionMapName", out value);
                 case "expressionBindings":
                     return TryReadMemberValue(binding, null, "_expressionBindings", out value);
-                case "gazeInputBindings":
-                    return TryReadMemberValue(binding, null, "_gazeInputBindings", out value);
                 default:
                     return TryReadMemberValue(
                         binding,
