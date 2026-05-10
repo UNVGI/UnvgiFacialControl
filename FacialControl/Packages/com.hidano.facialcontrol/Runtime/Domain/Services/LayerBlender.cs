@@ -92,7 +92,9 @@ namespace Hidano.FacialControl.Domain.Services
 
             // 安定ソート: 同一優先度では元の入力順を維持（挿入ソートなので自然に安定）
 
-            // 最低優先度のレイヤーで初期化
+            // 最低優先度のレイヤーで初期化。
+            // mask=null の場合は output 全体を上書きし、mask non-null の場合は mask=true index のみ更新する。
+            // mask=false index は呼出側 output の前値（= BaseExpression の値や前フレーム値）を保持する。
             int firstIdx = indices[0];
             float firstWeight = Clamp01(layers[firstIdx].Weight);
             var firstValues = layers[firstIdx].BlendShapeValues.Span;

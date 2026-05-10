@@ -227,44 +227,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
         }
 
         // ---------------------------------------------------------------
-        // Reorder（ListView.reorderable）（Req 1.4 / 2.4 派生）
+        // 並び替え機能は preview.1 の +/- フッター移行で削除された。
+        // 必要になったら別タスクで再導入する。
         // ---------------------------------------------------------------
-
-        [Test]
-        public void MoveBinding_SwapsOrderOfElements()
-        {
-            var view = CreateView();
-            var descA = RequireDescriptor(typeof(MockListViewSimpleBinding));
-            var descB = RequireDescriptor(typeof(MockListViewOtherBinding));
-
-            view.AddBindingFromDescriptor(descA);
-            view.AddBindingFromDescriptor(descB);
-
-            // 0 -> 1 へ移動: A,B → B,A
-            view.MoveBinding(fromIndex: 0, toIndex: 1);
-
-            _serializedObject.Update();
-            Assert.AreEqual(2, _listProperty.arraySize);
-
-            var first = _listProperty.GetArrayElementAtIndex(0).managedReferenceValue;
-            var second = _listProperty.GetArrayElementAtIndex(1).managedReferenceValue;
-
-            Assert.IsInstanceOf<MockListViewOtherBinding>(first,
-                "MoveBinding(0,1) 後、index 0 は元 index 1 だった MockListViewOtherBinding になるべき。");
-            Assert.IsInstanceOf<MockListViewSimpleBinding>(second,
-                "MoveBinding(0,1) 後、index 1 は元 index 0 だった MockListViewSimpleBinding になるべき。");
-        }
-
-        [Test]
-        public void InternalListView_IsReorderable()
-        {
-            // Req 3.5: UI Toolkit の reorderable list chrome を使う。
-            var view = CreateView();
-            var listView = view.Q<ListView>();
-            Assert.IsNotNull(listView, "AdapterBindingsListView の内部に UI Toolkit ListView が含まれているべき。");
-            Assert.IsTrue(listView.reorderable,
-                "ListView.reorderable は true でなければならない (Req 3.5 + Reorder UX)。");
-        }
 
         // ---------------------------------------------------------------
         // null 要素 → MissingAdapterPlaceholderElement（Req 2.7）

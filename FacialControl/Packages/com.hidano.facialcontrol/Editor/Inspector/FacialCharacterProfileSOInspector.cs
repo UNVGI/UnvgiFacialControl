@@ -47,8 +47,15 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string TabExpressionsName = "facial-character-tab-expressions";
         public const string TabGazeName = "facial-character-tab-gaze";
         public const string TabAdapterBindingsName = "facial-character-tab-adapter-bindings";
-        public const string TabModelName = "facial-character-tab-model";
         public const string TabDebugName = "facial-character-tab-debug";
+
+        /// <summary>「目線」タブの表示文字列（参照モデル変更時にアスタリスクを付与する基準値）。</summary>
+        public const string GazeTabBaseLabel = "目線";
+
+        /// <summary>「目線」タブに付与する「未確認」マーカー（参照モデルが変わった直後に表示）。</summary>
+        public const string GazeTabAttentionMarker = " *";
+
+        public const string ReferenceModelDirectFieldName = "facial-character-reference-model-field";
 
         public const string SaveStatusBarName = "facial-character-save-status-bar";
         public const string SaveButtonName = "facial-character-save-button";
@@ -125,7 +132,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         private Label _saveStatusLabel;
         private VisualElement _layersContainer;
         private VisualElement _gazeConfigsContainer;
-        private Button _gazeConfigBulkResolveButton;
+        private Tab _gazeTab;
 
         // ====================================================================
         // 候補リスト
@@ -164,7 +171,10 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             BuildSaveStatusBar(root);
 
-            // 5 タブ構成: 表情 / 目線 / Adapter Bindings / モデル / Debug
+            // 参照モデルはタブの上に常時表示する（モデルタブを廃止してアクセス頻度を上げる）。
+            BuildReferenceModelDirect(root);
+
+            // 4 タブ構成: 表情 / 目線 / Adapter Bindings / Debug
             // タブ間で機能の住み分けを明示し、設定漏れを予防する。
             var tabView = new TabView { name = TabViewName };
             tabView.style.flexGrow = 1f;
@@ -174,18 +184,17 @@ namespace Hidano.FacialControl.Editor.Inspector
             BuildBaseExpressionSection(expressionsTab.contentContainer);
             tabView.Add(expressionsTab);
 
-            var gazeTab = new Tab("目線") { name = TabGazeName };
-            BuildGazeConfigsSection(gazeTab.contentContainer);
-            tabView.Add(gazeTab);
+            _gazeTab = new Tab(GazeTabBaseLabel) { name = TabGazeName };
+            BuildGazeConfigsSection(_gazeTab.contentContainer);
+            // 目線タブのヘッダーをクリックした瞬間にアスタリスクを消す（参照モデル変更後の確認注意）。
+            // Tab 直下のクリックでは header subelement に届かないことがあるため、capture 段階で受ける。
+            _gazeTab.RegisterCallback<PointerDownEvent>(_ => ClearGazeTabAttention(), TrickleDown.TrickleDown);
+            tabView.Add(_gazeTab);
 
             var adapterTab = new Tab("Adapter Bindings") { name = TabAdapterBindingsName };
             OnBuildPreLayersSections(adapterTab.contentContainer);
             BuildAdapterBindingsSection(adapterTab.contentContainer);
             tabView.Add(adapterTab);
-
-            var modelTab = new Tab("モデル") { name = TabModelName };
-            BuildReferenceModelSection(modelTab.contentContainer);
-            tabView.Add(modelTab);
 
             var debugTab = new Tab("Debug") { name = TabDebugName };
             BuildDebugSection(debugTab.contentContainer);
@@ -444,17 +453,6 @@ namespace Hidano.FacialControl.Editor.Inspector
         private void BuildGazeConfigsSection(VisualElement root)
         {
             var foldout = MakeSectionFoldout(GazeConfigsFoldoutName, "GazeConfigs", open: true);
-
-            _gazeConfigBulkResolveButton = new Button(ResolveAllGazeConfigsFromReferenceModel)
-            {
-                name = GazeConfigBulkResolveButtonName,
-                text = "全 GazeConfig を参照モデルから再解決",
-                tooltip = "全ての GazeConfig を現在の参照モデルから再解決し、既存値を上書きします。",
-            };
-            _gazeConfigBulkResolveButton.SetEnabled(HasReferenceModel());
-            _gazeConfigBulkResolveButton.style.alignSelf = Align.FlexStart;
-            _gazeConfigBulkResolveButton.style.marginBottom = 4;
-            foldout.Add(_gazeConfigBulkResolveButton);
 
             _gazeConfigsContainer = new VisualElement();
             _gazeConfigsContainer.style.flexDirection = FlexDirection.Column;
@@ -836,24 +834,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             UpdateValidation();
         }
 
-        private void ResolveAllGazeConfigsFromReferenceModel()
-        {
-            if (!HasReferenceModel() || _rootGazeConfigsProperty == null) return;
-
-            serializedObject.Update();
-            int configCount = _rootGazeConfigsProperty.arraySize;
-            for (int i = 0; i < configCount; i++)
-            {
-                AssignGazeConfigFromReferenceModel(
-                    _rootGazeConfigsProperty.GetArrayElementAtIndex(i),
-                    resetRangesToDefaults: true);
-                serializedObject.Update();
-            }
-
-            RebuildGazeConfigsUI();
-            UpdateValidation();
-        }
-
 #if UNITY_EDITOR
         private void TrackReferenceModelChanges(VisualElement root)
         {
@@ -870,32 +850,35 @@ namespace Hidano.FacialControl.Editor.Inspector
             _lastReferenceModel = currentReferenceModel;
 
             UpdateGazeConfigResolveButtonStates();
-            if (currentReferenceModel == null || currentReferenceModel == previousReferenceModel) return;
 
-            AutoFillEmptyGazeConfigsFromReferenceModel();
-        }
-
-        private void AutoFillEmptyGazeConfigsFromReferenceModel()
-        {
-            if (!HasReferenceModel() || _rootGazeConfigsProperty == null) return;
-
-            serializedObject.Update();
-            int configCount = _rootGazeConfigsProperty.arraySize;
-            for (int i = 0; i < configCount; i++)
+            // 参照モデルが切り替わった/設定されたら、目線タブ名にアスタリスクを付けて
+            // 「ボーンパスを確認しろ」というユーザー注意を促す。
+            // 自動入力はしない（前回値が残ると未設定との区別が付かなくなるため。
+            // ユーザーが明示的に GazeConfig 行の「参照モデルから自動設定」ボタンで埋める想定）。
+            if (currentReferenceModel != null && currentReferenceModel != previousReferenceModel)
             {
-                var cfg = _rootGazeConfigsProperty.GetArrayElementAtIndex(i);
-                var leftBonePathProp = cfg.FindPropertyRelative("leftEyeBonePath");
-                var rightBonePathProp = cfg.FindPropertyRelative("rightEyeBonePath");
-                if (!IsEmptyString(leftBonePathProp) || !IsEmptyString(rightBonePathProp)) continue;
-
-                AssignGazeConfigFromReferenceModel(cfg, resetRangesToDefaults: false);
-                serializedObject.Update();
+                MarkGazeTabNeedsAttention();
             }
-
-            RebuildGazeConfigsUI();
-            UpdateValidation();
         }
 #endif
+
+        private void MarkGazeTabNeedsAttention()
+        {
+            if (_gazeTab == null) return;
+            if (!string.Equals(_gazeTab.label, GazeTabBaseLabel + GazeTabAttentionMarker, StringComparison.Ordinal))
+            {
+                _gazeTab.label = GazeTabBaseLabel + GazeTabAttentionMarker;
+            }
+        }
+
+        private void ClearGazeTabAttention()
+        {
+            if (_gazeTab == null) return;
+            if (!string.Equals(_gazeTab.label, GazeTabBaseLabel, StringComparison.Ordinal))
+            {
+                _gazeTab.label = GazeTabBaseLabel;
+            }
+        }
 
         private void AssignGazeConfigFromReferenceModel(
             SerializedProperty cfg,
@@ -930,11 +913,6 @@ namespace Hidano.FacialControl.Editor.Inspector
         private void UpdateGazeConfigResolveButtonStates()
         {
             bool hasReferenceModel = HasReferenceModel();
-            if (_gazeConfigBulkResolveButton != null)
-            {
-                _gazeConfigBulkResolveButton.SetEnabled(hasReferenceModel);
-            }
-
             if (_gazeConfigsContainer == null) return;
             _gazeConfigsContainer.Query<Button>(GazeConfigAutoAssignButtonName).ForEach(
                 button => button.SetEnabled(hasReferenceModel));
@@ -1316,26 +1294,13 @@ namespace Hidano.FacialControl.Editor.Inspector
             row.style.borderLeftColor = new StyleColor(new Color(0.7f, 0.7f, 0.7f));
             row.style.borderLeftWidth = 2;
 
-            // ヘッダー行: 目線操作 toggle + 削除ボタン
+            // ヘッダー行: 削除ボタンのみ。「目線操作」トグルは AnimationClip スロット直下に移動した。
             var headerRow = new VisualElement();
             headerRow.style.flexDirection = FlexDirection.Row;
             headerRow.style.alignItems = Align.Center;
+            headerRow.style.justifyContent = Justify.FlexEnd;
 
             bool currentIsGaze = isGazeProp != null && isGazeProp.boolValue;
-
-            // 目線操作のときのみ GazeConfig 経路で駆動する。それ以外は AnimationClip + 遷移時間。
-            var isGazeToggle = new Toggle("目線操作")
-            {
-                name = ExpressionRowIsGazeToggleName,
-                tooltip = "ON にするとこの表情は GazeConfig（目線設定）で駆動されます。OFF の通常表情では AnimationClip と遷移時間が使われます。",
-            };
-            isGazeToggle.SetValueWithoutNotify(currentIsGaze);
-            isGazeToggle.style.flexGrow = 1f;
-            isGazeToggle.RegisterValueChangedCallback(evt =>
-            {
-                ChangeExpressionIsGaze(exprIndex, evt.newValue);
-            });
-            headerRow.Add(isGazeToggle);
 
             var removeButton = new Button(() => RemoveExpression(exprIndex))
             {
@@ -1383,6 +1348,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             row.Add(transitionDurationField);
 
             // GazeConfig は専用セクションで opt-in 編集するため、Expression 行では共通 clip のみ表示する。
+            // BuildAnimationClipFields は AnimationClip スロットの直下に「目線操作」Toggle を配置する。
             BuildAnimationClipFields(row, exprIndex);
 
             // Validation
@@ -1433,6 +1399,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         {
             var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
             var clipProp = entryProp.FindPropertyRelative("animationClip");
+            var isGazeProp = entryProp.FindPropertyRelative("isGaze");
 
             var clipField = new ExpressionClipObjectField
             {
@@ -1455,6 +1422,22 @@ namespace Hidano.FacialControl.Editor.Inspector
                 clipField.RefreshDisplayLabel();
             }
             row.Add(clipField);
+
+            // AnimationClip スロットの直下に「目線操作」Toggle を配置する。
+            // ON にすると GazeConfig（目線設定）駆動、OFF だと AnimationClip + 遷移時間。
+            bool currentIsGaze = isGazeProp != null && isGazeProp.boolValue;
+            var isGazeToggle = new Toggle("目線操作")
+            {
+                name = ExpressionRowIsGazeToggleName,
+                tooltip = "ON にするとこの表情は GazeConfig（目線設定）で駆動されます。OFF の通常表情では AnimationClip と遷移時間が使われます。",
+            };
+            isGazeToggle.SetValueWithoutNotify(currentIsGaze);
+            isGazeToggle.style.marginTop = 2;
+            isGazeToggle.RegisterValueChangedCallback(evt =>
+            {
+                ChangeExpressionIsGaze(exprIndex, evt.newValue);
+            });
+            row.Add(isGazeToggle);
 
             var rendererSummary = new ListView
             {
@@ -1708,20 +1691,22 @@ namespace Hidano.FacialControl.Editor.Inspector
         }
 
         // ====================================================================
-        // Section: 参照モデル
+        // Section: 参照モデル（タブ外、常時表示）
         // ====================================================================
 
-        private void BuildReferenceModelSection(VisualElement root)
+        private void BuildReferenceModelDirect(VisualElement root)
         {
 #if UNITY_EDITOR
             if (_referenceModelProperty == null) return;
-            var foldout = MakeSectionFoldout(ReferenceModelFoldoutName, "参照モデル", open: false);
-            foldout.Add(MakeHelpBox(
-                "BlendShape 名やボーン名の取得元となるモデルを指定します。"
-                + "AnimationClip の RendererPath 検証にも利用されます。"));
-            var refModelField = new PropertyField(_referenceModelProperty, "参照モデル");
-            foldout.Add(refModelField);
-            root.Add(foldout);
+
+            var refModelField = new PropertyField(_referenceModelProperty, "参照モデル")
+            {
+                name = ReferenceModelDirectFieldName,
+                tooltip = "BlendShape 名やボーン名の取得元となるモデル。"
+                    + "AnimationClip の RendererPath 検証にも利用されます。",
+            };
+            refModelField.style.marginBottom = 6;
+            root.Add(refModelField);
 #endif
         }
 
