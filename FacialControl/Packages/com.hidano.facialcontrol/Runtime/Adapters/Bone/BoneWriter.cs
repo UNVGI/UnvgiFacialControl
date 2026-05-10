@@ -8,13 +8,13 @@ namespace Hidano.FacialControl.Adapters.Bone
 {
     /// <summary>
     /// active な <see cref="BoneSnapshot"/> 列を毎フレーム basis 相対で <see cref="UnityEngine.Transform.localRotation"/> に
-    /// 書戻すサービス (Req 5.1〜5.6, 6.1〜6.3, 11.1〜11.5)。
+    /// 書戻すサービス 。
     /// </summary>
     /// <remarks>
-    /// preview.1: メインスレッド限定、hot path で alloc しない。
-    /// MAJOR-1 反映: <see cref="RestoreInitialRotations"/> は遅延スナップショット方式 (タスク 7.5 / 7.6)。
-    /// MINOR-1 反映: <see cref="Initialize"/> で basis をキャッシュ、<see cref="Apply"/> は引数なし (タスク 6.2 で API 形状確定)。
-    /// 入力型は Phase 3.3 (inspector-and-data-model-redesign) で <see cref="BoneSnapshot"/> 経路に統一。
+    /// メインスレッド限定、hot path で alloc しない。
+    /// <see cref="RestoreInitialRotations"/> は遅延スナップショット方式。
+    /// <see cref="Initialize"/> で basis をキャッシュ、<see cref="Apply"/> は引数なし。
+    /// 入力型は <see cref="BoneSnapshot"/> 経路に統一。
     /// </remarks>
     public sealed class BoneWriter : IBonePoseSource, IBonePoseProvider, IDisposable
     {
@@ -69,10 +69,10 @@ namespace Hidano.FacialControl.Adapters.Bone
 
         /// <inheritdoc />
         /// <remarks>
-        /// next-frame セマンティクス (Req 11.2): 呼出時点では <c>_pendingSnapshots</c> に格納するのみで、
+        /// next-frame セマンティクス : 呼出時点では <c>_pendingSnapshots</c> に格納するのみで、
         /// 次回 <see cref="Apply"/> 開始時に <c>_activeSnapshots</c> へ swap する。
         /// 同一フレームで複数回呼ばれた場合は latest-wins（pending は queue ではなく最新値保持）。
-        /// メインスレッド限定契約（preview.1）。
+        /// メインスレッド限定契約。
         /// </remarks>
         public void SetActiveBoneSnapshots(ReadOnlyMemory<BoneSnapshot> snapshots)
         {
@@ -92,7 +92,7 @@ namespace Hidano.FacialControl.Adapters.Bone
         /// <remarks>
         /// MINOR-1: 引数なし。Initialize 時にキャッシュした basis Transform の <c>localRotation</c> を 1 回読み、
         /// 各エントリの最終 localRotation を Composer で合成して対象 Transform に書込む。
-        /// Position / Scale は preview.1 では未使用（Euler 角のみ反映）。
+        /// Position / Scale は未使用（Euler 角のみ反映）。
         /// </remarks>
         public void Apply()
         {
@@ -116,7 +116,7 @@ namespace Hidano.FacialControl.Adapters.Bone
 
             if (_basisBone == null)
             {
-                // basis 未解決時は world 軸フォールバックしない（Req 4.6）。warning は Initialize で出力済み。
+                // basis 未解決時は world 軸フォールバックしない。warning は Initialize で出力済み。
                 return;
             }
 
@@ -128,7 +128,7 @@ namespace Hidano.FacialControl.Adapters.Bone
                 var target = _resolver.Resolve(entry.BonePath);
                 if (target == null)
                 {
-                    // bone 名未解決は warning + skip + 続行（Req 2.4）。warning は resolver 側で dedupe 済み。
+                    // bone 名未解決は warning + skip + 続行。warning は resolver 側で dedupe 済み。
                     continue;
                 }
 

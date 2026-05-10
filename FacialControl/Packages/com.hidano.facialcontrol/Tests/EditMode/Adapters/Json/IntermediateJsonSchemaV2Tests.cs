@@ -17,15 +17,11 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
     ///      schemaVersion / layers / expressions / rendererPaths を全て埋めた
     ///      <see cref="ProfileSnapshotDto"/> を JSON へ書き出し、再パース後に同値であることを確認。
     ///   2. <c>Parse_SchemaVersionMismatch_ThrowsInvalidOperation</c>:
-    ///      schemaVersion が "1.0" 以外の場合に <see cref="Debug.LogError(object)"/> + <see cref="NotSupportedException"/> を出すこと（Req 10.1）。
+    ///      schemaVersion が "1.0" 以外の場合に <see cref="Debug.LogError(object)"/> + <see cref="NotSupportedException"/> を出すこと。
     ///   3. <c>Parse_MissingSnapshot_ProducesEmptySnapshot</c>:
     ///      <c>expressions[].snapshot</c> 欠落時に空 snapshot（duration=0.25 / Linear / 空配列）に正規化されること。
     ///   4. <c>RendererPaths_AreSubset_Of_TopLevelRendererPaths</c>:
     ///      <c>expressions[].snapshot.rendererPaths</c> がトップレベル <c>rendererPaths</c> の subset として保持されること。
-    ///
-    /// _Requirements: 9.1, 9.2, 9.7, 10.1
-    /// _Boundary: Adapters.Json.Dto, Adapters.Json.SystemTextJsonParser
-    /// _Depends: 1.3 (ExpressionSnapshot Domain 値型)
     /// </summary>
     [TestFixture]
     public class IntermediateJsonSchemaV2Tests
@@ -139,7 +135,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         [Test]
         public void Parse_SchemaVersionMismatch_ThrowsInvalidOperation()
         {
-            // schemaVersion = "2.0"（未サポート）を渡すと Debug.LogError + NotSupportedException が出る（Req 10.1）。
+            // schemaVersion = "2.0"（未サポート）を渡すと Debug.LogError + NotSupportedException が出る。
             var json = "{\"schemaVersion\":\"2.0\",\"layers\":[],\"expressions\":[],\"rendererPaths\":[]}";
 
             LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("schema v1.0 の strict チェックに失敗"));
@@ -153,7 +149,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         [Test]
         public void Parse_SchemaVersionMissing_ThrowsInvalidOperationWithMissingMarker()
         {
-            // schemaVersion 自体が無いケースも Req 10.1 により拒否される。
+            // schemaVersion 自体が無いケースも拒否される。
             var json = "{\"layers\":[],\"expressions\":[],\"rendererPaths\":[]}";
 
             LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("schema v1.0 の strict チェックに失敗"));
@@ -205,7 +201,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         [Test]
         public void RendererPaths_AreSubset_Of_TopLevelRendererPaths()
         {
-            // Req 9.7: expressions[].snapshot.rendererPaths はトップレベル rendererPaths の subset
+            /: expressions[].snapshot.rendererPaths はトップレベル rendererPaths の subset
             var json =
                 "{" +
                 "\"schemaVersion\":\"1.0\"," +

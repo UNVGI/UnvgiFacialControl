@@ -25,7 +25,7 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
         public string exclusionMode;
 
         /// <summary>
-        /// 入力源宣言。preview 破壊的変更 D-5 / Req 3.1, 3.2 により必須・非空配列。
+        /// 入力源宣言。preview 破壊的変更 D-5, 3.2 により必須・非空配列。
         /// </summary>
         public List<InputSourceDto> inputSources;
     }

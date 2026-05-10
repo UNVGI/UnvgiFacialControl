@@ -185,7 +185,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         [Test]
         public void ReferenceModelChanged_DoesNotAutoFillBonePathsAndMarksGazeTabWithAttention()
         {
-            // 仕様変更 (preview.1): 参照モデル変更時に GazeConfig を自動入力しない。
+            // 参照モデル変更時に GazeConfig を自動入力しない。
             // 代わりに目線タブにアスタリスクを付けてユーザーに「ボーン設定を確認しろ」と促す。
             // 前回の値が残ると未設定との区別がつかなくなる事象への対応。
             _so = CreateProfile();

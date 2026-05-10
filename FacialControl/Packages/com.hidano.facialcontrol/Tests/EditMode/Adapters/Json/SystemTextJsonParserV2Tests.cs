@@ -9,9 +9,9 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 {
     /// <summary>
-    /// preview.1 リリース前段階で <see cref="SystemTextJsonParser"/> がプロファイル JSON 専用となり、
+    /// <see cref="SystemTextJsonParser"/> がプロファイル JSON 専用として、
     /// <c>schemaVersion: "1.0"</c> 以外を <see cref="Debug.LogError(object)"/> +
-    /// <see cref="NotSupportedException"/> で拒否することの契約テスト（Req 9.1, 9.2, 9.7, 10.1）。
+    /// <see cref="NotSupportedException"/> で拒否することの契約テスト。
     /// </summary>
     [TestFixture]
     public class SystemTextJsonParserV2Tests

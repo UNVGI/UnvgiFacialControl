@@ -9,7 +9,6 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 {
     /// <summary>
     /// SO Serializable → Domain <see cref="FacialProfile"/> 変換器。
-    /// Phase 3.6 (inspector-and-data-model-redesign) で schema v2.0 専用となり、
     /// <see cref="ExpressionSerializable.cachedSnapshot"/> から BlendShape 値 / 遷移メタを
     /// 展開（snapshot 展開ロジック）して Domain Expression を構築する。
     /// </summary>

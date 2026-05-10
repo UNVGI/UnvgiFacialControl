@@ -8,9 +8,9 @@ namespace Hidano.FacialControl.Editor.Sampling
     /// AnimationClip → <see cref="ExpressionSnapshot"/> サンプラ。
     /// Editor 専用。Runtime asmdef からは不可視。
     /// <para>
-    /// 実装は stateless で、同一 clip に対して常に同一結果を返す（Req 12.4）。
+    /// 実装は stateless で、同一 clip に対して常に同一結果を返す。
     /// Domain は <c>UnityEngine.AnimationClip</c> を直接参照しないため、本 interface が
-    /// AnimationClip と Domain snapshot の境界を担う（Req 13.1, 13.2）。
+    /// AnimationClip と Domain snapshot の境界を担う。
     /// </para>
     /// </summary>
     public interface IExpressionAnimationClipSampler

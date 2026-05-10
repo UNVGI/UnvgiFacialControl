@@ -9,7 +9,7 @@ namespace Hidano.FacialControl.Editor.Tools
 {
     /// <summary>
     /// AnimationClip への BlendShape 値ベイク + メタデータ AnimationEvent 書き込みを担う
-    /// Editor 専用 static helper（Phase 5.2 / Refactor 抽出）。
+    /// Editor 専用 static helper。
     /// <para>
     /// ベイク経路:
     /// 1. 既存の EditorCurve を全削除（再ベイク時の整合性）
@@ -20,7 +20,7 @@ namespace Hidano.FacialControl.Editor.Tools
     /// </para>
     /// <para>
     /// 逆ロード経路: <see cref="IExpressionAnimationClipSampler.SampleSnapshot"/> 経由で
-    /// 時刻 0 の BlendShape 値を取得しスライダー初期値として返す（Req 2.1, 2.2）。
+    /// 時刻 0 の BlendShape 値を取得しスライダー初期値として返す。
     /// </para>
     /// </summary>
     public static class ExpressionClipBakery

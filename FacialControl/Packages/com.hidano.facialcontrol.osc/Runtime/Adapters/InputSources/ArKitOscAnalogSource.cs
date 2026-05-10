@@ -8,7 +8,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
 {
     /// <summary>
     /// ARKit 52ch (PerfectSync) を 1 つの N-axis <see cref="IAnalogInputSource"/> として公開する
-    /// アダプタ (Req 5.5, 5.6, 5.7, 8.6)。
+    /// アダプタ 。
     /// </summary>
     /// <remarks>
     /// 内部で <c>arkitParameterNames[i]</c> を <c>"/ARKit/{name}"</c> アドレスとして

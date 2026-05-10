@@ -1,7 +1,7 @@
 namespace Hidano.FacialControl.Adapters.Json.Dto
 {
     /// <summary>
-    /// アナログマッピングの Custom カーブ用キーフレーム DTO（Req 6.3, 6.4）。
+    /// アナログマッピングの Custom カーブ用キーフレーム DTO。
     /// 既存 <see cref="Hidano.FacialControl.Domain.Models.CurveKeyFrame"/> と 1:1 対応する。
     /// JsonUtility 互換のため class とし、フィールドは public（camelCase で永続化キーに整合）。
     /// </summary>

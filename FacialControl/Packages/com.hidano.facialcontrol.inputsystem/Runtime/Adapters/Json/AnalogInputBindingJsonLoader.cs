@@ -7,20 +7,20 @@ using UnityEngine;
 namespace Hidano.FacialControl.Adapters.Json
 {
     /// <summary>
-    /// <see cref="AnalogInputBindingProfile"/> の JSON 永続化（Load / Save、Req 6.3〜6.5, 6.7, 6.8, 9.6）。
+    /// <see cref="AnalogInputBindingProfile"/> の JSON 永続化（Load / Save, 6.7, 6.8, 9.6）。
     /// </summary>
     /// <remarks>
     /// <para>
     /// <c>JsonUtility.FromJson&lt;AnalogInputBindingProfileDto&gt;</c> でデシリアライズ後、
     /// 各エントリを <see cref="AnalogBindingEntry"/> へ変換する。
     /// 不正エントリ（未知の <c>targetKind</c> / 欠損 <c>targetIdentifier</c> 等）は
-    /// <see cref="Debug.LogWarning"/> + skip + 残余ロード継続（Req 6.5）。
+    /// <see cref="Debug.LogWarning"/> + skip + 残余ロード継続。
     /// JSON パース自体に失敗した場合も警告ログを出して空プロファイルを返し、例外伝播はしない。
     /// </para>
     /// <para>
     /// targetKind / targetAxis の文字列値は大小無視で解釈する。
-    /// Phase 3.5 で <c>mapping</c> field を撤去したため、dead-zone / scale / offset / curve / invert / clamp の
-    /// 値変換は Adapters 側 InputProcessor 経路で扱う（Decision 4 / Req 13.3）。
+    /// dead-zone / scale / offset / curve / invert / clamp の値変換は
+    /// Adapters 側 InputProcessor 経路で扱う。
     /// </para>
     /// </remarks>
     public static class AnalogInputBindingJsonLoader

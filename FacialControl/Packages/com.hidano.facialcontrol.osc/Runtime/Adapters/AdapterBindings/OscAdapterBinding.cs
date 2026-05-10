@@ -8,7 +8,7 @@ using UnityEngine;
 namespace Hidano.FacialControl.Adapters.AdapterBindings
 {
     /// <summary>
-    /// OSC 結線を 1 binding に集約した <see cref="AdapterBindingBase"/> 具象（Req 6.2, 6.9, 13.6, 13.7、design.md `## OscAdapterBinding`）。
+    /// OSC 結線を 1 binding に集約した <see cref="AdapterBindingBase"/> 具象。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -55,7 +55,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         /// <summary>
         /// パラメータレスコンストラクタ。Inspector の Add ドロップダウンで <c>Activator.CreateInstance</c> から
-        /// 生成される必要があるため明示する（Req 2.5）。
+        /// 生成される必要があるため明示する。
         /// </summary>
         public OscAdapterBinding()
         {
@@ -131,7 +131,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             if (!AdapterSlug.TryParse(Slug, out var slug))
             {
                 Debug.LogError(
-                    $"[OscAdapterBinding] Slug '{Slug}' が AdapterSlug 規約を満たしません。InputSourceRegistry に登録できません（Req 12.1）。");
+                    $"[OscAdapterBinding] Slug '{Slug}' が AdapterSlug 規約を満たしません。InputSourceRegistry に登録できません。");
                 return;
             }
 

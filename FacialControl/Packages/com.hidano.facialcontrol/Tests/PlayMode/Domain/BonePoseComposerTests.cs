@@ -17,9 +17,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Domain
     ///   - <c>Compose(basisQ, eulerXYZ)</c> が <c>basisQ * Quaternion.Euler(eulerXYZ)</c> と
     ///     数値等価であること（Hamilton 積）。
     ///   - 体が傾いた basis（非自明な basis quaternion）でも結果が正しく合成されること
-    ///     （Req 4.5: body tilt が gaze に漏れないことの構造的保証）。
-    ///
-    /// _Requirements: 4.2, 4.3, 4.4, 4.5
+    ///     （body tilt が gaze に漏れないことの構造的保証）。
     /// </summary>
     [TestFixture]
     public class BonePoseComposerTests
@@ -153,7 +151,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Domain
         {
             // basis が体の傾き相当（例: ZXY 順で構成された任意の rotation）でも、
             // 結果は basisQ * Quaternion.Euler(eulerXYZ) と数値等価でなければならない。
-            // これは body tilt が gaze offset へ正しく合成されることを保証する（Req 4.5）。
+            // これは body tilt が gaze offset へ正しく合成されることを保証する。
             var basisAngles = new (float x, float y, float z)[]
             {
                 (10f, 0f, 0f),       // 軽い前傾
@@ -194,7 +192,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Domain
         public void Compose_ZeroOffsetWithTiltedBasis_PreservesBasis()
         {
             // offset=(0, 0, 0) のとき、Compose の出力は basis をそのまま返す（identity 合成）。
-            // body tilt が gaze に漏れないことの最小ケース（Req 4.5）。
+            // body tilt が gaze に漏れないことの最小ケース。
             var basisQ = Quaternion.Euler(20f, -35f, 10f);
 
             BonePoseComposer.Compose(

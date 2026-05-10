@@ -34,7 +34,7 @@ namespace Hidano.FacialControl.Domain.Models
         /// <summary>
         /// レイヤー毎の <c>inputSources</c> 宣言配列。外側のインデックスは <see cref="Layers"/> と揃う。
         /// null / 空配列の場合は Serializer 側が placeholder（<c>input, weight=1.0</c>）を出力する。
-        /// JSON round-trip 安定性 (Req 3.5, 8.4) の担体。
+        /// JSON round-trip 安定性  の担体。
         /// </summary>
         public ReadOnlyMemory<InputSourceDeclaration[]> LayerInputSources { get; }
 

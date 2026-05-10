@@ -11,10 +11,9 @@ using UnityEngine.TestTools;
 namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
 {
     /// <summary>
-    /// Phase 2.1: <see cref="AnimationClipExpressionSampler"/> の Red フェーズテスト。
+    /// <see cref="AnimationClipExpressionSampler"/> のテスト。
     /// AnimationUtility 経由で時刻 0 の BlendShape / Transform 値を取得し、
     /// 不明 binding を warning + skip することを検証する。
-    /// _Requirements: 2.1, 2.2, 2.3, 2.7, 9.4, 13.2
     /// </summary>
     [TestFixture]
     public class AnimationClipExpressionSamplerTests
@@ -75,7 +74,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
             Assert.IsTrue(paths.Contains("Body/Face"));
             Assert.IsTrue(paths.Contains("Body/Head"));
 
-            // Phase 2.1 の段階では metadata 抽出は行わないため fallback default
+            // metadata 抽出を行わないため fallback default
             Assert.AreEqual(Expression.DefaultTransitionDuration, snapshot.TransitionDuration);
             Assert.AreEqual(TransitionCurvePreset.Linear, snapshot.TransitionCurvePreset);
         }

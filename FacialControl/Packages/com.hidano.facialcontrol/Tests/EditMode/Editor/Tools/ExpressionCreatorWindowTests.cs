@@ -10,9 +10,8 @@ using UnityEngine;
 namespace Hidano.FacialControl.Tests.EditMode.Editor.Tools
 {
     /// <summary>
-    /// Phase 5.2: ExpressionCreatorWindow の AnimationClip ベイク経路テスト。
-    /// ベイクロジックは <see cref="ExpressionClipBakery"/> static helper に抽出済み（Refactor）。
-    /// _Requirements: 2.1, 2.2, 13.5
+    /// ExpressionCreatorWindow の AnimationClip ベイク経路テスト。
+    /// ベイクロジックは <see cref="ExpressionClipBakery"/> static helper に抽出済み。
     /// </summary>
     [TestFixture]
     public class ExpressionCreatorWindowTests

@@ -9,7 +9,7 @@ using Hidano.FacialControl.Editor.Inspector;
 namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
 {
     /// <summary>
-    /// Phase 5.4: <see cref="FacialControllerEditor"/> の概要表示が
+    /// <see cref="FacialControllerEditor"/> の概要表示が
     /// 新モデル (Schema / Layer / Expression / Snapshot) に置き換わっており、
     /// 旧 BonePose 概念由来の文字列が一切残っていないことを検証する。
     /// </summary>
@@ -104,7 +104,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         [Test]
         public void SummaryLabelFormatConstants_DoNotMentionBonePose()
         {
-            // タスク 5.4 Refactor: 表示文字列を const 化。
+            / Refactor: 表示文字列を const 化。
             // const 文字列レベルでも旧概念が残っていないことを検証する。
             StringAssert.DoesNotContain("BonePose", FacialControllerEditor.SchemaVersionLabelFormat);
             StringAssert.DoesNotContain("BonePose", FacialControllerEditor.LayerCountLabelFormat);

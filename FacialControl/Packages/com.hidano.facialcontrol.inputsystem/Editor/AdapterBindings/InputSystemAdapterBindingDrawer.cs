@@ -18,14 +18,14 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
 {
     /// <summary>
     /// <see cref="InputSystemAdapterBinding"/> の inline UI を提供する UI Toolkit ベースの
-    /// <see cref="PropertyDrawer"/>（Req 3.1, 3.2, 3.3, 6.5, 7.4, 7.5, 11.4、design.md `## Adapter PropertyDrawers`）。
+    /// <see cref="PropertyDrawer"/>。
     /// </summary>
     /// <remarks>
-    /// preview.1 の破壊的変更により、Trigger / Gaze / Analog の 3 リストを単一の
+    /// Trigger / Gaze / Analog の 3 リストを単一の
     /// 「キーバインディング」リスト (<c>_expressionBindings</c>) に統合し、各行で
-    /// <see cref="BindingMode"/> を選択する形に集約した。
+    /// <see cref="BindingMode"/> を選択する形に集約する。
     /// <c>[CustomPropertyDrawer(typeof(InputSystemAdapterBinding))]</c> を付与し、core の
-    /// <see cref="UnityEditor.UIElements.PropertyField"/> から自動解決される（Req 3.3）。
+    /// <see cref="UnityEditor.UIElements.PropertyField"/> から自動解決される。
     /// </remarks>
     [CustomPropertyDrawer(typeof(InputSystemAdapterBinding))]
     public sealed class InputSystemAdapterBindingDrawer : PropertyDrawer
@@ -530,7 +530,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             var child = property.FindPropertyRelative(relativePath);
             if (child == null)
             {
-                // 該当フィールドが見つからない場合でも他フィールドの描画を止めない（Req 3.6 と同思想）。
+                // 該当フィールドが見つからない場合でも他フィールドの描画を止めない。
                 root.Add(new Label($"<missing field: {relativePath}>"));
                 return;
             }

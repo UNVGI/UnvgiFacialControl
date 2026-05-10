@@ -5,9 +5,8 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
     /// <summary>
-    /// ExpressionSnapshot の Red フェーズテスト。
+    /// ExpressionSnapshot のテスト。
     /// AnimationClip 由来 snapshot の Domain 受け皿としての振る舞いを検証する。
-    /// _Requirements: 1.5, 2.1, 2.2, 2.5, 2.6, 9.2, 13.1
     /// </summary>
     [TestFixture]
     public class ExpressionSnapshotTests
@@ -87,7 +86,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void TransitionDuration_Default_Is_OneFifteenth()
         {
-            // 引数省略時のフォールバック値が Expression.DefaultTransitionDuration (1/15 秒) （Req 2.5）
+            // 引数省略時のフォールバック値が Expression.DefaultTransitionDuration (1/15 秒) 
             var snapshot = ExpressionSnapshot.CreateDefault("expr-003");
 
             Assert.AreEqual("expr-003", snapshot.Id);

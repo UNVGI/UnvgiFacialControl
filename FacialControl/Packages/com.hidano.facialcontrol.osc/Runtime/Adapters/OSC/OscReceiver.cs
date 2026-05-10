@@ -175,7 +175,7 @@ namespace Hidano.FacialControl.Adapters.OSC
                 }
             }
 
-            // 加算的拡張: analog-input-binding 用任意アドレスリスナー通知 (Req 5.3〜5.5)
+            // 加算的拡張: analog-input-binding 用任意アドレスリスナー通知 
             NotifyAnalogListeners(message.address, value);
         }
 

@@ -15,8 +15,7 @@ namespace Hidano.FacialControl.Editor.Inspector
     /// OSC 設定はサブパッケージ <c>com.hidano.facialcontrol.osc</c> の専用 MonoBehaviour 側に移管されている。
     /// </summary>
     /// <remarks>
-    /// Phase 5.4 (inspector-and-data-model-redesign) で BonePose 概念が消えたため、
-    /// 概要表示は AnimationClip 由来の Snapshot 数を表示する形に置き換えた。
+    /// 概要表示は AnimationClip 由来の Snapshot 数を表示する。
     /// </remarks>
     [CustomEditor(typeof(FacialController))]
     public class FacialControllerEditor : UnityEditor.Editor

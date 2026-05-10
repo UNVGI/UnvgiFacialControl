@@ -7,7 +7,7 @@ namespace Hidano.FacialControl.Adapters.OSC
     /// <summary>
     /// <see cref="Hidano.FacialControl.Adapters.AdapterBindings.OscAdapterBinding"/> が
     /// <c>OnStart</c> 内で <c>ctx.HostGameObject.AddComponent</c> する OSC 受信用 helper
-    /// MonoBehaviour（Req 6.9, 13.6, 13.7、design.md `## OscAdapterBinding`）。
+    /// MonoBehaviour。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -17,11 +17,11 @@ namespace Hidano.FacialControl.Adapters.OSC
     /// </para>
     /// <para>
     /// HideFlags は <see cref="HideFlags.None"/> を維持し Inspector で見える状態を保つ
-    /// （Req 13.6、D-11 — デバッグしやすさのため <see cref="HideFlags.HideInInspector"/> は使わない）。
+    /// （デバッグしやすさのため <see cref="HideFlags.HideInInspector"/> は使わない）。
     /// </para>
     /// <para>
     /// <see cref="OnDestroy"/> で同 GameObject 上に追加した <see cref="OscReceiver"/> および
-    /// <c>uOSC.uOscServer</c> も破棄する（Req 13.7、socket close を保証）。
+    /// <c>uOSC.uOscServer</c> も破棄する（socket close を保証）。
     /// </para>
     /// </remarks>
     public sealed class OscReceiverHost : MonoBehaviour
@@ -93,7 +93,7 @@ namespace Hidano.FacialControl.Adapters.OSC
         private void OnDestroy()
         {
             // helper を Destroy したら同 GO 上の OscReceiver / uOscServer も同期して破棄し、
-            // socket を確実に close する（Req 13.7）。
+            // socket を確実に close する。
             if (_receiver != null)
             {
                 try

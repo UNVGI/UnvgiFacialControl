@@ -5,7 +5,7 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
     /// 通常表情 / 目線操作 / アナログ表情を 1 リスト内で分別するための区分。
     /// </summary>
     /// <remarks>
-    /// preview.1 の破壊的変更により、旧 <c>InputSystemGazeBinding</c> と
+    /// 旧 <c>InputSystemGazeBinding</c> と
     /// <c>AnalogExpressionBindingEntry</c> 由来の機能をこの区分で統合する。
     /// </remarks>
     public enum BindingMode

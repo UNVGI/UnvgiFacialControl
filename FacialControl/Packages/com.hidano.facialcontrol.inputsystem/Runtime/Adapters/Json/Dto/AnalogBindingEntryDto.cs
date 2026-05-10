@@ -1,13 +1,13 @@
 namespace Hidano.FacialControl.Adapters.Json.Dto
 {
     /// <summary>
-    /// <see cref="Hidano.FacialControl.Domain.Models.AnalogBindingEntry"/> の JSON 永続化 DTO（Req 6.3）。
+    /// <see cref="Hidano.FacialControl.Domain.Models.AnalogBindingEntry"/> の JSON 永続化 DTO。
     /// </summary>
     /// <remarks>
     /// <para>
     /// <see cref="targetKind"/> は文字列で永続化（"blendshape" / "bonepose"、大小無視）。
     /// <see cref="targetAxis"/> は文字列で永続化（"X" / "Y" / "Z"、BlendShape ターゲット時は無視）。
-    /// 不正値はローダ側で <c>Debug.LogWarning</c> + skip 扱い（Req 6.5）。
+    /// 不正値はローダ側で <c>Debug.LogWarning</c> + skip 扱い。
     /// </para>
     /// <para>
     /// <see cref="scale"/> と <see cref="direction"/> は BlendShape clip 由来 binding 用の追加属性。

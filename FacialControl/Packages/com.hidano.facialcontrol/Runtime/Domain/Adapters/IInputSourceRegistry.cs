@@ -5,7 +5,7 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Adapters.InputSources
 {
     /// <summary>
-    /// slug-keyed <see cref="IInputSource"/> lookup の中立 interface（Req 5.4, 6.10, 12.4, 12.5）。
+    /// slug-keyed <see cref="IInputSource"/> lookup の中立 interface。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -24,7 +24,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
     public interface IInputSourceRegistry
     {
         /// <summary>
-        /// <c>&lt;slug&gt;</c> primary id で <paramref name="source"/> を登録する（Req 12.4）。
+        /// <c>&lt;slug&gt;</c> primary id で <paramref name="source"/> を登録する。
         /// 同 id 重複登録は LogError + 後勝ち上書きとする（preview 段階の柔軟性優先）。
         /// </summary>
         /// <exception cref="System.ArgumentNullException">
@@ -33,7 +33,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
         void Register(AdapterSlug slug, IInputSource source);
 
         /// <summary>
-        /// <c>&lt;slug&gt;:&lt;sub&gt;</c> 複合 id で <paramref name="source"/> を登録する（Req 12.4）。
+        /// <c>&lt;slug&gt;:&lt;sub&gt;</c> 複合 id で <paramref name="source"/> を登録する。
         /// 同 id 重複登録は LogError + 後勝ち上書きとする。
         /// </summary>
         /// <exception cref="System.ArgumentException">
@@ -51,7 +51,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
         /// <summary>
         /// layer.inputSources[].id 形式の文字列（<c>&lt;slug&gt;</c> または <c>&lt;slug&gt;:&lt;sub&gt;</c>）
-        /// を登録済 <see cref="IInputSource"/> に解決する（Req 12.4）。
+        /// を登録済 <see cref="IInputSource"/> に解決する。
         /// </summary>
         /// <param name="layerInputSourceId">
         /// <c>null</c> または空文字列のときは <c>false</c> を返し <paramref name="source"/> は <c>null</c>。

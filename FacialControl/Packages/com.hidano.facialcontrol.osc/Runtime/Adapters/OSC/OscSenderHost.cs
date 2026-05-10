@@ -5,7 +5,7 @@ using UnityEngine;
 namespace Hidano.FacialControl.Adapters.OSC
 {
     /// <summary>
-    /// OSC 送信用 helper MonoBehaviour（Req 6.9, 13.6, 13.7）。
+    /// OSC 送信用 helper MonoBehaviour。
     /// binding が <c>OnStart</c> 内で <c>ctx.HostGameObject.AddComponent</c> し、
     /// <see cref="Configure"/> で送信先と mapping を確定する。
     /// </summary>

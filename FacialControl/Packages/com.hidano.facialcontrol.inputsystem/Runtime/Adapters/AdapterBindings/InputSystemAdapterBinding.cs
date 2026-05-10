@@ -15,12 +15,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
 {
     /// <summary>
     /// InputSystem 結線（Trigger + Analog + Gaze）を 1 binding に集約した
-    /// <see cref="AdapterBindingBase"/> 派生（Req 6.1, 6.8）。
+    /// <see cref="AdapterBindingBase"/> 派生。
     /// </summary>
     /// <remarks>
-    /// preview.1 の破壊的変更により、Trigger / Analog / Gaze の経路を
+    /// Trigger / Analog / Gaze の経路を
     /// <see cref="ExpressionBindingEntry.bindingMode"/> で分別する単一の
-    /// <c>_expressionBindings</c> リストに統合した。
+    /// <c>_expressionBindings</c> リストに統合する。
     /// <list type="bullet">
     ///   <item><see cref="OnStart"/>: <see cref="InputActionAsset.Instantiate()"/> +
     ///         <see cref="InputActionMap.Enable"/> +
@@ -385,7 +385,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                 sources[s.Id] = s;
             }
 
-            // Analog エントリのみ Domain 値型に変換する。scale は preview.1 で廃止し常に 1.0 として扱う。
+            // Analog エントリのみ Domain 値型に変換する。scale は常に 1.0 として扱う。
             var bindings = new List<AnalogExpressionBinding>();
             for (int i = 0; i < _expressionBindings.Count; i++)
             {

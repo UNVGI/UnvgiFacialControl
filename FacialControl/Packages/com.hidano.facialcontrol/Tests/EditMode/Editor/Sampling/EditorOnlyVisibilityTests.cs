@@ -8,11 +8,10 @@ using UnityEditor;
 namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
 {
     /// <summary>
-    /// Phase 2.4: <see cref="Hidano.FacialControl.Editor.Sampling"/> 名前空間が
+    /// <see cref="Hidano.FacialControl.Editor.Sampling"/> 名前空間が
     /// Runtime asmdef（Domain / Application / Adapters）から不可視であることを保証する。
     /// あわせて <c>Hidano.FacialControl.Editor.asmdef</c> の
     /// <c>includePlatforms</c> が <c>["Editor"]</c> 1 件であることを静的に検査する。
-    /// _Requirements: 9.4, 11.2, 13.2
     /// </summary>
     [TestFixture]
     public class EditorOnlyVisibilityTests

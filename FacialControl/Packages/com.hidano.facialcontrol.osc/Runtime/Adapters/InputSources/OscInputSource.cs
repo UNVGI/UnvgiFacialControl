@@ -12,7 +12,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
     /// 予約 id <c>osc</c> を持つ BlendShape 値提供型アダプタ。
     /// <see cref="OscDoubleBuffer"/> の読み取りバッファを <c>output</c> Span に
     /// コピーし、受信停止時は <c>stalenessSeconds</c> オプトインで IsValid=false を返す
-    /// （Req 5.2, 5.4, 5.5, 5.7）。
+    /// 。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -45,7 +45,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
         /// </summary>
         /// <param name="buffer">OSC 受信側ダブルバッファ。読み取りバッファを本アダプタが参照する。</param>
         /// <param name="stalenessSeconds">
-        /// 受信停止とみなす秒数 (&gt;= 0)。0 なら staleness 判定を無効化し常に true を返す (Req 5.5)。
+        /// 受信停止とみなす秒数 (&gt;= 0)。0 なら staleness 判定を無効化し常に true を返す 。
         /// </param>
         /// <param name="timeProvider">現在時刻の供給元。Adapters 層では <c>UnityTimeProvider</c> を DI する。</param>
         /// <exception cref="ArgumentNullException"><paramref name="buffer"/> または <paramref name="timeProvider"/> が null。</exception>

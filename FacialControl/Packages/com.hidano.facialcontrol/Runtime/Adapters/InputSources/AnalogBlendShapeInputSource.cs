@@ -10,19 +10,19 @@ namespace Hidano.FacialControl.Adapters.InputSources
 {
     /// <summary>
     /// 予約 id <c>analog-blendshape</c> を持つ BlendShape 値提供型アダプタ
-    /// （Req 3.1〜3.8、tasks.md 4.1）。
+    /// 。
     /// </summary>
     /// <remarks>
     /// <para>
     /// 1 つ以上の <see cref="IAnalogInputSource"/> から軸値を読出し、
-    /// binding が指定する BlendShape index に**加算**する（Req 3.3、二重 clamp なし）。
+    /// binding が指定する BlendShape index に**加算**する（二重 clamp なし）。
     /// dead-zone / scale / offset / curve / invert / clamp の値変換は Adapters 側 InputProcessor 経路で
-    /// 上流処理されるため、本アダプタは生値をそのまま反映する（Phase 3.5 / Decision 4 / Req 13.3）。
+    /// 上流処理されるため、本アダプタは生値をそのまま反映する。
     /// </para>
     /// <para>
     /// 構築時に bindings の <see cref="AnalogBindingEntry.TargetIdentifier"/> を BlendShape index に逆引きキャッシュする
-    /// （Req 3.4）。未存在 BS は <see cref="Debug.LogWarning(object)"/> + skip（Req 3.5）。
-    /// 内部出力バッファ <c>_outputCache</c> を 1 度だけ確保し、毎フレーム再利用する（Req 3.6）。
+    /// 。未存在 BS は <see cref="Debug.LogWarning(object)"/> + skip。
+    /// 内部出力バッファ <c>_outputCache</c> を 1 度だけ確保し、毎フレーム再利用する。
     /// </para>
     /// <para>
     /// 全 binding が無効ソース (<see cref="IAnalogInputSource.IsValid"/>=false / 未登録 source) の場合、
@@ -103,7 +103,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
                 {
                     Debug.LogWarning(
                         $"[AnalogBlendShapeInputSource] BlendShape '{entry.TargetIdentifier}' not found " +
-                        $"(sourceId={entry.SourceId}, sourceAxis={entry.SourceAxis}). Binding skipped (Req 3.5).");
+                        $"(sourceId={entry.SourceId}, sourceAxis={entry.SourceAxis}). Binding skipped .");
                     continue;
                 }
 

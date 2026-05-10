@@ -5,7 +5,7 @@ namespace Hidano.FacialControl.Adapters.Processors
     /// <summary>
     /// アナログ入力に preset 4 種（Linear / EaseIn / EaseOut / EaseInOut）の
     /// hard-coded カーブを適用する stateless な <see cref="InputProcessor{TValue}"/> 実装
-    /// （design.md Topic 3, research.md Topic 3 / Topic 9）。
+    /// 。
     /// </summary>
     /// <remarks>
     /// AnimationCurve は InputProcessor の serializer 制約（PrimitiveValue のみ）で扱えないため、

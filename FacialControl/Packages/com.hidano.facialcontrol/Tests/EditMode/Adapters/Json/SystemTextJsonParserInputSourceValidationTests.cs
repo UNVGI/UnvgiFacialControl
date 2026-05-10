@@ -9,10 +9,10 @@ using Hidano.FacialControl.Adapters.Json.Dto;
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 {
     /// <summary>
-    /// tasks.md 7.3: <see cref="SystemTextJsonParser"/> が
+    //: <see cref="SystemTextJsonParser"/> が
     /// <c>layers[].inputSources[]</c> の不正エントリに対して
     /// 警告 + skip / last-wins を適用し、profile ロードを継続することの契約テスト
-    /// (Req 1.7, 3.3, 3.4, D-5, D-6)。
+    /// 。
     /// <para>
     /// 検証シナリオ:
     /// <list type="bullet">
@@ -36,7 +36,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         }
 
         // ================================================================
-        // regex 違反 → 警告 + skip (Req 1.7, 3.3)
+        // regex 違反 → 警告 + skip 
         // ================================================================
 
         [Test]
@@ -110,7 +110,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         }
 
         // ================================================================
-        // 任意 slug 受理 (D-13 / Req 12.5: reserved id 体系廃止後は
+        // 任意 slug 受理 (D-13: reserved id 体系廃止後は
         // syntactic に valid な識別子はすべて parse 段階で受理し、
         // 解決失敗は実行時の InputSourceRegistry.TryResolve 側で処理する)
         // ================================================================
@@ -142,7 +142,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         }
 
         // ================================================================
-        // 重複 id → 警告 + last-wins (Req 3.4)
+        // 重複 id → 警告 + last-wins 
         // ================================================================
 
         [Test]
@@ -226,14 +226,14 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         }
 
         // ================================================================
-        // ロード継続性 (Req 3.3)
+        // ロード継続性 
         // ================================================================
 
         [Test]
         public void ParseLayerInputSources_MixedInvalidEntries_DoesNotAbortLoad()
         {
             // 1 つのレイヤーに regex 違反 / 重複 が混在していても parse は成功する。
-            // D-13 / Req 12.5 により reserved id 体系は撤廃済みのため、
+            // D-13 により reserved id 体系は撤廃済みのため、
             // syntactic に valid な slug (`unknown-thing`) は skip されず保持される。
             var json = @"{
                 ""schemaVersion"":""1.0"",

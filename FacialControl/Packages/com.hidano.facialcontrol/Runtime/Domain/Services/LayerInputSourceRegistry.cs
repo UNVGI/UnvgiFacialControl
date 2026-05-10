@@ -207,7 +207,7 @@ namespace Hidano.FacialControl.Domain.Services
         /// </para>
         /// <para>
         /// 範囲外 layer、null source、同 Id の重複はいずれも警告ログ + no-op として扱い、
-        /// 他のスロットを一切変更しない (Req 4.3)。
+        /// 他のスロットを一切変更しない 。
         /// </para>
         /// </remarks>
         public bool TryAddSource(int layerIdx, IInputSource source)
@@ -268,7 +268,7 @@ namespace Hidano.FacialControl.Domain.Services
         /// <see cref="GetSourceCountForLayer"/> は 1 減る。<see cref="MaxSourcesPerLayer"/> は縮小しない。
         /// </para>
         /// <para>
-        /// 範囲外 layer、未登録 id はいずれも警告ログ + no-op として扱い、他のスロットを変更しない (Req 4.3)。
+        /// 範囲外 layer、未登録 id はいずれも警告ログ + no-op として扱い、他のスロットを変更しない 。
         /// </para>
         /// </remarks>
         public bool TryRemoveSource(int layerIdx, InputSourceId id)

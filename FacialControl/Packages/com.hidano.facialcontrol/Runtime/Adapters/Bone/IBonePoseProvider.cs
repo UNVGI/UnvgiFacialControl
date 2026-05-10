@@ -4,11 +4,11 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Adapters.Bone
 {
     /// <summary>
-    /// 外部 (analog-input-binding 等) が active <see cref="BoneSnapshot"/> 列を注入する契約 (Req 11.1, 11.2, 11.3, 11.4, 11.5)。
+    /// 外部 (analog-input-binding 等) が active <see cref="BoneSnapshot"/> 列を注入する契約 。
     /// </summary>
     /// <remarks>
-    /// preview.1 ではメインスレッド限定契約。<see cref="SetActiveBoneSnapshots"/> は <see cref="ReadOnlyMemory{T}"/>
-    /// で配列参照を渡し、hot path で alloc しない (Req 11.5)。設定された snapshot 列は次フレームの <c>Apply</c> から有効 (Req 11.2)。
+    /// メインスレッド限定契約。<see cref="SetActiveBoneSnapshots"/> は <see cref="ReadOnlyMemory{T}"/>
+    /// で配列参照を渡し、hot path で alloc しない。設定された snapshot 列は次フレームの <c>Apply</c> から有効。
     /// </remarks>
     public interface IBonePoseProvider
     {

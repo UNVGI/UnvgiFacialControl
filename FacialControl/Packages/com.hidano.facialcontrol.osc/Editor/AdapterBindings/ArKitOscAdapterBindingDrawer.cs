@@ -8,14 +8,14 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
 {
     /// <summary>
     /// <see cref="ArKitOscAdapterBinding"/> の inline UI を提供する UI Toolkit ベースの
-    /// <see cref="PropertyDrawer"/>（Req 3.1, 3.2, 3.3, 6.5, 7.4, 7.5, 11.4、design.md `## Adapter PropertyDrawers`）。
+    /// <see cref="PropertyDrawer"/>。
     /// </summary>
     /// <remarks>
     /// <para>
     /// <c>[CustomPropertyDrawer(typeof(ArKitOscAdapterBinding))]</c> を付与し、core の
     /// <see cref="AdapterBindings.AdapterBindingsListView"/> 配下の
-    /// <see cref="UnityEditor.UIElements.PropertyField"/> から自動解決される（Req 3.3）。
-    /// core パッケージ側で本 drawer を登録しないこと（Req 3.1）。
+    /// <see cref="UnityEditor.UIElements.PropertyField"/> から自動解決される。
+    /// core パッケージ側で本 drawer を登録しないこと。
     /// </para>
     /// <para>
     /// 表示するフィールド:
@@ -28,7 +28,7 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
     /// </list>
     /// </para>
     /// <para>
-    /// 新規 IMGUI panel は導入しない（Req 11.4）。
+    /// 新規 IMGUI panel は導入しない。
     /// </para>
     /// </remarks>
     [CustomPropertyDrawer(typeof(ArKitOscAdapterBinding))]
@@ -77,7 +77,7 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
             var child = property.FindPropertyRelative(relativePath);
             if (child == null)
             {
-                // 該当フィールドが見つからない場合でも他フィールドの描画を止めない（Req 3.6 と同思想）。
+                // 該当フィールドが見つからない場合でも他フィールドの描画を止めない。
                 root.Add(new Label($"<missing field: {relativePath}>"));
                 return;
             }

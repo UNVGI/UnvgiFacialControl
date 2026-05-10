@@ -269,7 +269,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters
         }
 
         // ================================================================
-        // Phase 4.7: device 推定経路（InputDeviceCategorizer 連携）
+        // device 推定経路（InputDeviceCategorizer 連携）
         // ================================================================
 
         [Test]

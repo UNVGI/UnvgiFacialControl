@@ -3,7 +3,7 @@ namespace Hidano.FacialControl.Domain.Models
     /// <summary>
     /// <c>layers[].inputSources[]</c> の 1 宣言を表す Domain 値オブジェクト。
     /// <para>
-    /// JSON round-trip 安定性 (Req 3.5, 8.4) を実現するため、
+    /// JSON round-trip 安定性  を実現するため、
     /// <see cref="FacialProfile"/> が <c>inputSources</c> データを Parse → Serialize 経路で保持する際の担体。
     /// </para>
     /// <para>

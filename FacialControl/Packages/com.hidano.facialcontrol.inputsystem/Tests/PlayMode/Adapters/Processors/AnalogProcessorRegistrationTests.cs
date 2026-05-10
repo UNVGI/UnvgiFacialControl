@@ -7,7 +7,7 @@ using Hidano.FacialControl.Adapters.Processors;
 namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Adapters.Processors
 {
     /// <summary>
-    /// tasks.md 4.3: <see cref="AnalogProcessorRegistration"/> が 6 種の
+    //: <see cref="AnalogProcessorRegistration"/> が 6 種の
     /// <see cref="InputProcessor{TValue}"/> を Editor / Runtime 双方の初期化フェーズで
     /// <see cref="InputSystem.RegisterProcessor{T}(string)"/> 経由で登録していることを検証する。
     /// </summary>

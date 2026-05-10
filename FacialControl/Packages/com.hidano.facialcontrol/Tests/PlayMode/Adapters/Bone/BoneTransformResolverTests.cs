@@ -16,17 +16,15 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
     ///
     /// 検証項目:
     ///   - 名前から Transform を解決でき、未解決時に <c>Debug.LogWarning</c> + null 返却
-    ///     （throw しない、Req 2.4）。
-    ///   - 多バイト boneName（「頭」「左目」等）が解決できる（Req 2.2）。
-    ///   - 命名規則を強制しない（任意の prefix/suffix で OK、Req 2.5）。
+    ///     （throw しない）。
+    ///   - 多バイト boneName（「頭」「左目」等）が解決できる。
+    ///   - 命名規則を強制しない（任意の prefix/suffix で OK）。
     ///   - <c>Prime(boneNames)</c> 一括解決後、ホットパスでは辞書ルックアップのみ
     ///     （GC alloc ゼロ）。
     ///   - 同名 Transform が複数存在する場合は「最初の発見を採用 + 1 回だけ警告」
     ///     (M-7 backlog 対応)。曖昧性を避けたいときは相対 path を渡せば警告なしで解決される。
     ///   - 相対 path (<c>"Hips/Spine/Head"</c> 等) が <see cref="UnityEngine.Transform.Find"/>
-    ///     経由で解決できる (S-1 backlog 対応)。
-    ///
-    /// _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 5.1
+    ///     経由で解決できる。
     /// </summary>
     [TestFixture]
     public class BoneTransformResolverTests
@@ -96,7 +94,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
             _root = BuildHierarchy("Root", "Hips", "Head");
             var resolver = new BoneTransformResolver(_root.transform);
 
-            // 未解決時は throw せず Warning + null（Req 2.4）
+            // 未解決時は throw せず Warning + null
             LogAssert.Expect(LogType.Warning, new Regex("NonExistentBone"));
 
             Transform result = null;
@@ -119,13 +117,13 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
         }
 
         // ================================================================
-        // Resolve: 多バイト boneName（Req 2.2）
+        // Resolve: 多バイト boneName
         // ================================================================
 
         [Test]
         public void Resolve_MultiByteBoneName_Head_ReturnsTransform()
         {
-            // 多バイト文字「頭」が解決できる（Req 2.2）
+            // 多バイト文字「頭」が解決できる
             _root = BuildHierarchy("Root", "腰", "背骨", "頭");
             var resolver = new BoneTransformResolver(_root.transform);
 
@@ -138,7 +136,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
         [Test]
         public void Resolve_MultiByteBoneName_LeftEyeWithUnderscore_ReturnsTransform()
         {
-            // 多バイト + 特殊記号の組合せも解決できる（Req 2.2 / 2.5）
+            // 多バイト + 特殊記号の組合せも解決できる
             _root = BuildHierarchy("Root", "頭", "左目_あ");
             var resolver = new BoneTransformResolver(_root.transform);
 
@@ -149,7 +147,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
         }
 
         // ================================================================
-        // 命名規則を強制しない（Req 2.5）
+        // 命名規則を強制しない
         // ================================================================
 
         [Test]
@@ -238,7 +236,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Bone
         [Test]
         public void Prime_DedupesRepeatedWarningForSameMissingBone()
         {
-            // 同名 missing は一度しか warning しない（dedupe、Req 2.4）。
+            // 同名 missing は一度しか warning しない（dedupe）。
             // Prime と Resolve のどちらの経路でも一度警告したら抑制される。
             _root = BuildHierarchy("Root", "Hips", "Head");
             var resolver = new BoneTransformResolver(_root.transform);

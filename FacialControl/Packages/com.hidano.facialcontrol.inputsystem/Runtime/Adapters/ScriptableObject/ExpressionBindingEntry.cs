@@ -12,8 +12,8 @@ namespace Hidano.FacialControl.InputSystem.Adapters.ScriptableObject
     /// <remarks>
     /// device 種別 (Keyboard / Controller) は <c>ExpressionInputSourceAdapter</c> が
     /// <see cref="UnityEngine.InputSystem.InputAction.bindings"/> から自動推定するため、
-    /// 旧 <c>category</c> field は撤去された (Req 7.1, tasks.md 4.6)。
-    /// preview.1 の破壊的変更により、旧 <c>InputSystemGazeBinding</c> と
+    /// 旧 <c>category</c> field は撤去された。
+    /// 旧 <c>InputSystemGazeBinding</c> と
     /// <c>AnalogExpressionBindingEntry</c> 由来の機能を <see cref="bindingMode"/> による
     /// 1 リスト内分別で統合する。
     /// </remarks>

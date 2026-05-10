@@ -5,8 +5,8 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
     /// <summary>
-    /// Phase 3.1 (inspector-and-data-model-redesign) 対応で全面書き換え済みの ExpressionTests。
-    /// 新スキーマ (Id / Name / Layer / OverrideMask: LayerOverrideMask / SnapshotId: string) を中心に検証する。
+    /// ExpressionTests。
+    /// スキーマ (Id / Name / Layer / OverrideMask: LayerOverrideMask / SnapshotId: string) を中心に検証する。
     /// </summary>
     [TestFixture]
     public class ExpressionTests

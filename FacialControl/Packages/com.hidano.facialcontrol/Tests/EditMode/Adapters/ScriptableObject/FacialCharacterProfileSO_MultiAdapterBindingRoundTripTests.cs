@@ -13,7 +13,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
     /// <see cref="ArKitOscAdapterBinding"/> の 3 種を同時に保持し、
     /// <c>AssetDatabase.CreateAsset</c> → <c>LoadAssetAtPath</c> の round-trip で
     /// 3 種の concrete type identity と各 inline serialized field が維持されることを assert する。
-    /// task 12.3 / Req 2.3, 6.6 に対応する Phase 2 完了後検証。
+    /// task 12.3, 6.6 に対応する Phase 2 完了後検証。
     /// </summary>
     [TestFixture]
     public class FacialCharacterProfileSO_MultiAdapterBindingRoundTripTests
@@ -55,7 +55,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
         [Test]
         public void AdapterBindings_InputSystemAndOscAndArKit_RoundTripPreservesConcreteTypeIdentity()
         {
-            // Req 2.3, 6.6: 単一 SO に 3 種 binding を同時保持できることを round-trip で検証する。
+            /, 6.6: 単一 SO に 3 種 binding を同時保持できることを round-trip で検証する。
             var so = UnityEngine.ScriptableObject.CreateInstance<TestFacialCharacterProfileSO>();
 
             var input = new InputSystemAdapterBinding
@@ -94,7 +94,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
             Assert.That(loaded.AdapterBindings, Is.Not.Null);
             Assert.That(loaded.AdapterBindings.Count, Is.EqualTo(3));
 
-            // 3 種の concrete type identity が維持されていること（Req 6.6）。
+            // 3 種の concrete type identity が維持されていること。
             Assert.That(loaded.AdapterBindings[0], Is.InstanceOf<InputSystemAdapterBinding>(),
                 "Index 0 は InputSystemAdapterBinding として round-trip するはず");
             Assert.That(loaded.AdapterBindings[1], Is.InstanceOf<OscAdapterBinding>(),

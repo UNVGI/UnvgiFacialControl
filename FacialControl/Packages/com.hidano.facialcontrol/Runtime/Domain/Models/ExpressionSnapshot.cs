@@ -22,10 +22,10 @@ namespace Hidano.FacialControl.Domain.Models
         /// <summary>表情を一意に識別する Id（null は空文字に正規化）。</summary>
         public string Id { get; }
 
-        /// <summary>表情遷移時間（秒）。0〜1 秒、デフォルトは <see cref="Expression.DefaultTransitionDuration"/>（1/15 秒）（Req 2.5）。</summary>
+        /// <summary>表情遷移時間（秒）。0〜1 秒、デフォルトは <see cref="Expression.DefaultTransitionDuration"/>（1/15 秒）。</summary>
         public float TransitionDuration { get; }
 
-        /// <summary>遷移カーブプリセット（Linear / EaseIn / EaseOut / EaseInOut）。デフォルト Linear（Req 2.6）。</summary>
+        /// <summary>遷移カーブプリセット（Linear / EaseIn / EaseOut / EaseInOut）。デフォルト Linear。</summary>
         public TransitionCurvePreset TransitionCurvePreset { get; }
 
         /// <summary>BlendShape スナップショット配列。外部から書換不可（防御コピー済）。</summary>

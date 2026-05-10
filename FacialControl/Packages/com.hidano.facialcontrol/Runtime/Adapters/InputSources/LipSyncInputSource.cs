@@ -10,7 +10,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
     /// 予約 id <c>lipsync</c> を持つ BlendShape 値提供型アダプタ。
     /// <see cref="ILipSyncProvider.GetLipSyncValues(Span{float})"/> の出力を
     /// <c>output</c> Span にコピーし、値合計が <see cref="SilenceThreshold"/> 未満の
-    /// 無音フレームでは <c>IsValid = false</c> を返す（Req 5.3, 5.6, 5.7）。
+    /// 無音フレームでは <c>IsValid = false</c> を返す。
     /// </summary>
     /// <remarks>
     /// <para>

@@ -130,8 +130,7 @@ namespace Hidano.FacialControl.Adapters.Playable
             // 各アダプタの TriggerOn/Off または WriteTick 経由で駆動される。
             _layerUseCase.UpdateWeights(Time.deltaTime);
 
-            // Aggregator 出力を BlendShape に転写。PlayableGraph の出力はバイパスする
-            // （PlayableGraph は preview.2 以降で撤去検討）。
+            // Aggregator 出力を BlendShape に転写。PlayableGraph の出力はバイパスする。
             var output = _layerUseCase.BlendedOutputSpan;
 
             int count = Math.Min(output.Length, _blendShapeTargets.Length);
@@ -149,7 +148,7 @@ namespace Hidano.FacialControl.Adapters.Playable
                 }
             }
 
-            // BoneWriter は LateUpdate 末尾で適用する（Animator → BlendShape → BoneWriter の順、Req 5.3）。
+            // BoneWriter は LateUpdate 末尾で適用する（Animator → BlendShape → BoneWriter の順）。
             _boneWriter?.Apply();
         }
 
@@ -223,7 +222,7 @@ namespace Hidano.FacialControl.Adapters.Playable
 
             var blendShapeNames = _blendShapeNames ?? Array.Empty<string>();
 
-            // VContainer の per-FC child scope を無条件で build する（tasks.md 11.1: DD-2 並走期終了）。
+            // VContainer の per-FC child scope を無条件で build する。
             // 各 binding の OnStart は VContainer の IInitializable 経由で同期的に呼ばれ、
             // 自身の IInputSource を child scope の InputSourceRegistry に slug ベースで登録する。
             BuildAdapterBindingsChildScope(profile, blendShapeNames);
@@ -241,7 +240,7 @@ namespace Hidano.FacialControl.Adapters.Playable
 
             _graphBuildResult.Graph.Play();
 
-            // BoneWriter を生成・初期化（Req 5.3, 5.6, 11.1〜11.4）。
+            // BoneWriter を生成・初期化。
             SetupBoneWriter(profile);
 
             _isInitialized = true;
@@ -270,7 +269,7 @@ namespace Hidano.FacialControl.Adapters.Playable
             }
 
             // _characterSO が null または AdapterBindings が空でも child scope は build する
-            // （新 binding 経路一本化、tasks.md 11.1: 無条件 build）。
+            // （新 binding 経路一本化: 無条件 build）。
             // bindings が無い場合は空 list を渡して InputSourceRegistry のみ container に登録される。
             try
             {
@@ -532,8 +531,8 @@ namespace Hidano.FacialControl.Adapters.Playable
                 }
             }
 
-            // Phase 3.3 (inspector-and-data-model-redesign) 以降、初期 BoneSnapshot 列は profile から
-            // 撤去されたため空で初期化する。analog-input-binding 等が後から SetActiveBoneSnapshots で流す。
+            // 初期 BoneSnapshot 列は profile に保持しない設計のため空で初期化する。
+            // analog-input-binding 等が後から SetActiveBoneSnapshots で流す。
             _boneWriter.Initialize(ReadOnlyMemory<BoneSnapshot>.Empty, basisBoneName);
         }
 
@@ -627,8 +626,8 @@ namespace Hidano.FacialControl.Adapters.Playable
         /// <summary>
         /// (layer, source) スロットの入力源ウェイトをランタイムで書込む (8.3)。
         /// 任意スレッドから呼出可能で、書込は次回の <c>LayerInputSourceAggregator.Aggregate</c>
-        /// 入口の <c>SwapIfDirty</c> 以降に観測される (Req 4.1, 4.2, 4.4)。
-        /// 値は 0〜1 に silent clamp され、範囲外 (layer, source) は警告 + no-op (Req 4.3)。
+        /// 入口の <c>SwapIfDirty</c> 以降に観測される 。
+        /// 値は 0〜1 に silent clamp され、範囲外 (layer, source) は警告 + no-op 。
         /// 未初期化の場合は警告ログを出して何もしない。
         /// </summary>
         /// <param name="layerIdx">レイヤーインデックス。</param>
@@ -672,7 +671,7 @@ namespace Hidano.FacialControl.Adapters.Playable
         /// 入力源ウェイトのバルク書込スコープを開始する (8.3)。
         /// 返された <see cref="LayerInputSourceWeightBuffer.BulkScope"/> の
         /// <c>SetWeight</c> で書いた値はスコープの <c>Dispose</c> 時に一括 flush され、
-        /// 次回 Aggregate で atomic に観測される (Req 4.5)。
+        /// 次回 Aggregate で atomic に観測される 。
         /// 戻り値は <see cref="IDisposable"/> として <c>using</c> 文で利用可能。
         /// 未初期化の場合は no-op となるスコープを返す。
         /// </summary>
@@ -689,7 +688,7 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         /// <summary>
         /// 直近 Aggregate で観測された (layer, source) ウェイトの診断スナップショットを返す
-        /// (Req 8.1, 8.3, 8.6)。Editor の読取専用ビュー向け。
+        /// 。Editor の読取専用ビュー向け。
         /// 未初期化の場合は空リストを返す。
         /// </summary>
         public IReadOnlyList<LayerSourceWeightEntry> GetInputSourceWeightsSnapshot()
@@ -723,7 +722,7 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         /// <summary>
         /// 外部 (analog-input-binding 等) から現在 active な <see cref="BoneSnapshot"/> 列を差替える
-        /// (Req 11.1, 11.2, 11.3, 11.4, 11.5)。次フレームの <see cref="BoneWriter.Apply"/> から有効。
+        /// 。次フレームの <see cref="BoneWriter.Apply"/> から有効。
         /// </summary>
         public void SetActiveBoneSnapshots(ReadOnlyMemory<BoneSnapshot> snapshots)
         {
@@ -737,7 +736,7 @@ namespace Hidano.FacialControl.Adapters.Playable
         }
 
         /// <summary>
-        /// 現在 active な <see cref="BoneSnapshot"/> 列を返す (Req 5.6, 11.1)。
+        /// 現在 active な <see cref="BoneSnapshot"/> 列を返す 。
         /// </summary>
         public ReadOnlyMemory<BoneSnapshot> GetActiveBoneSnapshots()
         {
@@ -921,8 +920,8 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         private void Cleanup()
         {
-            // child scope を build していた場合は最初に Dispose し、binding.Dispose を完了させる
-            // （tasks.md 6.2: child scope.Dispose() を最初に呼び host 群の Dispose を完了させてから既存 cleanup を行う）。
+            // child scope を build していた場合は最初に Dispose し、binding.Dispose を完了させる。
+            // host 群の Dispose を完了させてから既存 cleanup を行う。
             if (_childLifetimeScope != null)
             {
                 _childLifetimeScope.Dispose();

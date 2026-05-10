@@ -14,11 +14,10 @@ namespace Hidano.FacialControl.Domain.Adapters
     /// <remarks>
     /// <para>
     /// 値型のため stack 渡し。<c>in</c> 修飾で binding の <see cref="AdapterBindingBase.OnStart"/>
-    /// に渡され、boxing なしで field アクセス可能（Req 4.10, 13.1）。
+    /// に渡され、boxing なしで field アクセス可能。
     /// </para>
     /// <para>
-    /// 設計上の Boundary Note: design.md の component 表は本 struct を Adapters/DI 層に置くと
-    /// 記述しているが、<see cref="AdapterBindingBase.OnStart(in AdapterBuildContext)"/> が Domain
+    /// <see cref="AdapterBindingBase.OnStart(in AdapterBuildContext)"/> が Domain
     /// 層から本 struct を参照する都合上、Domain.Adapters 名前空間に配置する。
     /// </para>
     /// </remarks>

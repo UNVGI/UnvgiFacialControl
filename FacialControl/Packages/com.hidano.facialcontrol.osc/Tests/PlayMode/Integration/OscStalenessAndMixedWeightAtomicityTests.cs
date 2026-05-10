@@ -14,7 +14,7 @@ using Hidano.FacialControl.Domain.Services;
 namespace Hidano.FacialControl.Tests.PlayMode.Integration
 {
     /// <summary>
-    /// タスク 10.6 PlayMode 統合テスト: 実 <see cref="UnityTimeProvider"/> 下での OSC staleness
+    // PlayMode 統合テスト: 実 <see cref="UnityTimeProvider"/> 下での OSC staleness
     /// タイムアウト動作と、同フレーム内における Bulk / Single Set 混在の atomic 観測を検証する。
     /// </summary>
     /// <remarks>
@@ -23,11 +23,11 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
     /// </para>
     /// <list type="bullet">
     ///   <item>実 <see cref="UnityTimeProvider"/> 下で <c>stalenessSeconds = 1.0</c> の OSC 入力が
-    ///   1 秒超過した時点で <see cref="OscInputSource.TryWriteValues"/> が false を返すこと (Req 5.5)。</item>
+    ///   1 秒超過した時点で <see cref="OscInputSource.TryWriteValues"/> が false を返すこと 。</item>
     ///   <item>同フレーム内で <see cref="LayerUseCase.BeginInputSourceWeightBatch"/> 経由の Bulk 書込と
     ///   <see cref="LayerUseCase.SetInputSourceWeight"/> 経由の Single 書込を混在させても、
     ///   次フレームの <see cref="LayerUseCase.UpdateWeights"/> 実行後に全書込が期待どおりに
-    ///   BlendShape 出力へ反映されること (Req 4.5, D-7)。</item>
+    ///   BlendShape 出力へ反映されること 。</item>
     /// </list>
     /// </remarks>
     [TestFixture]
@@ -70,7 +70,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             bool wrote = source.TryWriteValues(output);
 
             Assert.IsFalse(wrote,
-                "実 UnityTimeProvider 下で staleness 1 秒を超過したら IsValid=false を返すこと (Req 5.5)。");
+                "実 UnityTimeProvider 下で staleness 1 秒を超過したら IsValid=false を返すこと 。");
             Assert.AreEqual(99f, output[0], 1e-5f,
                 "false を返した場合は output を変更しないこと (IInputSource 契約)。");
             Assert.AreEqual(99f, output[1], 1e-5f);
@@ -164,7 +164,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
                 layerUseCase.UpdateWeights(0.016f);
                 var output1 = layerUseCase.GetBlendedOutput();
                 Assert.AreEqual(0.2f, output1[1], 1e-4f,
-                    "Single 先行 + Bulk 後続の場合、Bulk commit が writeBuffer を上書きし last-writer-wins となること (Req 4.5, D-7)。");
+                    "Single 先行 + Bulk 後続の場合、Bulk commit が writeBuffer を上書きし last-writer-wins となること 。");
 
                 // ケース 2: Bulk → Single の順で同 source を上書き。Single が直接 writeBuffer に
                 //           書込むため last-writer (= Single) が勝つ。
@@ -179,7 +179,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
                 layerUseCase.UpdateWeights(0.016f);
                 var output2 = layerUseCase.GetBlendedOutput();
                 Assert.AreEqual(0.9f, output2[1], 1e-4f,
-                    "Bulk 先行 + Single 後続の場合、Single の直接書込が勝ち last-writer-wins となること (Req 4.5, D-7)。");
+                    "Bulk 先行 + Single 後続の場合、Single の直接書込が勝ち last-writer-wins となること 。");
             }
             finally
             {

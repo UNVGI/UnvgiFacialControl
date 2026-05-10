@@ -9,9 +9,9 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance
 {
     /// <summary>
-    /// tasks.md 4.8: <see cref="ExpressionInputSourceAdapter"/> の
+    //: <see cref="ExpressionInputSourceAdapter"/> の
     /// <c>InputAction.performed</c> dispatch ホットパスが 100 回連続呼出で 0-alloc であることを
-    /// 検証する PlayMode/Performance テスト（Req 11.3, 11.5, 12.7）。
+    /// 検証する PlayMode/Performance テスト。
     /// </summary>
     /// <remarks>
     /// <para>

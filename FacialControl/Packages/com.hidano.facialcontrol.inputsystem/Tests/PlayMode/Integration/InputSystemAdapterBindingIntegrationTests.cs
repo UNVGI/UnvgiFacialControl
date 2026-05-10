@@ -19,7 +19,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
     /// <see cref="InputSystemAdapterBinding"/> が <c>OnStart</c> で
     /// <c>InputActionAsset.Instantiate</c> + <c>ActionMap.Enable</c> を実行し、
     /// InputAction 仮想 device → ExpressionTrigger / Analog / Gaze の 3 経路（D-8 集約）で
-    /// 入力源が登録 / 解決可能になることを assert する（Req 6.1, 6.5, 6.8, 7.4, 7.5）。
+    /// 入力源が登録 / 解決可能になることを assert する。
     /// <c>Dispose</c> で <c>ActionMap.Disable</c> + 内部 Asset destroy + provider dispose が
     /// 走り再 <c>Dispose</c> 呼び出しが冪等であることも検証する。
     /// </summary>
@@ -120,9 +120,9 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
 
             InputActionMap runtimeMap = _binding.RuntimeActionMap;
             Assert.IsNotNull(runtimeMap,
-                "OnStart 後は RuntimeActionMap が解決済みであるべき（Req 6.1）。");
+                "OnStart 後は RuntimeActionMap が解決済みであるべき。");
             Assert.IsTrue(runtimeMap.enabled,
-                "OnStart は instantiate した runtime ActionMap を Enable するべき（Req 6.1, D-10）。");
+                "OnStart は instantiate した runtime ActionMap を Enable するべき。");
         }
 
         [Test]
@@ -177,7 +177,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
 
             bool resolved = _registry.TryResolve(slug, out IInputSource source);
             Assert.IsTrue(resolved,
-                $"InputSourceRegistry.TryResolve(\"{slug}\") は OnStart 後に true を返すべき（Req 6.1, D-3）。");
+                $"InputSourceRegistry.TryResolve(\"{slug}\") は OnStart 後に true を返すべき。");
             Assert.IsNotNull(source,
                 "解決結果の IInputSource は non-null であるべき。");
         }
@@ -211,7 +211,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             ExpressionInputSourceAdapter adapter =
                 _hostGameObject.GetComponent<ExpressionInputSourceAdapter>();
             Assert.IsNotNull(adapter,
-                "OnStart は ExpressionTrigger 経路のために ExpressionInputSourceAdapter を host GameObject に AddComponent するべき（Req 6.8, D-8）。");
+                "OnStart は ExpressionTrigger 経路のために ExpressionInputSourceAdapter を host GameObject に AddComponent するべき。");
         }
 
         [Test]
@@ -242,10 +242,10 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             _binding.OnStart(in ctx);
             _bindingStarted = true;
 
-            // Composite slug `<slug>:<actionName>` で analog source が解決できるべき（Req 12.4 (b)）。
+            // Composite slug `<slug>:<actionName>` で analog source が解決できるべき。
             bool resolved = _registry.TryResolve(slug + ":GazeLook", out IInputSource source);
             Assert.IsTrue(resolved,
-                $"Analog 経路の InputSource は \"{slug}:GazeLook\" で解決できるべき（Req 12.4, D-8）。");
+                $"Analog 経路の InputSource は \"{slug}:GazeLook\" で解決できるべき。");
             Assert.IsNotNull(source);
         }
 
@@ -360,7 +360,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             _bindingStarted = false;
 
             Assert.IsFalse(runtimeMap.enabled,
-                "Dispose は runtime ActionMap を Disable するべき（Req 6.1, D-10）。");
+                "Dispose は runtime ActionMap を Disable するべき。");
         }
 
         [UnityTest]
@@ -395,7 +395,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
 
             // Unity の Object 等価性: Destroy 後の参照は == null となる。
             Assert.IsTrue(runtimeAsset == null,
-                "Dispose は Instantiate した runtime ActionAsset を Destroy するべき（Req 6.1, D-10）。");
+                "Dispose は Instantiate した runtime ActionAsset を Destroy するべき。");
         }
 
         [Test]
@@ -477,7 +477,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             _bindingStarted = false;
 
             Assert.DoesNotThrow(() => _binding.Dispose(),
-                "Dispose は冪等で 2 回目以降の呼び出しでも例外を投げないべき（Req 13.5）。");
+                "Dispose は冪等で 2 回目以降の呼び出しでも例外を投げないべき。");
         }
 
         // ---------------------------------------------------------------

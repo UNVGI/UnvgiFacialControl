@@ -4,7 +4,7 @@ namespace Hidano.FacialControl.Domain.Interfaces
 {
     /// <summary>
     /// アナログ入力源の Unity 非依存契約。scalar / 2-axis / N-axis のいずれかを返す。
-    /// Domain 層配置のため Unity API に非依存（Req 1.5）。
+    /// Domain 層配置のため Unity API に非依存。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -18,28 +18,28 @@ namespace Hidano.FacialControl.Domain.Interfaces
     /// Postconditions:
     /// <list type="bullet">
     ///   <item><see cref="IsValid"/> が false のとき <c>TryRead*</c> は false を返し、out 引数 / output は不変。</item>
-    ///   <item>true でも実装側のサポート外形（例: scalar 専用ソースに <see cref="TryReadAxes"/>）は false を許容（Req 1.4）。</item>
-    ///   <item><see cref="TryReadAxes"/> は overlap 範囲のみ書込み、output が AxisCount より長い場合の残余は呼出側責務（Req 1.4）。</item>
+    ///   <item>true でも実装側のサポート外形（例: scalar 専用ソースに <see cref="TryReadAxes"/>）は false を許容。</item>
+    ///   <item><see cref="TryReadAxes"/> は overlap 範囲のみ書込み、output が AxisCount より長い場合の残余は呼出側責務。</item>
     /// </list>
     /// </para>
     /// <para>
     /// Invariants:
     /// <list type="bullet">
     ///   <item><see cref="Id"/> と <see cref="AxisCount"/> は構築後不変。</item>
-    ///   <item><see cref="Id"/> は <c>[a-zA-Z0-9_.\-:]{1,64}</c> 規約を満たす（Req 1.2 / D-6）。<c>:</c> は <c>slug:sub</c> 合成キーの区切り文字。</item>
+    ///   <item><see cref="Id"/> は <c>[a-zA-Z0-9_.\-:]{1,64}</c> 規約を満たす。<c>:</c> は <c>slug:sub</c> 合成キーの区切り文字。</item>
     /// </list>
     /// </para>
     /// </remarks>
     public interface IAnalogInputSource
     {
         /// <summary>
-        /// 入力源識別子。<c>[a-zA-Z0-9_.\-:]{1,64}</c> 規約に従う（Req 1.2）。
+        /// 入力源識別子。<c>[a-zA-Z0-9_.\-:]{1,64}</c> 規約に従う。
         /// <c>:</c> は <c>slug:sub</c> 形式の合成キー区切り文字として使われる。
         /// </summary>
         string Id { get; }
 
         /// <summary>
-        /// 有効性フラグ。false の間 <c>TryRead*</c> は false を返してよい（Req 1.3 / 1.6 last-valid policy）。
+        /// 有効性フラグ。false の間 <c>TryRead*</c> は false を返してよい（last-valid policy）。
         /// </summary>
         bool IsValid { get; }
 
@@ -68,7 +68,7 @@ namespace Hidano.FacialControl.Domain.Interfaces
 
         /// <summary>
         /// N-axis 値の取得。<paramref name="output"/> の長さが <see cref="AxisCount"/> より小さい場合は overlap のみ書込み true。
-        /// 長い場合は <see cref="AxisCount"/> まで書込み、残余は呼出側責務（Req 1.4）。
+        /// 長い場合は <see cref="AxisCount"/> まで書込み、残余は呼出側責務。
         /// </summary>
         /// <param name="output">書込先バッファ。Length &gt; 0。</param>
         /// <returns>有効なら true、無効なら false（false の場合 <paramref name="output"/> は不変）。</returns>

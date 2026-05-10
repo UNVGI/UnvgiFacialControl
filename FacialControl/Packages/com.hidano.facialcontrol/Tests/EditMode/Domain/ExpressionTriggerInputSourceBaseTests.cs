@@ -12,7 +12,7 @@ using Hidano.FacialControl.Domain.Services;
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
     /// <summary>
-    /// ExpressionTriggerInputSourceBase のテスト (tasks.md 4.2)。
+    /// ExpressionTriggerInputSourceBase のテスト 。
     /// </summary>
     /// <remarks>
     /// 観測完了条件:
@@ -333,7 +333,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             Assert.AreEqual(1.0f, buffer[1], 1e-5f, "angry should be 1 under Blend");
         }
 
-        // ----- 3.1 ExpressionTrigger の transition union mask (Req 1.2, 1.3, 10.9) -----
+        // ----- 3.1 ExpressionTrigger の transition union mask  -----
 
         [Test]
         public void ContributeMask_DuringExpressionTransition_ReturnsOutgoingAndIncomingUnion()
@@ -442,7 +442,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             Assert.IsFalse(wrote, "フェードアウト完了後は空スタック状態で false を返す");
         }
 
-        // ----- 4.3 スタック深度超過時の最古 drop と per-instance 1 回 warning (Req 1.6) -----
+        // ----- 4.3 スタック深度超過時の最古 drop と per-instance 1 回 warning  -----
 
         [Test]
         public void StackDepthExceeded_EmitsWarningOncePerInstance()

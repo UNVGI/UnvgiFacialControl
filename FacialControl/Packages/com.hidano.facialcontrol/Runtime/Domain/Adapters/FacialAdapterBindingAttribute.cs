@@ -8,7 +8,7 @@ namespace Hidano.FacialControl.Domain.Adapters
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Domain layer 配置（Req 1.2, 4.4, 11.1）。adapter package は core を参照するだけで利用可能。
+    /// Domain layer 配置。adapter package は core を参照するだけで利用可能。
     /// 同一クラスへの多重付与・継承は不可（<see cref="AttributeUsageAttribute.AllowMultiple"/> = false,
     /// <see cref="AttributeUsageAttribute.Inherited"/> = false）。
     /// </para>

@@ -13,7 +13,7 @@ using Hidano.FacialControl.Tests.Shared;
 namespace Hidano.FacialControl.Tests.EditMode.Domain
 {
     /// <summary>
-    /// LayerInputSourceRegistry の初期化・プール確保・基本アクセサのテスト (tasks.md 3.5)。
+    /// LayerInputSourceRegistry の初期化・プール確保・基本アクセサのテスト 。
     /// </summary>
     /// <remarks>
     /// 観測完了条件: 3 layer × 2 source × 200 blendShape の Registry を構築すると、
@@ -319,7 +319,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
                 "Dispose 後は scratch バッファが解放されるため IsEmpty を返すこと");
         }
 
-        // ----- 3.6 低頻度ランタイム API: TryAddSource / TryRemoveSource (Req 1.2, 4.3) -----
+        // ----- 3.6 低頻度ランタイム API: TryAddSource / TryRemoveSource  -----
 
         [Test]
         public void TryAddSource_WithinExistingCapacity_ReusesFreedSlot()

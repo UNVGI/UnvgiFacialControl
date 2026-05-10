@@ -14,7 +14,7 @@ namespace Hidano.FacialControl.Domain.Services
     /// </summary>
     /// <remarks>
     /// <para>
-    /// 本基底は Req 1.6 / 1.8 を満たすためのインスタンス独立性を確保する。
+    /// 本基底はインスタンス独立性を確保する。
     /// 同レイヤーに複数の <see cref="ExpressionTriggerInputSourceBase"/> 派生を配置しても、
     /// 各インスタンスの Expression スタックと
     /// 遷移状態は互いに干渉しない。
@@ -159,7 +159,7 @@ namespace Hidano.FacialControl.Domain.Services
         /// 既に積まれている場合は一旦 remove してから末尾に再配置する (LIFO 位置を最新化)。
         /// 深度が <see cref="MaxStackDepth"/> を超える場合は最古の Expression が自動 drop され、
         /// 当該インスタンスで初回のみ <see cref="UnityEngine.Debug.LogWarning(object)"/> が出る
-        /// (per-instance 1 回のみ、Req 1.6)。
+        /// (per-instance 1 回のみ)。
         /// push 後、現在値をスナップショットとして新ターゲットへの遷移を開始する。
         /// </summary>
         /// <param name="expressionId">push する Expression の ID。</param>

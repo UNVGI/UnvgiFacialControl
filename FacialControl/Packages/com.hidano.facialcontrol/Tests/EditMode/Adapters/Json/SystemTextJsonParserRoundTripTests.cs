@@ -5,9 +5,7 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 {
     /// <summary>
-    /// Phase 3.6 (inspector-and-data-model-redesign) tasks.md 3.6:
-    /// <see cref="SystemTextJsonParser"/> のプロファイル JSON round-trip 契約テスト
-    /// (Req 3.5, 8.4, 9.1, 9.7, 10.1)。
+    /// <see cref="SystemTextJsonParser"/> のプロファイル JSON round-trip 契約テスト。
     /// <para>
     /// 観測完了条件:
     /// <list type="bullet">
@@ -84,7 +82,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 
             Assert.AreEqual(s1, s2);
 
-            // 宣言順の保持 (Req 3.5): [input, osc] が保たれる。
+            // 宣言順の保持 : [input, osc] が保たれる。
             Assert.AreEqual(2, p2.LayerInputSources.Span[0].Length);
             Assert.AreEqual("input", p2.LayerInputSources.Span[0][0].Id);
             Assert.AreEqual("osc", p2.LayerInputSources.Span[0][1].Id);
@@ -121,7 +119,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         }
 
         // ================================================================
-        // 宣言順と既定値の扱い (Req 3.5)
+        // 宣言順と既定値の扱い 
         // ================================================================
 
         [Test]

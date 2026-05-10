@@ -4,7 +4,7 @@ namespace Hidano.FacialControl.Domain.Models
 {
     /// <summary>
     /// 1 つのアナログ入力源軸 → 1 つのターゲット (BlendShape または BonePose 軸) の
-    /// 宣言的バインディング (Domain 値型, Req 6.2)。
+    /// 宣言的バインディング (Domain 値型)。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -20,11 +20,10 @@ namespace Hidano.FacialControl.Domain.Models
     /// BonePose ターゲットでは原則 Bipolar / Scale=1 で使う想定。
     /// </para>
     /// <para>
-    /// Phase 3.5 で <c>Mapping</c> field を撤去し、5 値（SourceId / SourceAxis / TargetKind /
-    /// TargetIdentifier / TargetAxis）構成だった。今回 BlendShape clip 駆動の必要性により
-    /// Scale / Direction を追加した（gaze-blendshape-clip 系）。
+    /// 5 値（SourceId / SourceAxis / TargetKind / TargetIdentifier / TargetAxis）に加え、
+    /// BlendShape clip 駆動の必要性により Scale / Direction を持つ（gaze-blendshape-clip 系）。
     /// dead-zone / scale (axis 全体) / offset / curve / invert / clamp の値変換は
-    /// Adapters 側 InputProcessor 経路（<c>InputActionReference</c>）で扱う（Decision 4 / Req 13.3）。
+    /// Adapters 側 InputProcessor 経路（<c>InputActionReference</c>）で扱う。
     /// </para>
     /// </remarks>
     public readonly struct AnalogBindingEntry

@@ -14,10 +14,9 @@ using Object = UnityEngine.Object;
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
 {
     /// <summary>
-    /// Task 1.5: SO ルート <c>_gazeConfigs</c> を Exporter → JSON → Parser → Converter で
+    /// SO ルート <c>_gazeConfigs</c> を Exporter → JSON → Parser → Converter で
     /// ラウンドトリップさせ、各 entry が value-equal で復元されることを保証する。
     /// 旧 v2.0 JSON が parser で strict 拒否され続ける（自動 migration が存在しない）ことも併せて確認する。
-    /// _Requirements: 2.5, 2.6, 11.1, 11.7
     /// </summary>
     [TestFixture]
     public class FacialCharacterProfileSO_GazeConfigsRoundTripTests
@@ -30,7 +29,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
         [Test]
         public void RoundTrip_MultipleGazeConfigs_PreservesValueEqualEntriesAtSORoot()
         {
-            // ラウンドトリップ手順（Req 2.5 / 11.1）:
+            // ラウンドトリップ手順:
             //   (a) SO ルートに GazeBindingConfig を 2 件詰める。
             //   (b) FacialCharacterProfileExporter で StreamingAssets profile.json に書き出す（SO → JSON）。
             //   (c) SystemTextJsonParser.ParseProfileSnapshotV2 で v1.0 strict パース。
@@ -90,7 +89,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
         public void RoundTrip_EmptyGazeConfigs_RestoresEmptyListWithoutNull()
         {
             // SO ルートが空 list でも JSON ↔ SO ラウンドトリップが破綻しないことを保証する。
-            // Converter は空 list を null 化せず new List<GazeBindingConfig>() を返す（design Req 1.1 / 1.2）。
+            // Converter は空 list を null 化せず new List<GazeBindingConfig>() を返す。
 
             var so = UnityEngine.ScriptableObject.CreateInstance<TestCharacterSO>();
             string assetName = "GazeConfigsRoundTripEmpty_" + Guid.NewGuid().ToString("N");
@@ -127,7 +126,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
         [Test]
         public void Parse_UnsupportedSchemaVersion_IsRejectedToKeepCIFailingOnUnsupportedJson()
         {
-            // Req 2.6: preview.1 段階の "1.0" 以外（未サポート）の JSON が誤って silent migrate されないこと。
+            // "1.0" 以外（未サポート）の JSON が誤って silent migrate されないこと。
             // パーサが schemaVersion="2.0" のような未サポート値を NotSupportedException で拒否し続けることで、
             // 自動 migration コードを書かないという方針が CI で守られる（CI が落ちる挙動を維持）。
             var unsupportedJson =

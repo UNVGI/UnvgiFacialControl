@@ -11,9 +11,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
     /// SwapIfDirty (index flip + copy-forward) / BulkScope / 範囲外警告 の契約テスト。
     /// </summary>
     /// <remarks>
-    /// 3.1 の silent clamp (Req 2.5, 4.1)、3.2 の copy-forward (Critical 1 回帰防止,
-    /// Req 4.2, 4.4)、3.3 の BulkScope による atomic flush (Req 4.5)、
-    /// 3.4 の範囲外 (layer, source) への Set で警告 + no-op (Req 4.3) を検証する。
+    /// 3.1 の silent clamp 、3.2 の copy-forward (Critical 1 回帰防止,
+    //, 4.4)、3.3 の BulkScope による atomic flush 、
+    /// 3.4 の範囲外 (layer, source) への Set で警告 + no-op  を検証する。
     /// </remarks>
     [TestFixture]
     public class LayerInputSourceWeightBufferTests
@@ -138,7 +138,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         public void SwapIfDirty_FrameWithoutSetAfterWrite_PreservesPreviousValue_CopyForward()
         {
             // Critical 1 回帰: フレーム 1 で Set → Swap、フレーム 2 は Set なしで Swap しても
-            // 直近書込値が保たれていること (スタレデータバグ防止, Req 4.2, 4.4)。
+            // 直近書込値が保たれていること (スタレデータバグ防止, 4.4)。
             using var buffer = new LayerInputSourceWeightBuffer(layerCount: 1, maxSourcesPerLayer: 1);
 
             // Frame 1
@@ -178,7 +178,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void SwapIfDirty_ConsecutiveSwapsWithoutWrite_AreAllNoOp()
         {
-            // 「Set なしの SwapIfDirty は値を変化させない」(tasks.md 3.2 観測完了条件の 2 つ目)。
+            // 「Set なしの SwapIfDirty は値を変化させない」。
             using var buffer = new LayerInputSourceWeightBuffer(layerCount: 1, maxSourcesPerLayer: 1);
 
             buffer.SetWeight(0, 0, 0.8f);
@@ -201,7 +201,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             Assert.DoesNotThrow(() => buffer.Dispose());
         }
 
-        // ----- 3.3 BulkScope による atomic flush (Req 4.5) -----
+        // ----- 3.3 BulkScope による atomic flush  -----
 
         [Test]
         public void BulkScope_WritesBeforeDispose_AreNotObservableEvenAfterSwap()
@@ -319,7 +319,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             buffer.SwapIfDirty();
 
             Assert.AreEqual(0.5f, buffer.GetWeight(0, 0),
-                "BulkScope でも範囲外キーは warning + no-op で既存値を変更しないこと (Req 4.3)");
+                "BulkScope でも範囲外キーは warning + no-op で既存値を変更しないこと ");
         }
 
         [Test]
@@ -380,7 +380,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             Assert.AreEqual(0.6f, buffer.GetWeight(0, 1), 1e-6f);
         }
 
-        // ----- 3.4 範囲外 (layer, source) への Set で警告 + no-op (Req 4.3) -----
+        // ----- 3.4 範囲外 (layer, source) への Set で警告 + no-op  -----
 
         [Test]
         public void SetWeight_LayerIdxBeyondLayerCount_LogsWarningAndLeavesWeightsUnchanged()
@@ -442,7 +442,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             buffer.SwapIfDirty();
 
             Assert.AreEqual(0.5f, buffer.GetWeight(0, 0),
-                "負数 layerIdx への Set は警告 + no-op で既存値を変更しないこと (Req 4.3)");
+                "負数 layerIdx への Set は警告 + no-op で既存値を変更しないこと ");
         }
 
         [Test]
@@ -462,7 +462,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             // Swap を挟んでも readBuffer は不変。
             buffer.SwapIfDirty();
             Assert.AreEqual(0.4f, buffer.GetWeight(0, 0),
-                "範囲外 Set は dirtyTick を進めず、既存 weight を変更しないこと (Req 4.3)");
+                "範囲外 Set は dirtyTick を進めず、既存 weight を変更しないこと ");
         }
 
         [Test]

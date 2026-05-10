@@ -9,13 +9,12 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
     /// <summary>
     /// FacialControl の app-level <see cref="LifetimeScope"/>。
     /// PlayMode 開始時に <c>RuntimeInitializeOnLoadMethod</c> で auto-spawn される singleton MonoBehaviour として動作し、
-    /// <see cref="ITimeProvider"/> 等のプロセス共有 service を保持する（Req 4.7, 9.4, D-12）。
+    /// <see cref="ITimeProvider"/> 等のプロセス共有 service を保持する。
     /// </summary>
     /// <remarks>
     /// <para>
     /// <see cref="RuntimeInitializeLoadType.SubsystemRegistration"/> は PlayMode 開始時のみ呼ばれるため、
-    /// Edit Mode（PlayMode に入っていない Editor 状態）では auto-spawn されない（design.md
-    /// `## FacialControlAppLifetimeScope > Implementation Notes`）。
+    /// Edit Mode（PlayMode に入っていない Editor 状態）では auto-spawn されない。
     /// </para>
     /// <para>
     /// <see cref="FacialControllerLifetimeScope.Build"/> から <c>CreateChild</c> を呼ぶための親 scope として使われる。
@@ -36,7 +35,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
         private static void AutoSpawn()
         {
 #if UNITY_EDITOR
-            // Edit Mode 中の auto-spawn を抑止する（PlayMode 限定、design.md Implementation Notes）。
+            // Edit Mode 中の auto-spawn を抑止する（PlayMode 限定）。
             if (!UnityEngine.Application.isPlaying)
             {
                 return;
@@ -73,7 +72,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
         /// <inheritdoc />
         protected override void Configure(IContainerBuilder builder)
         {
-            // ITimeProvider はプロセス共有 singleton として登録する（Req 4.7, 9.4）。
+            // ITimeProvider はプロセス共有 singleton として登録する。
             builder.Register<ITimeProvider, UnityTimeProvider>(Lifetime.Singleton);
 
             // ILipSyncProvider は optional。利用側が必要に応じて拡張で登録する。

@@ -12,9 +12,9 @@ using Hidano.FacialControl.Tests.Shared;
 namespace Hidano.FacialControl.Tests.EditMode.Integration
 {
     /// <summary>
-    /// tasks.md 10.1 EditMode 統合テスト: Fake OSC + Fake Controller の 50/50 合成を
+    // EditMode 統合テスト: Fake OSC + Fake Controller の 50/50 合成を
     /// <see cref="LayerInputSourceAggregator"/> → <see cref="LayerBlender"/> パイプラインで
-    /// end-to-end に検証する (Req 2.6, 5.1, 5.2, 8.2)。
+    /// end-to-end に検証する 。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -22,14 +22,14 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
     /// <list type="number">
     ///   <item><b>UC1 状況切替</b>:
     ///     ランタイム weight 変更でコントローラ駆動から OSC キャプチャ駆動へ切替えると、
-    ///     最終 BlendShape 出力が次フレームで切替わる (Req 4.2 / 4.4)。</item>
+    ///     最終 BlendShape 出力が次フレームで切替わる 。</item>
     ///   <item><b>UC2 重み付きブレンド</b>:
     ///     同レイヤーにコントローラ (Expression トリガー型) と OSC (値提供型) を
     ///     0.5 / 0.5 で配置した時、両者の BlendShape 値が値レベルで加重和 + 最終クランプ
-    ///     される (Req 2.2, 2.3, 5.1, 5.2)。</item>
+    ///     される 。</item>
     ///   <item><b>UC3 特定入力源固定</b>:
     ///     あるレイヤーで片側ソースの weight=0 を設定した場合、もう片側ソースの値が
-    ///     そのままレイヤー出力になる (Req 7.2 の単独ソース exact 出力契約 と一貫)。</item>
+    ///     そのままレイヤー出力になる (単独ソース exact 出力契約と一貫)。</item>
     /// </list>
     /// </para>
     /// <para>
@@ -37,7 +37,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
     /// <see cref="OscInputSource"/> の実装を直接使い、モックは <see cref="OscDoubleBuffer"/>
     /// の書込側と <see cref="ManualTimeProvider"/> (時刻決定論化) のみを用いる。
     /// 集約経路は <see cref="LayerInputSourceAggregator.AggregateAndBlend"/> を通すことで
-    /// 既存 <see cref="LayerBlender"/> のシグネチャを一切変更せず (Req 7.1) 最終 BlendShape
+    /// 既存 <see cref="LayerBlender"/> のシグネチャを一切変更せず  最終 BlendShape
     /// 配列までの全パイプラインを検証する。
     /// </para>
     /// <para>
@@ -175,7 +175,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
         public void UC2_WeightedBlend_SumExceedsOne_IsClampedToOne()
         {
             // 両 source が同じ BlendShape に値を提供し、weight 合計も 1 を超える場合、
-            // 加重和 > 1 でも最終クランプで 1.0 に収まる (Req 2.3)。
+            // 加重和 > 1 でも最終クランプで 1.0 に収まる 。
             using var h = new Harness();
 
             // 両者が mouth_open に 1.0 を提供する状況を作る (OSC はそのまま、
@@ -263,7 +263,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Integration
         {
             // 「lipsync レイヤーは常に uLipSync のみ有効、OSC の口パラメータは無視」を抽象化:
             // レイヤーにコントローラと OSC を両方登録するが controller weight=0 に固定する。
-            // OSC の値だけが最終出力に現れる (Req 7.2 に整合)。
+            // OSC の値だけが最終出力に現れる。
             using var h = new Harness();
 
             h.Controller.TriggerOn("smile"); // 無視されるべき駆動

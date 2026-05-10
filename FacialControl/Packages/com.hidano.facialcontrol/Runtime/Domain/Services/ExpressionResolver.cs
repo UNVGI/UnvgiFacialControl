@@ -7,7 +7,7 @@ namespace Hidano.FacialControl.Domain.Services
     /// <summary>
     /// <see cref="ExpressionSnapshot"/> 辞書を構築時に preallocate し、
     /// SnapshotId → BlendShape 値 / Bone スナップショット列の解決を 0-alloc で提供する Domain サービス
-    /// （tasks.md 3.4 / Req 3.2, 9.3, 11.1, 11.4）。
+    /// 。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -17,7 +17,7 @@ namespace Hidano.FacialControl.Domain.Services
     /// </para>
     /// <para>
     /// LayerOverrideMask の解釈は呼出側 (<c>LayerInputSourceAggregator</c>) で行う想定で、
-    /// 本サービスは snapshot table 引きと出力バッファへの値展開のみを担う（design.md ExpressionResolver セクション）。
+    /// 本サービスは snapshot table 引きと出力バッファへの値展開のみを担う。
     /// </para>
     /// </remarks>
     public sealed class ExpressionResolver

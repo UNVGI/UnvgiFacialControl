@@ -8,7 +8,7 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
 {
     /// <summary>
-    /// <see cref="LipSyncInputSource"/> の EditMode 契約テスト (tasks.md 6.7)。
+    /// <see cref="LipSyncInputSource"/> の EditMode 契約テスト 。
     /// </summary>
     /// <remarks>
     /// 観測完了条件:

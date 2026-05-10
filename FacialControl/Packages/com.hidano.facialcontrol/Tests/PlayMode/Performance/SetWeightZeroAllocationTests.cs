@@ -12,7 +12,7 @@ using Hidano.FacialControl.Domain.Services;
 namespace Hidano.FacialControl.Tests.PlayMode.Performance
 {
     /// <summary>
-    /// タスク 10.4: per-frame <c>SetWeight</c> 1000 回 × 60 frame の GC ゼロ検証 (Req 6.1 / 6.2)。
+    //: per-frame <c>SetWeight</c> 1000 回 × 60 frame の GC ゼロ検証 。
     /// </summary>
     /// <remarks>
     /// 観測完了条件: verbose logging OFF の前提で、
@@ -82,7 +82,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
                 registry.LayerCount, registry.MaxSourcesPerLayer);
 
             var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, BlendShapeCount);
-            // verbose logging は OFF のまま（既定）。Req 6.1 / 6.2 の 0-alloc 契約は verbose OFF 前提。
+            // verbose logging は OFF のまま（既定）。0-alloc 契約は verbose OFF 前提。
 
             var outputPerLayer = new LayerBlender.LayerInput[LayerCount];
             var outputSpan = outputPerLayer.AsSpan();

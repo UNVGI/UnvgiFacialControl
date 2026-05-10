@@ -7,17 +7,17 @@ using UnityEngine;
 namespace Hidano.FacialControl.Adapters.InputSources
 {
     /// <summary>
-    /// slug-keyed <see cref="IInputSource"/> lookup の per-FC 実装（Req 5.4, 6.10, 12.4, 12.5）。
+    /// slug-keyed <see cref="IInputSource"/> lookup の per-FC 実装。
     /// </summary>
     /// <remarks>
     /// <para>
     /// 内部は <see cref="Dictionary{TKey, TValue}"/> を 1 個保持し、
     /// <c>&lt;slug&gt;</c> / <c>&lt;slug&gt;:&lt;sub&gt;</c> 文字列をそのままキーに格納する
-    /// （design.md `## InputSourceRegistry > 実装メモ`）。
+    /// 。
     /// </para>
     /// <para>
     /// 旧ファクトリ経路の (id, options) ディスパッチ / JSON deserialize / reserved id
-    /// チェックは本クラスでは保持しない（D-13 廃止、Req 6.10）。
+    /// チェックは本クラスでは保持しない（D-13 廃止）。
     /// </para>
     /// <para>
     /// DD-1 注記: Public API の slug 引数は <see cref="AdapterSlug"/> 値オブジェクトとして受け、

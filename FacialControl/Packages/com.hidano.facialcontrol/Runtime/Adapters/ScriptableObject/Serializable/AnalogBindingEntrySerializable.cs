@@ -11,14 +11,12 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Phase 4.7 で 3 フィールドに簡素化済（Req 6.2）:
+    /// 3 フィールド構成:
     /// <see cref="inputActionRef"/> + <see cref="targetIdentifier"/> + <see cref="targetAxis"/>。
-    /// 旧 <c>sourceId / sourceAxis / targetKind / mapping</c> field は撤去。
     /// </para>
     /// <para>
     /// 値変換 (deadzone / scale / offset / curve / invert / clamp) は InputActionAsset 側
-    /// processor チェーンで完結する（Decision 4 / Req 13.3）。Adapters 側 InputProcessor は
-    /// Phase 4.1-4.3 で登録済み。
+    /// processor チェーンで完結する。Adapters 側 InputProcessor は登録済み。
     /// </para>
     /// <para>
     /// 本型は core パッケージ (com.hidano.facialcontrol) に所属する asmdef 制約上

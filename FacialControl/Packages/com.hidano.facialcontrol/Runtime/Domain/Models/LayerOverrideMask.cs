@@ -10,7 +10,7 @@ namespace Hidano.FacialControl.Domain.Models
     /// JSON 永続化は bit 値ではなく layer 名の配列として保存することで Layer 並び替えに対する脆弱性を排除する。
     /// </para>
     /// <para>
-    /// 詳細な設計判断は <c>.kiro/specs/inspector-and-data-model-redesign/research.md</c> Topic 9 を参照。
+    /// 詳細な設計判断は  Topic 9 を参照。
     /// </para>
     /// </summary>
     [Flags]

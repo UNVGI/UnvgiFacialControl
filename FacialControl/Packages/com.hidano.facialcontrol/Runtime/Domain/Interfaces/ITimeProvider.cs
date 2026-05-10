@@ -4,7 +4,7 @@ namespace Hidano.FacialControl.Domain.Interfaces
     /// ゲーム内の <c>Time.timeScale</c> に影響されない経過秒数を提供する時刻抽象。
     /// Domain 層に配置することで、Unity API 非依存の純粋ロジックから時刻を参照できる。
     /// 実装は Adapters 層の <c>UnityTimeProvider</c>、テストは Tests/Shared の
-    /// <c>ManualTimeProvider</c> を使い分ける（EditMode での決定論化, Req 8.2）。
+    /// <c>ManualTimeProvider</c> を使い分ける（EditMode での決定論化）。
     /// </summary>
     public interface ITimeProvider
     {

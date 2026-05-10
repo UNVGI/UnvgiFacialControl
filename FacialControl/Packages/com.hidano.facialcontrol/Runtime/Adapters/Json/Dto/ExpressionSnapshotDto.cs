@@ -14,25 +14,25 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
     [System.Serializable]
     public sealed class ExpressionSnapshotDto
     {
-        /// <summary>表情遷移時間（秒）。0〜1 秒、デフォルトは <see cref="Expression.DefaultTransitionDuration"/>（1/15 秒）（Req 2.5）。</summary>
+        /// <summary>表情遷移時間（秒）。0〜1 秒、デフォルトは <see cref="Expression.DefaultTransitionDuration"/>（1/15 秒）。</summary>
         public float transitionDuration = Expression.DefaultTransitionDuration;
 
         /// <summary>
         /// 遷移カーブプリセット名（"Linear" / "EaseIn" / "EaseOut" / "EaseInOut"）。
-        /// デフォルト "Linear"（Req 2.6）。
+        /// デフォルト "Linear"。
         /// 空文字 / null は Linear として解釈される。
         /// </summary>
         public string transitionCurvePreset = "Linear";
 
-        /// <summary>BlendShape スナップショット配列（Req 9.2）。</summary>
+        /// <summary>BlendShape スナップショット配列。</summary>
         public List<BlendShapeSnapshotDto> blendShapes;
 
-        /// <summary>Bone 姿勢スナップショット配列（Req 9.2）。</summary>
+        /// <summary>Bone 姿勢スナップショット配列。</summary>
         public List<BoneSnapshotDto> bones;
 
         /// <summary>
         /// この snapshot 内に登場する SkinnedMeshRenderer Transform 階層パスのサマリ。
-        /// トップレベル <see cref="ProfileSnapshotDto.rendererPaths"/> の subset である必要がある（Req 9.7）。
+        /// トップレベル <see cref="ProfileSnapshotDto.rendererPaths"/> の subset である必要がある。
         /// </summary>
         public List<string> rendererPaths;
 

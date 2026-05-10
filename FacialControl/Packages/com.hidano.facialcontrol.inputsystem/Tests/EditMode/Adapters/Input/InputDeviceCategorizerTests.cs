@@ -4,14 +4,13 @@ using Hidano.FacialControl.Adapters.Input;
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.Input
 {
     /// <summary>
-    /// <see cref="InputDeviceCategorizer"/> の path 解析と fallback フラグ伝搬を検証する EditMode テスト
-    /// （tasks.md 4.4 / requirements.md Req 7.2-7.5）。
+    /// <see cref="InputDeviceCategorizer"/> の path 解析と fallback フラグ伝搬を検証する EditMode テスト。
     /// </summary>
     /// <remarks>
     /// <list type="bullet">
-    ///   <item><c>&lt;Keyboard&gt;</c> 始まり → Keyboard、wasFallback=false（Req 7.3）</item>
-    ///   <item><c>&lt;Gamepad&gt;</c> / <c>&lt;XRController&gt;</c> 等 → Controller、wasFallback=false（Req 7.4）</item>
-    ///   <item>未認識 prefix / null / 空文字 → Controller、wasFallback=true（Req 7.5）</item>
+    ///   <item><c>&lt;Keyboard&gt;</c> 始まり → Keyboard、wasFallback=false</item>
+    ///   <item><c>&lt;Gamepad&gt;</c> / <c>&lt;XRController&gt;</c> 等 → Controller、wasFallback=false</item>
+    ///   <item>未認識 prefix / null / 空文字 → Controller、wasFallback=true</item>
     /// </list>
     /// </remarks>
     [TestFixture]

@@ -9,8 +9,7 @@ using Hidano.FacialControl.Domain.Models;
 namespace Hidano.FacialControl.Tests.PlayMode.Adapters.InputSources
 {
     /// <summary>
-    /// Phase 3.2: <see cref="InputActionAnalogSource"/> のテスト
-    /// (Req 1.6, 5.1, 5.2, 5.6, 5.7, 8.1)。
+    /// <see cref="InputActionAnalogSource"/> のテスト。
     /// </summary>
     [TestFixture]
     public class InputActionAnalogSourceTests : InputTestFixture

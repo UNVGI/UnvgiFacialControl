@@ -7,16 +7,16 @@ using Hidano.FacialControl.Adapters.Processors;
 namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Performance
 {
     /// <summary>
-    /// tasks.md 4.8: 6 種 stateless アナログ <see cref="InputProcessor{TValue}"/>
+    //: 6 種 stateless アナログ <see cref="InputProcessor{TValue}"/>
     /// （DeadZone / Scale / Offset / Clamp / Curve / Invert）の per-Process 0-alloc を検証する
-    /// PlayMode/Performance テスト（Req 11.1, 11.3, 11.4, 11.5, 12.7）。
+    /// PlayMode/Performance テスト。
     /// </summary>
     /// <remarks>
     /// <para>
     /// ProcessorRegistration を経由する InputAction 経路ではなく、各 processor を直接インスタンス化し
     /// 6 種を連結した <c>Process(value, control)</c> 呼出を 1000 回繰り返して GC アロケーションを計測する。
     /// 6 種は全て stateless かつ <see cref="float"/> field のみを保持するため、純粋関数として
-    /// 0-alloc であることが期待される（design.md Topic 3）。
+    /// 0-alloc であることが期待される。
     /// </para>
     /// <para>
     /// 計測手段は <see cref="ProfilerRecorder"/>(<c>"GC.Alloc"</c>) で fine-grained に計測する。

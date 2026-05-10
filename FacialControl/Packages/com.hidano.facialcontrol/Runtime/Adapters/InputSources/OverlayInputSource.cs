@@ -23,7 +23,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
     /// </para>
     /// <para>
     /// ctor 時点で profile 内の全 Expression について「触る BlendShape index 列」「value 列」「mask」を事前計算し、
-    /// 毎フレームの解決はキャッシュ参照と output コピーのみで完結する (Req 6.1 / GC ゼロ寄与)。
+    /// 毎フレームの解決はキャッシュ参照と output コピーのみで完結する (GC ゼロ寄与)。
     /// </para>
     /// </remarks>
     public sealed class OverlayInputSource : ValueProviderInputSourceBase

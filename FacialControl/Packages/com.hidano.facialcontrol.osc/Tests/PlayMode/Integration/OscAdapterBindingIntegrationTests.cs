@@ -18,7 +18,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
     /// 実 UDP loopback で <see cref="OscAdapterBinding"/> の <c>OnStart</c> が
     /// <c>ctx.HostGameObject.AddComponent&lt;OscReceiverHost&gt;()</c> + <c>Configure(...)</c>
     /// を実行し、<c>InputSourceRegistry.Register(slug, source)</c> で primary
-    /// <see cref="IInputSource"/> が解決可能になることを assert する（Req 6.2, 6.9, 13.6, 13.7）。
+    /// <see cref="IInputSource"/> が解決可能になることを assert する。
     /// <c>Dispose</c> で helper MonoBehaviour が破棄され socket がクローズされること、
     /// helper の <see cref="HideFlags"/> が <c>HideInInspector</c> を含まないことも検証する。
     /// </summary>
@@ -96,7 +96,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             OscReceiverHost helper = _hostGameObject.GetComponent<OscReceiverHost>();
             Assert.IsNotNull(helper,
-                "OnStart は ctx.HostGameObject に OscReceiverHost を AddComponent するべき（Req 13.6）。");
+                "OnStart は ctx.HostGameObject に OscReceiverHost を AddComponent するべき。");
         }
 
         [Test]
@@ -115,7 +115,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             HideFlags actualFlags = helper.hideFlags;
             Assert.That((actualFlags & HideFlags.HideInInspector), Is.EqualTo(HideFlags.None),
-                "Req 13.6: helper MonoBehaviour は Inspector で見える（HideInInspector を含まない）べき。");
+                "helper MonoBehaviour は Inspector で見える（HideInInspector を含まない）べき。");
         }
 
         [Test]
@@ -132,7 +132,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             bool resolved = _registry.TryResolve(slug, out IInputSource source);
             Assert.IsTrue(resolved,
-                $"InputSourceRegistry.TryResolve(\"{slug}\") は OnStart 後に true を返すべき（Req 6.2, D-3）。");
+                $"InputSourceRegistry.TryResolve(\"{slug}\") は OnStart 後に true を返すべき。");
             Assert.IsNotNull(source,
                 "解決結果の IInputSource は non-null であるべき。");
         }
@@ -194,7 +194,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             sender.StopSending();
             Assert.IsTrue(received,
-                "実 UDP loopback で送信した値が registered InputSource に届くべき（Req 6.2, 6.9, D-3）。");
+                "実 UDP loopback で送信した値が registered InputSource に届くべき。");
         }
 
         // ---------------------------------------------------------------
@@ -222,7 +222,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             // Unity の MonoBehaviour Object 等価性: Destroy 後の参照は == null となる。
             Assert.IsTrue(helper == null,
-                "Dispose 時に Object.Destroy(_helperHost) で helper が破棄されるべき（Req 13.7）。");
+                "Dispose 時に Object.Destroy(_helperHost) で helper が破棄されるべき。");
 
             OscReceiverHost remaining = _hostGameObject.GetComponent<OscReceiverHost>();
             Assert.IsNull(remaining,
