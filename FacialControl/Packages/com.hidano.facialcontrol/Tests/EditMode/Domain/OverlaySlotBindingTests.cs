@@ -8,193 +8,97 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
     public class OverlaySlotBindingTests
     {
         [Test]
-        public void Constructor_ValidArgs_KeepsBothFields()
+        public void Constructor_DefaultFallback_KeepsSlotAndState()
         {
-            var binding = new OverlaySlotBinding("blink", "anger_blink");
+            var binding = new OverlaySlotBinding("blink", suppress: false, snapshot: null);
+
             Assert.AreEqual("blink", binding.Slot);
-            Assert.AreEqual("anger_blink", binding.ExpressionId);
-            Assert.IsFalse(binding.IsSuppress);
+            Assert.IsFalse(binding.Suppress);
+            Assert.IsFalse(binding.Snapshot.HasValue);
+            Assert.IsTrue(binding.IsDefaultFallback);
         }
 
         [Test]
-        public void Constructor_NullExpressionId_MarksSuppress()
+        public void Constructor_Suppress_KeepsSlotAndState()
         {
-            var binding = new OverlaySlotBinding("blink", null);
-            Assert.IsTrue(binding.IsSuppress, "ExpressionId が null なら suppress とみなされること");
+            var binding = new OverlaySlotBinding("blink", suppress: true, snapshot: null);
+
+            Assert.AreEqual("blink", binding.Slot);
+            Assert.IsTrue(binding.Suppress);
+            Assert.IsFalse(binding.Snapshot.HasValue);
+            Assert.IsFalse(binding.IsDefaultFallback);
         }
 
         [Test]
-        public void Constructor_EmptyExpressionId_MarksSuppress()
+        public void Constructor_SnapshotOverride_KeepsSlotAndState()
         {
-            var binding = new OverlaySlotBinding("blink", string.Empty);
-            Assert.IsTrue(binding.IsSuppress);
+            var snapshot = CreateSnapshot("blink-override");
+
+            var binding = new OverlaySlotBinding("blink", suppress: false, snapshot: snapshot);
+
+            Assert.AreEqual("blink", binding.Slot);
+            Assert.IsFalse(binding.Suppress);
+            Assert.IsTrue(binding.Snapshot.HasValue);
+            Assert.AreEqual(snapshot, binding.Snapshot.Value);
+            Assert.IsFalse(binding.IsDefaultFallback);
         }
 
         [Test]
-        public void Constructor_WhitespaceExpressionId_MarksSuppress()
+        public void Constructor_SuppressWithSnapshot_ThrowsArgumentException()
         {
-            var binding = new OverlaySlotBinding("blink", "   ");
-            Assert.IsTrue(binding.IsSuppress);
+            var snapshot = CreateSnapshot("blink-override");
+
+            Assert.Throws<ArgumentException>(() =>
+                new OverlaySlotBinding("blink", suppress: true, snapshot: snapshot));
         }
 
         [TestCase(null)]
         [TestCase("")]
         [TestCase("   ")]
-        public void Constructor_InvalidSlot_Throws(string slot)
+        public void Constructor_EmptySlot_ThrowsArgumentException(string slot)
         {
-            Assert.Throws<ArgumentException>(() => new OverlaySlotBinding(slot, "anger_blink"));
+            Assert.Throws<ArgumentException>(() =>
+                new OverlaySlotBinding(slot, suppress: false, snapshot: null));
         }
 
         [Test]
-        public void Equality_SameSlotAndExpressionId_AreEqual()
+        public void Equals_SameSlotSuppressAndSnapshot_AreEqual()
         {
-            var a = new OverlaySlotBinding("blink", "anger_blink");
-            var b = new OverlaySlotBinding("blink", "anger_blink");
+            var snapshot = CreateSnapshot("blink-override");
+            var a = new OverlaySlotBinding("blink", suppress: false, snapshot: snapshot);
+            var b = new OverlaySlotBinding("blink", suppress: false, snapshot: snapshot);
+
             Assert.IsTrue(a.Equals(b));
             Assert.AreEqual(a.GetHashCode(), b.GetHashCode());
         }
 
         [Test]
-        public void Equality_DifferentSlot_NotEqual()
+        public void Equals_DifferentState_AreNotEqual()
         {
-            var a = new OverlaySlotBinding("blink", "x");
-            var b = new OverlaySlotBinding("blush", "x");
-            Assert.IsFalse(a.Equals(b));
+            var fallback = new OverlaySlotBinding("blink", suppress: false, snapshot: null);
+            var suppress = new OverlaySlotBinding("blink", suppress: true, snapshot: null);
+            var overrideSnapshot = new OverlaySlotBinding(
+                "blink",
+                suppress: false,
+                snapshot: CreateSnapshot("blink-override"));
+
+            Assert.IsFalse(fallback.Equals(suppress));
+            Assert.IsFalse(fallback.Equals(overrideSnapshot));
+            Assert.IsFalse(suppress.Equals(overrideSnapshot));
         }
 
-        [Test]
-        public void Equality_SuppressEntries_AreEqualWhenSlotMatches()
+        private static ExpressionSnapshot CreateSnapshot(string id)
         {
-            var a = new OverlaySlotBinding("blink", null);
-            var b = new OverlaySlotBinding("blink", null);
-            Assert.IsTrue(a.Equals(b));
-        }
-    }
-
-    [TestFixture]
-    public class ExpressionOverlaysTests
-    {
-        [Test]
-        public void Overlays_DefaultCtor_IsEmpty()
-        {
-            var expr = new Expression("smile", "Smile", "emotion");
-            Assert.AreEqual(0, expr.Overlays.Length, "overlays 未指定なら空配列");
-        }
-
-        [Test]
-        public void Overlays_PassedThroughCtor_AreCopiedDefensively()
-        {
-            var src = new[]
-            {
-                new OverlaySlotBinding("blink", "anger_blink"),
-            };
-            var expr = new Expression(
-                "anger", "Anger", "emotion",
-                Expression.DefaultTransitionDuration, default,
-                blendShapeValues: null, overlays: src);
-
-            // 防御的コピー: 元配列を書き換えても影響しない
-            src[0] = new OverlaySlotBinding("blink", "TAMPERED");
-            Assert.AreEqual("anger_blink", expr.Overlays.Span[0].ExpressionId);
-        }
-
-        [Test]
-        public void TryGetOverlay_DeclaredSlot_ReturnsTrueAndBinding()
-        {
-            var expr = new Expression(
-                "anger", "Anger", "emotion",
-                Expression.DefaultTransitionDuration, default,
-                blendShapeValues: null,
-                overlays: new[]
+            return new ExpressionSnapshot(
+                id,
+                transitionDuration: Expression.DefaultTransitionDuration,
+                transitionCurvePreset: TransitionCurvePreset.Linear,
+                blendShapes: new[]
                 {
-                    new OverlaySlotBinding("blink", "anger_blink"),
-                    new OverlaySlotBinding("blush", null),
-                });
-
-            Assert.IsTrue(expr.TryGetOverlay("blink", out var blink));
-            Assert.AreEqual("anger_blink", blink.ExpressionId);
-            Assert.IsFalse(blink.IsSuppress);
-
-            Assert.IsTrue(expr.TryGetOverlay("blush", out var blush));
-            Assert.IsTrue(blush.IsSuppress, "明示 suppress の slot も TryGetOverlay は true を返す");
-        }
-
-        [Test]
-        public void TryGetOverlay_UnknownSlot_ReturnsFalse()
-        {
-            var expr = new Expression(
-                "anger", "Anger", "emotion",
-                Expression.DefaultTransitionDuration, default,
-                blendShapeValues: null,
-                overlays: new[] { new OverlaySlotBinding("blink", "anger_blink") });
-
-            Assert.IsFalse(expr.TryGetOverlay("never", out _));
-        }
-
-        [TestCase(null)]
-        [TestCase("")]
-        public void TryGetOverlay_NullOrEmptySlot_ReturnsFalse(string slot)
-        {
-            var expr = new Expression(
-                "anger", "Anger", "emotion",
-                Expression.DefaultTransitionDuration, default,
-                blendShapeValues: null,
-                overlays: new[] { new OverlaySlotBinding("blink", "anger_blink") });
-
-            Assert.IsFalse(expr.TryGetOverlay(slot, out _));
-        }
-    }
-
-    [TestFixture]
-    public class FacialProfileDefaultOverlaysTests
-    {
-        [Test]
-        public void DefaultOverlays_NotPassed_IsEmpty()
-        {
-            var profile = new FacialProfile("1.0");
-            Assert.AreEqual(0, profile.DefaultOverlays.Length);
-        }
-
-        [Test]
-        public void DefaultOverlays_PassedThroughCtor_AreCopiedDefensively()
-        {
-            var src = new[] { new OverlaySlotBinding("blink", "default_blink") };
-            var profile = new FacialProfile(
-                "1.0", layers: null, expressions: null,
-                rendererPaths: null, layerInputSources: null,
-                defaultOverlays: src);
-
-            src[0] = new OverlaySlotBinding("blink", "TAMPERED");
-            Assert.AreEqual("default_blink", profile.DefaultOverlays.Span[0].ExpressionId);
-        }
-
-        [Test]
-        public void TryGetDefaultOverlay_DeclaredSlot_ReturnsTrue()
-        {
-            var profile = new FacialProfile(
-                "1.0", layers: null, expressions: null,
-                rendererPaths: null, layerInputSources: null,
-                defaultOverlays: new[]
-                {
-                    new OverlaySlotBinding("blink", "default_blink"),
-                });
-
-            Assert.IsTrue(profile.TryGetDefaultOverlay("blink", out var b));
-            Assert.AreEqual("default_blink", b.ExpressionId);
-        }
-
-        [Test]
-        public void TryGetDefaultOverlay_UnknownSlot_ReturnsFalse()
-        {
-            var profile = new FacialProfile(
-                "1.0", layers: null, expressions: null,
-                rendererPaths: null, layerInputSources: null,
-                defaultOverlays: new[]
-                {
-                    new OverlaySlotBinding("blink", "default_blink"),
-                });
-
-            Assert.IsFalse(profile.TryGetDefaultOverlay("blush", out _));
+                    new BlendShapeSnapshot("Body/Face", "Blink", 100f),
+                },
+                bones: null,
+                rendererPaths: new[] { "Body/Face" });
         }
     }
 }
