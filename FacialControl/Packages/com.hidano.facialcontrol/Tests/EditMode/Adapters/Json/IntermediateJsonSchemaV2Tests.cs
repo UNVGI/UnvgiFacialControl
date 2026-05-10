@@ -41,6 +41,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             Assert.IsNotNull(dst, "再パース結果が null になってはならない");
             Assert.AreEqual(src.schemaVersion, dst.schemaVersion);
 
+            Assert.AreEqual(src.slots.Count, dst.slots.Count, "slots count mismatch");
+            for (int i = 0; i < src.slots.Count; i++)
+            {
+                Assert.AreEqual(src.slots[i], dst.slots[i]);
+            }
+
             // layers[] の round-trip
             Assert.AreEqual(src.layers.Count, dst.layers.Count, "layers count mismatch");
             for (int i = 0; i < src.layers.Count; i++)
@@ -126,6 +132,26 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             Assert.AreEqual(SystemTextJsonParser.SchemaVersionV2, parsed.schemaVersion);
             Assert.AreEqual(src.expressions.Count, parsed.expressions.Count);
             Assert.AreEqual(src.expressions[0].snapshot.blendShapes.Count, parsed.expressions[0].snapshot.blendShapes.Count);
+        }
+
+        [Test]
+        public void FromJson_SlotsKey_PopulatesSlotsField()
+        {
+            var json =
+                "{" +
+                "\"schemaVersion\":\"1.0\"," +
+                "\"slots\":[\"blink\",\"mouth\"]," +
+                "\"layers\":[]," +
+                "\"expressions\":[]," +
+                "\"rendererPaths\":[]" +
+                "}";
+
+            var dto = JsonUtility.FromJson<ProfileSnapshotDto>(json);
+
+            Assert.IsNotNull(dto.slots);
+            Assert.AreEqual(2, dto.slots.Count);
+            Assert.AreEqual("blink", dto.slots[0]);
+            Assert.AreEqual("mouth", dto.slots[1]);
         }
 
         // ================================================================
@@ -245,6 +271,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             return new ProfileSnapshotDto
             {
                 schemaVersion = SystemTextJsonParser.SchemaVersionV2,
+                slots = new List<string> { "blink", "mouth" },
                 layers = new List<LayerDefinitionDto>
                 {
                     new LayerDefinitionDto

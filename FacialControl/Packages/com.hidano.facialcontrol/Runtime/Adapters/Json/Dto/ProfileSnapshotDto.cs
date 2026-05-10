@@ -4,7 +4,7 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
 {
     /// <summary>
     /// プロファイル JSON: トップレベル DTO。
-    /// <c>schemaVersion / layers[] / expressions[] / rendererPaths[] / gazeConfigs[]</c> の 5 フィールドを保持する。
+    /// <c>schemaVersion / slots[] / layers[] / expressions[] / rendererPaths[] / gazeConfigs[]</c> を保持する。
     /// JsonUtility 互換のため <see cref="System.SerializableAttribute"/> を付与する。
     /// <para>
     /// schemaVersion は <c>"1.0"</c> 以外を許容しない。
@@ -19,6 +19,9 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
 
         /// <summary>レイヤー定義配列。</summary>
         public List<LayerDefinitionDto> layers;
+
+        /// <summary>プロファイル全体で宣言される overlay slot 識別子配列。</summary>
+        public List<string> slots;
 
         /// <summary>表情エントリ配列（<see cref="ExpressionSnapshotDto"/> を含む snapshot 形式）。</summary>
         public List<ExpressionDto> expressions;
