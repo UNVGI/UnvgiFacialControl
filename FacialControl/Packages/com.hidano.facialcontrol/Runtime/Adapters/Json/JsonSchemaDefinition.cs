@@ -33,6 +33,9 @@ namespace Hidano.FacialControl.Adapters.Json
             /// <summary>expressions フィールド名</summary>
             public const string Expressions = "expressions";
 
+            /// <summary>slots フィールド名（profile root、overlay slot 識別子の宣言）</summary>
+            public const string Slots = "slots";
+
             /// <summary>rendererPaths フィールド名</summary>
             public const string RendererPaths = "rendererPaths";
 
@@ -147,8 +150,11 @@ namespace Hidano.FacialControl.Adapters.Json
                 /// <summary>slot 識別子</summary>
                 public const string Slot = "slot";
 
-                /// <summary>発火させる overlay Expression ID（空文字で suppress）</summary>
-                public const string ExpressionId = "expressionId";
+                /// <summary>当該 slot の overlay を明示的に抑制するかどうか</summary>
+                public const string Suppress = "suppress";
+
+                /// <summary>個別 override として適用する ExpressionSnapshot</summary>
+                public const string Snapshot = "snapshot";
             }
 
             /// <summary>
@@ -291,6 +297,7 @@ namespace Hidano.FacialControl.Adapters.Json
         /// </summary>
         public const string SampleProfileJson = @"{
     ""schemaVersion"": ""1.0"",
+    ""slots"": [""blink""],
     ""rendererPaths"": [""Armature/Body"", ""Face""],
     ""layers"": [
         {""name"": ""emotion"", ""priority"": 0, ""exclusionMode"": ""lastWins"", ""inputSources"": [
@@ -306,7 +313,7 @@ namespace Hidano.FacialControl.Adapters.Json
     ],
     ""expressions"": [
         {
-            ""id"": ""550e8400-e29b-41d4-a716-446655440000"",
+            ""id"": ""smile"",
             ""name"": ""笑顔"",
             ""layer"": ""emotion"",
             ""layerOverrideMask"": [""lipsync""],
@@ -319,40 +326,44 @@ namespace Hidano.FacialControl.Adapters.Json
                     {""rendererPath"": ""Face"", ""name"": ""Fcl_EYE_Joy_R"", ""value"": 0.6}
                 ],
                 ""bones"": [],
-                ""rendererPaths"": [""Armature/Body"", ""Face""]
+                ""rendererPaths"": [""Armature/Body"", ""Face""],
+                ""overlays"": [
+                    {""slot"": ""blink"", ""suppress"": false, ""snapshot"": {
+                        ""transitionDuration"": 0.08,
+                        ""transitionCurvePreset"": ""Linear"",
+                        ""blendShapes"": [
+                            {""rendererPath"": ""Face"", ""name"": ""Fcl_EYE_Close_L"", ""value"": 1.0},
+                            {""rendererPath"": ""Face"", ""name"": ""Fcl_EYE_Close_R"", ""value"": 1.0}
+                        ],
+                        ""bones"": [],
+                        ""rendererPaths"": [""Face""],
+                        ""overlays"": []
+                    }}
+                ]
             }
         },
         {
-            ""id"": ""661f9511-f30c-52e5-b827-557766551111"",
-            ""name"": ""怒り"",
+            ""id"": ""smile_closed_eye"",
+            ""name"": ""笑顔（閉眼）"",
             ""layer"": ""emotion"",
             ""layerOverrideMask"": [],
             ""snapshot"": {
                 ""transitionDuration"": 0.15,
                 ""transitionCurvePreset"": ""Linear"",
                 ""blendShapes"": [
-                    {""rendererPath"": """", ""name"": ""Fcl_ALL_Angry"", ""value"": 1.0},
-                    {""rendererPath"": """", ""name"": ""Fcl_BRW_Angry"", ""value"": 0.9}
-                ],
-                ""bones"": [],
-                ""rendererPaths"": [""Armature/Body""]
-            }
-        },
-        {
-            ""id"": ""772a0622-a41d-63f6-c938-668877662222"",
-            ""name"": ""まばたき"",
-            ""layer"": ""eye"",
-            ""layerOverrideMask"": [],
-            ""snapshot"": {
-                ""transitionDuration"": 0.08,
-                ""transitionCurvePreset"": ""Linear"",
-                ""blendShapes"": [
+                    {""rendererPath"": """", ""name"": ""Fcl_ALL_Joy"", ""value"": 1.0},
                     {""rendererPath"": """", ""name"": ""Fcl_EYE_Close"", ""value"": 1.0}
                 ],
                 ""bones"": [],
-                ""rendererPaths"": [""Armature/Body""]
+                ""rendererPaths"": [""Armature/Body""],
+                ""overlays"": [
+                    {""slot"": ""blink"", ""suppress"": true, ""snapshot"": null}
+                ]
             }
         }
+    ],
+    ""defaultOverlays"": [
+        {""slot"": ""blink"", ""suppress"": false, ""snapshot"": null}
     ]
 }";
 
