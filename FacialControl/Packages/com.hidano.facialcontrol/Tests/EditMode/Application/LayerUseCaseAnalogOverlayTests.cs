@@ -10,11 +10,11 @@ using Hidano.FacialControl.Domain.Services;
 namespace Hidano.FacialControl.Tests.EditMode.Application
 {
     /// <summary>
-    /// 「ボタン操作の表情に Analog Trigger を重ねて、目だけ追加で閉じる」要件を
-    /// intra-layer 加算で実現する経路の回帰テスト。
+    /// <see cref="AnalogExpressionInputSource"/> による intra-layer 加算経路の契約テスト。
     /// 同一レイヤーに <see cref="LayerUseCase"/> 既定の LayerExpressionSource (sourceIdx=0) と
-    /// <see cref="AnalogExpressionInputSource"/> (sourceIdx=1) を同居させ、Trigger 値に応じて
-    /// 目 BlendShape のみが上乗せされ、眉口は表情の最終値を維持することを確認する。
+    /// <see cref="AnalogExpressionInputSource"/> (sourceIdx=1) を同居させ、Analog 値に応じて
+    /// 特定 BlendShape のみが上乗せされ、それ以外の BlendShape は表情の最終値を維持することを観測する。
+    /// （Overlay slot による inter-layer 機構は別ファイル <c>LayerUseCaseOverlayLayerTests</c> で扱う。）
     /// </summary>
     [TestFixture]
     public class LayerUseCaseAnalogOverlayTests

@@ -73,7 +73,7 @@ Play モードに入ります。画面左上に HUD が表示されます。
   - 「可動範囲 (角度制限)」 foldout で上方向/下方向/外側/内側の最大角度を設定できます。例えば「向かって左に視線を送るとき、向かって左の眼は外側、向かって右の眼は内側の値で動く」非対称制限により、両目を完全同角度で動かすことによる違和感を回避できます。
 - **キーバインディング** の動作モードは「Hold (押下中のみ ON)」が既定。リリースで OFF に戻ります。トグル動作 (押すたびに ON/OFF 切替) が必要なバインディングは Inspector で「動作モード」を `Toggle` に変更してください。
 - **左トリガー (LT)** で smile を Analog 駆動 (押し量に応じて smile 全体の BlendShape をスケール、`input:analog-expression` 経路)。
-- **右トリガー (RT)** は **Overlay モード** で `blink` slot を駆動します。active 表情の `overlays.blink` を解決し、無ければ profile の `defaultOverlays.blink` (= `blink_overlay`) にフォールバックします。これがユーザー要望「ボタン操作の表情に対し、追加で Trigger を押すと目だけ閉じる、ただし表情ごとに違う最終形にしたい」を解決する仕組みです。
+- **右トリガー (RT)** は **Overlay モード** で `blink` slot を駆動します。active 表情の `overlays.blink` を解決し、無ければ profile の `defaultOverlays.blink` (= `blink_overlay`) にフォールバックします。「ボタン操作の表情に対し、追加で Trigger を押すと目だけ閉じる、ただし表情ごとに違う最終形にしたい」というユースケースを宣言ベースで実現します。
   - 例 1: Trigger1 で smile を ON にした上で RT を引くと、`overlay` レイヤー (priority=1) に `blink_overlay` が立ち、`emotion` レイヤー (smile) の眉・口角は ContributeMask off で貫通、`まばたき` だけが lerp で 0→1 に補間されます。
   - 例 2: Trigger5 で `smile_closed_eye` を ON にした状態で RT を引くと、Expression 側の `overlays.blink = ""`（明示 suppress）が効き overlay は発火しません。「すでに目を閉じている表情で RT を引いても二重に閉じない」を実現します。
   - 各表情ごとの「目閉じ最終形」を別 Expression として用意し、SO Inspector の Expression エントリの `overlays` リストに `slot:blink, expressionId:<その表情用 *_blink>` を登録するとコンテキスト連動が可能。`expressionId` を空にすると当該 slot を suppress 扱いにできます。

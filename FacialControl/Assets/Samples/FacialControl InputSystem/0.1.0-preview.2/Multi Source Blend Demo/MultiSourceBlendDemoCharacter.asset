@@ -11,19 +11,19 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d135770dce0e9d5479f0b6ee124b640a, type: 3}
   m_Name: MultiSourceBlendDemoCharacter
-  m_EditorClassIdentifier: 
-  _schemaVersion: 1.0
+  m_EditorClassIdentifier:
+  _schemaVersion: "1.0"
   _layers:
   - name: emotion
     priority: 0
     exclusionMode: 0
     inputSources:
     - id: input
-      weight: 1
+      weight: 1.0
       optionsJson: '{"maxStackDepth":4}'
     - id: input:analog-expression
-      weight: 1
-      optionsJson:
+      weight: 1.0
+      optionsJson: ''
     layerOverrideMask:
     - emotion
   - name: overlay
@@ -31,8 +31,8 @@ MonoBehaviour:
     exclusionMode: 0
     inputSources:
     - id: input:overlay:blink
-      weight: 1
-      optionsJson:
+      weight: 1.0
+      optionsJson: ''
     layerOverrideMask: []
   _expressions:
   - id: smile
@@ -51,11 +51,11 @@ MonoBehaviour:
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
-        name: "\u7B11\u3044"
-        value: 100
+        name: 笑い
+        value: 1.0
       - rendererPath: Body
-        name: "\u53E3\u89D2\u4E0A\u3052"
-        value: 60
+        name: 口角上げ
+        value: 0.6
       bones: []
       rendererPaths:
       - Body
@@ -75,14 +75,14 @@ MonoBehaviour:
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
-        name: "\u6012\u308A"
-        value: 100
+        name: 怒り
+        value: 1.0
       - rendererPath: Body
-        name: "\u5DE6\u7709\u4E0B\u3052"
-        value: 50
+        name: 左眉下げ
+        value: 0.5
       - rendererPath: Body
-        name: "\u53F3\u7709\u4E0B\u3052"
-        value: 50
+        name: 右眉下げ
+        value: 0.5
       bones: []
       rendererPaths:
       - Body
@@ -102,11 +102,11 @@ MonoBehaviour:
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
-        name: "\u3073\u3063\u304F\u308A"
-        value: 100
+        name: びっくり
+        value: 1.0
       - rendererPath: Body
-        name: "\u25B2"
-        value: 80
+        name: ▲
+        value: 0.8
       bones: []
       rendererPaths:
       - Body
@@ -126,8 +126,8 @@ MonoBehaviour:
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
-        name: "\u3042"
-        value: 100
+        name: あ
+        value: 1.0
       bones: []
       rendererPaths:
       - Body
@@ -135,7 +135,7 @@ MonoBehaviour:
     name: BlinkOverlay
     layer: emotion
     isGaze: 0
-    animationClip: {fileID: 7400000, guid: 0f4e3f9cae8478d458c9dc4adbf5ef97, type: 2}
+    animationClip: {fileID: 0}
     transitionDuration: 0.05
     transitionCurve:
       type: 0
@@ -147,74 +147,8 @@ MonoBehaviour:
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
-        name: Looking Up
-        value: 0
-      - rendererPath: Body
-        name: Looking Down
-        value: 0
-      - rendererPath: Body
-        name: "\u307E\u3070\u305F\u304D"
-        value: 0
-      - rendererPath: Body
-        name: "\u7B11\u3044"
-        value: 0
-      - rendererPath: Body
-        name: "\u306A\u3054\u307F"
-        value: 0
-      - rendererPath: Body
-        name: "\u3058\u3068\u76EE"
-        value: 0
-      - rendererPath: Body
-        name: "\u306F\u3045"
-        value: 0
-      - rendererPath: Body
-        name: "\u3073\u3063\u304F\u308A"
-        value: 0
-      - rendererPath: Body
-        name: "\uFF77\uFF98\uFF6F"
-        value: 0
-      - rendererPath: Body
-        name: "\u30B0\u30EB\u30B0\u30EB"
-        value: 0
-      - rendererPath: Body
-        name: "\u661F\u76EE"
-        value: 0
-      - rendererPath: Body
-        name: "\u306F\u3061\u3085\u76EE"
-        value: 0
-      - rendererPath: Body
-        name: "\u306F\u3061\u3085\u76EE\u7E26\u6F70\u308C"
-        value: 0
-      - rendererPath: Body
-        name: "\u306F\u3061\u3085\u76EE\u6A2A\u6F70\u308C"
-        value: 0
-      - rendererPath: Body
-        name: "\u306F\u3041\u3068"
-        value: 0
-      - rendererPath: Body
-        name: "\u77B3\u5C0F"
-        value: 0
-      - rendererPath: Body
-        name: "\u77B3\u7E26\u6F70\u308C"
-        value: 0
-      - rendererPath: Body
-        name: "\u5149\u5C0F"
-        value: 0
-      - rendererPath: Body
-        name: "\u30A6\u30A3\u30F3\u30AF"
-        value: 0
-      - rendererPath: Body
-        name: "\u30A6\u30A3\u30F3\u30AF\u53F3"
-        value: 0
-      - rendererPath: Body
-        name: "\u30A6\u30A3\u30F3\u30AF\uFF12"
-        value: 100
-      - rendererPath: Body
-        name: "\uFF73\uFF68\uFF9D\uFF78\uFF12\u53F3"
-        value: 100
-      - rendererPath: Body
-        name: "\u4E0B"
-        value: 30
+        name: まばたき
+        value: 1.0
       bones: []
       rendererPaths:
       - Body
@@ -234,14 +168,14 @@ MonoBehaviour:
       transitionCurvePreset: Linear
       blendShapes:
       - rendererPath: Body
-        name: "\u7B11\u3044"
-        value: 100
+        name: 笑い
+        value: 1.0
       - rendererPath: Body
-        name: "\u30A6\u30A3\u30F3\u30AF"
-        value: 100
+        name: ウィンク
+        value: 1.0
       - rendererPath: Body
-        name: "\u30A6\u30A3\u30F3\u30AF\u53F3"
-        value: 100
+        name: ウィンク右
+        value: 1.0
       bones: []
       rendererPaths:
       - Body
@@ -249,7 +183,7 @@ MonoBehaviour:
     - slot: blink
       expressionId:
   - id: eye_look
-    name: "\u76EE\u7DDA"
+    name: 目線
     layer: emotion
     isGaze: 1
     animationClip: {fileID: 0}
@@ -265,26 +199,18 @@ MonoBehaviour:
       blendShapes: []
       bones: []
       rendererPaths: []
-  _baseExpression:
-    animationClip: {fileID: 0}
-    cachedSnapshot:
-      transitionDuration: 0.06666667
-      transitionCurvePreset: Linear
-      blendShapes: []
-      bones: []
-      rendererPaths: []
   _rendererPaths:
   - Body
   _gazeConfigs:
   - expressionId: eye_look
-    leftEyeBonePath: Left Eye
-    leftEyeInitialRotation: {x: 0.057332043, y: -4.897653e-10, z: -4.900752e-13}
-    leftEyeYawAxisLocal: {x: 5.684343e-14, y: 0.9999995, z: 0.0010005992}
-    leftEyePitchAxisLocal: {x: 1, y: -7.1054274e-14, z: -6.2136407e-12}
-    rightEyeBonePath: Right Eye
-    rightEyeInitialRotation: {x: 0.057332043, y: -5.5448524e-10, z: -5.548364e-13}
-    rightEyeYawAxisLocal: {x: 5.684343e-14, y: 0.9999995, z: 0.0010005992}
-    rightEyePitchAxisLocal: {x: 1, y: -7.1054274e-14, z: -6.2136407e-12}
+    leftEyeBonePath:
+    leftEyeInitialRotation: {x: 0, y: 0, z: 0}
+    leftEyeYawAxisLocal: {x: 0, y: 1, z: 0}
+    leftEyePitchAxisLocal: {x: 1, y: 0, z: 0}
+    rightEyeBonePath:
+    rightEyeInitialRotation: {x: 0, y: 0, z: 0}
+    rightEyeYawAxisLocal: {x: 0, y: 1, z: 0}
+    rightEyePitchAxisLocal: {x: 1, y: 0, z: 0}
     lookUpAngle: 15
     lookDownAngle: 9
     outerYawAngle: 15
@@ -302,7 +228,7 @@ MonoBehaviour:
     expressionId: blink_overlay
   _adapterBindings:
   - rid: 8000000000000000001
-  _referenceModel: {fileID: 919132149155446097, guid: 9c07cd4e1ef6a2a49a1c212c15237ef8, type: 3}
+  _referenceModel: {fileID: 0}
   references:
     version: 2
     RefIds:
