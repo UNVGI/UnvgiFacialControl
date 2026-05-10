@@ -171,12 +171,20 @@ namespace Hidano.FacialControl.LipSync.Adapters
             return weights;
         }
 
+        // ContributeMask に取り込む閾値。これ未満の |weights[i]| は「触らない BlendShape」と扱う。
+        // Animation Recording で誤って小さな値 (= 0.0001 程度) が混入したスナップショットが
+        // ContributeMask を膨らませて、表情レイヤー側の BlendShape を不必要に上書きするのを防ぐ。
+        // <see cref="LipSyncInputSource.SilenceThreshold"/> と同値で整合させる。
+        private const float ContributeThreshold = 1e-4f;
+
         private static void MarkContributeIndexes(float[] weights, BitArray mask)
         {
             int count = weights.Length < mask.Length ? weights.Length : mask.Length;
             for (int i = 0; i < count; i++)
             {
-                if (weights[i] != 0f)
+                float w = weights[i];
+                if (w < 0f) w = -w;
+                if (w > ContributeThreshold)
                 {
                     mask[i] = true;
                 }

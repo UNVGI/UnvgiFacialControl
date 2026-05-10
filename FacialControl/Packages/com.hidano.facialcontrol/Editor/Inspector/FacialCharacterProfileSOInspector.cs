@@ -77,6 +77,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string ExpressionRowRendererSummaryName = "expression-row-renderer-summary";
         public const string ExpressionRowValidationHelpName = "expression-row-validation-help";
         public const string ExpressionRowTransitionDurationFieldName = "expression-row-transition-duration-field";
+        public const string ExpressionRowGazeAutoAssignButtonName = "expression-row-gaze-auto-assign-button";
         public const string GazeConfigAddDropdownName = "gaze-config-add-dropdown";
         public const string GazeConfigBulkResolveButtonName = "gaze-config-bulk-resolve-button";
         public const string GazeConfigNoCandidatesLabel = "追加できる目線操作の表情はありません";
@@ -387,6 +388,13 @@ namespace Hidano.FacialControl.Editor.Inspector
                 + "Add ボタンから利用可能な binding を追加し、各 binding は SO 内に直接保存されます。"));
 
             var listView = new AdapterBindingsListView(_adapterBindingsProperty);
+            // Adapter Binding 追加時に Layer が自動追加された場合は、Layers セクションも再描画する。
+            listView.OnLayersAutoModified += () =>
+            {
+                RefreshLayerNameChoices();
+                RebuildLayersUI();
+                UpdateValidation();
+            };
             listView.Bind(serializedObject);
             foldout.Add(listView);
 
@@ -913,9 +921,16 @@ namespace Hidano.FacialControl.Editor.Inspector
         private void UpdateGazeConfigResolveButtonStates()
         {
             bool hasReferenceModel = HasReferenceModel();
-            if (_gazeConfigsContainer == null) return;
-            _gazeConfigsContainer.Query<Button>(GazeConfigAutoAssignButtonName).ForEach(
-                button => button.SetEnabled(hasReferenceModel));
+            if (_gazeConfigsContainer != null)
+            {
+                _gazeConfigsContainer.Query<Button>(GazeConfigAutoAssignButtonName).ForEach(
+                    button => button.SetEnabled(hasReferenceModel));
+            }
+            if (_layersContainer != null)
+            {
+                _layersContainer.Query<Button>(ExpressionRowGazeAutoAssignButtonName).ForEach(
+                    button => button.SetEnabled(hasReferenceModel));
+            }
         }
 
         private bool HasReferenceModel()
@@ -1085,14 +1100,18 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             if (exclusionModeProp != null)
             {
-                var modeField = new EnumField("排他モード", (ExclusionMode)exclusionModeProp.enumValueIndex);
+                var initialMode = (ExclusionMode)exclusionModeProp.enumValueIndex;
+                var modeField = new EnumField("排他モード", initialMode);
+                var modeHelp = MakeHelpBox(GetExclusionModeDescription(initialMode));
                 modeField.RegisterValueChangedCallback(evt =>
                 {
                     serializedObject.Update();
                     var p = _layersProperty.GetArrayElementAtIndex(layerIndex).FindPropertyRelative("exclusionMode");
                     if (p != null) { p.enumValueIndex = (int)(ExclusionMode)evt.newValue; serializedObject.ApplyModifiedProperties(); }
+                    modeHelp.text = GetExclusionModeDescription((ExclusionMode)evt.newValue);
                 });
                 card.Add(modeField);
+                card.Add(modeHelp);
             }
 
             // LayerOverrideMask: このレイヤーがアクティブな間に上書きする他レイヤー
@@ -1151,6 +1170,19 @@ namespace Hidano.FacialControl.Editor.Inspector
             card.Add(removeLayerButton);
 
             return card;
+        }
+
+        private static string GetExclusionModeDescription(ExclusionMode mode)
+        {
+            switch (mode)
+            {
+                case ExclusionMode.LastWins:
+                    return "後勝ち: 同レイヤー内で別の表情がトリガされると、現在の表情から新しい表情へ遷移時間でクロスフェードします。";
+                case ExclusionMode.Blend:
+                    return "ブレンド: 同レイヤー内で同時にアクティブな表情のウェイトを加算し、最終値を 0〜1 にクランプします。";
+                default:
+                    return string.Empty;
+            }
         }
 
         private void RebuildLayerOverrideMaskFieldInto(VisualElement container, int layerIndex)
@@ -1360,9 +1392,71 @@ namespace Hidano.FacialControl.Editor.Inspector
             validationHelp.style.display = DisplayStyle.None;
             row.Add(validationHelp);
 
+            // 目線操作の表情で GazeConfig が未作成、または参照モデルから再解決したい時のためのボタン。
+            // 表示制御は UpdateRowValidation 側で警告表示と連動させる（目線タブの行にあるボタンと同じ動作）。
+            var gazeAutoAssignButton = new Button(() => AutoAssignGazeConfigForExpression(exprIndex))
+            {
+                name = ExpressionRowGazeAutoAssignButtonName,
+                text = "参照モデルから自動設定",
+                tooltip = "現在の参照モデルからこの表情の GazeConfig を作成 / 再解決します。既存値は上書きされます。",
+            };
+            gazeAutoAssignButton.style.alignSelf = Align.FlexStart;
+            gazeAutoAssignButton.style.marginTop = 2;
+            gazeAutoAssignButton.style.display = DisplayStyle.None;
+            row.Add(gazeAutoAssignButton);
+
             UpdateRowValidation(row, exprIndex);
 
             return row;
+        }
+
+        private void AutoAssignGazeConfigForExpression(int exprIndex)
+        {
+            if (_expressionsProperty == null || _rootGazeConfigsProperty == null) return;
+            if (exprIndex < 0 || exprIndex >= _expressionsProperty.arraySize) return;
+            if (!HasReferenceModel())
+            {
+                Debug.LogWarning(
+                    "[FacialCharacterProfileSOInspector] 参照モデルが未割り当てのため、目線設定の自動入力を skip します。"
+                    + " Inspector の「参照モデル」セクションで GameObject を割り当ててから再実行してください。");
+                return;
+            }
+
+            serializedObject.Update();
+            var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
+            var idProp = entryProp.FindPropertyRelative("id");
+            var isGazeProp = entryProp.FindPropertyRelative("isGaze");
+            string expressionId = idProp != null ? idProp.stringValue : string.Empty;
+            if (string.IsNullOrEmpty(expressionId)) return;
+
+            int undoGroup = BeginUndoGroup("Auto-Assign GazeConfig from Reference Model");
+            // isGaze が OFF の場合は ON に切替えて GazeConfig 駆動に統一する。
+            if (isGazeProp != null && !isGazeProp.boolValue)
+            {
+                isGazeProp.boolValue = true;
+            }
+
+            int cfgIndex = FindRootGazeConfigIndex(expressionId);
+            if (cfgIndex < 0)
+            {
+                cfgIndex = _rootGazeConfigsProperty.arraySize;
+                _rootGazeConfigsProperty.InsertArrayElementAtIndex(cfgIndex);
+                var cfg = _rootGazeConfigsProperty.GetArrayElementAtIndex(cfgIndex);
+                ResetGazeConfigToDefaults(cfg);
+                var newIdProp = cfg.FindPropertyRelative("expressionId");
+                if (newIdProp != null) newIdProp.stringValue = expressionId;
+            }
+
+            AssignGazeConfigFromReferenceModel(
+                _rootGazeConfigsProperty.GetArrayElementAtIndex(cfgIndex),
+                resetRangesToDefaults: true);
+
+            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
+
+            RebuildLayersUI();
+            RebuildGazeConfigsUI();
+            RebuildExpressionIdMapping();
+            UpdateValidation();
         }
 
         private void ChangeExpressionIsGaze(int exprIndex, bool newIsGaze)
@@ -2026,6 +2120,16 @@ namespace Hidano.FacialControl.Editor.Inspector
             {
                 help.text = string.Join("\n", messages);
                 help.style.display = DisplayStyle.Flex;
+            }
+
+            // 目線操作の表情で警告が出ている場合のみ「参照モデルから自動設定」ボタンを表示する。
+            // 参照モデル未割り当て時はクリック不可にする。
+            var gazeAutoAssignButton = rowElement.Q<Button>(ExpressionRowGazeAutoAssignButtonName);
+            if (gazeAutoAssignButton != null)
+            {
+                bool showButton = isGaze && messages.Count > 0;
+                gazeAutoAssignButton.style.display = showButton ? DisplayStyle.Flex : DisplayStyle.None;
+                gazeAutoAssignButton.SetEnabled(HasReferenceModel());
             }
         }
 

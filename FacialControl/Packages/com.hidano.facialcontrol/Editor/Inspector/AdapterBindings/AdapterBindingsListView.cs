@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Models;
 using UnityEditor;
@@ -51,6 +52,13 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
         private readonly Button _removeButton;
         private AdvancedDropdownState _addDropdownState;
         private int _selectedIndex = -1;
+
+        /// <summary>
+        /// Adapter Binding 追加時に <see cref="IAdapterBindingDefaultLayer"/> 経由で
+        /// プロファイルの <c>_layers</c> が自動的に書換えられた直後に呼ばれる通知。
+        /// 親 Inspector に Layers セクションの再描画を依頼するためのフック。
+        /// </summary>
+        public event Action OnLayersAutoModified;
 
         public AdapterBindingsListView(SerializedProperty listProperty)
         {
@@ -128,7 +136,145 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
             if (list == null) return;
             list.Add(instance);
 
+            // 自身用の Layer がプロファイルに無い場合のみ自動的に作成する
+            // (例: uLipSync は専用 Layer を必要とするため Inspector 操作の手間を減らす)。
+            bool layersModified = false;
+            if (instance is IAdapterBindingDefaultLayer defaultLayer)
+            {
+                layersModified = EnsureDefaultLayerForBinding(defaultLayer);
+            }
+
             CommitMutation();
+
+            if (layersModified)
+            {
+                OnLayersAutoModified?.Invoke();
+            }
+        }
+
+        private bool EnsureDefaultLayerForBinding(IAdapterBindingDefaultLayer defaultLayer)
+        {
+            string sourceId = defaultLayer.DefaultLayerInputSourceId;
+            if (string.IsNullOrEmpty(sourceId)) return false;
+
+            var so = _listProperty.serializedObject;
+            so.Update();
+            var layersProperty = so.FindProperty("_layers");
+            if (layersProperty == null || !layersProperty.isArray) return false;
+
+            // 既に同じ入力源 ID を持つ Layer があれば何もしない (重複追加防止)。
+            for (int i = 0; i < layersProperty.arraySize; i++)
+            {
+                if (LayerContainsInputSourceId(layersProperty.GetArrayElementAtIndex(i), sourceId))
+                {
+                    return false;
+                }
+            }
+
+            int newIndex = layersProperty.arraySize;
+            layersProperty.InsertArrayElementAtIndex(newIndex);
+            var layerProp = layersProperty.GetArrayElementAtIndex(newIndex);
+
+            string desiredName = string.IsNullOrEmpty(defaultLayer.DefaultLayerName)
+                ? sourceId
+                : defaultLayer.DefaultLayerName;
+            string uniqueName = ResolveUniqueLayerName(layersProperty, desiredName, excludeIndex: newIndex);
+
+            var nameProp = layerProp.FindPropertyRelative("name");
+            if (nameProp != null) nameProp.stringValue = uniqueName;
+
+            var priorityProp = layerProp.FindPropertyRelative("priority");
+            if (priorityProp != null) priorityProp.intValue = ResolveNextPriority(layersProperty, excludeIndex: newIndex);
+
+            var modeProp = layerProp.FindPropertyRelative("exclusionMode");
+            if (modeProp != null) modeProp.enumValueIndex = (int)defaultLayer.DefaultLayerExclusionMode;
+
+            var inputSourcesProp = layerProp.FindPropertyRelative("inputSources");
+            if (inputSourcesProp != null && inputSourcesProp.isArray)
+            {
+                inputSourcesProp.ClearArray();
+                inputSourcesProp.InsertArrayElementAtIndex(0);
+                var declProp = inputSourcesProp.GetArrayElementAtIndex(0);
+                var idProp = declProp.FindPropertyRelative("id");
+                if (idProp != null) idProp.stringValue = sourceId;
+                var weightProp = declProp.FindPropertyRelative("weight");
+                if (weightProp != null) weightProp.floatValue = 1f;
+                var optionsProp = declProp.FindPropertyRelative("optionsJson");
+                if (optionsProp != null) optionsProp.stringValue = string.Empty;
+            }
+
+            // layerOverrideMask は空 (= 何も上書きしない) を初期値にする。
+            var maskProp = layerProp.FindPropertyRelative("layerOverrideMask");
+            if (maskProp != null && maskProp.isArray)
+            {
+                maskProp.ClearArray();
+            }
+
+            so.ApplyModifiedProperties();
+            return true;
+        }
+
+        private static bool LayerContainsInputSourceId(SerializedProperty layerProp, string inputSourceId)
+        {
+            if (layerProp == null || string.IsNullOrEmpty(inputSourceId)) return false;
+            var inputSourcesProp = layerProp.FindPropertyRelative("inputSources");
+            if (inputSourcesProp == null || !inputSourcesProp.isArray) return false;
+            for (int i = 0; i < inputSourcesProp.arraySize; i++)
+            {
+                var declProp = inputSourcesProp.GetArrayElementAtIndex(i);
+                var idProp = declProp.FindPropertyRelative("id");
+                if (idProp != null && string.Equals(idProp.stringValue, inputSourceId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static string ResolveUniqueLayerName(
+            SerializedProperty layersProperty, string desired, int excludeIndex)
+        {
+            if (string.IsNullOrEmpty(desired)) desired = "layer";
+
+            var existing = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < layersProperty.arraySize; i++)
+            {
+                if (i == excludeIndex) continue;
+                var nameProp = layersProperty.GetArrayElementAtIndex(i).FindPropertyRelative("name");
+                if (nameProp != null && !string.IsNullOrEmpty(nameProp.stringValue))
+                {
+                    existing.Add(nameProp.stringValue);
+                }
+            }
+
+            if (!existing.Contains(desired)) return desired;
+
+            for (int suffix = 2; suffix < 1000; suffix++)
+            {
+                string candidate = $"{desired}-{suffix}";
+                if (!existing.Contains(candidate)) return candidate;
+            }
+            return desired + "-" + Guid.NewGuid().ToString("N").Substring(0, 4);
+        }
+
+        private static int ResolveNextPriority(SerializedProperty layersProperty, int excludeIndex)
+        {
+            int maxPriority = -1;
+            bool anyFound = false;
+            for (int i = 0; i < layersProperty.arraySize; i++)
+            {
+                if (i == excludeIndex) continue;
+                var priorityProp = layersProperty.GetArrayElementAtIndex(i).FindPropertyRelative("priority");
+                if (priorityProp == null) continue;
+                if (!anyFound || priorityProp.intValue > maxPriority)
+                {
+                    maxPriority = priorityProp.intValue;
+                    anyFound = true;
+                }
+            }
+
+            if (!anyFound) return 0;
+            return maxPriority + 1;
         }
 
         /// <summary>

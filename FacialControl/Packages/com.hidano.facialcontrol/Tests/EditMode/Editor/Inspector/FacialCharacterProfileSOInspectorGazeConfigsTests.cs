@@ -318,6 +318,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
 
             var root = BuildInspectorRoot();
+            // expression-row-gaze-auto-assign-button は 2026-05 のレイヤー/表情タブ改修で
+            // 「目線設定が未作成 / 参照モデル変更時に行内から再解決する」用途のボタンとして
+            // 再導入されているため legacy 一覧から除外している (UpdateRowValidation 経由で表示)。
             var legacyNames = new[]
             {
                 "expression-row-id-label",
@@ -329,7 +332,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
                 "expression-row-gaze-look-right-clip",
                 "expression-row-gaze-look-up-clip",
                 "expression-row-gaze-look-down-clip",
-                "expression-row-gaze-auto-assign-button",
             };
 
             foreach (var legacyName in legacyNames)
