@@ -49,6 +49,7 @@ FBX / VRM / prefab いずれでも可。以下の BlendShape 名を持つ Skinne
 | anger | `怒り`, `左眉下げ`, `右眉下げ` |
 | surprise | `びっくり`, `▲` |
 | lipsync_a | `あ` |
+| blink_overlay | `まばたき` |
 
 BlendShape 名が合致しないモデルを使う場合は、`MultiSourceBlendDemoCharacter` SO の Inspector を開き、Expression セクションで BlendShape 名をモデルに合わせて編集してください。SO の保存時に裏で `StreamingAssets/.../profile.json` が自動エクスポートされ、ランタイムへ反映されます。
 
@@ -70,6 +71,10 @@ Play モードに入ります。画面左上に HUD が表示されます。
   - 目線ボーンは「参照モデルから自動設定」ボタンで、ボーン名・初期回転に加えて世界の上下/左右軸が各目ボーンの local 空間でどの方向に対応するかを自動算出します。モデルを差替えたら必ず再実行してください。
   - 「可動範囲 (角度制限)」 foldout で上方向/下方向/外側/内側の最大角度を設定できます。例えば「向かって左に視線を送るとき、向かって左の眼は外側、向かって右の眼は内側の値で動く」非対称制限により、両目を完全同角度で動かすことによる違和感を回避できます。
 - **キーバインディング** の動作モードは「Hold (押下中のみ ON)」が既定。リリースで OFF に戻ります。トグル動作 (押すたびに ON/OFF 切替) が必要なバインディングは Inspector で「動作モード」を `Toggle` に変更してください。
+- **左トリガー (LT)** で smile を Analog 駆動 (押し量に応じて smile 全体の BlendShape をスケール)。
+- **右トリガー (RT)** で `blink_overlay` (= `まばたき` のみを持つ Expression) を Analog 駆動。これがユーザー要望「ボタン操作の表情に対し、追加で Trigger を押すと目だけ閉じる」の典型例です。
+  - 例: Trigger1 で smile を ON にした上で RT を引くと、smile の眉・口角は維持されたまま、`まばたき` のみが押し量に応じて加算されます。`emotion` レイヤーが intra-layer 加算 (LayerExpressionSource + AnalogExpressionInputSource) で合成しているため、別レイヤーを増やさず重ね合わせが成立します。
+  - 別の表情 BlendShape を重ねたい場合は、`blink_overlay` のように「重ねたい BlendShape のみを持つ Expression」を追加して `RightTrigger` (または別の Analog Action) と Analog バインディングを張ってください。
 
 ### トラブルシューティング
 
