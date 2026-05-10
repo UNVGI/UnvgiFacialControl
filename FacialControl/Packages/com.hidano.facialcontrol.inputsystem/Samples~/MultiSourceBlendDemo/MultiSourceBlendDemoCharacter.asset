@@ -123,6 +123,27 @@ MonoBehaviour:
       bones: []
       rendererPaths:
       - Body
+  - id: blink_overlay
+    name: BlinkOverlay
+    layer: emotion
+    isGaze: 0
+    animationClip: {fileID: 0}
+    transitionDuration: 0.05
+    transitionCurve:
+      type: 0
+      keys: []
+    blendShapeValues: []
+    layerOverrideMask: []
+    cachedSnapshot:
+      transitionDuration: 0.05
+      transitionCurvePreset: Linear
+      blendShapes:
+      - rendererPath: Body
+        name: まばたき
+        value: 1.0
+      bones: []
+      rendererPaths:
+      - Body
   - id: eye_look
     name: 目線
     layer: emotion
@@ -203,5 +224,5 @@ MonoBehaviour:
           triggerMode: 0
         - bindingMode: 2
           actionName: RightTrigger
-          expressionId: anger
+          expressionId: blink_overlay
           triggerMode: 0
