@@ -9,7 +9,7 @@
                 {
                     "id": "input",
                     "weight": 1.0,
-                    "options":{"maxStackDepth":8}
+                    "options":{"maxStackDepth":4}
                 },
                 {
                     "id": "input:analog-expression",
@@ -27,18 +27,18 @@
                 "emotion"
             ],
             "snapshot": {
-                "transitionDuration": 0.25,
+                "transitionDuration": 0.10000000149011612,
                 "transitionCurvePreset": "Linear",
                 "blendShapes": [
                     {
                         "rendererPath": "Body",
                         "name": "笑い",
-                        "value": 1.0
+                        "value": 100.0
                     },
                     {
                         "rendererPath": "Body",
                         "name": "口角上げ",
-                        "value": 0.6
+                        "value": 60.0
                     }
                 ],
                 "bones": [],
@@ -55,23 +55,23 @@
                 "emotion"
             ],
             "snapshot": {
-                "transitionDuration": 0.25,
+                "transitionDuration": 0.10000000149011612,
                 "transitionCurvePreset": "Linear",
                 "blendShapes": [
                     {
                         "rendererPath": "Body",
                         "name": "怒り",
-                        "value": 1.0
+                        "value": 100.0
                     },
                     {
                         "rendererPath": "Body",
                         "name": "左眉下げ",
-                        "value": 0.5
+                        "value": 50.0
                     },
                     {
                         "rendererPath": "Body",
                         "name": "右眉下げ",
-                        "value": 0.5
+                        "value": 50.0
                     }
                 ],
                 "bones": [],
@@ -88,18 +88,18 @@
                 "emotion"
             ],
             "snapshot": {
-                "transitionDuration": 0.20000000298023225,
+                "transitionDuration": 0.10000000149011612,
                 "transitionCurvePreset": "Linear",
                 "blendShapes": [
                     {
                         "rendererPath": "Body",
                         "name": "びっくり",
-                        "value": 1.0
+                        "value": 100.0
                     },
                     {
                         "rendererPath": "Body",
                         "name": "▲",
-                        "value": 0.8
+                        "value": 80.0
                     }
                 ],
                 "bones": [],
@@ -122,7 +122,140 @@
                     {
                         "rendererPath": "Body",
                         "name": "あ",
-                        "value": 1.0
+                        "value": 100.0
+                    }
+                ],
+                "bones": [],
+                "rendererPaths": [
+                    "Body"
+                ]
+            }
+        },
+        {
+            "id": "blink_overlay",
+            "name": "BlinkOverlay",
+            "layer": "emotion",
+            "layerOverrideMask": [
+                "emotion"
+            ],
+            "snapshot": {
+                "transitionDuration": 0.05000000074505806,
+                "transitionCurvePreset": "Linear",
+                "blendShapes": [
+                    {
+                        "rendererPath": "Body",
+                        "name": "Looking Up",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "Looking Down",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "まばたき",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "笑い",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "なごみ",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "じと目",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "はぅ",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "びっくり",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "ｷﾘｯ",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "グルグル",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "星目",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "はちゅ目",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "はちゅ目縦潰れ",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "はちゅ目横潰れ",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "はぁと",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "瞳小",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "瞳縦潰れ",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "光小",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "ウィンク",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "ウィンク右",
+                        "value": 0.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "ウィンク２",
+                        "value": 100.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "ｳｨﾝｸ２右",
+                        "value": 100.0
+                    },
+                    {
+                        "rendererPath": "Body",
+                        "name": "下",
+                        "value": 30.0
                     }
                 ],
                 "bones": [],
@@ -139,7 +272,7 @@
                 "emotion"
             ],
             "snapshot": {
-                "transitionDuration": 0.0,
+                "transitionDuration": 0.10000000149011612,
                 "transitionCurvePreset": "Linear",
                 "blendShapes": [],
                 "bones": [],
@@ -147,7 +280,55 @@
             }
         }
     ],
+    "baseExpression": {
+        "transitionDuration": 0.06666667014360428,
+        "transitionCurvePreset": "Linear",
+        "blendShapes": [],
+        "bones": [],
+        "rendererPaths": []
+    },
     "rendererPaths": [
         "Body"
+    ],
+    "gaze_configs": [
+        {
+            "expressionId": "eye_look",
+            "leftEyeBonePath": "Left Eye",
+            "leftEyeInitialRotation": {
+                "x": 0.05733204260468483,
+                "y": -4.897652838842248e-10,
+                "z": -4.900752113151663e-13
+            },
+            "leftEyeYawAxisLocal": {
+                "x": 5.684343241333517e-14,
+                "y": 0.9999995231628418,
+                "z": 0.0010005992371588946
+            },
+            "leftEyePitchAxisLocal": {
+                "x": 1.0,
+                "y": -7.105427357601002e-14,
+                "z": -6.213640713070845e-12
+            },
+            "rightEyeBonePath": "Right Eye",
+            "rightEyeInitialRotation": {
+                "x": 0.05733204260468483,
+                "y": -5.544852355043872e-10,
+                "z": -5.548363960113101e-13
+            },
+            "rightEyeYawAxisLocal": {
+                "x": 5.684343241333517e-14,
+                "y": 0.9999995231628418,
+                "z": 0.0010005992371588946
+            },
+            "rightEyePitchAxisLocal": {
+                "x": 1.0,
+                "y": -7.105427357601002e-14,
+                "z": -6.213640713070845e-12
+            },
+            "lookUpAngle": 15.0,
+            "lookDownAngle": 9.0,
+            "outerYawAngle": 15.0,
+            "innerYawAngle": 18.0
+        }
     ]
 }
