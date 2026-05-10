@@ -232,7 +232,7 @@
   - _Requirements: 6.1, 6.2_
   - _Boundary: Editor.Inspector_
 
-- [ ] 6.3 表情ライブラリタブに Slots 宣言セクションを実装する
+- [x] 6.3 表情ライブラリタブに Slots 宣言セクションを実装する
   - `BuildSlotsDeclarationSection(VisualElement root)` を新規実装し、`_layerNameChoices` パターン (`FacialCharacterProfileSOInspector.cs:142, 1020`) を踏襲して `_slotNameChoices` 動的候補リストを生成する
   - `BuildArrayListView<string>(_slotsProperty, allowAdd, allowRemove, onRename)` で Slot 識別子文字列の追加 / 削除 / リネーム UI を提供する
   - `_slotsProperty` を `TrackPropertyValue` で監視し、変更検知時に `RefreshSlotNameChoices()` で全 DropdownField の choices を再設定する

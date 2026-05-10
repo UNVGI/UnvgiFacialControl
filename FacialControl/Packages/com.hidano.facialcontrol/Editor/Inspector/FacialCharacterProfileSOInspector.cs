@@ -123,6 +123,8 @@ namespace Hidano.FacialControl.Editor.Inspector
         protected SerializedProperty _baseExpressionProperty;
         protected SerializedProperty _schemaVersionProperty;
         protected SerializedProperty _adapterBindingsProperty;
+        protected SerializedProperty _slotsProperty;
+        protected SerializedProperty _defaultOverlaysProperty;
 
 #if UNITY_EDITOR
         protected SerializedProperty _referenceModelProperty;
@@ -145,12 +147,14 @@ namespace Hidano.FacialControl.Editor.Inspector
         private VisualElement _layersContainer;
         private VisualElement _gazeConfigsContainer;
         private Tab _gazeTab;
+        private readonly List<DropdownField> _slotDropdowns = new List<DropdownField>();
 
         // ====================================================================
         // 候補リスト
         // ====================================================================
 
         protected readonly List<string> _layerNameChoices = new List<string>();
+        protected readonly List<string> _slotNameChoices = new List<string>();
 
         protected IExpressionAnimationClipSampler _sampler;
         private bool _autoSavePending;
@@ -180,6 +184,8 @@ namespace Hidano.FacialControl.Editor.Inspector
             // BuildLayersSection は内部で MaskField の choices を _layerNameChoices から構築する。
             // そのため先に RefreshLayerNameChoices() を呼んで候補を確定させてから section を構築する。
             RefreshLayerNameChoices();
+            RefreshSlotNameChoices();
+            _slotDropdowns.Clear();
 
             BuildSaveStatusBar(root);
 
@@ -192,6 +198,8 @@ namespace Hidano.FacialControl.Editor.Inspector
             tabView.style.flexGrow = 1f;
 
             var expressionLibraryTab = new Tab("表情ライブラリ") { name = TabExpressionLibraryName };
+            BuildSlotsDeclarationSection(expressionLibraryTab.contentContainer);
+            BuildDefaultOverlaysSection(expressionLibraryTab.contentContainer);
             tabView.Add(expressionLibraryTab);
 
             var layersTab = new Tab("レイヤー") { name = TabLayersName };
@@ -226,6 +234,10 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             // 自動保存: SerializedObject の変更を監視
             root.TrackSerializedObjectValue(serializedObject, _ => OnSerializedObjectChanged());
+            if (_slotsProperty != null)
+            {
+                root.TrackPropertyValue(_slotsProperty, _ => OnSlotsPropertyChanged());
+            }
 
 #if UNITY_EDITOR
             TrackReferenceModelChanges(root);
@@ -241,6 +253,8 @@ namespace Hidano.FacialControl.Editor.Inspector
             _baseExpressionProperty = serializedObject.FindProperty("_baseExpression");
             _schemaVersionProperty = serializedObject.FindProperty("_schemaVersion");
             _adapterBindingsProperty = serializedObject.FindProperty("_adapterBindings");
+            _slotsProperty = serializedObject.FindProperty("_slots");
+            _defaultOverlaysProperty = serializedObject.FindProperty("_defaultOverlays");
 
 #if UNITY_EDITOR
             _referenceModelProperty = serializedObject.FindProperty("_referenceModel");
@@ -469,6 +483,266 @@ namespace Hidano.FacialControl.Editor.Inspector
         {
             if (unsetHelp == null) return;
             unsetHelp.style.display = clip == null ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        // ====================================================================
+        // Section: 表情ライブラリ / Slots 宣言
+        // ====================================================================
+
+        private void BuildSlotsDeclarationSection(VisualElement root)
+        {
+            var foldout = MakeSectionFoldout(SlotsDeclarationFoldoutName, "Slots 宣言", open: true);
+            foldout.Add(MakeHelpBox(
+                "Overlay が参照する slot 識別子を宣言します。"
+                + "ここで定義した名前が Default Overlays と Expression Overlays の候補になります。"));
+
+            if (_slotsProperty == null)
+            {
+                foldout.Add(MakeHelpBox("_slots の保存先が見つかりません。", HelpBoxMessageType.Warning));
+                root.Add(foldout);
+                return;
+            }
+
+            var listView = BuildArrayListView(
+                _slotsProperty,
+                28f,
+                () => new VisualElement(),
+                BindSlotDeclarationRow);
+
+            listView.itemsAdded += indices =>
+            {
+                serializedObject.Update();
+                foreach (int index in indices)
+                {
+                    if (index < 0 || index >= _slotsProperty.arraySize) continue;
+                    var slotProp = _slotsProperty.GetArrayElementAtIndex(index);
+                    if (slotProp != null && string.IsNullOrWhiteSpace(slotProp.stringValue))
+                    {
+                        slotProp.stringValue = GenerateUniqueSlotName();
+                    }
+                }
+                serializedObject.ApplyModifiedProperties();
+                OnSlotsPropertyChanged();
+                listView.Rebuild();
+            };
+            listView.itemsRemoved += _ => OnSlotsPropertyChanged();
+
+            foldout.Add(listView);
+            root.Add(foldout);
+        }
+
+        private void BindSlotDeclarationRow(VisualElement row, int slotIndex)
+        {
+            row.Clear();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+
+            if (_slotsProperty == null || slotIndex < 0 || slotIndex >= _slotsProperty.arraySize)
+            {
+                row.Add(MakeHelpBox("Slot 行を解決できません。", HelpBoxMessageType.Warning));
+                return;
+            }
+
+            var slotProp = _slotsProperty.GetArrayElementAtIndex(slotIndex);
+            var slotField = new TextField("Slot")
+            {
+                tooltip = "overlaySlot / DefaultOverlays / Expression.Overlays から参照する識別子です。",
+            };
+            slotField.style.flexGrow = 1f;
+            slotField.SetValueWithoutNotify(slotProp != null ? slotProp.stringValue ?? string.Empty : string.Empty);
+            slotField.RegisterValueChangedCallback(evt =>
+            {
+                serializedObject.Update();
+                if (_slotsProperty != null && slotIndex >= 0 && slotIndex < _slotsProperty.arraySize)
+                {
+                    var p = _slotsProperty.GetArrayElementAtIndex(slotIndex);
+                    if (p != null)
+                    {
+                        p.stringValue = evt.newValue ?? string.Empty;
+                        serializedObject.ApplyModifiedProperties();
+                        OnSlotsPropertyChanged();
+                    }
+                }
+            });
+            row.Add(slotField);
+        }
+
+        private void BuildDefaultOverlaysSection(VisualElement root)
+        {
+            var foldout = MakeSectionFoldout(DefaultOverlaysFoldoutName, "Default Overlays", open: true);
+            foldout.Add(MakeHelpBox(
+                "slot ごとの既定 overlay clip を設定します。"
+                + "slot 候補は Slots 宣言から生成されます。"));
+
+            if (_defaultOverlaysProperty == null)
+            {
+                foldout.Add(MakeHelpBox("_defaultOverlays の保存先が見つかりません。", HelpBoxMessageType.Warning));
+                root.Add(foldout);
+                return;
+            }
+
+            var rows = new VisualElement();
+            rows.style.flexDirection = FlexDirection.Column;
+            RebuildDefaultOverlayRows(rows);
+            foldout.Add(rows);
+
+            var addButton = new Button(() =>
+            {
+                serializedObject.Update();
+                int newIndex = _defaultOverlaysProperty.arraySize;
+                _defaultOverlaysProperty.InsertArrayElementAtIndex(newIndex);
+                InitializeDefaultOverlayRow(newIndex);
+                serializedObject.ApplyModifiedProperties();
+                RebuildDefaultOverlayRows(rows);
+                RefreshAllSlotDropdownChoices();
+            })
+            {
+                text = "+ Default Overlay を追加",
+            };
+            addButton.style.alignSelf = Align.FlexStart;
+            addButton.style.marginTop = 4;
+            foldout.Add(addButton);
+            root.Add(foldout);
+        }
+
+        private void RebuildDefaultOverlayRows(VisualElement rows)
+        {
+            if (rows == null) return;
+            rows.Clear();
+            if (_defaultOverlaysProperty == null) return;
+
+            serializedObject.Update();
+            for (int i = 0; i < _defaultOverlaysProperty.arraySize; i++)
+            {
+                int overlayIndex = i;
+                var row = new VisualElement();
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems = Align.Center;
+                row.style.marginBottom = 4;
+                BindDefaultOverlayRow(row, overlayIndex);
+
+                var removeButton = new Button(() =>
+                {
+                    serializedObject.Update();
+                    if (overlayIndex >= 0 && overlayIndex < _defaultOverlaysProperty.arraySize)
+                    {
+                        _defaultOverlaysProperty.DeleteArrayElementAtIndex(overlayIndex);
+                        serializedObject.ApplyModifiedProperties();
+                        RebuildDefaultOverlayRows(rows);
+                        RefreshAllSlotDropdownChoices();
+                    }
+                })
+                {
+                    text = "削除",
+                };
+                removeButton.style.marginLeft = 4;
+                row.Add(removeButton);
+                rows.Add(row);
+            }
+        }
+
+        private void BindDefaultOverlayRow(VisualElement row, int overlayIndex)
+        {
+            row.Clear();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+
+            if (_defaultOverlaysProperty == null
+                || overlayIndex < 0
+                || overlayIndex >= _defaultOverlaysProperty.arraySize)
+            {
+                row.Add(MakeHelpBox("Default Overlay 行を解決できません。", HelpBoxMessageType.Warning));
+                return;
+            }
+
+            var bindingProp = _defaultOverlaysProperty.GetArrayElementAtIndex(overlayIndex);
+            var slotProp = bindingProp.FindPropertyRelative("slot");
+            var suppressProp = bindingProp.FindPropertyRelative("suppress");
+            var clipProp = bindingProp.FindPropertyRelative("animationClip");
+
+            string currentSlot = slotProp != null ? slotProp.stringValue ?? string.Empty : string.Empty;
+            var slotDropdown = new DropdownField("Slot")
+            {
+                name = DefaultOverlaySlotDropdownName,
+            };
+            slotDropdown.style.minWidth = 160;
+            slotDropdown.style.flexGrow = 1f;
+            RegisterSlotDropdown(slotDropdown, currentSlot);
+            slotDropdown.RegisterValueChangedCallback(evt =>
+            {
+                serializedObject.Update();
+                if (_defaultOverlaysProperty != null
+                    && overlayIndex >= 0
+                    && overlayIndex < _defaultOverlaysProperty.arraySize)
+                {
+                    var current = _defaultOverlaysProperty.GetArrayElementAtIndex(overlayIndex);
+                    var p = current.FindPropertyRelative("slot");
+                    if (p != null)
+                    {
+                        p.stringValue = evt.newValue ?? string.Empty;
+                        serializedObject.ApplyModifiedProperties();
+                    }
+                }
+            });
+            row.Add(slotDropdown);
+
+            var clipField = new ObjectField("AnimationClip")
+            {
+                objectType = typeof(AnimationClip),
+                allowSceneObjects = false,
+            };
+            clipField.style.flexGrow = 1f;
+            if (clipProp != null)
+            {
+                clipField.BindProperty(clipProp);
+                clipField.RegisterValueChangedCallback(_ =>
+                {
+                    serializedObject.Update();
+                    if (_defaultOverlaysProperty != null
+                        && overlayIndex >= 0
+                        && overlayIndex < _defaultOverlaysProperty.arraySize)
+                    {
+                        var current = _defaultOverlaysProperty.GetArrayElementAtIndex(overlayIndex);
+                        var suppress = current.FindPropertyRelative("suppress");
+                        if (suppress != null)
+                        {
+                            suppress.boolValue = false;
+                            serializedObject.ApplyModifiedProperties();
+                        }
+                    }
+                });
+            }
+            else
+            {
+                clipField.SetEnabled(false);
+            }
+            row.Add(clipField);
+
+            if (suppressProp != null && suppressProp.boolValue)
+            {
+                suppressProp.boolValue = false;
+                serializedObject.ApplyModifiedProperties();
+            }
+        }
+
+        private void InitializeDefaultOverlayRow(int overlayIndex)
+        {
+            if (_defaultOverlaysProperty == null
+                || overlayIndex < 0
+                || overlayIndex >= _defaultOverlaysProperty.arraySize)
+            {
+                return;
+            }
+
+            var bindingProp = _defaultOverlaysProperty.GetArrayElementAtIndex(overlayIndex);
+            var slotProp = bindingProp.FindPropertyRelative("slot");
+            if (slotProp != null && string.IsNullOrWhiteSpace(slotProp.stringValue) && _slotNameChoices.Count > 0)
+            {
+                slotProp.stringValue = _slotNameChoices[0];
+            }
+
+            var suppressProp = bindingProp.FindPropertyRelative("suppress");
+            if (suppressProp != null) suppressProp.boolValue = false;
         }
 
         // ====================================================================
@@ -1400,6 +1674,9 @@ namespace Hidano.FacialControl.Editor.Inspector
             // BuildAnimationClipFields は AnimationClip スロットの直下に「目線操作」Toggle を配置する。
             BuildAnimationClipFields(row, exprIndex);
 
+            var overlaysProp = entryProp.FindPropertyRelative("overlays");
+            row.Add(BuildOverlaysSectionForExpression(overlaysProp, exprIndex));
+
             // Validation
             var validationHelp = new HelpBox(string.Empty, HelpBoxMessageType.Warning)
             {
@@ -1425,6 +1702,270 @@ namespace Hidano.FacialControl.Editor.Inspector
             UpdateRowValidation(row, exprIndex);
 
             return row;
+        }
+
+        private VisualElement BuildOverlaysSectionForExpression(SerializedProperty overlaysProp, int exprIndex)
+        {
+            var section = new Foldout
+            {
+                name = ExpressionOverlaysSectionName,
+                text = "Overlays",
+                value = true,
+            };
+            section.style.marginTop = 6;
+
+            if (overlaysProp == null)
+            {
+                section.Add(MakeHelpBox("Expression.Overlays の保存先が見つかりません。", HelpBoxMessageType.Warning));
+                return section;
+            }
+
+            var slots = CollectOverlaySlotsForExpression(overlaysProp);
+            if (slots.Count == 0)
+            {
+                var empty = new Label("宣言済み slot はありません。");
+                empty.style.color = new StyleColor(new Color(0.55f, 0.55f, 0.55f));
+                section.Add(empty);
+                return section;
+            }
+
+            for (int i = 0; i < slots.Count; i++)
+            {
+                section.Add(BuildExpressionOverlayRow(overlaysProp, exprIndex, slots[i]));
+            }
+
+            return section;
+        }
+
+        private VisualElement BuildExpressionOverlayRow(
+            SerializedProperty overlaysProp,
+            int exprIndex,
+            string slot)
+        {
+            int bindingIndex = FindOverlayBindingIndex(overlaysProp, slot);
+            SerializedProperty bindingProp = bindingIndex >= 0
+                ? overlaysProp.GetArrayElementAtIndex(bindingIndex)
+                : null;
+            var state = ReadOverlayBindingState(bindingProp);
+            bool declared = IsDeclaredSlot(slot);
+
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Column;
+            row.style.marginTop = 4;
+            row.style.marginBottom = 4;
+            row.style.paddingLeft = 6;
+
+            var line = new VisualElement();
+            line.style.flexDirection = FlexDirection.Row;
+            line.style.alignItems = Align.Center;
+
+            var slotLabel = new Label(string.IsNullOrEmpty(slot) ? "(未設定 slot)" : slot);
+            slotLabel.style.minWidth = 120;
+            slotLabel.style.whiteSpace = WhiteSpace.Normal;
+            line.Add(slotLabel);
+
+            var radio = new OverlayStateRadioButtonGroup
+            {
+                name = ExpressionOverlayStateRadioName,
+                choices = new List<string> { "Default", "Suppress", "Override" },
+            };
+            radio.SetValueWithoutNotify(ToRadioIndex(state));
+            radio.style.minWidth = 240;
+            line.Add(radio);
+
+            var clipField = new ObjectField("AnimationClip")
+            {
+                name = ExpressionOverlayAnimationClipFieldName,
+                objectType = typeof(AnimationClip),
+                allowSceneObjects = false,
+            };
+            clipField.style.flexGrow = 1f;
+            clipField.style.display = state == OverlaySlotBindingState.Override
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+            if (bindingProp != null)
+            {
+                var clipProp = bindingProp.FindPropertyRelative("animationClip");
+                if (clipProp != null)
+                {
+                    clipField.SetValueWithoutNotify(clipProp.objectReferenceValue);
+                }
+            }
+            line.Add(clipField);
+
+            radio.OnValueAssigned = value =>
+            {
+                var newState = FromRadioIndex(value);
+                ApplyExpressionOverlayState(exprIndex, slot, newState, clipField);
+                clipField.style.display = newState == OverlaySlotBindingState.Override
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+            };
+            clipField.RegisterValueChangedCallback(evt =>
+            {
+                ApplyExpressionOverlayClip(exprIndex, slot, evt.newValue as AnimationClip);
+            });
+
+            row.Add(line);
+
+            if (!declared)
+            {
+                var help = MakeHelpBox(
+                    $"未宣言 slot '{slot}' を参照しています。Slots 宣言に追加するか、この overlay を削除してください。",
+                    HelpBoxMessageType.Warning);
+                help.name = ExpressionOverlayUndeclaredSlotHelpName;
+                row.Add(help);
+            }
+
+            return row;
+        }
+
+        private List<string> CollectOverlaySlotsForExpression(SerializedProperty overlaysProp)
+        {
+            var slots = new List<string>(_slotNameChoices.Count + (overlaysProp != null ? overlaysProp.arraySize : 0));
+            for (int i = 0; i < _slotNameChoices.Count; i++)
+            {
+                if (!slots.Contains(_slotNameChoices[i])) slots.Add(_slotNameChoices[i]);
+            }
+
+            if (overlaysProp == null) return slots;
+
+            for (int i = 0; i < overlaysProp.arraySize; i++)
+            {
+                var bindingProp = overlaysProp.GetArrayElementAtIndex(i);
+                var slotProp = bindingProp.FindPropertyRelative("slot");
+                var slot = slotProp != null ? slotProp.stringValue ?? string.Empty : string.Empty;
+                if (!slots.Contains(slot)) slots.Add(slot);
+            }
+
+            return slots;
+        }
+
+        private static OverlaySlotBindingState ReadOverlayBindingState(SerializedProperty bindingProp)
+        {
+            if (bindingProp == null) return OverlaySlotBindingState.DefaultFallback;
+
+            var suppressProp = bindingProp.FindPropertyRelative("suppress");
+            if (suppressProp != null && suppressProp.boolValue)
+            {
+                return OverlaySlotBindingState.Suppress;
+            }
+
+            var clipProp = bindingProp.FindPropertyRelative("animationClip");
+            if (clipProp != null && clipProp.objectReferenceValue != null)
+            {
+                return OverlaySlotBindingState.Override;
+            }
+
+            return OverlaySlotBindingState.DefaultFallback;
+        }
+
+        private static int ToRadioIndex(OverlaySlotBindingState state)
+        {
+            switch (state)
+            {
+                case OverlaySlotBindingState.DefaultFallback:
+                    return 0;
+                case OverlaySlotBindingState.Suppress:
+                    return 1;
+                case OverlaySlotBindingState.Override:
+                    return 2;
+                default:
+                    return 0;
+            }
+        }
+
+        private static OverlaySlotBindingState FromRadioIndex(int value)
+        {
+            switch (value)
+            {
+                case 1:
+                    return OverlaySlotBindingState.Suppress;
+                case 2:
+                    return OverlaySlotBindingState.Override;
+                default:
+                    return OverlaySlotBindingState.DefaultFallback;
+            }
+        }
+
+        private void ApplyExpressionOverlayState(
+            int exprIndex,
+            string slot,
+            OverlaySlotBindingState state,
+            ObjectField clipField)
+        {
+            var binding = GetOrCreateExpressionOverlayBinding(exprIndex, slot);
+            if (binding == null) return;
+
+            Undo.RecordObject(target, "Change Expression Overlay State");
+            switch (state)
+            {
+                case OverlaySlotBindingState.Suppress:
+                    binding.suppress = true;
+                    binding.animationClip = null;
+                    binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                    if (clipField != null) clipField.SetValueWithoutNotify(null);
+                    break;
+                case OverlaySlotBindingState.Override:
+                    binding.suppress = false;
+                    break;
+                default:
+                    binding.suppress = false;
+                    binding.animationClip = null;
+                    binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                    if (clipField != null) clipField.SetValueWithoutNotify(null);
+                    break;
+            }
+
+            EditorUtility.SetDirty(target);
+            serializedObject.Update();
+        }
+
+        private void ApplyExpressionOverlayClip(int exprIndex, string slot, AnimationClip clip)
+        {
+            var binding = GetOrCreateExpressionOverlayBinding(exprIndex, slot);
+            if (binding == null) return;
+
+            Undo.RecordObject(target, "Change Expression Overlay Clip");
+            binding.suppress = false;
+            binding.animationClip = clip;
+            if (clip == null)
+            {
+                binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+            }
+            EditorUtility.SetDirty(target);
+            serializedObject.Update();
+        }
+
+        private OverlaySlotBindingSerializable GetOrCreateExpressionOverlayBinding(int exprIndex, string slot)
+        {
+            var profileSO = target as FacialCharacterProfileSO;
+            if (profileSO == null || profileSO.Expressions == null) return null;
+            if (exprIndex < 0 || exprIndex >= profileSO.Expressions.Count) return null;
+
+            var expression = profileSO.Expressions[exprIndex];
+            if (expression.overlays == null)
+            {
+                expression.overlays = new List<OverlaySlotBindingSerializable>();
+            }
+
+            for (int i = 0; i < expression.overlays.Count; i++)
+            {
+                var binding = expression.overlays[i];
+                if (binding != null && string.Equals(binding.slot, slot, StringComparison.Ordinal))
+                {
+                    return binding;
+                }
+            }
+
+            var created = new OverlaySlotBindingSerializable
+            {
+                slot = slot,
+                suppress = false,
+                cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot(),
+            };
+            expression.overlays.Add(created);
+            return created;
         }
 
         private void AutoAssignGazeConfigForExpression(int exprIndex)
@@ -2340,6 +2881,138 @@ namespace Hidano.FacialControl.Editor.Inspector
             }
         }
 
+        protected void RefreshSlotNameChoices()
+        {
+            _slotNameChoices.Clear();
+            if (_slotsProperty == null) return;
+
+            serializedObject.Update();
+            for (int i = 0; i < _slotsProperty.arraySize; i++)
+            {
+                var elem = _slotsProperty.GetArrayElementAtIndex(i);
+                var name = elem != null ? elem.stringValue : null;
+                if (!string.IsNullOrEmpty(name) && !_slotNameChoices.Contains(name))
+                {
+                    _slotNameChoices.Add(name);
+                }
+            }
+        }
+
+        private void OnSlotsPropertyChanged()
+        {
+            RefreshSlotNameChoices();
+            RefreshAllSlotDropdownChoices();
+        }
+
+        private void RegisterSlotDropdown(DropdownField dropdown, string currentValue)
+        {
+            if (dropdown == null) return;
+            ApplySlotDropdownChoices(dropdown, currentValue);
+            if (!_slotDropdowns.Contains(dropdown))
+            {
+                _slotDropdowns.Add(dropdown);
+            }
+        }
+
+        private void RefreshAllSlotDropdownChoices()
+        {
+            for (int i = _slotDropdowns.Count - 1; i >= 0; i--)
+            {
+                var dropdown = _slotDropdowns[i];
+                if (dropdown == null || dropdown.parent == null)
+                {
+                    _slotDropdowns.RemoveAt(i);
+                    continue;
+                }
+
+                ApplySlotDropdownChoices(dropdown, dropdown.value);
+            }
+        }
+
+        private void ApplySlotDropdownChoices(DropdownField dropdown, string currentValue)
+        {
+            var choices = BuildSlotDropdownChoices(currentValue);
+            dropdown.choices = choices;
+
+            string value = currentValue ?? string.Empty;
+            if (choices.Count > 0 && !choices.Contains(value))
+            {
+                value = choices[0];
+            }
+            dropdown.SetValueWithoutNotify(value);
+            dropdown.SetEnabled(choices.Count > 0);
+        }
+
+        private List<string> BuildSlotDropdownChoices(string currentValue)
+        {
+            var choices = new List<string>(_slotNameChoices.Count + 1);
+            for (int i = 0; i < _slotNameChoices.Count; i++)
+            {
+                if (!choices.Contains(_slotNameChoices[i]))
+                {
+                    choices.Add(_slotNameChoices[i]);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(currentValue) && !choices.Contains(currentValue))
+            {
+                choices.Add(currentValue);
+            }
+
+            return choices;
+        }
+
+        private string GenerateUniqueSlotName()
+        {
+            const string baseName = "slot";
+            if (!_slotNameChoices.Contains(baseName))
+            {
+                return baseName;
+            }
+
+            for (int i = 2; i < 1000; i++)
+            {
+                string candidate = baseName + i;
+                if (!_slotNameChoices.Contains(candidate))
+                {
+                    return candidate;
+                }
+            }
+
+            return Guid.NewGuid().ToString("N");
+        }
+
+        private bool IsDeclaredSlot(string slot)
+        {
+            if (string.IsNullOrEmpty(slot)) return false;
+            for (int i = 0; i < _slotNameChoices.Count; i++)
+            {
+                if (string.Equals(_slotNameChoices[i], slot, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static int FindOverlayBindingIndex(SerializedProperty overlaysProp, string slot)
+        {
+            if (overlaysProp == null || !overlaysProp.isArray) return -1;
+
+            for (int i = 0; i < overlaysProp.arraySize; i++)
+            {
+                var binding = overlaysProp.GetArrayElementAtIndex(i);
+                var slotProp = binding.FindPropertyRelative("slot");
+                var candidate = slotProp != null ? slotProp.stringValue ?? string.Empty : string.Empty;
+                if (string.Equals(candidate, slot ?? string.Empty, StringComparison.Ordinal))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
         protected List<string> CollectExpressionIds()
         {
             var ids = new List<string>();
@@ -2471,6 +3144,21 @@ namespace Hidano.FacialControl.Editor.Inspector
         // ====================================================================
         // AnimationClip 表示用 ObjectField
         // ====================================================================
+
+        private sealed class OverlayStateRadioButtonGroup : RadioButtonGroup
+        {
+            public Action<int> OnValueAssigned;
+
+            public override int value
+            {
+                get => base.value;
+                set
+                {
+                    base.value = value;
+                    OnValueAssigned?.Invoke(value);
+                }
+            }
+        }
 
         /// <summary>
         /// AnimationClip 名ではなく、プロジェクトのファイル名（拡張子なし）を表示するカスタム ObjectField。
