@@ -414,6 +414,13 @@ namespace Hidano.FacialControl.Domain.Services
             return _emptyMask;
         }
 
+        // ContributeMask に取り込む閾値。これ未満の |value| の BlendShape は
+        // 「Expression が実際には触らない (= 値 0 のキーが Animation Recording 等で bake され
+        // 副次的にエクスポートされただけ)」とみなし mask に含めない。
+        // ContributeMask が広がると、上位 layer (lipsync 等) との衝突によって
+        // 「表情の触らない BlendShape まで lipsync が 0 上書きする」現象を引き起こすため。
+        private const float ContributeThreshold = 1e-4f;
+
         private Dictionary<string, BitArray> BuildExpressionMasks(FacialProfile profile)
         {
             var masks = new Dictionary<string, BitArray>(StringComparer.Ordinal);
@@ -430,6 +437,13 @@ namespace Hidano.FacialControl.Domain.Services
                 var bsSpan = expression.BlendShapeValues.Span;
                 for (int v = 0; v < bsSpan.Length; v++)
                 {
+                    float value = bsSpan[v].Value;
+                    if (value < 0f) value = -value;
+                    if (value <= ContributeThreshold)
+                    {
+                        continue;
+                    }
+
                     int idx = FindBlendShapeIndex(bsSpan[v].Name);
                     if (idx >= 0)
                     {

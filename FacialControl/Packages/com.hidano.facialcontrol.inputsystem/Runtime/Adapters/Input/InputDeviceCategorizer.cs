@@ -50,6 +50,14 @@ namespace Hidano.FacialControl.Adapters.Input
         {
             "<Gamepad>",
             "<Joystick>",
+            // XInputController は Windows で XInput 互換コントローラ (Xbox 系) を表す
+            // 具象 layout で、Gamepad の派生扱いだが path 先頭は <XInputController> となる。
+            "<XInputController>",
+            // DualShockGamepad / DualSenseGamepad / SwitchProControllerHID 等の具象も
+            // 設計上 Gamepad の派生で Controller 扱いにしたい。
+            "<DualShockGamepad>",
+            "<DualSenseGamepadHID>",
+            "<SwitchProControllerHID>",
             "<XRController>",
             "<Pen>",
             "<Touchscreen>",

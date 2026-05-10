@@ -52,6 +52,14 @@
 - **トリガ**: 複数 ULipSyncAdapterBinding を 1 SO に同時搭載する利用シナリオが発生したとき / Inspector UX 全体の整理タイミング
 - **影響範囲**: `Editor/Inspector/ULipSyncAdapterBindingDrawer.cs`、他 adapter binding drawer
 
+### S-9: LipSync の AnimationClip 形式が動かない件の根本対応
+- **出典**: ユーザー報告（2026-05-10）「LipsyncをAnimationClipで設定できない」/ HANDOVER.md タスク 8 の積み残し
+- **内容**: `ULipSyncAdapterBinding.TryFillAnimationClipSnapshot` は `entry.Clip.SampleAnimation(ctx.HostGameObject, sampleTime)` 経由で口形状クリップを採取するが、ユーザー作成 AnimationClip の rendererPath とキャラ階層が一致しない / クリップが BlendShape カーブを持たない等で snapshot が空になり結果として ContributeMask が空になる → BlendShape 直指定形式（`BlendShapePhonemeEntry`）では動くが AnimationClip 形式（`AnimationClipPhonemeEntry`）では動かない、という挙動になる。
+  - 直近 PR で「sample 結果が全 0 のとき LogWarning」「Inspector に AnimationClip 未割り当て HelpBox」を追加して原因切り分けはできるようにしたが、ユーザー視点の体験としては依然「動かない」。
+  - 候補根本対応: (a) 「FacialProfile 内 Expression（既登録の表情）を音素として直接指定する `ExpressionPhonemeEntry` を新設」して AnimationClip 採取を AdapterBinding 内では行わず profile 既存値を流用、(b) AnimationClip の path を `AnimationUtility.GetCurveBindings`（Editor only）で事前検証し runtime で path 自動補正する、(c) sample 失敗時に `BlendShapePhonemeEntry` 風の暗黙 fallback を提供。
+- **トリガ**: ユーザーが本格的に AnimationClip 形式を必要とするタイミング（口の組み合わせ表現が複数 BS 必要になったとき） / preview.2 のリップシンク機能拡張時
+- **影響範囲**: `Packages/com.hidano.facialcontrol.lipsync/Runtime/Adapters/ULipSyncAdapterBinding.cs`、`PhonemeEntries/`（新 `ExpressionPhonemeEntry` 追加）、`Editor/Inspector/PhonemeEntryListView.cs`（形式 dropdown に追加）
+
 ### S-7: アナログ入力 Weight 値による Expression Lerp 駆動
 - **出典**: ユーザー報告（2026-05-09）「目線操作以外のアナログ操作のExpressionが意図した動作になっていない」
 - **内容**: 現状、`ExpressionInputSourceAdapter` は Hold/Toggle 二値で Expression を on/off するため、controller のアナログトリガー（0.0〜1.0）を握っても expression weight は遷移時間ベースで一定速度進行してしまう。ユーザー要求は「InputAction の analog value がそのまま無入力↔押し切りの Lerp 値になる」挙動。実装には (1) `ExpressionTriggerInputSource` への continuous-weight API 追加、(2) `InputSystemAdapterBinding` に gaze 用とは別の "analog expression bindings" リスト追加、(3) `InputSystemAdapterBindingDrawer` の対応 UI、(4) `OnLateTick` での毎フレーム value→weight 反映、が必要で 1 PR の規模を超える。
@@ -179,3 +187,4 @@
 - 2026-05-04: 新設。HANDOVER.md 優先度低 #5（S-1）/ Phase 6.5 残課題（S-4）/ 各 spec の preview.2 以降宣言（M-3〜M-12）を集約。
 - 2026-05-06: spec `adapter-binding-architecture` クローズに伴い follow-up 2 件追加（S-5: Sample SO guid 再生成、S-6: VContainer dependency 宣言）。
 - 2026-05-06: spec `gaze-config-promotion` 設計セッションで preview.1 スコープ外と確定した 2 件を追加（M-13: 複数 Vector2 入力源での gaze 同時駆動、M-14: Domain への動的 Expression driver 概念導入）。
+- 2026-05-10: ユーザー指示で「LipSync の AnimationClip 形式が動かない件の根本対応」を S-9 として追加（凌ぎの診断ログ / HelpBox は既に main に入っている）。
