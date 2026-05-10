@@ -5,9 +5,9 @@ using UnityEngine;
 namespace Hidano.FacialControl.Adapters.ScriptableObject
 {
     /// <summary>
-    /// Vector2 アナログ入力 (左スティック・OSC・ARKit 等) で両目を同時駆動するアナログ表情の設定。
+    /// Vector2 アナログ入力 (左スティック・OSC・ARKit 等) で両目を同時駆動する目線操作表情の設定。
     /// 入力源には依存しない汎用データ構造で、対応する <see cref="Serializable.ExpressionSerializable"/>
-    /// (kind=Analog) に対して <see cref="expressionId"/> で紐づく。
+    /// (isGaze=true) に対して <see cref="expressionId"/> で紐づく。
     /// </summary>
     /// <remarks>
     /// <para>

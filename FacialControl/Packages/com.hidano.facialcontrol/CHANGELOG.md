@@ -8,6 +8,8 @@
 
 - GazeConfig は `InputSystemAdapterBinding._gazeConfigs` から `FacialCharacterProfileSO` ルート直下の `_gazeConfigs` へ昇格しました。InputSystem 側は入力結線のみを保持する構造に変わるため、既存 SO YAML は binding 内部の gaze configs を SO ルートへ移植する必要があります。
 - `profile.json` の `schemaVersion` は preview.1 リリース前段階のため `"1.0"` に統一しました。バージョンを別管理しないポリシーに従い、旧開発過程で出現した `"2.0"` / `"2.1"` の JSON は preview 段階の破壊的変更として migration なしで `"1.0"` への hand-edit が必要です。
+- `InputSourceId` の正規表現を `^[a-zA-Z0-9_.-]{1,64}$` から `^[a-zA-Z0-9_.\-:]{1,64}$` に拡張し、`slug:sub` 合成キー（例: `input:analog-expression`）を JSON 経路でも正しく受理するよう修正しました。`AdapterSlug` 自身の regex は `:` 不許可のまま維持。これにより `SystemTextJsonParser` が profile.json 内の `input:analog-expression` を弾いていた警告が解消されます。
+- `ExpressionSerializable.kind` (`ExpressionKind` enum: Digital/Analog) を撤廃し、`bool isGaze`（目線操作フラグ）に置換しました。Inspector の種別 dropdown は「目線操作」チェックボックスに統一され、目線操作以外の表情は「名前 / AnimationClip / 遷移時間」のみで設定可能になります。Layer 側の種別属性は元々存在しないため変更なし。preview.1 段階のため自動マイグレーションは提供しません。サンプル `.asset` の YAML 上の `kind: 0|1` を `isGaze: 0|1` に置換しています（`_schemaVersion` は preview ポリシーに従い `"1.0"` のまま据え置き）。
 
 ### ⚠ BREAKING CHANGES — Adapter Binding アーキテクチャ移行 (spec `adapter-binding-architecture`)
 

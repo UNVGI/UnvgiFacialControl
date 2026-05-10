@@ -196,7 +196,7 @@ namespace Hidano.FacialControl.Adapters.Json
                     {
                         Debug.LogWarning(
                             $"SystemTextJsonParser: レイヤー '{layer.name}' の inputSources[{j}] に不正な識別子 '{rawId ?? "<null>"}' が指定されました。" +
-                            "識別子は [a-zA-Z0-9_.-]{1,64} を満たす必要があります (D-5 により 'legacy' は受理されません)。スキップします。");
+                            "識別子は [a-zA-Z0-9_.\\-:]{1,64} を満たす必要があります (D-5 により 'legacy' は受理されません)。スキップします。");
                         continue;
                     }
 

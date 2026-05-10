@@ -55,7 +55,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
 
         [TestCase("bad id")]
         [TestCase("bad/id")]
-        [TestCase("bad:id")]
         [TestCase("日本語")]
         [TestCase("has\tTab")]
         [TestCase("has\nNewline")]
@@ -94,6 +93,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [TestCase("dash-separated")]
         [TestCase("Alpha123")]
         [TestCase("a")]
+        [TestCase("slug:sub")]
+        [TestCase("input:analog-expression")]
+        [TestCase("x-vendor:event")]
         public void TryParse_AllowedAsciiCharacters_IsAccepted(string candidate)
         {
             var parsed = InputSourceId.TryParse(candidate, out var id);

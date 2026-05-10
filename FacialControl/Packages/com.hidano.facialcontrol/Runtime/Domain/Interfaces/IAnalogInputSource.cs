@@ -26,14 +26,15 @@ namespace Hidano.FacialControl.Domain.Interfaces
     /// Invariants:
     /// <list type="bullet">
     ///   <item><see cref="Id"/> と <see cref="AxisCount"/> は構築後不変。</item>
-    ///   <item><see cref="Id"/> は <c>[a-zA-Z0-9_.-]{1,64}</c> 規約を満たす（Req 1.2 / D-6）。</item>
+    ///   <item><see cref="Id"/> は <c>[a-zA-Z0-9_.\-:]{1,64}</c> 規約を満たす（Req 1.2 / D-6）。<c>:</c> は <c>slug:sub</c> 合成キーの区切り文字。</item>
     /// </list>
     /// </para>
     /// </remarks>
     public interface IAnalogInputSource
     {
         /// <summary>
-        /// 入力源識別子。<c>[a-zA-Z0-9_.-]{1,64}</c> 規約に従う（Req 1.2）。
+        /// 入力源識別子。<c>[a-zA-Z0-9_.\-:]{1,64}</c> 規約に従う（Req 1.2）。
+        /// <c>:</c> は <c>slug:sub</c> 形式の合成キー区切り文字として使われる。
         /// </summary>
         string Id { get; }
 

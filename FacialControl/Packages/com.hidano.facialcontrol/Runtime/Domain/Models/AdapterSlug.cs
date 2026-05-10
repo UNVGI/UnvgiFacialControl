@@ -14,6 +14,11 @@ namespace Hidano.FacialControl.Domain.Models
     /// <c>legacy</c> 禁止のような追加制約は持たない（D-13 廃止）。
     /// </para>
     /// <para>
+    /// 区切り文字 <c>:</c> は slug 内には含めない（<see cref="CompositeSeparator"/> として
+    /// <c>slug:sub</c> 合成キーの境界に予約）。合成済み id 文字列を扱うのは
+    /// <see cref="InputSourceId"/> 側で、そちらの regex は <c>:</c> を許容する。
+    /// </para>
+    /// <para>
     /// Invariants: 構築後の <see cref="Value"/> は常にパターンを満たす ASCII 文字列。
     /// 未初期化（<c>default</c>）では <see cref="Value"/> は <c>null</c>。
     /// </para>

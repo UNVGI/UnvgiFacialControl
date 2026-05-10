@@ -43,6 +43,13 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string DebugFoldoutName = "facial-character-debug-foldout";
         public const string AdapterBindingsFoldoutName = "facial-character-adapter-bindings-foldout";
 
+        public const string TabViewName = "facial-character-tabview";
+        public const string TabExpressionsName = "facial-character-tab-expressions";
+        public const string TabGazeName = "facial-character-tab-gaze";
+        public const string TabAdapterBindingsName = "facial-character-tab-adapter-bindings";
+        public const string TabModelName = "facial-character-tab-model";
+        public const string TabDebugName = "facial-character-tab-debug";
+
         public const string SaveStatusBarName = "facial-character-save-status-bar";
         public const string SaveButtonName = "facial-character-save-button";
         public const string SaveStatusLabelName = "facial-character-save-status";
@@ -58,14 +65,14 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string ReferenceModelFoldoutName = "facial-character-reference-model-foldout";
 
         public const string ExpressionRowNameFieldName = "expression-row-name-field";
-        public const string ExpressionRowKindDropdownName = "expression-row-kind-dropdown";
+        public const string ExpressionRowIsGazeToggleName = "expression-row-is-gaze-toggle";
         public const string ExpressionRowClipFieldName = "expression-row-clip-field";
         public const string ExpressionRowRendererSummaryName = "expression-row-renderer-summary";
         public const string ExpressionRowValidationHelpName = "expression-row-validation-help";
         public const string ExpressionRowTransitionDurationFieldName = "expression-row-transition-duration-field";
         public const string GazeConfigAddDropdownName = "gaze-config-add-dropdown";
         public const string GazeConfigBulkResolveButtonName = "gaze-config-bulk-resolve-button";
-        public const string GazeConfigNoCandidatesLabel = "追加できる Analog Expression はありません";
+        public const string GazeConfigNoCandidatesLabel = "追加できる目線操作の表情はありません";
         public const string GazeConfigRowName = "gaze-config-row";
         public const string GazeConfigExpressionNameLabelName = "gaze-config-expression-name";
         public const string GazeConfigLeftBonePathFieldName = "gaze-config-left-bone-path";
@@ -80,9 +87,6 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string GazeConfigLookDownClipFieldName = "gaze-config-look-down-clip";
         public const string GazeConfigAutoAssignButtonName = "gaze-config-auto-assign-button";
         public const string GazeConfigRemoveButtonName = "gaze-config-remove-button";
-
-        private const string ExpressionKindDigitalLabel = "デジタル操作";
-        private const string ExpressionKindAnalogLabel = "アナログ操作";
 
         // ====================================================================
         // 共通スタイル定数
@@ -159,13 +163,35 @@ namespace Hidano.FacialControl.Editor.Inspector
             RefreshLayerNameChoices();
 
             BuildSaveStatusBar(root);
-            BuildReferenceModelSection(root);
-            BuildLayersSection(root);
-            BuildBaseExpressionSection(root);
-            BuildGazeConfigsSection(root);
-            OnBuildPreLayersSections(root);
-            BuildAdapterBindingsSection(root);
-            BuildDebugSection(root);
+
+            // 5 タブ構成: 表情 / 目線 / Adapter Bindings / モデル / Debug
+            // タブ間で機能の住み分けを明示し、設定漏れを予防する。
+            var tabView = new TabView { name = TabViewName };
+            tabView.style.flexGrow = 1f;
+
+            var expressionsTab = new Tab("表情") { name = TabExpressionsName };
+            BuildLayersSection(expressionsTab.contentContainer);
+            BuildBaseExpressionSection(expressionsTab.contentContainer);
+            tabView.Add(expressionsTab);
+
+            var gazeTab = new Tab("目線") { name = TabGazeName };
+            BuildGazeConfigsSection(gazeTab.contentContainer);
+            tabView.Add(gazeTab);
+
+            var adapterTab = new Tab("Adapter Bindings") { name = TabAdapterBindingsName };
+            OnBuildPreLayersSections(adapterTab.contentContainer);
+            BuildAdapterBindingsSection(adapterTab.contentContainer);
+            tabView.Add(adapterTab);
+
+            var modelTab = new Tab("モデル") { name = TabModelName };
+            BuildReferenceModelSection(modelTab.contentContainer);
+            tabView.Add(modelTab);
+
+            var debugTab = new Tab("Debug") { name = TabDebugName };
+            BuildDebugSection(debugTab.contentContainer);
+            tabView.Add(debugTab);
+
+            root.Add(tabView);
 
             UpdateValidation();
             UpdateDebugLabels();
@@ -656,8 +682,8 @@ namespace Hidano.FacialControl.Editor.Inspector
             for (int i = 0; i < _expressionsProperty.arraySize; i++)
             {
                 var expr = _expressionsProperty.GetArrayElementAtIndex(i);
-                var kindProp = expr.FindPropertyRelative("kind");
-                if (kindProp == null || (ExpressionKind)kindProp.enumValueIndex != ExpressionKind.Analog) continue;
+                var isGazeProp = expr.FindPropertyRelative("isGaze");
+                if (isGazeProp == null || !isGazeProp.boolValue) continue;
 
                 var idProp = expr.FindPropertyRelative("id");
                 string expressionId = idProp != null ? idProp.stringValue : string.Empty;
@@ -1123,17 +1149,17 @@ namespace Hidano.FacialControl.Editor.Inspector
             expressionAddRow.style.flexDirection = FlexDirection.Row;
             expressionAddRow.style.marginTop = 4;
 
-            var addExpressionButton = new Button(() => AddExpressionForLayer(layerName, ExpressionKind.Digital))
+            var addExpressionButton = new Button(() => AddExpressionForLayer(layerName, isGaze: false))
             {
-                text = "+ デジタル操作の表情を追加",
+                text = "+ 表情を追加",
             };
             expressionAddRow.Add(addExpressionButton);
 
-            var addAnalogButton = new Button(() => AddExpressionForLayer(layerName, ExpressionKind.Analog))
+            var addGazeButton = new Button(() => AddExpressionForLayer(layerName, isGaze: true))
             {
-                text = "+ アナログ操作の表情を追加",
+                text = "+ 目線操作の表情を追加",
             };
-            expressionAddRow.Add(addAnalogButton);
+            expressionAddRow.Add(addGazeButton);
 
             card.Add(expressionAddRow);
 
@@ -1219,7 +1245,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             UpdateValidation();
         }
 
-        private void AddExpressionForLayer(string layerName, ExpressionKind kind)
+        private void AddExpressionForLayer(string layerName, bool isGaze)
         {
             serializedObject.Update();
             int newIndex = _expressionsProperty.arraySize;
@@ -1229,13 +1255,13 @@ namespace Hidano.FacialControl.Editor.Inspector
             var idProp = entryProp.FindPropertyRelative("id");
             var nameProp = entryProp.FindPropertyRelative("name");
             var layerProp = entryProp.FindPropertyRelative("layer");
-            var kindProp = entryProp.FindPropertyRelative("kind");
+            var isGazeProp = entryProp.FindPropertyRelative("isGaze");
 
             string newId = Guid.NewGuid().ToString("N");
             if (idProp != null) idProp.stringValue = newId;
-            if (nameProp != null) nameProp.stringValue = kind == ExpressionKind.Analog ? "アナログ表情" : "新規表情";
+            if (nameProp != null) nameProp.stringValue = isGaze ? "目線操作" : "新規表情";
             if (layerProp != null) layerProp.stringValue = layerName ?? string.Empty;
-            if (kindProp != null) kindProp.enumValueIndex = (int)kind;
+            if (isGazeProp != null) isGazeProp.boolValue = isGaze;
 
             serializedObject.ApplyModifiedProperties();
 
@@ -1272,7 +1298,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
             var idProp = entryProp.FindPropertyRelative("id");
             var nameProp = entryProp.FindPropertyRelative("name");
-            var kindProp = entryProp.FindPropertyRelative("kind");
+            var isGazeProp = entryProp.FindPropertyRelative("isGaze");
             var transitionDurationProp = entryProp.FindPropertyRelative("transitionDuration");
 
             // Id 自動採番
@@ -1290,35 +1316,26 @@ namespace Hidano.FacialControl.Editor.Inspector
             row.style.borderLeftColor = new StyleColor(new Color(0.7f, 0.7f, 0.7f));
             row.style.borderLeftWidth = 2;
 
-            // ヘッダー行: kind dropdown + 削除ボタン
+            // ヘッダー行: 目線操作 toggle + 削除ボタン
             var headerRow = new VisualElement();
             headerRow.style.flexDirection = FlexDirection.Row;
             headerRow.style.alignItems = Align.Center;
 
-            ExpressionKind currentKind = ExpressionKind.Digital;
-            if (kindProp != null)
-            {
-                currentKind = (ExpressionKind)kindProp.enumValueIndex;
-            }
+            bool currentIsGaze = isGazeProp != null && isGazeProp.boolValue;
 
-            // EnumField そのままだと表示ラベルが "Digital" / "Analog" の英語になる。
-            // ユーザー視点では「デジタル操作 / アナログ操作」のほうが意図が伝わるため
-            // DropdownField で日本語ラベルを供給し、選択値を ExpressionKind に同期させる。
-            var kindDropdown = new DropdownField("種別")
+            // 目線操作のときのみ GazeConfig 経路で駆動する。それ以外は AnimationClip + 遷移時間。
+            var isGazeToggle = new Toggle("目線操作")
             {
-                name = ExpressionRowKindDropdownName,
-                choices = new List<string> { ExpressionKindDigitalLabel, ExpressionKindAnalogLabel },
+                name = ExpressionRowIsGazeToggleName,
+                tooltip = "ON にするとこの表情は GazeConfig（目線設定）で駆動されます。OFF の通常表情では AnimationClip と遷移時間が使われます。",
             };
-            kindDropdown.SetValueWithoutNotify(currentKind == ExpressionKind.Analog ? ExpressionKindAnalogLabel : ExpressionKindDigitalLabel);
-            kindDropdown.style.flexGrow = 1f;
-            kindDropdown.RegisterValueChangedCallback(evt =>
+            isGazeToggle.SetValueWithoutNotify(currentIsGaze);
+            isGazeToggle.style.flexGrow = 1f;
+            isGazeToggle.RegisterValueChangedCallback(evt =>
             {
-                var newKind = string.Equals(evt.newValue, ExpressionKindAnalogLabel, StringComparison.Ordinal)
-                    ? ExpressionKind.Analog
-                    : ExpressionKind.Digital;
-                ChangeExpressionKind(exprIndex, newKind);
+                ChangeExpressionIsGaze(exprIndex, evt.newValue);
             });
-            headerRow.Add(kindDropdown);
+            headerRow.Add(isGazeToggle);
 
             var removeButton = new Button(() => RemoveExpression(exprIndex))
             {
@@ -1351,7 +1368,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             }
             row.Add(nameField);
 
-            // 遷移時間。アナログ操作では概念がないため非表示にする (データは互換目的で保持)。
+            // 遷移時間。目線操作では概念がないため非表示にする (データは互換目的で保持)。
             var transitionDurationField = new Slider("遷移時間 (秒)", 0f, 1f)
             {
                 name = ExpressionRowTransitionDurationFieldName,
@@ -1362,7 +1379,7 @@ namespace Hidano.FacialControl.Editor.Inspector
                 transitionDurationField.BindProperty(transitionDurationProp);
             }
             transitionDurationField.style.display =
-                currentKind == ExpressionKind.Analog ? DisplayStyle.None : DisplayStyle.Flex;
+                currentIsGaze ? DisplayStyle.None : DisplayStyle.Flex;
             row.Add(transitionDurationField);
 
             // GazeConfig は専用セクションで opt-in 編集するため、Expression 行では共通 clip のみ表示する。
@@ -1382,22 +1399,22 @@ namespace Hidano.FacialControl.Editor.Inspector
             return row;
         }
 
-        private void ChangeExpressionKind(int exprIndex, ExpressionKind newKind)
+        private void ChangeExpressionIsGaze(int exprIndex, bool newIsGaze)
         {
             serializedObject.Update();
             if (exprIndex < 0 || exprIndex >= _expressionsProperty.arraySize) return;
 
             var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
-            var kindProp = entryProp.FindPropertyRelative("kind");
-            if (kindProp == null) return;
+            var isGazeProp = entryProp.FindPropertyRelative("isGaze");
+            if (isGazeProp == null) return;
 
-            var previousKind = (ExpressionKind)kindProp.enumValueIndex;
-            if (previousKind == newKind) return;
+            bool previousIsGaze = isGazeProp.boolValue;
+            if (previousIsGaze == newIsGaze) return;
 
-            int undoGroup = BeginUndoGroup("Change Expression Kind");
-            kindProp.enumValueIndex = (int)newKind;
+            int undoGroup = BeginUndoGroup("Change Expression IsGaze");
+            isGazeProp.boolValue = newIsGaze;
 
-            if (previousKind == ExpressionKind.Analog && newKind != ExpressionKind.Analog)
+            if (previousIsGaze && !newIsGaze)
             {
                 var idProp = entryProp.FindPropertyRelative("id");
                 CleanupRootGazeConfigsForRemovedExpression(
@@ -1806,18 +1823,18 @@ namespace Hidano.FacialControl.Editor.Inspector
             var row = BuildExpressionIdMappingRowContainer();
             row.Add(BuildExpressionIdMappingCell("name", null, bold: true));
             row.Add(BuildExpressionIdMappingCell("expressionId", null, bold: true));
-            row.Add(BuildExpressionIdMappingCell("kind", null, bold: true));
+            row.Add(BuildExpressionIdMappingCell("種別", null, bold: true));
             row.Add(BuildExpressionIdMappingCell("layer", null, bold: true));
             return row;
         }
 
         private VisualElement BuildExpressionIdMappingRow(SerializedProperty expr)
         {
-            string kind = string.Empty;
-            var kindProp = expr.FindPropertyRelative("kind");
-            if (kindProp != null)
+            string kindLabel = "通常";
+            var isGazeProp = expr.FindPropertyRelative("isGaze");
+            if (isGazeProp != null && isGazeProp.boolValue)
             {
-                kind = ((ExpressionKind)kindProp.enumValueIndex).ToString();
+                kindLabel = "目線";
             }
 
             var row = BuildExpressionIdMappingRowContainer();
@@ -1827,7 +1844,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             row.Add(BuildExpressionIdMappingCell(
                 ReadStringProperty(expr, "id"),
                 DebugExpressionIdMappingExpressionIdCellName));
-            row.Add(BuildExpressionIdMappingCell(kind, DebugExpressionIdMappingKindCellName));
+            row.Add(BuildExpressionIdMappingCell(kindLabel, DebugExpressionIdMappingKindCellName));
             row.Add(BuildExpressionIdMappingCell(
                 ReadStringProperty(expr, "layer"),
                 DebugExpressionIdMappingLayerCellName));
@@ -1890,20 +1907,20 @@ namespace Hidano.FacialControl.Editor.Inspector
             // layerOverrideMask が空（= Nothing）はユーザーの明示的な選択として
             // 「このレイヤーは他レイヤーに何も上書きしない」と扱うため、警告にしない。
 
-            // AnimationClip null タリー (kind=Digital のみ。Analog は AnimationClip 任意)
+            // AnimationClip null タリー (通常表情のみ。目線操作は AnimationClip 任意)
             int nullClipCount = 0;
             for (int i = 0; i < _expressionsProperty.arraySize; i++)
             {
                 var elem = _expressionsProperty.GetArrayElementAtIndex(i);
-                var kindP = elem.FindPropertyRelative("kind");
-                int kindValue = kindP != null ? kindP.enumValueIndex : 0;
-                if (kindValue != (int)ExpressionKind.Digital) continue;
+                var isGazeP = elem.FindPropertyRelative("isGaze");
+                bool isGaze = isGazeP != null && isGazeP.boolValue;
+                if (isGaze) continue;
                 var clipP = elem.FindPropertyRelative("animationClip");
                 if (clipP != null && clipP.objectReferenceValue == null) nullClipCount++;
             }
             if (nullClipCount > 0)
             {
-                errors.Add($"AnimationClip が未割当のデジタル表情が {nullClipCount} 件あります。");
+                errors.Add($"AnimationClip が未割当の通常表情が {nullClipCount} 件あります。");
             }
 
             if (_expressionsValidationHelp != null)
@@ -1963,14 +1980,14 @@ namespace Hidano.FacialControl.Editor.Inspector
             if (help == null) return;
 
             var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
-            var kindProp = entryProp.FindPropertyRelative("kind");
+            var isGazeProp = entryProp.FindPropertyRelative("isGaze");
             var clipProp = entryProp.FindPropertyRelative("animationClip");
             var idProp = entryProp.FindPropertyRelative("id");
 
-            ExpressionKind kind = kindProp != null ? (ExpressionKind)kindProp.enumValueIndex : ExpressionKind.Digital;
+            bool isGaze = isGazeProp != null && isGazeProp.boolValue;
 
             var messages = new List<string>();
-            if (kind == ExpressionKind.Digital)
+            if (!isGaze)
             {
                 if (clipProp == null || clipProp.objectReferenceValue == null)
                 {
@@ -1979,21 +1996,21 @@ namespace Hidano.FacialControl.Editor.Inspector
                 var mismatchMessage = BuildRendererPathMismatchMessage(clipProp != null ? clipProp.objectReferenceValue as AnimationClip : null);
                 if (!string.IsNullOrEmpty(mismatchMessage)) messages.Add(mismatchMessage);
             }
-            else if (kind == ExpressionKind.Analog)
+            else
             {
-                // _rootGazeConfigsProperty を持たない派生 (GazeBinding 機能なし) では analog 個別検証は省略する。
+                // _rootGazeConfigsProperty を持たない派生 (GazeBinding 機能なし) では gaze 個別検証は省略する。
                 if (_rootGazeConfigsProperty != null)
                 {
                     int cfgIndex = FindRootGazeConfigIndex(idProp != null ? idProp.stringValue : string.Empty);
                     if (cfgIndex < 0)
                     {
-                        messages.Add("アナログ操作の設定が見つかりません。");
+                        messages.Add("目線操作の設定が見つかりません。");
                     }
                     else
                     {
                         var cfgProp = _rootGazeConfigsProperty.GetArrayElementAtIndex(cfgIndex);
-                        var analogMessages = ValidateAnalogExpression(cfgProp);
-                        if (analogMessages != null) messages.AddRange(analogMessages);
+                        var gazeMessages = ValidateGazeExpression(cfgProp);
+                        if (gazeMessages != null) messages.AddRange(gazeMessages);
 
                         bool anyBone = false;
                         foreach (var fname in new[] { "leftEyeBonePath", "rightEyeBonePath" })
@@ -2028,10 +2045,10 @@ namespace Hidano.FacialControl.Editor.Inspector
         }
 
         /// <summary>
-        /// 派生クラスがアナログ表情に対する追加バリデーションメッセージを返すフック。
+        /// 派生クラスが目線操作の表情に対する追加バリデーションメッセージを返すフック。
         /// 既定は空配列。例: InputActionReference 未割り当てチェックなど。
         /// </summary>
-        protected virtual IReadOnlyList<string> ValidateAnalogExpression(SerializedProperty gazeConfigProperty)
+        protected virtual IReadOnlyList<string> ValidateGazeExpression(SerializedProperty gazeConfigProperty)
             => Array.Empty<string>();
 
         private void OnClipChanged(int index, AnimationClip newClip, VisualElement rowElement)
