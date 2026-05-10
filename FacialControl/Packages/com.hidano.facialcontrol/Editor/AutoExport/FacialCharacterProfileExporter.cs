@@ -50,21 +50,62 @@ namespace Hidano.FacialControl.Editor.AutoExport
                 for (int i = 0; i < expressions.Count; i++)
                 {
                     var expr = expressions[i];
-                    if (expr == null || expr.animationClip == null)
+                    if (expr == null)
                     {
                         continue;
                     }
-                    var snapshotId = string.IsNullOrEmpty(expr.id) ? string.Empty : expr.id;
-                    var snapshot = sampler.SampleSnapshot(snapshotId, expr.animationClip);
-                    var dto = ConvertSnapshotToDto(snapshot);
+                    if (expr.animationClip != null)
+                    {
+                        var snapshotId = string.IsNullOrEmpty(expr.id) ? string.Empty : expr.id;
+                        var snapshot = sampler.SampleSnapshot(snapshotId, expr.animationClip);
+                        var dto = ConvertSnapshotToDto(snapshot);
                     // Inspector スライダー (expr.transitionDuration) を cachedSnapshot 側にも反映し、
                     // 後続の JSON 出力経路と SO 直読み経路で値を一致させる。
-                    dto.transitionDuration = expr.transitionDuration;
-                    expr.cachedSnapshot = dto;
+                        dto.transitionDuration = expr.transitionDuration;
+                        expr.cachedSnapshot = dto;
+                    }
+
+                    BakeOverlaySnapshots(expr.overlays, sampler);
                 }
             }
 
+            BakeOverlaySnapshots(so.DefaultOverlays, sampler);
             BakeBaseExpressionSnapshot(so.BaseExpression, sampler);
+        }
+
+        private static void BakeOverlaySnapshots(
+            IReadOnlyList<OverlaySlotBindingSerializable> overlays,
+            IExpressionAnimationClipSampler sampler)
+        {
+            if (overlays == null || overlays.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < overlays.Count; i++)
+            {
+                BakeOverlaySnapshot(overlays[i], sampler);
+            }
+        }
+
+        private static void BakeOverlaySnapshot(
+            OverlaySlotBindingSerializable overlay,
+            IExpressionAnimationClipSampler sampler)
+        {
+            if (overlay == null)
+            {
+                return;
+            }
+
+            if (overlay.suppress || overlay.animationClip == null)
+            {
+                overlay.cachedSnapshot = CreateDefaultSnapshotDto();
+                return;
+            }
+
+            var snapshotId = string.IsNullOrEmpty(overlay.slot) ? string.Empty : overlay.slot;
+            var snapshot = sampler.SampleSnapshot(snapshotId, overlay.animationClip);
+            overlay.cachedSnapshot = ConvertSnapshotToDto(snapshot);
         }
 
         private static void BakeBaseExpressionSnapshot(
@@ -153,11 +194,15 @@ namespace Hidano.FacialControl.Editor.AutoExport
             var dto = new ProfileSnapshotDto
             {
                 schemaVersion = string.IsNullOrEmpty(so.SchemaVersion) ? SystemTextJsonParser.SchemaVersionV2 : so.SchemaVersion,
+                slots = CopyStringList(so.Slots),
                 layers = new List<LayerDefinitionDto>(),
                 expressions = new List<ExpressionDto>(),
                 rendererPaths = new List<string>(),
                 gazeConfigs = ConvertGazeConfigsToDto(so.GazeConfigs),
+                defaultOverlays = BuildOverlaySlotBindingDtoList(so.DefaultOverlays),
             };
+
+            LogSlotDiagnostics(so);
 
             // top-level rendererPaths: Inspector 入力 + 各 Expression snapshot からの統合
             var rendererPathSet = new HashSet<string>(StringComparer.Ordinal);
@@ -217,23 +262,134 @@ namespace Hidano.FacialControl.Editor.AutoExport
                     if (exprDto.snapshot != null)
                     {
                         exprDto.snapshot.transitionDuration = src.transitionDuration;
+                        exprDto.snapshot.overlays = BuildOverlaySlotBindingDtoList(src.overlays);
                     }
 
                     // Expression snapshot の rendererPaths を top-level set にマージ
-                    if (exprDto.snapshot != null && exprDto.snapshot.rendererPaths != null)
-                    {
-                        for (int j = 0; j < exprDto.snapshot.rendererPaths.Count; j++)
-                        {
-                            var p = exprDto.snapshot.rendererPaths[j] ?? string.Empty;
-                            if (rendererPathSet.Add(p)) dto.rendererPaths.Add(p);
-                        }
-                    }
+                    MergeRendererPaths(exprDto.snapshot, rendererPathSet, dto.rendererPaths);
+                    MergeOverlayRendererPaths(exprDto.snapshot?.overlays, rendererPathSet, dto.rendererPaths);
 
                     dto.expressions.Add(exprDto);
                 }
             }
 
+            MergeOverlayRendererPaths(dto.defaultOverlays, rendererPathSet, dto.rendererPaths);
             return dto;
+        }
+
+        private static void LogSlotDiagnostics(FacialCharacterProfileSO so)
+        {
+            var slots = so.Slots;
+            var referencedSlots = new HashSet<string>(StringComparer.Ordinal);
+
+            if (slots != null)
+            {
+                for (int i = 0; i < slots.Count; i++)
+                {
+                    var slot = slots[i] ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(slot))
+                    {
+                        continue;
+                    }
+
+                    for (int j = i + 1; j < slots.Count; j++)
+                    {
+                        if (string.Equals(slot, slots[j], StringComparison.Ordinal))
+                        {
+                            Debug.LogWarning(
+                                $"FacialCharacterProfileExporter: duplicate overlay slot '{slot}' in _slots.");
+                            break;
+                        }
+                    }
+                }
+            }
+
+            CollectReferencedSlots(so.DefaultOverlays, referencedSlots, "defaultOverlays", slots);
+
+            var expressions = so.Expressions;
+            if (expressions != null)
+            {
+                for (int i = 0; i < expressions.Count; i++)
+                {
+                    var expr = expressions[i];
+                    if (expr == null)
+                    {
+                        continue;
+                    }
+
+                    CollectReferencedSlots(
+                        expr.overlays,
+                        referencedSlots,
+                        $"expressions[{i}].snapshot.overlays",
+                        slots);
+                }
+            }
+
+            if (slots == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var slot = slots[i] ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(slot))
+                {
+                    continue;
+                }
+
+                if (!referencedSlots.Contains(slot))
+                {
+                    Debug.LogWarning(
+                        $"FacialCharacterProfileExporter: overlay slot '{slot}' is declared in _slots but is not referenced by overlays.");
+                }
+            }
+        }
+
+        private static void CollectReferencedSlots(
+            IReadOnlyList<OverlaySlotBindingSerializable> overlays,
+            HashSet<string> referencedSlots,
+            string path,
+            IReadOnlyList<string> declaredSlots)
+        {
+            if (overlays == null || overlays.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < overlays.Count; i++)
+            {
+                var overlay = overlays[i];
+                if (overlay == null || string.IsNullOrWhiteSpace(overlay.slot))
+                {
+                    continue;
+                }
+
+                referencedSlots.Add(overlay.slot);
+                if (!ContainsSlot(declaredSlots, overlay.slot))
+                {
+                    Debug.LogWarning(
+                        $"FacialCharacterProfileExporter: overlay slot '{overlay.slot}' referenced by {path}[{i}] is not declared in _slots.");
+                }
+            }
+        }
+
+        private static bool ContainsSlot(IReadOnlyList<string> slots, string slot)
+        {
+            if (slots == null || string.IsNullOrEmpty(slot))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < slots.Count; i++)
+            {
+                if (string.Equals(slots[i], slot, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static List<GazeBindingConfigDto> ConvertGazeConfigsToDto(IReadOnlyList<GazeBindingConfig> configs)
@@ -324,6 +480,87 @@ namespace Hidano.FacialControl.Editor.AutoExport
             };
         }
 
+        private static List<OverlaySlotBindingDto> BuildOverlaySlotBindingDtoList(
+            IReadOnlyList<OverlaySlotBindingSerializable> source)
+        {
+            if (source == null || source.Count == 0)
+            {
+                return new List<OverlaySlotBindingDto>();
+            }
+
+            var list = new List<OverlaySlotBindingDto>(source.Count);
+            for (int i = 0; i < source.Count; i++)
+            {
+                var overlay = source[i];
+                if (overlay == null || string.IsNullOrWhiteSpace(overlay.slot))
+                {
+                    continue;
+                }
+
+                list.Add(new OverlaySlotBindingDto
+                {
+                    slot = overlay.slot,
+                    suppress = overlay.suppress,
+                    snapshot = ShouldEmitOverlaySnapshot(overlay)
+                        ? overlay.cachedSnapshot
+                        : null,
+                });
+            }
+
+            return list;
+        }
+
+        private static bool ShouldEmitOverlaySnapshot(OverlaySlotBindingSerializable overlay)
+        {
+            return overlay != null
+                && !overlay.suppress
+                && overlay.animationClip != null
+                && !IsSnapshotEmpty(overlay.cachedSnapshot);
+        }
+
+        private static bool IsSnapshotEmpty(ExpressionSnapshotDto snapshot)
+        {
+            return snapshot == null
+                || ((snapshot.blendShapes == null || snapshot.blendShapes.Count == 0)
+                    && (snapshot.bones == null || snapshot.bones.Count == 0));
+        }
+
+        private static void MergeOverlayRendererPaths(
+            IReadOnlyList<OverlaySlotBindingDto> overlays,
+            HashSet<string> rendererPathSet,
+            List<string> rendererPaths)
+        {
+            if (overlays == null || overlays.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < overlays.Count; i++)
+            {
+                MergeRendererPaths(overlays[i]?.snapshot, rendererPathSet, rendererPaths);
+            }
+        }
+
+        private static void MergeRendererPaths(
+            ExpressionSnapshotDto snapshot,
+            HashSet<string> rendererPathSet,
+            List<string> rendererPaths)
+        {
+            if (snapshot == null || snapshot.rendererPaths == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < snapshot.rendererPaths.Count; i++)
+            {
+                var p = snapshot.rendererPaths[i] ?? string.Empty;
+                if (rendererPathSet.Add(p))
+                {
+                    rendererPaths.Add(p);
+                }
+            }
+        }
+
         private static List<InputSourceDto> BuildInputSourceDtoList(List<InputSourceDeclarationSerializable> sources)
         {
             if (sources == null || sources.Count == 0)
@@ -358,7 +595,7 @@ namespace Hidano.FacialControl.Editor.AutoExport
             };
         }
 
-        private static List<string> CopyStringList(List<string> src)
+        private static List<string> CopyStringList(IReadOnlyList<string> src)
         {
             if (src == null) return new List<string>();
             var copy = new List<string>(src.Count);
