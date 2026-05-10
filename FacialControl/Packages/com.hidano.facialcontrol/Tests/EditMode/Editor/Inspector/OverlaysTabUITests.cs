@@ -158,6 +158,82 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             Assert.That(dropdown.choices, Is.EqualTo(new[] { BlinkSlotName, WinkSlotName }));
         }
 
+        [Test]
+        public void CreateInspectorGUI_DefaultOverlayRowStateRadioInitialValue_MatchesSerializableGetState()
+        {
+            _so = CreateProfileWithSlots(BlinkSlotName);
+            var binding = new OverlaySlotBindingSerializable
+            {
+                slot = BlinkSlotName,
+                suppress = true,
+            };
+            _so.DefaultOverlays.Add(binding);
+
+            var root = BuildInspectorRoot();
+            var radio = root.Q<RadioButtonGroup>(FacialCharacterProfileSOInspector.DefaultOverlayStateRadioName);
+            var clipField = root.Q<ObjectField>(FacialCharacterProfileSOInspector.DefaultOverlayAnimationClipFieldName);
+
+            Assert.That(radio, Is.Not.Null, "Default Overlays row の 3 状態ラジオが見つかりません。");
+            Assert.That(radio.choices, Is.EqualTo(new[] { "Default", "Suppress", "Override" }));
+            Assert.That(radio.value, Is.EqualTo(ToRadioIndex(binding.GetState())));
+            Assert.That(clipField, Is.Not.Null, "Default Overlays row の AnimationClip フィールドが見つかりません。");
+            Assert.That(clipField.style.display.value, Is.EqualTo(DisplayStyle.None));
+        }
+
+        [Test]
+        public void DefaultOverlayStateRadioSelection_UpdatesSerializableFieldsAndClipVisibility()
+        {
+            _so = CreateProfileWithSlots(BlinkSlotName);
+            var clip = CreateClip("DefaultOverlayStateRadioSelection_OverrideClip");
+            var binding = new OverlaySlotBindingSerializable
+            {
+                slot = BlinkSlotName,
+                animationClip = clip,
+                cachedSnapshot = CreateCachedSnapshot(),
+            };
+            _so.DefaultOverlays.Add(binding);
+
+            var root = BuildInspectorRoot();
+            var radio = root.Q<RadioButtonGroup>(FacialCharacterProfileSOInspector.DefaultOverlayStateRadioName);
+            var clipField = root.Q<ObjectField>(FacialCharacterProfileSOInspector.DefaultOverlayAnimationClipFieldName);
+            Assert.That(radio, Is.Not.Null);
+            Assert.That(clipField, Is.Not.Null);
+            Assert.That(clipField.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+
+            radio.value = ToRadioIndex(OverlaySlotBindingState.Suppress);
+            Assert.That(binding.suppress, Is.True);
+            Assert.That(binding.animationClip, Is.Null);
+            Assert.That(IsEmptySnapshot(binding.cachedSnapshot), Is.True);
+            Assert.That(clipField.style.display.value, Is.EqualTo(DisplayStyle.None));
+
+            binding.animationClip = clip;
+            binding.cachedSnapshot = CreateCachedSnapshot();
+
+            radio.value = ToRadioIndex(OverlaySlotBindingState.DefaultFallback);
+            Assert.That(binding.suppress, Is.False);
+            Assert.That(binding.animationClip, Is.Null);
+            Assert.That(IsEmptySnapshot(binding.cachedSnapshot), Is.True);
+            Assert.That(clipField.style.display.value, Is.EqualTo(DisplayStyle.None));
+
+            radio.value = ToRadioIndex(OverlaySlotBindingState.Override);
+            Assert.That(binding.suppress, Is.False);
+            Assert.That(clipField.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+        }
+
+        [Test]
+        public void CreateInspectorGUI_DefaultOverlayUndeclaredSlot_RendersWarningHelpBoxOnRow()
+        {
+            _so = CreateProfileWithSlots();
+            _so.DefaultOverlays.Add(new OverlaySlotBindingSerializable { slot = BlinkSlotName });
+
+            var root = BuildInspectorRoot();
+            var help = root.Q<HelpBox>(FacialCharacterProfileSOInspector.DefaultOverlayUndeclaredSlotHelpName);
+
+            Assert.That(help, Is.Not.Null, "未宣言 slot を参照する Default Overlay row の警告 HelpBox が見つかりません。");
+            Assert.That(help.messageType, Is.EqualTo(HelpBoxMessageType.Warning));
+            StringAssert.Contains(BlinkSlotName, help.text);
+        }
+
         private VisualElement BuildInspectorRoot()
         {
             _editor = UnityEditor.Editor.CreateEditor(_so, typeof(FacialCharacterProfileSOInspector));

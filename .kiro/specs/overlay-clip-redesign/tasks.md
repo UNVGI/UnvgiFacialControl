@@ -240,7 +240,7 @@
   - _Requirements: 6.3, 6.4_
   - _Boundary: Editor.Inspector_
 
-- [ ] 6.4 表情ライブラリタブに Default Overlays セクションを実装する
+- [x] 6.4 表情ライブラリタブに Default Overlays セクションを実装する
   - `BuildDefaultOverlaysSection(VisualElement root)` を新規実装し、slot プルダウン × AnimationClip フィールドの組をリスト形式で編集できる UI を提供する
   - 各 row で `OverlaySlotBindingSerializableExtensions.GetState()` を使って 3 状態ラジオの初期値を判定する
   - 観測可能な完了条件: SO Inspector の表情ライブラリタブに Default Overlays セクションが Slots 宣言セクションの直下に表示され、追加 / 削除 / 編集が可能なこと (Req 6.5)
