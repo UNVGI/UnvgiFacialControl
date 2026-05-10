@@ -86,6 +86,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string ReferenceModelFoldoutName = "facial-character-reference-model-foldout";
 
         public const string ExpressionRowNameFieldName = "expression-row-name-field";
+        public const string ExpressionRowLayerDropdownName = "expression-row-layer-dropdown";
         public const string ExpressionRowIsGazeToggleName = "expression-row-is-gaze-toggle";
         public const string ExpressionRowClipFieldName = "expression-row-clip-field";
         public const string ExpressionRowRendererSummaryName = "expression-row-renderer-summary";
@@ -1672,6 +1673,29 @@ namespace Hidano.FacialControl.Editor.Inspector
             UpdateValidation();
         }
 
+        private void ChangeExpressionLayer(int exprIndex, string layerName)
+        {
+            if (_expressionsProperty == null) return;
+
+            serializedObject.Update();
+            if (exprIndex < 0 || exprIndex >= _expressionsProperty.arraySize) return;
+
+            var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
+            var layerProp = entryProp.FindPropertyRelative("layer");
+            if (layerProp == null) return;
+
+            string nextLayer = layerName ?? string.Empty;
+            if (string.Equals(layerProp.stringValue, nextLayer, StringComparison.Ordinal)) return;
+
+            int undoGroup = BeginUndoGroup("Change Expression Layer");
+            layerProp.stringValue = nextLayer;
+            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
+
+            RebuildLayersUI();
+            RebuildExpressionIdMapping();
+            UpdateValidation();
+        }
+
         private void RebuildExpressionRowsForLayer(VisualElement container, string layerName)
         {
             container.Clear();
@@ -1699,6 +1723,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
             var idProp = entryProp.FindPropertyRelative("id");
             var nameProp = entryProp.FindPropertyRelative("name");
+            var layerProp = entryProp.FindPropertyRelative("layer");
             var isGazeProp = entryProp.FindPropertyRelative("isGaze");
             var transitionDurationProp = entryProp.FindPropertyRelative("transitionDuration");
 
@@ -1755,6 +1780,30 @@ namespace Hidano.FacialControl.Editor.Inspector
                 });
             }
             row.Add(nameField);
+
+            var layerDropdown = new ExpressionLayerDropdownField
+            {
+                label = "Layer",
+                name = ExpressionRowLayerDropdownName,
+            };
+            layerDropdown.style.minWidth = 180;
+            if (layerProp != null)
+            {
+                string currentLayer = layerProp.stringValue ?? string.Empty;
+                var layerChoices = BuildLayerDropdownChoices(currentLayer);
+                layerDropdown.choices = layerChoices;
+                layerDropdown.SetValueWithoutNotify(currentLayer);
+                layerDropdown.SetEnabled(layerChoices.Count > 0);
+                layerDropdown.OnValueAssigned = value =>
+                {
+                    ChangeExpressionLayer(exprIndex, value ?? string.Empty);
+                };
+            }
+            else
+            {
+                layerDropdown.SetEnabled(false);
+            }
+            row.Add(layerDropdown);
 
             // 遷移時間。目線操作では概念がないため非表示にする (データは互換目的で保持)。
             var transitionDurationField = new Slider("遷移時間 (秒)", 0f, 1f)
@@ -1846,7 +1895,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             SerializedProperty bindingProp = bindingIndex >= 0
                 ? overlaysProp.GetArrayElementAtIndex(bindingIndex)
                 : null;
-            var state = ReadOverlayBindingState(bindingProp);
+            var state = ReadExpressionOverlayBindingState(exprIndex, slot, bindingProp);
             bool declared = IsDeclaredSlot(slot);
 
             var row = new VisualElement();
@@ -1918,6 +1967,20 @@ namespace Hidano.FacialControl.Editor.Inspector
             }
 
             return row;
+        }
+
+        private OverlaySlotBindingState ReadExpressionOverlayBindingState(
+            int exprIndex,
+            string slot,
+            SerializedProperty bindingProp)
+        {
+            var binding = GetExpressionOverlayBinding(exprIndex, slot);
+            if (binding != null)
+            {
+                return binding.GetState();
+            }
+
+            return ReadOverlayBindingState(bindingProp);
         }
 
         private List<string> CollectOverlaySlotsForExpression(SerializedProperty overlaysProp)
@@ -2037,6 +2100,27 @@ namespace Hidano.FacialControl.Editor.Inspector
             serializedObject.Update();
         }
 
+        private OverlaySlotBindingSerializable GetExpressionOverlayBinding(int exprIndex, string slot)
+        {
+            var profileSO = target as FacialCharacterProfileSO;
+            if (profileSO == null || profileSO.Expressions == null) return null;
+            if (exprIndex < 0 || exprIndex >= profileSO.Expressions.Count) return null;
+
+            var expression = profileSO.Expressions[exprIndex];
+            if (expression == null || expression.overlays == null) return null;
+
+            for (int i = 0; i < expression.overlays.Count; i++)
+            {
+                var binding = expression.overlays[i];
+                if (binding != null && string.Equals(binding.slot, slot, StringComparison.Ordinal))
+                {
+                    return binding;
+                }
+            }
+
+            return null;
+        }
+
         private OverlaySlotBindingSerializable GetOrCreateExpressionOverlayBinding(int exprIndex, string slot)
         {
             var profileSO = target as FacialCharacterProfileSO;
@@ -2049,13 +2133,10 @@ namespace Hidano.FacialControl.Editor.Inspector
                 expression.overlays = new List<OverlaySlotBindingSerializable>();
             }
 
-            for (int i = 0; i < expression.overlays.Count; i++)
+            var existing = GetExpressionOverlayBinding(exprIndex, slot);
+            if (existing != null)
             {
-                var binding = expression.overlays[i];
-                if (binding != null && string.Equals(binding.slot, slot, StringComparison.Ordinal))
-                {
-                    return binding;
-                }
+                return existing;
             }
 
             var created = new OverlaySlotBindingSerializable
@@ -2998,6 +3079,25 @@ namespace Hidano.FacialControl.Editor.Inspector
             }
         }
 
+        private List<string> BuildLayerDropdownChoices(string currentValue)
+        {
+            var choices = new List<string>(_layerNameChoices.Count + 1);
+            for (int i = 0; i < _layerNameChoices.Count; i++)
+            {
+                if (!choices.Contains(_layerNameChoices[i]))
+                {
+                    choices.Add(_layerNameChoices[i]);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(currentValue) && !choices.Contains(currentValue))
+            {
+                choices.Add(currentValue);
+            }
+
+            return choices;
+        }
+
         private void OnSlotsPropertyChanged()
         {
             RefreshSlotNameChoices();
@@ -3256,6 +3356,25 @@ namespace Hidano.FacialControl.Editor.Inspector
                 {
                     base.value = value;
                     OnValueAssigned?.Invoke(value);
+                }
+            }
+        }
+
+        private sealed class ExpressionLayerDropdownField : DropdownField
+        {
+            public Action<string> OnValueAssigned;
+
+            public override string value
+            {
+                get => base.value;
+                set
+                {
+                    var previous = base.value;
+                    base.value = value;
+                    if (!string.Equals(previous, value, StringComparison.Ordinal))
+                    {
+                        OnValueAssigned?.Invoke(value);
+                    }
                 }
             }
         }

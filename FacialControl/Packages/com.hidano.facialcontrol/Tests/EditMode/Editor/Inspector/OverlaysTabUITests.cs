@@ -16,6 +16,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
     public class OverlaysTabUITests
     {
         private const string EmotionLayerName = "Emotion";
+        private const string SecondaryLayerName = "Detail";
         private const string BlinkSlotName = "blink";
         private const string WinkSlotName = "wink";
 
@@ -66,6 +67,29 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             Assert.That(radio, Is.Not.Null, "Expression row の Overlays 3 状態ラジオが見つかりません。");
             Assert.That(radio.choices, Is.EqualTo(new[] { "Default", "Suppress", "Override" }));
             Assert.That(radio.value, Is.EqualTo(ToRadioIndex(binding.GetState())));
+        }
+
+        [Test]
+        public void CreateInspectorGUI_ExpressionRowLayerDropdown_UsesLayerChoicesAndUpdatesExpressionLayer()
+        {
+            _so = CreateProfileWithSlots(BlinkSlotName);
+            _so.Layers.Add(new LayerDefinitionSerializable
+            {
+                name = SecondaryLayerName,
+                priority = 1,
+            });
+            _so.Expressions.Add(CreateExpression(new OverlaySlotBindingSerializable { slot = BlinkSlotName }));
+
+            var root = BuildInspectorRoot();
+            var dropdown = root.Q<DropdownField>(FacialCharacterProfileSOInspector.ExpressionRowLayerDropdownName);
+
+            Assert.That(dropdown, Is.Not.Null, "Expression row の Layer DropdownField が見つかりません。");
+            Assert.That(dropdown.choices, Is.EqualTo(new[] { EmotionLayerName, SecondaryLayerName }));
+            Assert.That(dropdown.value, Is.EqualTo(EmotionLayerName));
+
+            dropdown.value = SecondaryLayerName;
+
+            Assert.That(_so.Expressions[0].layer, Is.EqualTo(SecondaryLayerName));
         }
 
         [Test]
