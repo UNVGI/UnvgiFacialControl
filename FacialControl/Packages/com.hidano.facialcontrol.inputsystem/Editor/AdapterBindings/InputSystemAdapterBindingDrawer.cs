@@ -43,9 +43,12 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
         public const string ExpressionDropdownName = "input-system-binding-expression-dropdown";
         public const string TriggerModeFieldName = "input-system-binding-trigger-mode-field";
         public const string ModeMismatchHelpName = "input-system-binding-mode-mismatch-help";
+        public const string OverlaySlotDropdownName = "input-system-binding-overlay-slot-dropdown";
+        public const string OverlaySlotHelpName = "input-system-binding-overlay-slot-help";
 
         // 1 行の高さ (Action + Expression + BindingMode + TriggerMode + ヒントボックス分の余裕)
         private const float RowHeight = 156f;
+        private const long OverlaySlotRefreshIntervalMs = 500;
 
         /// <inheritdoc />
         public override VisualElement CreatePropertyGUI(SerializedProperty property)
@@ -360,10 +363,10 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             element.Add(triggerModeField);
 
             // 4b) Overlay モード時のみ表示する overlaySlot / overlayTargetLayer。
-            var overlaySlotField = new PropertyField(overlaySlotProp, "Overlay slot")
-            {
-                tooltip = "Overlay モード時のみ有効。駆動する slot 識別子（例: blink）。",
-            };
+            var overlaySlotField = CreateOverlaySlotDropdown(
+                bindingProperty,
+                index,
+                overlaySlotProp);
             element.Add(overlaySlotField);
 
             var overlayTargetLayerField = new PropertyField(overlayTargetLayerProp, "Overlay 対象レイヤー")
@@ -427,6 +430,126 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             DisplayStyle d = mode == BindingMode.Overlay ? DisplayStyle.Flex : DisplayStyle.None;
             if (overlaySlotField != null) overlaySlotField.style.display = d;
             if (overlayTargetLayerField != null) overlayTargetLayerField.style.display = d;
+        }
+
+        private static VisualElement CreateOverlaySlotDropdown(
+            SerializedProperty bindingProperty,
+            int index,
+            SerializedProperty overlaySlotProp)
+        {
+            var container = new VisualElement();
+
+            var dropdown = new DropdownField("Overlay slot")
+            {
+                name = OverlaySlotDropdownName,
+                tooltip = "Overlay モード時のみ有効。駆動する slot 識別子（例: blink）。",
+            };
+            var help = new HelpBox(string.Empty, HelpBoxMessageType.Warning)
+            {
+                name = OverlaySlotHelpName,
+            };
+            help.style.display = DisplayStyle.None;
+
+            RefreshOverlaySlotChoices(dropdown, help, bindingProperty, overlaySlotProp);
+
+            dropdown.RegisterValueChangedCallback(evt =>
+            {
+                var so = bindingProperty.serializedObject;
+                so.Update();
+                var prop = overlaySlotProp
+                    ?? FindExpressionBindingEntryProperty(bindingProperty, index)
+                        ?.FindPropertyRelative("overlaySlot");
+                if (prop != null)
+                {
+                    prop.stringValue = evt.newValue ?? string.Empty;
+                    so.ApplyModifiedProperties();
+                    RefreshOverlaySlotChoices(dropdown, help, bindingProperty, prop);
+                }
+            });
+
+            container.Add(dropdown);
+            container.Add(help);
+            container.schedule.Execute(() =>
+            {
+                var so = bindingProperty.serializedObject;
+                so.Update();
+                var prop = FindExpressionBindingEntryProperty(bindingProperty, index)
+                    ?.FindPropertyRelative("overlaySlot");
+                RefreshOverlaySlotChoices(dropdown, help, bindingProperty, prop);
+            }).Every(OverlaySlotRefreshIntervalMs);
+
+            return container;
+        }
+
+        private static SerializedProperty FindExpressionBindingEntryProperty(
+            SerializedProperty bindingProperty,
+            int index)
+        {
+            var list = bindingProperty.FindPropertyRelative(ExpressionBindingsFieldName);
+            if (list == null || index < 0 || index >= list.arraySize)
+            {
+                return null;
+            }
+
+            return list.GetArrayElementAtIndex(index);
+        }
+
+        private static void RefreshOverlaySlotChoices(
+            DropdownField dropdown,
+            HelpBox help,
+            SerializedProperty bindingProperty,
+            SerializedProperty overlaySlotProp)
+        {
+            if (dropdown == null) return;
+
+            string current = overlaySlotProp != null ? overlaySlotProp.stringValue ?? string.Empty : string.Empty;
+            bool canSelect = TryCollectOverlaySlots(bindingProperty, out var slotNames);
+            var choices = BuildSafeChoices(slotNames, current);
+            if (!StringListEquals(dropdown.choices, choices))
+            {
+                dropdown.choices = choices;
+            }
+
+            dropdown.SetValueWithoutNotify(current);
+            dropdown.SetEnabled(canSelect && overlaySlotProp != null);
+
+            if (help == null) return;
+            if (canSelect && overlaySlotProp != null)
+            {
+                help.style.display = DisplayStyle.None;
+            }
+            else
+            {
+                help.text = "FacialCharacterProfileSO の Slots を先に宣言してください。";
+                help.style.display = DisplayStyle.Flex;
+            }
+        }
+
+        private static bool TryCollectOverlaySlots(
+            SerializedProperty bindingProperty,
+            out List<string> slotNames)
+        {
+            slotNames = new List<string>();
+            var so = bindingProperty.serializedObject;
+            if (!(so.targetObject is FacialCharacterProfileSO profileSo))
+            {
+                return false;
+            }
+
+            var slots = profileSo.Slots;
+            if (slots == null || slots.Count == 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < slots.Count; i++)
+            {
+                string slot = slots[i];
+                if (string.IsNullOrEmpty(slot)) continue;
+                if (!slotNames.Contains(slot)) slotNames.Add(slot);
+            }
+
+            return slotNames.Count > 0;
         }
 
         /// <summary>
@@ -663,6 +786,18 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 result.Add(currentValue);
             }
             return result;
+        }
+
+        private static bool StringListEquals(IReadOnlyList<string> left, IReadOnlyList<string> right)
+        {
+            if (ReferenceEquals(left, right)) return true;
+            if (left == null || right == null) return false;
+            if (left.Count != right.Count) return false;
+            for (int i = 0; i < left.Count; i++)
+            {
+                if (!string.Equals(left[i], right[i], StringComparison.Ordinal)) return false;
+            }
+            return true;
         }
     }
 }

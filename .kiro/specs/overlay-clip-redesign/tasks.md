@@ -260,7 +260,7 @@
   - _Requirements: 6.6, 6.7, 6.8, 6.9, 6.10_
   - _Boundary: Editor.Inspector_
 
-- [ ] 6.6 InputSystemAdapterBindingDrawer の overlaySlot を DropdownField 化する
+- [x] 6.6 InputSystemAdapterBindingDrawer の overlaySlot を DropdownField 化する
   - `Packages/com.hidano.facialcontrol.inputsystem/Editor/AdapterBindings/InputSystemAdapterBindingDrawer.cs:288, 363-376` の `PropertyField` (TextField) を `DropdownField` に置換する
   - choices は `property.serializedObject.targetObject as FacialCharacterProfileSO` を辿って `so.Slots` から動的取得する
   - SO 取得失敗時は HelpBox `"FacialCharacterProfileSO の Slots を先に宣言してください"` を表示し、dropdown を disabled にする
