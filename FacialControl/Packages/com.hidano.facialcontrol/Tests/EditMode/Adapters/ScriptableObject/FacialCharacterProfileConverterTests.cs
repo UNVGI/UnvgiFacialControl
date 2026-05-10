@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using Hidano.FacialControl.Adapters.Json;
 using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Models;
@@ -110,6 +111,139 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
         }
 
         [Test]
+        public void ToFacialProfile_SlotsAndSerializableOverlayStates_MapsNewSchemaToDomain()
+        {
+            var layers = new List<LayerDefinitionSerializable>
+            {
+                new LayerDefinitionSerializable
+                {
+                    name = "emotion",
+                    priority = 0,
+                    exclusionMode = ExclusionMode.LastWins,
+                },
+            };
+            var expressions = new List<ExpressionSerializable>
+            {
+                new ExpressionSerializable
+                {
+                    id = "smile",
+                    name = "Smile",
+                    layer = "emotion",
+                    transitionDuration = 0.2f,
+                    overlays = new List<OverlaySlotBindingSerializable>
+                    {
+                        new OverlaySlotBindingSerializable { slot = "blink" },
+                        new OverlaySlotBindingSerializable
+                        {
+                            slot = "blush",
+                            suppress = true,
+                            cachedSnapshot = CreateSnapshotDto("Face", "Ignored", 1f),
+                        },
+                        new OverlaySlotBindingSerializable
+                        {
+                            slot = "sparkle",
+                            cachedSnapshot = CreateSnapshotDto("Face", "Sparkle", 0.75f),
+                        },
+                    },
+                },
+            };
+            var defaultOverlays = new List<OverlaySlotBindingSerializable>
+            {
+                new OverlaySlotBindingSerializable
+                {
+                    slot = "blink",
+                    cachedSnapshot = CreateSnapshotDto("Face", "Blink", 1f),
+                },
+            };
+
+            var profile = FacialCharacterProfileConverter.ToFacialProfile(
+                schemaVersion: SystemTextJsonParser.SchemaVersionV2,
+                layers: layers,
+                expressions: expressions,
+                rendererPaths: new List<string> { "Face" },
+                defaultOverlays: defaultOverlays,
+                slots: new List<string> { "blink", "blush", "sparkle" });
+
+            Assert.That(profile.Slots.Length, Is.EqualTo(3));
+            Assert.That(profile.Slots.Span[0], Is.EqualTo("blink"));
+
+            var overlays = profile.Expressions.Span[0].Overlays.Span;
+            Assert.That(overlays.Length, Is.EqualTo(3));
+            Assert.That(overlays[0].Slot, Is.EqualTo("blink"));
+            Assert.That(overlays[0].IsDefaultFallback, Is.True);
+
+            Assert.That(overlays[1].Slot, Is.EqualTo("blush"));
+            Assert.That(overlays[1].Suppress, Is.True);
+            Assert.That(overlays[1].Snapshot.HasValue, Is.False);
+
+            Assert.That(overlays[2].Slot, Is.EqualTo("sparkle"));
+            Assert.That(overlays[2].Suppress, Is.False);
+            Assert.That(overlays[2].Snapshot.HasValue, Is.True);
+            Assert.That(overlays[2].Snapshot.Value.Id, Is.EqualTo("sparkle"));
+            Assert.That(overlays[2].Snapshot.Value.BlendShapes.Span[0].Name, Is.EqualTo("Sparkle"));
+
+            var defaultOverlay = profile.DefaultOverlays.Span[0];
+            Assert.That(defaultOverlay.Slot, Is.EqualTo("blink"));
+            Assert.That(defaultOverlay.Snapshot.HasValue, Is.True);
+            Assert.That(defaultOverlay.Snapshot.Value.BlendShapes.Span[0].Name, Is.EqualTo("Blink"));
+        }
+
+        [Test]
+        public void ToProfileSnapshotDto_DomainOverlayStates_EmitsNewOverlayDtoSchema()
+        {
+            var overlaySnapshot = new ExpressionSnapshot(
+                "sparkle",
+                0.3f,
+                TransitionCurvePreset.EaseOut,
+                new[]
+                {
+                    new BlendShapeSnapshot("Face", "Sparkle", 0.75f),
+                },
+                null,
+                new[] { "Face" });
+            var expression = new Expression(
+                "smile",
+                "Smile",
+                "emotion",
+                transitionDuration: 0.2f,
+                transitionCurve: TransitionCurve.Linear,
+                blendShapeValues: new[] { new BlendShapeMapping("MouthSmile", 1f, "Face") },
+                overlays: new[]
+                {
+                    new OverlaySlotBinding("blink", suppress: false, snapshot: null),
+                    new OverlaySlotBinding("blush", suppress: true, snapshot: null),
+                    new OverlaySlotBinding("sparkle", suppress: false, snapshot: overlaySnapshot),
+                });
+            var profile = new FacialProfile(
+                SystemTextJsonParser.SchemaVersionV2,
+                layers: new[] { new LayerDefinition("emotion", 0, ExclusionMode.LastWins) },
+                expressions: new[] { expression },
+                rendererPaths: new[] { "Face" },
+                slots: new[] { "blink", "blush", "sparkle" });
+
+            ProfileSnapshotDto dto = FacialCharacterProfileConverter.ToProfileSnapshotDto(profile);
+
+            Assert.That(dto.slots, Is.EqualTo(new List<string> { "blink", "blush", "sparkle" }));
+            var overlayDtos = dto.expressions[0].snapshot.overlays;
+            Assert.That(overlayDtos, Has.Count.EqualTo(3));
+            Assert.That(overlayDtos[0].slot, Is.EqualTo("blink"));
+            Assert.That(overlayDtos[0].suppress, Is.False);
+            Assert.That(overlayDtos[0].snapshot, Is.Null);
+            Assert.That(overlayDtos[1].slot, Is.EqualTo("blush"));
+            Assert.That(overlayDtos[1].suppress, Is.True);
+            Assert.That(overlayDtos[1].snapshot, Is.Null);
+            Assert.That(overlayDtos[2].slot, Is.EqualTo("sparkle"));
+            Assert.That(overlayDtos[2].suppress, Is.False);
+            Assert.That(overlayDtos[2].snapshot, Is.Not.Null);
+            Assert.That(overlayDtos[2].snapshot.blendShapes[0].name, Is.EqualTo("Sparkle"));
+
+            string json = new SystemTextJsonParser().SerializeProfileSnapshot(dto);
+            var reparsed = new SystemTextJsonParser().ParseProfile(json);
+            Assert.That(reparsed.Slots.Length, Is.EqualTo(3));
+            Assert.That(reparsed.Expressions.Span[0].Overlays.Span[2].Snapshot.HasValue, Is.True);
+        }
+
+        [Test]
         public void ToSORootGazeConfigs_RootDtoGazeConfigs_MapsEveryValueToRootConfig()
         {
             var dto = new ProfileSnapshotDto
@@ -167,6 +301,28 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
         {
             Assert.That(FacialCharacterProfileConverter.ToSORootGazeConfigs((ProfileSnapshotDto)null), Is.Empty);
             Assert.That(FacialCharacterProfileConverter.ToSORootGazeConfigs(new ProfileSnapshotDto()), Is.Empty);
+        }
+
+        private static ExpressionSnapshotDto CreateSnapshotDto(
+            string rendererPath,
+            string blendShapeName,
+            float value)
+        {
+            return new ExpressionSnapshotDto
+            {
+                transitionDuration = 0.1f,
+                transitionCurvePreset = "EaseIn",
+                rendererPaths = new List<string> { rendererPath },
+                blendShapes = new List<BlendShapeSnapshotDto>
+                {
+                    new BlendShapeSnapshotDto
+                    {
+                        rendererPath = rendererPath,
+                        name = blendShapeName,
+                        value = value,
+                    },
+                },
+            };
         }
     }
 }
