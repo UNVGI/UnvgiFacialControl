@@ -768,7 +768,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
         [Test]
         public void AggregateAndBlend_SourceWeightDoesNotMultiplyIntoLayerWeight()
         {
-            /: source weight と LayerInput.Weight が乗算されない独立適用を最終出力レベルで検証。
+            // source weight と LayerInput.Weight が乗算されない独立適用を最終出力レベルで検証。
             // レイヤー 1 本構成なら LayerBlender.Blend は basis として values*weight を clamp01 する
             // (LayerBlender.cs:85 "output[i] = Clamp01(firstValues[i] * firstWeight)")。
             //   final = clamp01(perLayer * layerWeight)

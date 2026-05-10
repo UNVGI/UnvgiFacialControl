@@ -28,11 +28,11 @@ namespace Hidano.FacialControl.Domain.Services
     /// <c>float[]</c> を使い回すため GC アロケーションは発生しない (Design §Output semantics)。
     /// </para>
     /// <para>
-    /// 本タスク時点での責務: per-layer 加重和 + 最終クランプ (5.1)、
-    /// 長さ不一致時の overlap-only 処理 + 無効ソース (TryWriteValues=false) のゼロ寄与 (5.2 / 1.4)、
-    /// 空レイヤー検出 + per-layer per-session 1 回 warning (5.3)、
+    /// 責務: per-layer 加重和 + 最終クランプ、
+    /// 長さ不一致時の overlap-only 処理 + 無効ソース (TryWriteValues=false) のゼロ寄与、
+    /// 空レイヤー検出 + per-layer per-session 1 回 warning、
     /// および既存 <see cref="LayerBlender.Blend(System.ReadOnlySpan{LayerBlender.LayerInput}, System.Span{float})"/>
-    /// との 2 段パイプライン接続 (5.4 / 2.7 / 6.4 / 7.1)。
+    /// との 2 段パイプライン接続。
     /// </para>
     /// <para>
     /// overlap-only 契約: 各 <c>source.TryWriteValues(scratch)</c> の直前に scratch を
@@ -50,7 +50,7 @@ namespace Hidano.FacialControl.Domain.Services
     /// 一度 warning を出したレイヤーは、以後 valid に戻って再び空になっても warning は再発しない。
     /// </para>
     /// <para>
-    /// 2 段パイプライン (5.4 / 2.7): intra-layer の加重和 + クランプ (source weight による合成)
+    /// 2 段パイプライン: intra-layer の加重和 + クランプ (source weight による合成)
     /// と inter-layer の <see cref="LayerBlender.LayerInput.Weight"/> による優先度ブレンドは独立に適用される。
     /// Aggregator は source weight を per-layer float バッファに畳み込んだうえで、呼出側から渡された
     /// inter-layer weight をそのまま <see cref="LayerBlender.LayerInput"/> の <c>weight</c> に載せる
@@ -71,7 +71,7 @@ namespace Hidano.FacialControl.Domain.Services
     /// が true を返した source の weight 合計) の場合に true となる。
     /// </para>
     /// <para>
-    /// verbose log rate-limit (5.6): <see cref="SetVerboseLogging(bool)"/> を true にした場合、
+    /// verbose log rate-limit: <see cref="SetVerboseLogging(bool)"/> を true にした場合、
     /// 各レイヤーの現在 per-source weight を <see cref="UnityEngine.Debug.Log(object)"/> に出力するが、
     /// 同一レイヤーの出力は <see cref="Hidano.FacialControl.Domain.Interfaces.ITimeProvider.UnscaledTimeSeconds"/>
     /// ベースで 1 秒あたり最大 1 回にレート制限される。
@@ -120,7 +120,7 @@ namespace Hidano.FacialControl.Domain.Services
         /// <param name="weightBuffer">入力源ウェイトのダブルバッファ。非 null。</param>
         /// <param name="blendShapeCount">1 レイヤーの出力 BlendShape 個数。0 以上。</param>
         /// <param name="timeProvider">
-        /// verbose log rate-limit  で使用する時刻源。省略または null の場合は
+        /// verbose log rate-limit で使用する時刻源。省略または null の場合は
         /// <see cref="UnityEngine.Time.unscaledTimeAsDouble"/> を参照する内部実装にフォールバックする。
         /// EditMode テストでは <c>Tests.Shared.ManualTimeProvider</c> を注入することで
         /// 1 秒ウィンドウを決定論的に検証できる。
@@ -249,7 +249,7 @@ namespace Hidano.FacialControl.Domain.Services
         }
 
         /// <summary>
-        /// 2 段パイプラインを 1 呼出しで回すエントリポイント (5.4)。
+        /// 2 段パイプラインを 1 呼出しで回すエントリポイント。
         /// per-layer 加重和 + クランプを行った後、事前確保済みの
         /// <see cref="LayerBlender.LayerInput"/> スクラッチ経由で
         /// <see cref="LayerBlender.Blend(ReadOnlySpan{LayerBlender.LayerInput}, Span{float})"/>
@@ -582,7 +582,7 @@ namespace Hidano.FacialControl.Domain.Services
         /// 既定実装。<see cref="UnityEngine.Time.unscaledTimeAsDouble"/> を直接参照する。
         /// </summary>
         /// <remarks>
-        /// Adapters 層 <c>UnityTimeProvider</c> とほぼ同義だが、Domain 層 Aggregator 単体テスト (5.6) で
+        /// Adapters 層 <c>UnityTimeProvider</c> とほぼ同義だが、Domain 層 Aggregator 単体テストで
         /// Adapters 依存を避けるために Domain 層内部に同梱する。本番コード (FacialController 初期化経路) では
         /// Adapters 層の <c>UnityTimeProvider</c> を明示的に注入し、プロセス内で単一時刻源を共有する運用を推奨する。
         /// </remarks>

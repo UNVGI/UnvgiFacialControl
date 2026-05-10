@@ -92,7 +92,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ser
         [Test]
         public void SerializeReference_SameTypeMultipleInstances_PreserveIndependentFieldValues()
         {
-            /: 同型 binding が複数登録できる（slug 違いの OSC を 2 個など）。
+            // 同型 binding が複数登録できる（slug 違いの OSC を 2 個など）。
             var so = ScriptableObject.CreateInstance<SerializeReferenceTestProfileStub>();
             so.AdapterBindings.Add(new MockTriggerAdapterBindingStub { slug = "first", triggerThreshold = 1 });
             so.AdapterBindings.Add(new MockTriggerAdapterBindingStub { slug = "second", triggerThreshold = 2 });
@@ -117,7 +117,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ser
         [Test]
         public void SerializeReference_EmptyList_RoundTripsAsEmpty()
         {
-            /: AdapterBindings は zero 個でも許容される。
+            // AdapterBindings は zero 個でも許容される。
             var so = ScriptableObject.CreateInstance<SerializeReferenceTestProfileStub>();
 
             AssetDatabase.CreateAsset(so, _assetPath);

@@ -55,7 +55,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
         [Test]
         public void AdapterBindings_InputSystemAndOscAndArKit_RoundTripPreservesConcreteTypeIdentity()
         {
-            /, 6.6: 単一 SO に 3 種 binding を同時保持できることを round-trip で検証する。
+            // 単一 SO に 3 種 binding を同時保持できることを round-trip で検証する。
             var so = UnityEngine.ScriptableObject.CreateInstance<TestFacialCharacterProfileSO>();
 
             var input = new InputSystemAdapterBinding

@@ -68,7 +68,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         [Test]
         public void Type_HasParameterlessConstructor_ForActivatorCreateInstance()
         {
-            /: Inspector の Add ドロップダウンが Activator.CreateInstance 等で具象を生成できる必要がある。
+            // Inspector の Add ドロップダウンが Activator.CreateInstance 等で具象を生成できる必要がある。
             System.Reflection.ConstructorInfo ctor = typeof(OscAdapterBinding)
                 .GetConstructor(Type.EmptyTypes);
 
@@ -79,7 +79,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         [Test]
         public void TypeCache_DiscoversOscAdapterBindingViaFacialAdapterBindingAttribute()
         {
-            /, 6.2: 各アダプタ package の binding 具象は TypeCache で discovery 列挙される。
+            // 各アダプタ package の binding 具象は TypeCache で discovery 列挙される。
             System.Collections.Generic.List<Type> discovered = TypeCache
                 .GetTypesWithAttribute<FacialAdapterBindingAttribute>()
                 .ToList();

@@ -177,7 +177,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
         [Test]
         public void Refresh_DuplicateDisplayName_LogsWarningListingFullyQualifiedTypeNames()
         {
-            /: 同 displayName が複数あれば Debug.LogWarning で両方の FQTN を列挙する。
+            // 同 displayName が複数あれば Debug.LogWarning で両方の FQTN を列挙する。
             // 静的初期化時の log は test 開始時には既に消費済みなので、
             // 明示的な Refresh() で再 scan + 再警告を起こして LogAssert で捕捉する。
             LogAssert.Expect(LogType.Warning, new Regex(Regex.Escape(DuplicateDisplayName)));

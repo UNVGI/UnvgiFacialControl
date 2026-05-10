@@ -173,7 +173,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
         [Test]
         public void AddBindingFromDescriptor_SameTypeTwice_AppendsTwoIndependentInstances()
         {
-            /: 同型 binding を複数追加できる。
+            // 同型 binding を複数追加できる。
             var view = CreateView();
             var descriptor = RequireDescriptor(typeof(MockListViewSimpleBinding));
 
@@ -238,7 +238,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
         [Test]
         public void NullElement_RendersMissingAdapterPlaceholderForRow()
         {
-            /: managedReferenceValue が null の要素は型欠落 placeholder で描画される。
+            // managedReferenceValue が null の要素は型欠落 placeholder で描画される。
             // _so.WritableAdapterBindings に null を直接追加し、SerializedObject を再構築する。
             _so.WritableAdapterBindings.Add(null);
             EditorUtility.SetDirty(_so);
@@ -318,7 +318,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
         [Test]
         public void ThrowingPropertyDrawer_RendersFallbackElementWithoutBreakingOtherRows()
         {
-            /: PropertyDrawer 例外を bindItem 内で catch + per-element fallback element 表示。
+            // PropertyDrawer 例外を bindItem 内で catch + per-element fallback element 表示。
             //         他 row の描画が止まらないこと。
             _so.WritableAdapterBindings.Add(new MockListViewSimpleBinding { Slug = "ok-front" });
             _so.WritableAdapterBindings.Add(new MockListViewThrowingDrawerBinding { Slug = "boom" });

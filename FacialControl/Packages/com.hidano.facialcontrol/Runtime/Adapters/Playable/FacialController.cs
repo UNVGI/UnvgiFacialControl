@@ -624,7 +624,7 @@ namespace Hidano.FacialControl.Adapters.Playable
         }
 
         /// <summary>
-        /// (layer, source) スロットの入力源ウェイトをランタイムで書込む (8.3)。
+        /// (layer, source) スロットの入力源ウェイトをランタイムで書込む。
         /// 任意スレッドから呼出可能で、書込は次回の <c>LayerInputSourceAggregator.Aggregate</c>
         /// 入口の <c>SwapIfDirty</c> 以降に観測される 。
         /// 値は 0〜1 に silent clamp され、範囲外 (layer, source) は警告 + no-op 。
@@ -632,7 +632,7 @@ namespace Hidano.FacialControl.Adapters.Playable
         /// </summary>
         /// <param name="layerIdx">レイヤーインデックス。</param>
         /// <param name="sourceIdx">入力源インデックス。<c>0</c> は内部 Expression スロットの予約枠、
-        /// プロファイル宣言 (<c>inputSources</c>) で追加された入力源は登録順に <c>1, 2, ...</c> を取る (8.2)。</param>
+        /// プロファイル宣言 (<c>inputSources</c>) で追加された入力源は登録順に <c>1, 2, ...</c> を取る。</param>
         /// <param name="weight">ウェイト値 (範囲外は silent clamp)。</param>
         public void SetInputSourceWeight(int layerIdx, int sourceIdx, float weight)
         {
@@ -668,7 +668,7 @@ namespace Hidano.FacialControl.Adapters.Playable
         }
 
         /// <summary>
-        /// 入力源ウェイトのバルク書込スコープを開始する (8.3)。
+        /// 入力源ウェイトのバルク書込スコープを開始する。
         /// 返された <see cref="LayerInputSourceWeightBuffer.BulkScope"/> の
         /// <c>SetWeight</c> で書いた値はスコープの <c>Dispose</c> 時に一括 flush され、
         /// 次回 Aggregate で atomic に観測される 。
@@ -934,7 +934,7 @@ namespace Hidano.FacialControl.Adapters.Playable
                 _graphBuildResult = null;
             }
 
-            // プロファイル再ロード時は Registry / WeightBuffer を Dispose して再構築する (8.2)
+            // プロファイル再ロード時は Registry / WeightBuffer を Dispose して再構築する。
             if (_layerUseCase != null)
             {
                 _layerUseCase.Dispose();

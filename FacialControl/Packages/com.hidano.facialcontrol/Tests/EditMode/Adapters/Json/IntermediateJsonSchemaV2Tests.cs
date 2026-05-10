@@ -201,7 +201,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         [Test]
         public void RendererPaths_AreSubset_Of_TopLevelRendererPaths()
         {
-            /: expressions[].snapshot.rendererPaths はトップレベル rendererPaths の subset
+            // expressions[].snapshot.rendererPaths はトップレベル rendererPaths の subset
             var json =
                 "{" +
                 "\"schemaVersion\":\"1.0\"," +

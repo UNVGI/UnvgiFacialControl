@@ -173,7 +173,7 @@ namespace Hidano.FacialControl.Adapters.Json
             }
         }
 
-        /, 3.3, 3.4 / D-5, D-6: inputSources エントリの識別子検証と重複解決。
+        // inputSources エントリの識別子検証と重複解決。
         private static InputSourceDto[][] ExtractInputSources(ProfileSnapshotDto dto)
         {
             if (dto.layers == null || dto.layers.Count == 0)
