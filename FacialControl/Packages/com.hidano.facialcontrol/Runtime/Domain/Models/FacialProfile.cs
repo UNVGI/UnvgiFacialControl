@@ -45,8 +45,10 @@ namespace Hidano.FacialControl.Domain.Models
         public ReadOnlyMemory<InputSourceDeclaration[]> LayerInputSources { get; }
 
         /// <summary>
-        /// active 表情に slot 宣言が無い場合の fallback 用 default overlay。
-        /// 各要素は suppress / snapshot / default fallback の 3 状態を表す。
+        /// active 表情側で該当 slot が未宣言、または default fallback を宣言している場合に参照される default overlay。
+        /// 各要素は <see cref="OverlaySlotBinding.Suppress"/> と
+        /// <see cref="OverlaySlotBinding.Snapshot"/> の組み合わせで default fallback /
+        /// 明示 suppress / 個別 snapshot override の 3 状態を表す。
         /// </summary>
         public ReadOnlyMemory<OverlaySlotBinding> DefaultOverlays { get; }
 
@@ -161,11 +163,12 @@ namespace Hidano.FacialControl.Domain.Models
         }
 
         /// <summary>
-        /// 指定 slot の <see cref="OverlaySlotBinding"/> を <see cref="DefaultOverlays"/> から検索する。
+        /// 指定 slot の fallback 用 overlay 解決状態を表す <see cref="OverlaySlotBinding"/> を
+        /// <see cref="DefaultOverlays"/> から検索する。
         /// </summary>
         /// <param name="slot">検索対象 slot 名。</param>
         /// <param name="binding">見つかった binding。見つからなければ default。</param>
-        /// <returns>当該 slot の default が宣言されていれば true（suppress を含む）。</returns>
+        /// <returns>当該 slot の fallback binding が宣言されていれば true（suppress / snapshot / default fallback を含む）。</returns>
         public bool TryGetDefaultOverlay(string slot, out OverlaySlotBinding binding)
         {
             binding = default;
