@@ -353,7 +353,7 @@
   - _Requirements: 6.3, 6.6_
   - _Boundary: Editor.Inspector_
 
-- [ ] 9.2 (T45) レイヤータブから Expression リスト構築を撤去する
+- [x] 9.2 (T45) レイヤータブから Expression リスト構築を撤去する
   - `Editor/Inspector/FacialCharacterProfileSOInspector.cs:1533-1535` 周辺の `BuildLayersSection` 内で、各レイヤーカードに対する `RebuildExpressionRowsForLayer(expressionsContainer, layerName)` 呼び出しを削除する
   - レイヤーカードはレイヤー定義 (name / priority / exclusionMode / inputSources) の編集 UI のみを保持する
   - `RebuildExpressionRowsForLayer` メソッド自体は 9.1 の `BuildExpressionLibrarySection` から間接的に利用される可能性がないなら削除、利用するなら refactor して shared helper 化する

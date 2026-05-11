@@ -93,6 +93,30 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         }
 
         [Test]
+        public void CreateInspectorGUI_LayersTab_DoesNotRenderExpressionRows()
+        {
+            _so = CreateProfileWithSlots(BlinkSlotName);
+            _so.Expressions.Add(CreateExpression(new OverlaySlotBindingSerializable { slot = BlinkSlotName }));
+
+            var root = BuildInspectorRoot();
+            var layersTab = root.Q<VisualElement>(FacialCharacterProfileSOInspector.TabLayersName);
+
+            Assert.That(layersTab, Is.Not.Null, "Layers tab was not found.");
+            Assert.That(
+                layersTab.Q<TextField>(FacialCharacterProfileSOInspector.ExpressionRowNameFieldName),
+                Is.Null,
+                "Layers tab must not render Expression row name fields.");
+            Assert.That(
+                layersTab.Q<DropdownField>(FacialCharacterProfileSOInspector.ExpressionRowLayerDropdownName),
+                Is.Null,
+                "Layers tab must not render Expression row layer dropdowns.");
+            Assert.That(
+                layersTab.Q<RadioButtonGroup>(FacialCharacterProfileSOInspector.ExpressionOverlayStateRadioName),
+                Is.Null,
+                "Layers tab must not render Expression overlay controls.");
+        }
+
+        [Test]
         public void CreateInspectorGUI_OverrideSelected_ShowsAnimationClipFieldOnlyForOverride()
         {
             _so = CreateProfileWithSlots(BlinkSlotName);

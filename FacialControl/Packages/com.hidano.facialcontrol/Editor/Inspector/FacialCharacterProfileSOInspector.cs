@@ -1397,9 +1397,9 @@ namespace Hidano.FacialControl.Editor.Inspector
                 _gazeConfigsContainer.Query<Button>(GazeConfigAutoAssignButtonName).ForEach(
                     button => button.SetEnabled(hasReferenceModel));
             }
-            if (_layersContainer != null)
+            if (_expressionLibraryContainer != null)
             {
-                _layersContainer.Query<Button>(ExpressionRowGazeAutoAssignButtonName).ForEach(
+                _expressionLibraryContainer.Query<Button>(ExpressionRowGazeAutoAssignButtonName).ForEach(
                     button => button.SetEnabled(hasReferenceModel));
             }
         }
@@ -1605,34 +1605,6 @@ namespace Hidano.FacialControl.Editor.Inspector
                 card.Add(inputSourcesField);
             }
 
-            // 表情リスト
-            var expressionHeader = new Label("表情");
-            expressionHeader.style.unityFontStyleAndWeight = FontStyle.Normal;
-            expressionHeader.style.marginTop = 8;
-            card.Add(expressionHeader);
-
-            var expressionsContainer = new VisualElement { name = $"layer-expressions-{layerIndex}" };
-            card.Add(expressionsContainer);
-            RebuildExpressionRowsForLayer(expressionsContainer, layerName);
-
-            var expressionAddRow = new VisualElement();
-            expressionAddRow.style.flexDirection = FlexDirection.Row;
-            expressionAddRow.style.marginTop = 4;
-
-            var addExpressionButton = new Button(() => AddExpressionForLayer(layerName, isGaze: false))
-            {
-                text = "+ 表情を追加",
-            };
-            expressionAddRow.Add(addExpressionButton);
-
-            var addGazeButton = new Button(() => AddExpressionForLayer(layerName, isGaze: true))
-            {
-                text = "+ 目線操作の表情を追加",
-            };
-            expressionAddRow.Add(addGazeButton);
-
-            card.Add(expressionAddRow);
-
             // レイヤー削除
             var removeLayerButton = new Button(() => RemoveLayer(layerIndex))
             {
@@ -1778,24 +1750,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             RebuildExpressionLibraryUI();
             RebuildExpressionIdMapping();
             UpdateValidation();
-        }
-
-        private void RebuildExpressionRowsForLayer(VisualElement container, string layerName)
-        {
-            container.Clear();
-            if (_expressionsProperty == null) return;
-
-            for (int i = 0; i < _expressionsProperty.arraySize; i++)
-            {
-                int exprIndex = i;
-                var exprProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
-                var lp = exprProp.FindPropertyRelative("layer");
-                if (lp == null) continue;
-                if (!string.Equals(lp.stringValue, layerName, StringComparison.Ordinal)) continue;
-
-                var row = BuildExpressionRow(exprIndex);
-                container.Add(row);
-            }
         }
 
         // ====================================================================
@@ -2846,7 +2800,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             }
 
             // 各行 validation
-            if (_layersContainer != null)
+            if (_expressionLibraryContainer != null)
             {
                 UpdateAllRowValidations();
             }
@@ -2854,29 +2808,13 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         private void UpdateAllRowValidations()
         {
-            for (int i = 0; i < _layersProperty.arraySize; i++)
+            if (_expressionLibraryContainer == null || _expressionsProperty == null) return;
+
+            for (int i = 0; i < _expressionsProperty.arraySize; i++)
             {
-                var lp = _layersProperty.GetArrayElementAtIndex(i);
-                var nameP = lp.FindPropertyRelative("name");
-                if (nameP == null) continue;
-                var layerName = nameP.stringValue ?? string.Empty;
-
-                var container = _layersContainer.Q<VisualElement>($"layer-expressions-{i}");
-                if (container == null) continue;
-
-                int rowIdx = 0;
-                for (int j = 0; j < _expressionsProperty.arraySize; j++)
+                if (i < _expressionLibraryContainer.childCount)
                 {
-                    var ep = _expressionsProperty.GetArrayElementAtIndex(j);
-                    var lP = ep.FindPropertyRelative("layer");
-                    if (lP == null) continue;
-                    if (!string.Equals(lP.stringValue, layerName, StringComparison.Ordinal)) continue;
-
-                    if (rowIdx < container.childCount)
-                    {
-                        UpdateRowValidation(container[rowIdx], j);
-                    }
-                    rowIdx++;
+                    UpdateRowValidation(_expressionLibraryContainer[i], i);
                 }
             }
         }
