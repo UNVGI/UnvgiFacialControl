@@ -283,7 +283,7 @@
   - _Requirements: 7.5_
   - _Boundary: Tests/EditMode/Editor/Inspector_
 
-- [ ] 7.2 dev 側 profile.json (StreamingAssets) を新スキーマへ移行する
+- [x] 7.2 dev 側 profile.json (StreamingAssets) を新スキーマへ移行する
   - `FacialControl/Assets/StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/profile.json:140-348` を編集する
   - (i) ルートに `"slots": ["blink"]` を追加する
   - (ii) `expressions[]` から `blink_overlay` Expression エントリ (lines 145-225) を削除する
@@ -302,7 +302,7 @@
   - _Requirements: 7.3, 7.5, 7.7_
   - _Boundary: Sample.Packages.Samples~_
 
-- [ ] 7.4 MultiSourceBlendDemoCharacter.asset を新スキーマへ移行する
+- [x] 7.4 MultiSourceBlendDemoCharacter.asset を新スキーマへ移行する
   - `FacialControl/Assets/Samples/FacialControl InputSystem/0.1.0-preview.2/Multi Source Blend Demo/MultiSourceBlendDemoCharacter.asset:38-228` を編集する
   - (i) `_slots: ["blink"]` を追加する
   - (ii) `blink_overlay` Expression を `_expressions[]` から削除する
@@ -314,7 +314,7 @@
   - _Requirements: 7.1, 7.4, 7.7_
   - _Boundary: Sample.Assets_
 
-- [ ] 7.5 Sample 起動確認と Samples~ 側 .asset 同期
+- [x] 7.5 Sample 起動確認と Samples~ 側 .asset 同期
   - Unity Editor で `MultiSourceBlendDemo` Scene を開いて再生し、`smile` 表情選択時に blink overlay が乗る、`smile_closed_eye` 選択時に blink overlay が抑制されることを確認する (Req 7.6)
   - `Packages/com.hidano.facialcontrol.inputsystem/Samples~/MultiSourceBlendDemo/MultiSourceBlendDemoCharacter.asset` が存在する場合は dev 側 .asset と同期する
   - 7.1 の `SampleAssetsAreInSyncTests` を実行し、すべて Green であることを確認する
