@@ -23,6 +23,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         private const string PackageSampleAssetPath =
             "Packages/com.hidano.facialcontrol.inputsystem/Samples~/MultiSourceBlendDemo/MultiSourceBlendDemoCharacter.asset";
 
+        // 第 3 コピー: dev プロジェクト側 Sample import 結果。dev 起動時に
+        // Assets/StreamingAssets/.. へコピーされる前のテンプレートとして配置されるが、
+        // Sample Import 経路の整合性検証では dev StreamingAssets の正本と一致している必要がある。
+        private const string ImportedSampleStreamingProfilePath =
+            "Assets/Samples/FacialControl InputSystem/0.1.0-preview.2/Multi Source Blend Demo/StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/profile.json";
+
         [Test]
         public void ProfileJson_DevStreamingAssetsAndPackageSample_AreByteIdentical()
         {
@@ -70,6 +76,154 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
                 "MultiSourceBlendDemoCharacter.asset YAML key set drift detected between imported dev sample and package Samples~.\n" +
                 $"Dev sample: {ImportedSampleAssetPath}\n" +
                 $"Samples~: {PackageSampleAssetPath}");
+        }
+
+        [Test]
+        public void ProfileJson_ImportedSampleStreamingAssets_AreByteIdenticalToDev()
+        {
+            // dev `Assets/StreamingAssets/...` と Sample import 配下の同名 profile.json は
+            // 3 点同期 (dev / Samples~ / Sample import 結果) の最後の 1 つ。drift していると
+            // ユーザーが Sample Import 後にコピーした JSON が dev と異なり、preview.2 schema
+            // 検証で SystemTextJsonParser.RejectLegacyExpressionIdInOverlays が FormatException
+            // を投げる経路 (Req 7.5 / 7.7 違反) を見逃してしまう。
+            string devPath = ResolveProjectPath(DevStreamingProfilePath);
+            string importedPath = ResolveProjectPath(ImportedSampleStreamingProfilePath);
+            AssertFileExists(devPath, DevStreamingProfilePath);
+            AssertFileExists(importedPath, ImportedSampleStreamingProfilePath);
+
+            byte[] devBytes = File.ReadAllBytes(devPath);
+            byte[] importedBytes = File.ReadAllBytes(importedPath);
+
+            Assert.That(
+                devBytes,
+                Is.EqualTo(importedBytes),
+                "MultiSourceBlendDemo profile.json drift detected between dev StreamingAssets and imported sample copy.\n" +
+                $"Dev: {DevStreamingProfilePath}\n" +
+                $"Imported sample: {ImportedSampleStreamingProfilePath}");
+        }
+
+        [Test]
+        public void ProfileJson_ImportedSampleStreamingAssets_DoesNotContainLegacyExpressionIdField()
+        {
+            // 第 3 コピーが旧 `"expressionId"` フィールドを保持していると Sample Import 経路で
+            // SystemTextJsonParser.RejectLegacyExpressionIdInOverlays が FormatException を投げ、
+            // 起動できなくなる。gaze_configs[].expressionId は別スコープなので除外する。
+            string importedPath = ResolveProjectPath(ImportedSampleStreamingProfilePath);
+            AssertFileExists(importedPath, ImportedSampleStreamingProfilePath);
+
+            string text = NormalizeLineEndings(File.ReadAllText(importedPath, Encoding.UTF8));
+            string stripped = StripGazeConfigsSection(text);
+
+            StringAssert.DoesNotContain(
+                "\"expressionId\"",
+                stripped,
+                $"{ImportedSampleStreamingProfilePath} still contains a legacy \"expressionId\" field outside gaze_configs scope.");
+        }
+
+        [Test]
+        public void MultiSourceBlendDemoCharacterAsset_DefaultOverlaysBlinkSnapshot_HasNonZeroMabataki()
+        {
+            // .asset の `_defaultOverlays[0].cachedSnapshot.blendShapes` に `まばたき` が含まれ、
+            // かつ value が 0 でないことを検証する。preview.2 移行中に旧 blink_overlay
+            // (`まばたき=1.0`) の値が新 `_defaultOverlays` へ転写されないまま 0.0 に化けると、
+            // Sample 起動時に blink overlay が見た目に乗らない (Req 7.6 違反)。
+            AssertMabatakiNonZeroInDefaultOverlays(ImportedSampleAssetPath, required: true);
+            AssertMabatakiNonZeroInDefaultOverlays(PackageSampleAssetPath, required: false);
+        }
+
+        private static void AssertMabatakiNonZeroInDefaultOverlays(string relativePath, bool required)
+        {
+            string path = ResolveProjectPath(relativePath);
+            if (!File.Exists(path))
+            {
+                if (required)
+                {
+                    Assert.Fail($"Required sample asset is missing: {relativePath}");
+                }
+
+                return;
+            }
+
+            string text = NormalizeLineEndings(File.ReadAllText(path, Encoding.UTF8));
+            int defaultOverlaysIdx = text.IndexOf("\n  _defaultOverlays:\n", StringComparison.Ordinal);
+            Assert.That(
+                defaultOverlaysIdx,
+                Is.GreaterThanOrEqualTo(0),
+                $"{relativePath}: '_defaultOverlays' section not found in asset YAML.");
+
+            // _defaultOverlays セクションの直後 (次の同階層 key `_adapterBindings:` まで) を切り出す
+            int sectionStart = defaultOverlaysIdx;
+            int sectionEnd = text.IndexOf("\n  _adapterBindings:", sectionStart, StringComparison.Ordinal);
+            if (sectionEnd < 0)
+            {
+                sectionEnd = text.Length;
+            }
+            string section = text.Substring(sectionStart, sectionEnd - sectionStart);
+
+            // section 中の `name: まばたき` 直後の `value: <num>` を探す
+            int nameIdx = section.IndexOf("name: まばたき", StringComparison.Ordinal);
+            Assert.That(
+                nameIdx,
+                Is.GreaterThanOrEqualTo(0),
+                $"{relativePath}: '_defaultOverlays[*].cachedSnapshot.blendShapes' does not contain a 'まばたき' entry.\n" +
+                "preview.2 移行で旧 blink_overlay の snapshot が転写されていない可能性があります。");
+
+            int valueIdx = section.IndexOf("value:", nameIdx, StringComparison.Ordinal);
+            Assert.That(
+                valueIdx,
+                Is.GreaterThanOrEqualTo(0),
+                $"{relativePath}: 'まばたき' entry found but no 'value:' line follows.");
+
+            int valueStart = valueIdx + "value:".Length;
+            int valueEnd = section.IndexOf('\n', valueStart);
+            if (valueEnd < 0)
+            {
+                valueEnd = section.Length;
+            }
+            string valueStr = section.Substring(valueStart, valueEnd - valueStart).Trim();
+            Assert.That(
+                float.TryParse(valueStr, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float value),
+                Is.True,
+                $"{relativePath}: 'まばたき' value '{valueStr}' is not a valid float.");
+            Assert.That(
+                value,
+                Is.Not.EqualTo(0f),
+                $"{relativePath}: 'まばたき' value in _defaultOverlays cachedSnapshot is 0 — preview.2 移行で旧 blink_overlay の '{nameof(value)}=1.0' が転写されず blink overlay が機能しません (Req 7.6 違反)。");
+        }
+
+        // gaze_configs セクション (`"gaze_configs": [ ... ]` または `"_gazeConfigs": [ ... ]`) を
+        // 文字列レベルで除去する。JSON 階層解析ではないため、本サンプル profile.json の構造
+        // (gaze_configs はルート配列で他に紛れない) に限定して有効。
+        private static string StripGazeConfigsSection(string json)
+        {
+            int idx = json.IndexOf("\"gaze_configs\"", StringComparison.Ordinal);
+            if (idx < 0)
+            {
+                return json;
+            }
+
+            int bracketStart = json.IndexOf('[', idx);
+            if (bracketStart < 0)
+            {
+                return json;
+            }
+
+            int depth = 0;
+            for (int i = bracketStart; i < json.Length; i++)
+            {
+                char c = json[i];
+                if (c == '[') depth++;
+                else if (c == ']')
+                {
+                    depth--;
+                    if (depth == 0)
+                    {
+                        return json.Substring(0, idx) + json.Substring(i + 1);
+                    }
+                }
+            }
+
+            return json;
         }
 
         private static void AssertDoesNotContainLegacyBlinkOverlayExpression(string relativePath, bool required)
