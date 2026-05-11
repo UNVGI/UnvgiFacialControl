@@ -237,7 +237,7 @@ MonoBehaviour:
         value: 0.0
       - rendererPath: Body
         name: まばたき
-        value: 0.0
+        value: 1.0
       - rendererPath: Body
         name: 笑い
         value: 0.0
