@@ -239,7 +239,7 @@
                     {
                         "rendererPath": "Body",
                         "name": "まばたき",
-                        "value": 0.0
+                        "value": 100.0
                     },
                     {
                         "rendererPath": "Body",
