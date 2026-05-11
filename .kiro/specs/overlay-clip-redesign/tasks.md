@@ -341,9 +341,9 @@
 > - Req 6.2 違反: レイヤータブと表情ライブラリタブが Expression リストを完全に分離できていない。
 > - Req 6.5 違反: Default Overlays セクションに 3 状態ラジオ (`Default / Suppress / Override`) が混入。spec は「slot プルダウン + AnimationClip フィールドのみ」を要求している。意味論的にも DefaultOverlays では「Default fallback」と「Suppress」が同じ runtime 結果（overlay 出力なし）になり redundant。
 
-- [ ] 9. Inspector UI を Req 6.2 / 6.3 / 6.5 に適合させる
+- [x] 9. Inspector UI を Req 6.2 / 6.3 / 6.5 に適合させる
 
-- [ ] 9.1 (T44) 表情ライブラリタブに Expression リストセクションを新設する
+- [x] 9.1 (T44) 表情ライブラリタブに Expression リストセクションを新設する
   - `Editor/Inspector/FacialCharacterProfileSOInspector.cs:204-211` の `CreateInspectorGUI` 内で、表情ライブラリタブの `BuildDefaultOverlaysSection` 呼び出しの直後に `BuildExpressionLibrarySection(expressionLibraryTab.contentContainer)` を追加する
   - `BuildExpressionLibrarySection(VisualElement root)` を新規実装し、全 Expression を所属レイヤーに依らずフラットに列挙する単一リストとして構築する
   - 各 row は既存の `BuildExpressionRow(int exprIndex)` を流用するが、Layer プルダウン (`ExpressionRowLayerDropdownName`) を必ず表示する（Req 6.6）。`_layerNameChoices` を choices として動的生成する
@@ -361,7 +361,7 @@
   - _Requirements: 6.2_
   - _Boundary: Editor.Inspector_
 
-- [ ] 9.3 (T46) Default Overlays セクションから 3 状態ラジオを撤去する
+- [x] 9.3 (T46) Default Overlays セクションから 3 状態ラジオを撤去する
   - `Editor/Inspector/FacialCharacterProfileSOInspector.cs:706-713` の `OverlayStateRadioButtonGroup` 生成と関連ハンドラ (`:739-746` の `radio.OnValueAssigned`) を削除する
   - AnimationClip フィールド (`DefaultOverlayAnimationClipFieldName`) を常時 visible にする（`style.display = DisplayStyle.None` 制御を撤去）
   - データモデル側のセマンティクスを以下に固定する:
@@ -373,7 +373,7 @@
   - _Requirements: 6.5_
   - _Boundary: Editor.Inspector_
 
-- [ ] 9.4 (T47) Inspector UI テストを 9.1 〜 9.3 の構造変更に合わせて更新する
+- [x] 9.4 (T47) Inspector UI テストを 9.1 〜 9.3 の構造変更に合わせて更新する
   - `Tests/EditMode/Editor/Inspector/OverlaysTabUITests.cs`（6.1 で追加）を以下の観点で拡張する:
     - (i) 表情ライブラリタブ内に Expression リストセクションが存在し、全レイヤーの Expression が含まれること（Req 6.3）
     - (ii) Expression row の Layer プルダウンを操作すると `_expressions[i].layer` SerializedProperty が更新されること（Req 6.6）
@@ -385,7 +385,7 @@
   - _Requirements: 6.2, 6.3, 6.5, 6.6, 11.8_
   - _Boundary: Tests/EditMode/Editor/Inspector_
 
-- [ ] 9.5 (T48) Sample データの DefaultOverlays 正規化と Sample 起動回帰確認
+- [x] 9.5 (T48) Sample データの DefaultOverlays 正規化と Sample 起動回帰確認
   - `Assets/Samples/FacialControl InputSystem/0.1.0-preview.2/Multi Source Blend Demo/MultiSourceBlendDemoCharacter.asset` の `_defaultOverlays[]` を確認し、`suppress` フィールドが全エントリで `false` であることを確認する（9.3 のセマンティクス変更で `suppress = true` は意味を持たなくなる）
   - `Assets/StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/profile.json` および `Packages/com.hidano.facialcontrol.inputsystem/Samples~/MultiSourceBlendDemo/StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/profile.json` の `defaultOverlays[].suppress` も同様に `false` で統一されていることを確認する
   - 7.1 の `SampleAssetsAreInSyncTests` を再実行し、dev 側と Samples~ 側が drift していないことを確認する
