@@ -50,6 +50,46 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         }
 
         [Test]
+        public void CreateInspectorGUI_ExpressionLibrarySection_RendersAllExpressionsFromAllLayers()
+        {
+            _so = CreateProfileWithSlots(BlinkSlotName);
+            _so.Layers.Add(new LayerDefinitionSerializable
+            {
+                name = SecondaryLayerName,
+                priority = 1,
+            });
+            _so.Expressions.Add(CreateExpression(
+                new OverlaySlotBindingSerializable { slot = BlinkSlotName },
+                id: "smile",
+                name: "Smile",
+                layer: EmotionLayerName));
+            _so.Expressions.Add(CreateExpression(
+                new OverlaySlotBindingSerializable { slot = BlinkSlotName },
+                id: "wink",
+                name: "Wink",
+                layer: SecondaryLayerName));
+
+            var root = BuildInspectorRoot();
+            var expressionLibrary = root.Q<VisualElement>(FacialCharacterProfileSOInspector.ExpressionLibraryFoldoutName);
+
+            Assert.That(expressionLibrary, Is.Not.Null, "表情ライブラリタブに Expression リストセクションが見つかりません。");
+
+            var nameFields = new List<TextField>();
+            var layerDropdowns = new List<DropdownField>();
+            expressionLibrary.Query<TextField>(FacialCharacterProfileSOInspector.ExpressionRowNameFieldName)
+                .ForEach(nameFields.Add);
+            expressionLibrary.Query<DropdownField>(FacialCharacterProfileSOInspector.ExpressionRowLayerDropdownName)
+                .ForEach(layerDropdowns.Add);
+
+            Assert.That(nameFields, Has.Count.EqualTo(2), "表情ライブラリタブは全レイヤーの Expression をフラットに表示する必要があります。");
+            Assert.That(layerDropdowns, Has.Count.EqualTo(2), "各 Expression row には Layer DropdownField が必要です。");
+            Assert.That(nameFields[0].value, Is.EqualTo("Smile"));
+            Assert.That(layerDropdowns[0].value, Is.EqualTo(EmotionLayerName));
+            Assert.That(nameFields[1].value, Is.EqualTo("Wink"));
+            Assert.That(layerDropdowns[1].value, Is.EqualTo(SecondaryLayerName));
+        }
+
+        [Test]
         public void CreateInspectorGUI_OverlaysStateRadioInitialValue_MatchesSerializableGetState()
         {
             _so = CreateProfileWithSlots(BlinkSlotName);
@@ -311,6 +351,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
 
             AssertPrivateBuilderExists("BuildSlotsDeclarationSection", typeof(VisualElement));
             AssertPrivateBuilderExists("BuildDefaultOverlaysSection", typeof(VisualElement));
+            AssertPrivateBuilderExists("BuildExpressionLibrarySection", typeof(VisualElement));
             AssertPrivateBuilderExists("BuildOverlaysSectionForExpression", typeof(SerializedProperty), typeof(int));
 
             Assert.That(
@@ -321,6 +362,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
                 root.Q<VisualElement>(FacialCharacterProfileSOInspector.DefaultOverlaysFoldoutName),
                 Is.Not.Null,
                 "表情ライブラリタブに Default Overlays セクションが必要です。");
+            Assert.That(
+                root.Q<VisualElement>(FacialCharacterProfileSOInspector.ExpressionLibraryFoldoutName),
+                Is.Not.Null,
+                "表情ライブラリタブに Expression リストセクションが必要です。");
             Assert.That(
                 root.Q<VisualElement>(FacialCharacterProfileSOInspector.ExpressionOverlaysSectionName),
                 Is.Not.Null,
@@ -352,13 +397,17 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             return so;
         }
 
-        private static ExpressionSerializable CreateExpression(OverlaySlotBindingSerializable binding)
+        private static ExpressionSerializable CreateExpression(
+            OverlaySlotBindingSerializable binding,
+            string id = "smile",
+            string name = "Smile",
+            string layer = EmotionLayerName)
         {
             return new ExpressionSerializable
             {
-                id = "smile",
-                name = "Smile",
-                layer = EmotionLayerName,
+                id = id,
+                name = name,
+                layer = layer,
                 isGaze = false,
                 overlays = new List<OverlaySlotBindingSerializable> { binding },
             };
