@@ -1,99 +1,117 @@
-# Multi Source Blend Demo
+# Multi Source Blend Demo セットアップガイド
 
-単一レイヤーに `input-system` slug の `InputSystemAdapterBinding` (controller / keyboard 双方の Trigger Action を受ける) を配置してウェイトブレンドの振る舞いを確認するとともに、Vector2 入力 (左スティック / WASD) で両目を同時駆動するアナログ操作 (目線) の挙動を目視するための PlayMode 専用サンプルです。
+ボタン・スティック・トリガーで Unity 上のキャラモデルの表情を切り替えるデモサンプルです。所要時間 10〜15 分。
 
-## 同梱物
+## このサンプルでできること
+
+| 操作 | 動き |
+|---|---|
+| キーボード `1` / コントローラの該当ボタン | 笑顔の ON / OFF |
+| キーボード `2` / 〃 | 怒りの ON / OFF |
+| キーボード `3` / 〃 | 驚きの ON / OFF |
+| キーボード `4` / 〃 | 「あ」の口の ON / OFF |
+| キーボード `5` / 〃 | 目を閉じた笑顔（パターン違い）の ON / OFF |
+| W A S D / 左スティック | 視線（両目を同時に動かす） |
+| 左トリガー (LT) | 笑顔を押し込み量に応じてじわっと出す |
+| 右トリガー (RT) | 今出している表情に「目を閉じる」動きを重ねる |
+
+## 同梱されているもの
 
 | ファイル | 役割 |
-|---------|------|
-| `MultiSourceBlendDemo.unity` | Animator / FacialController / HUD を結線済みの Scene (新アーキテクチャでは scene 上に追加 MonoBehaviour Extension は不要) |
-| `MultiSourceBlendDemoCharacter.asset` | `FacialCharacterProfileSO`（`_adapterBindings` に `InputSystemAdapterBinding` を保持。表情 5 種 (smile / anger / surprise / lipsync_a + 目線) と Trigger1〜10 + Look (Vector2) のバインディングを内蔵） |
-| `MultiSourceBlendDemoActions.inputactions` | Expression 用 Trigger1〜10 + 目線アナログ操作用 Look (Vector2) を 1 つの ActionMap "Expression" にまとめた InputActionAsset |
-| `Smile.anim` / `Anger.anim` / `Surprise.anim` / `Lipsync_A.anim` | 各表情の AnimationClip。`FacialControlMeta_Set` AnimationEvent で transitionDuration / transitionCurvePreset を内蔵 |
-| `MultiSourceBlendDemoHUD.cs` | Weight スライダー + 各ソースごとの TriggerOn/Off ボタン + 目線アナログ操作関連 BlendShape の現在値を表示する HUD コンポーネント |
-| `StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/profile.json` | 表情定義 (FacialController が起動時に自動探索) |
+|---|---|
+| `MultiSourceBlendDemo.unity` | 必要なものが結線済みのシーン |
+| `MultiSourceBlendDemoCharacter.asset` | 表情・キー割り当ての定義本体（SO） |
+| `MultiSourceBlendDemoActions.inputactions` | キーボード / コントローラの入力定義 |
+| `Smile.anim` / `Anger.anim` / `Surprise.anim` / `Lipsync_A.anim` | サンプル用の表情アニメーション |
+| `MultiSourceBlendDemoHUD.cs` | 画面左上の操作 HUD |
 | `README.md` | 本ファイル |
 
-モデル (prefab / FBX / VRM) はライセンスの都合で同梱しません。ユーザー自身で用意してください。
+> キャラモデル (FBX / VRM / prefab) は同梱していません。お手持ちのものを用意してください。
 
-## セットアップ手順
+## 前提
 
-### 1. Scene を開く
+- Unity Editor (6000.3 以降) でこのプロジェクトを開いている
+- 自分のキャラモデルが 1 体ある
 
-Package Manager で本サンプルを Import すると以下に展開されます。
+---
 
-- `Assets/Samples/FacialControl InputSystem/<version>/Multi Source Blend Demo/MultiSourceBlendDemo.unity`
-- `Assets/Samples/FacialControl InputSystem/<version>/Multi Source Blend Demo/MultiSourceBlendDemoCharacter.asset`
-- `Assets/Samples/FacialControl InputSystem/<version>/Multi Source Blend Demo/StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/profile.json`
+## 手順 1: サンプルを取り込む
 
-`StreamingAssets/...` 配下の JSON は **Project ルート直下の `Assets/StreamingAssets/`** に手動で配置し直す必要があります。Sample import 後、フォルダごと `Assets/StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/` にコピー (または移動) してください。これにより `FacialController` の OnEnable で `Application.streamingAssetsPath/FacialControl/{SO 名}/profile.json` が自動探索されます。
+1. メニュー **Window → Package Manager** を開きます。
+2. 上の絞り込みを **In Project** にして、`FacialControl InputSystem` を選びます。
+3. 右側の **Samples** タブで `Multi Source Blend Demo` の **Import** ボタンを押します。
+4. `Assets/Samples/FacialControl InputSystem/<バージョン>/Multi Source Blend Demo/` 以下に展開されます。
 
-`MultiSourceBlendDemo.unity` をダブルクリックで開いてください。Scene には既に以下の GameObject が存在します。
+## 手順 2: シーンを開く
 
-- **Character** — モデルを配置するルート GameObject
-  - `Animator`（FacialController の `RequireComponent`）
-  - `FacialController`（SO フィールドに `MultiSourceBlendDemoCharacter` が結線済み）
-- **Multi Source Blend Demo HUD** — OnGUI ウィジェットを担う GO
-  - `MultiSourceBlendDemoHUD`（`_facialController` は Character の FacialController を参照、`_inputSourceSlug = "input-system"` で slug 駆動）
-- Main Camera / Directional Light
+1. Project ウィンドウで `MultiSourceBlendDemo.unity` をダブルクリックします。
+2. Hierarchy に **Character / Multi Source Blend Demo HUD / Main Camera / Directional Light** が並んでいれば OK です。
 
-> 新アーキテクチャでは `_adapterBindings` 内の `InputSystemAdapterBinding` が `FacialController.Initialize` 時に per-FC `LifetimeScope` 上で自動的に `OnStart` を実行し、`InputActionAsset.Instantiate` + `ActionMap.Enable` + Expression / Analog バインディングの結線を行います。scene 上に Extension MonoBehaviour を追加する必要はありません。
+> サンプルフォルダの中に `StreamingAssets/...` というフォルダが見えますが、これは出荷時の参考データで**手動で動かす必要はありません**。表情データの本体は `MultiSourceBlendDemoCharacter.asset` の中にあり、Inspector を開く／保存するたびに `Assets/StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/profile.json` が自動生成されます。
 
-### 2. モデルを Character の子に配置
+## 手順 3: キャラモデルを置く
 
-FBX / VRM / prefab いずれでも可。以下の BlendShape 名を持つ SkinnedMeshRenderer を持つモデルを推奨します。
+1. Hierarchy の **Character** をクリックして選びます。
+2. Project ウィンドウから自分のキャラモデルの prefab を **Character の上にドラッグ**します。Character の子（一段下）に入れば成功です。
 
-| Expression | 必要な BlendShape 名 |
-|-----------|-------------------|
-| smile | `笑い`, `口角上げ` |
-| anger | `怒り`, `左眉下げ`, `右眉下げ` |
-| surprise | `びっくり`, `▲` |
-| lipsync_a | `あ` |
-| `blink` slot (default overlay) | `まばたき`（Expression ではなく `profile.defaultOverlays[blink]` の snapshot として inline 保存） |
-| smile_closed_eye | `笑い`, `ウィンク`, `ウィンク右`（overlay suppress デモ用の目閉じ笑顔） |
+> サンプル付属のアニメーションは「`笑い` / `口角上げ` / `怒り` / `まばたき`」などの日本語の標準的な BlendShape 名を持つキャラモデル前提で作られています。お手持ちのモデルがこれと合わない場合、Play しても表情が動きません。その場合は手順 6 を参照してください。
 
-BlendShape 名が合致しないモデルを使う場合は、`MultiSourceBlendDemoCharacter` SO の Inspector を開き、Expression セクションで BlendShape 名をモデルに合わせて編集してください。SO の保存時に裏で `StreamingAssets/.../profile.json` が自動エクスポートされ、ランタイムへ反映されます。
+## 手順 4: 視線まわりの初期設定（モデルを差し替えるたびに必要）
 
-モデル配置手順:
+両目の動きは、キャラモデルごとに「眼球ボーンがどこにあって、どの軸が上下／左右なのか」が違います。これを自動で測ってもらいます。
 
-1. Hierarchy の **Character** を選択
-2. モデル (FBX/VRM) の prefab を Hierarchy の **Character** に **ドラッグ&ドロップ**（子として配置）
-3. SkinnedMeshRenderer は `FacialController.Skinned Mesh Renderers` が空なら子から自動検索されます
+1. Project ウィンドウで `MultiSourceBlendDemoCharacter` を選びます。
+2. Inspector で **目線アナログ表情** セクションを開きます。
+3. **「参照モデルから自動設定」** ボタンを押します。
+4. 必要なら **「可動範囲（角度制限）」** で目の動く最大角度を調整します。
 
-### 3. Play
+## 手順 5: 再生して動かしてみる
 
-Play モードに入ります。画面左上に HUD が表示されます。
+1. Unity 上部の **▶ 再生ボタン** を押します。
+2. 画面左上に操作 HUD が出ます。
+3. 上の「このサンプルでできること」の表どおりに、キー・スティック・トリガーを触ってみてください。
 
-- `Input weight` スライダーで `input-system` ソースの重みを 0〜1 で調整
-- `入力源` ブロックで smile / anger / surprise / lipsync_a の **On / Off** をトリガー
-- **コントローラ / キーボード** いずれの入力でも同じ `input-system` ソースに集約され、Action 名 (Trigger1〜4) → Expression ID マッピングで発火します
-- **キーボード 1 / 2 / 3 / 4** キーでも `input-system` 経由で smile / anger / surprise / lipsync_a が発火します（`InputSystemAdapterBinding` の `ExpressionBindings` で Action 名 → Expression ID をマッピング）
-- **左スティック** または **WASD** で `Look` (Vector2) を入力すると、SO の Inspector で目線アナログ表情に設定した両目ボーン (主) や BlendShape (オプション) が同時に駆動されます。
-  - 目線ボーンは「参照モデルから自動設定」ボタンで、ボーン名・初期回転に加えて世界の上下/左右軸が各目ボーンの local 空間でどの方向に対応するかを自動算出します。モデルを差替えたら必ず再実行してください。
-  - 「可動範囲 (角度制限)」 foldout で上方向/下方向/外側/内側の最大角度を設定できます。例えば「向かって左に視線を送るとき、向かって左の眼は外側、向かって右の眼は内側の値で動く」非対称制限により、両目を完全同角度で動かすことによる違和感を回避できます。
-- **キーバインディング** の動作モードは「Hold (押下中のみ ON)」が既定。リリースで OFF に戻ります。トグル動作 (押すたびに ON/OFF 切替) が必要なバインディングは Inspector で「動作モード」を `Toggle` に変更してください。
-- **左トリガー (LT)** で smile を Analog 駆動 (押し量に応じて smile 全体の BlendShape をスケール、`input:analog-expression` 経路)。
-- **右トリガー (RT)** は **Overlay モード** で `blink` slot を駆動します。active 表情の `overlays.blink` を解決し、default fallback / suppress / 個別 snapshot override の 3 状態いずれかが選ばれ、default fallback の場合は profile の `defaultOverlays.blink` (inline snapshot) にフォールバックします。「ボタン操作の表情に対し、追加で Trigger を押すと目だけ閉じる、ただし表情ごとに違う最終形にしたい」というユースケースを宣言ベースで実現します。
-  - 例 1: Trigger1 で smile を ON にした上で RT を引くと、smile の `overlays.blink` が default fallback (suppress=false, snapshot=null) なので、`overlay` レイヤー (priority=1) に `profile.defaultOverlays[blink]` の snapshot が立ち、`emotion` レイヤー (smile) の眉・口角は ContributeMask off で貫通、`まばたき` だけが lerp で 0→1 に補間されます。
-  - 例 2: Trigger5 で `smile_closed_eye` を ON にした状態で RT を引くと、Expression 側の `overlays.blink.suppress = true` が効き overlay は発火しません。「すでに目を閉じている表情で RT を引いても二重に閉じない」を実現します。
-  - 各表情ごとの「目閉じ最終形」は SO Inspector の Expression エントリの `overlays` セクションで slot ごとに 3 状態 (Default / Suppress / Override) を選択できます。Override を選ぶと AnimationClip を割り当ててその表情専用の snapshot を inline 化でき、Suppress を選ぶと当該 slot の overlay を完全に抑制できます。Default のままなら profile の `defaultOverlays[blink]` snapshot にフォールバックします。
+> **キー操作の動作モード** は「**Hold**（押している間だけ ON）」がデフォルトです。「**Toggle**（押すたびに ON / OFF 切替）」にしたい場合は、`MultiSourceBlendDemoCharacter` の Inspector で各バインディングの **動作モード** を変更してください。
 
-参考: 「smile (普通) Hold + RT 全押し」では smile の `overlays.blink` が default fallback なので、profile-level の `defaultOverlays[blink]` snapshot が発火して `まばたき` だけが lerp で立ち上がります。
+## 手順 6: 自分のキャラに合わせて表情を作り直す（任意）
 
-### トラブルシューティング
+サンプル付属のアニメーション (`Smile.anim` など) がそのまま動かない場合は、自分のキャラに合わせた表情アニメーションを作ります。
 
-- **HUD が表示されない**: Play モードに入っているか確認。`Application.runInBackground` を HUD.Awake で true に設定しているので Game View 非 focus でも動きます
-- **BlendShape が動かない**: SO の Expression セクションの BlendShape 名とモデルの BlendShape 名が完全一致しているか確認（日本語・特殊記号の扱いに注意）
-- **`input-system は profile.inputSources に未宣言`**: `StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/profile.json` が `Assets/StreamingAssets/...` 配下に展開されているか、SO の `_layers[].inputSources` に `input-system` slug が宣言されているか、`_adapterBindings` 内の `InputSystemAdapterBinding.Slug` が一致しているかを確認
-- **FacialController 初期化前**: SO に StreamingAssets パス相当の JSON が無く、SO のフィールドも空の場合は初期化されません。Inspector で SO の状態を確認してください
+1. Unity の **Animation ウィンドウ** で `Smile.anim` を開きます（または同じ要領で新規作成します）。
+2. キャラモデル上の SkinnedMeshRenderer が持つ BlendShape を選び、好みの表情になるよう値を打ちます。
+3. できたアニメーションを `MultiSourceBlendDemoCharacter` の Inspector の対応する **Expression** の **AnimationClip** 欄にドラッグします。
+4. SO を保存すると、表情データに自動反映されます。
+
+> **リップシンクについて**: `Lipsync_A.anim` は AnimationClip 1 個で「あ」の口を出すだけの暫定実装です。今後 uLipSync 等の外部プラグインと連携する形に置き換える予定で、ユーザーが日常的に「あ」「い」「う」…の AnimationClip を増やすワークフローではなくなります。
+
+---
 
 ## カスタマイズ
 
-### 独自プロファイルに差し替える
+### 「目を閉じる」動きを表情ごとに使い分ける
 
-`MultiSourceBlendDemoCharacter` SO の Inspector で Expression セクションを直接編集するか、`Tools / FacialControl / Force Export Selected Character SO` メニューから StreamingAssets への即時反映が可能です。SO 自体を別の `FacialCharacterProfileSO` アセットに差し替えるだけで設定一式が切り替わります。
+各表情に対して、右トリガーで重なる「目を閉じる」動きを 3 通りから選べます。`MultiSourceBlendDemoCharacter` の Inspector → 各 Expression の **`overlays.blink`** で切り替えます。
+
+| 設定 | 動き |
+|---|---|
+| **Default** | 共通の「まばたき」を重ねる（標準） |
+| **Suppress** | 重ねない（すでに目を閉じている表情向け） |
+| **Override** | この表情専用の目閉じアニメーションを使う |
+
+### キャラ定義を別アセットに差し替える
+
+`MultiSourceBlendDemoCharacter` を別の `FacialCharacterProfileSO` アセットに差し替えるだけで設定一式が切り替わります。
+
+---
+
+## トラブルシューティング
+
+- **HUD が出ない**: 再生中であること、Game ビューが表示されていることを確認してください。
+- **表情が動かない**: お手持ちのキャラモデルの BlendShape 名が、サンプル付属アニメーションが想定する日本語名と一致していない可能性が高いです。手順 6 の方法で表情アニメーションを作り直してください。
+- **視線がおかしい / 動かない**: 手順 4 の **「参照モデルから自動設定」** を実行したか確認してください。モデルを差し替えるたびに必要です。
+- **Play 直後に何も初期化されない**: Hierarchy の `Character` を選び、Inspector で `FacialController` の **Character SO** 欄が空になっていないかを確認してください（通常はサンプル状態で結線済みです）。
 
 ## 参考
 
-- `Documentation~/quickstart.md`: コア機能のセットアップフロー全体
-- `Documentation~/json-schema.md`: プロファイル JSON スキーマ詳細 (上級者向け、通常運用では Inspector のみで完結)
+- `Documentation~/quickstart.md`: コア機能の全体セットアップフロー
+- `Documentation~/json-schema.md`: 上級者向けの内部 JSON 仕様（通常運用では Inspector のみで完結します）
