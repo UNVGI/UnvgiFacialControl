@@ -58,7 +58,6 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string ExpressionLibraryAddButtonName = "facial-character-expression-library-add-button";
         public const string ExpressionOverlaysSectionName = "expression-row-overlays-section";
         public const string DefaultOverlaySlotDropdownName = "default-overlay-slot-dropdown";
-        public const string DefaultOverlayStateRadioName = "default-overlay-state-radio";
         public const string DefaultOverlayAnimationClipFieldName = "default-overlay-animation-clip-field";
         public const string DefaultOverlayUndeclaredSlotHelpName = "default-overlay-undeclared-slot-help";
         public const string ExpressionOverlayStateRadioName = "expression-overlay-state-radio";
@@ -669,12 +668,13 @@ namespace Hidano.FacialControl.Editor.Inspector
                 return;
             }
 
+            NormalizeDefaultOverlayBinding(overlayIndex);
+
             var bindingProp = _defaultOverlaysProperty.GetArrayElementAtIndex(overlayIndex);
             var slotProp = bindingProp.FindPropertyRelative("slot");
             var clipProp = bindingProp.FindPropertyRelative("animationClip");
 
             string currentSlot = slotProp != null ? slotProp.stringValue ?? string.Empty : string.Empty;
-            var state = ReadDefaultOverlayBindingState(overlayIndex, bindingProp);
             bool declared = IsDeclaredSlot(currentSlot);
 
             if (!declared)
@@ -712,47 +712,24 @@ namespace Hidano.FacialControl.Editor.Inspector
             });
             row.Add(slotDropdown);
 
-            var radio = new OverlayStateRadioButtonGroup
-            {
-                name = DefaultOverlayStateRadioName,
-                choices = new List<string> { "Default", "Suppress", "Override" },
-            };
-            radio.SetValueWithoutNotify(ToRadioIndex(state));
-            radio.style.minWidth = 240;
-            row.Add(radio);
-
-            var clipField = new ObjectField("AnimationClip")
+            var clipField = new OverlayAnimationClipObjectField("AnimationClip")
             {
                 name = DefaultOverlayAnimationClipFieldName,
                 objectType = typeof(AnimationClip),
                 allowSceneObjects = false,
             };
             clipField.style.flexGrow = 1f;
-            clipField.style.display = state == OverlaySlotBindingState.Override
-                ? DisplayStyle.Flex
-                : DisplayStyle.None;
+            clipField.style.display = DisplayStyle.Flex;
             if (clipProp != null)
             {
                 clipField.SetValueWithoutNotify(clipProp.objectReferenceValue);
-                clipField.RegisterValueChangedCallback(evt =>
-                {
-                    ApplyDefaultOverlayClip(overlayIndex, evt.newValue as AnimationClip);
-                });
+                clipField.OnValueAssigned = clip => ApplyDefaultOverlayClip(overlayIndex, clip);
             }
             else
             {
                 clipField.SetEnabled(false);
             }
             row.Add(clipField);
-
-            radio.OnValueAssigned = value =>
-            {
-                var newState = FromRadioIndex(value);
-                ApplyDefaultOverlayState(overlayIndex, newState, clipField);
-                clipField.style.display = newState == OverlaySlotBindingState.Override
-                    ? DisplayStyle.Flex
-                    : DisplayStyle.None;
-            };
         }
 
         private void InitializeDefaultOverlayRow(int overlayIndex)
@@ -771,51 +748,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             EditorUtility.SetDirty(target);
         }
 
-        private OverlaySlotBindingState ReadDefaultOverlayBindingState(
-            int overlayIndex,
-            SerializedProperty bindingProp)
-        {
-            var binding = GetDefaultOverlayBinding(overlayIndex);
-            if (binding != null)
-            {
-                return binding.GetState();
-            }
-
-            return ReadOverlayBindingState(bindingProp);
-        }
-
-        private void ApplyDefaultOverlayState(
-            int overlayIndex,
-            OverlaySlotBindingState state,
-            ObjectField clipField)
-        {
-            var binding = EnsureDefaultOverlayBinding(overlayIndex);
-            if (binding == null) return;
-
-            Undo.RecordObject(target, "Change Default Overlay State");
-            switch (state)
-            {
-                case OverlaySlotBindingState.Suppress:
-                    binding.suppress = true;
-                    binding.animationClip = null;
-                    binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
-                    if (clipField != null) clipField.SetValueWithoutNotify(null);
-                    break;
-                case OverlaySlotBindingState.Override:
-                    binding.suppress = false;
-                    break;
-                default:
-                    binding.suppress = false;
-                    binding.animationClip = null;
-                    binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
-                    if (clipField != null) clipField.SetValueWithoutNotify(null);
-                    break;
-            }
-
-            EditorUtility.SetDirty(target);
-            serializedObject.Update();
-        }
-
         private void ApplyDefaultOverlayClip(int overlayIndex, AnimationClip clip)
         {
             var binding = EnsureDefaultOverlayBinding(overlayIndex);
@@ -831,6 +763,26 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             EditorUtility.SetDirty(target);
             serializedObject.Update();
+        }
+
+        private void NormalizeDefaultOverlayBinding(int overlayIndex)
+        {
+            var binding = EnsureDefaultOverlayBinding(overlayIndex);
+            if (binding == null) return;
+
+            bool changed = binding.suppress;
+            binding.suppress = false;
+            if (binding.animationClip == null && !BaseExpressionSerializable.IsSnapshotEmpty(binding.cachedSnapshot))
+            {
+                binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                changed = true;
+            }
+
+            if (changed)
+            {
+                EditorUtility.SetDirty(target);
+                serializedObject.Update();
+            }
         }
 
         private OverlaySlotBindingSerializable GetDefaultOverlayBinding(int overlayIndex)
@@ -3417,6 +3369,30 @@ namespace Hidano.FacialControl.Editor.Inspector
                 {
                     base.value = value;
                     OnValueAssigned?.Invoke(value);
+                }
+            }
+        }
+
+        private sealed class OverlayAnimationClipObjectField : ObjectField
+        {
+            public Action<AnimationClip> OnValueAssigned;
+
+            public OverlayAnimationClipObjectField(string label)
+                : base(label)
+            {
+            }
+
+            public override UnityEngine.Object value
+            {
+                get => base.value;
+                set
+                {
+                    var previous = base.value;
+                    base.value = value;
+                    if (!ReferenceEquals(previous, value))
+                    {
+                        OnValueAssigned?.Invoke(value as AnimationClip);
+                    }
                 }
             }
         }
