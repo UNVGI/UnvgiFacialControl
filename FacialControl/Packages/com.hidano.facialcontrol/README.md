@@ -37,7 +37,7 @@
     ],
     "dependencies": {
         "jp.hadashikick.vcontainer": "1.16.6",
-        "com.hidano.facialcontrol": "0.1.0-preview.1"
+        "com.hidano.facialcontrol": "0.1.0-preview.2"
     }
 }
 ```
@@ -74,6 +74,62 @@ Editor/             # Editor 拡張 (UI Toolkit)
 ```
 
 表情制御は PlayableGraph + AnimationStream API ベースで、既存の Animator と共存可能。
+
+## Overlay slot スキーマ (preview.2)
+
+preview.2 では Overlay を Expression ID 参照ではなく、slot ごとの snapshot として定義する。`slots[]` が overlay slot 識別子の宣言元で、`defaultOverlays[]` と各 `expressions[].snapshot.overlays[]` は同じ `slot / suppress / snapshot` 形式を使う。
+
+- `suppress: false` かつ `snapshot: null` — profile の `defaultOverlays[]` へ fallback
+- `suppress: true` かつ `snapshot: null` — その slot の overlay を明示的に抑制
+- `suppress: false` かつ `snapshot` 指定 — その Expression 専用の overlay snapshot を適用
+
+旧 `expressionId` フィールドは preview.2 で廃止された。旧フィールドが `defaultOverlays[]` または `expressions[].snapshot.overlays[]` に残っている JSON は、`SystemTextJsonParser` が `FormatException` で拒否する。自動マイグレーションは提供しないため、`blink_overlay` のような中間 Expression は overlay snapshot として inline 化する。
+
+```json
+{
+  "schemaVersion": "1.0",
+  "slots": ["blink"],
+  "rendererPaths": [],
+  "layers": [],
+  "expressions": [
+    {
+      "id": "smile",
+      "name": "Smile",
+      "layer": "emotion",
+      "layerOverrideMask": [],
+      "snapshot": {
+        "transitionDuration": 0.0667,
+        "transitionCurvePreset": "EaseInOut",
+        "blendShapes": [],
+        "bones": [],
+        "rendererPaths": [],
+        "overlays": [
+          { "slot": "blink", "suppress": false, "snapshot": null }
+        ]
+      }
+    }
+  ],
+  "defaultOverlays": [
+    {
+      "slot": "blink",
+      "suppress": false,
+      "snapshot": {
+        "transitionDuration": 0.08,
+        "transitionCurvePreset": "Linear",
+        "blendShapes": [
+          { "rendererPath": "Face", "name": "Fcl_EYE_Close_L", "value": 1.0 },
+          { "rendererPath": "Face", "name": "Fcl_EYE_Close_R", "value": 1.0 }
+        ],
+        "bones": [],
+        "rendererPaths": ["Face"],
+        "overlays": []
+      }
+    }
+  ]
+}
+```
+
+`FacialCharacterProfileSO` の Inspector は「表情ライブラリ / レイヤー / ベース表情 / 目線 / Adapter Bindings / Debug」の 6 タブ構成になり、slot 宣言、Default Overlays、Expression ごとの Overlays は表情ライブラリタブで編集する。Adapter Bindings の `overlaySlot` は `slots[]` から dropdown 生成される。
 
 ## パフォーマンス
 

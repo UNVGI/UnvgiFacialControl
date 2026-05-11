@@ -250,6 +250,76 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
         }
 
         [Test]
+        public void OnStart_OverlayPath_DeclaredSlot_RegistersOverlayInputSource()
+        {
+            const string slug = "input-system-overlay-declared-slot";
+            _sourceAsset = CreateValueActionAsset(
+                actionMapName: "Expression",
+                actionName: "BlinkWeight",
+                binding: "<Gamepad>/rightTrigger");
+
+            _binding = CreateBinding(
+                slug: slug,
+                asset: _sourceAsset,
+                actionMapName: "Expression",
+                expressionBindings: new List<ExpressionBindingEntry>
+                {
+                    new ExpressionBindingEntry
+                    {
+                        bindingMode = BindingMode.Overlay,
+                        actionName = "BlinkWeight",
+                        overlaySlot = "blink",
+                    },
+                });
+
+            AdapterBuildContext ctx = CreateContext(slots: new[] { "blink" });
+
+            _binding.OnStart(in ctx);
+            _bindingStarted = true;
+
+            bool resolved = _registry.TryResolve(slug + ":overlay:blink", out IInputSource source);
+            Assert.IsTrue(resolved, "Slots に宣言された overlaySlot は overlay source として登録されるべき。");
+            Assert.IsInstanceOf<OverlayInputSource>(source);
+        }
+
+        [Test]
+        public void OnStart_OverlayPath_UndeclaredSlot_LogsWarningAndSkipsOverlaySource()
+        {
+            const string slug = "input-system-overlay-undeclared-slot";
+            _sourceAsset = CreateValueActionAsset(
+                actionMapName: "Expression",
+                actionName: "BlinkWeight",
+                binding: "<Gamepad>/rightTrigger");
+
+            _binding = CreateBinding(
+                slug: slug,
+                asset: _sourceAsset,
+                actionMapName: "Expression",
+                expressionBindings: new List<ExpressionBindingEntry>
+                {
+                    new ExpressionBindingEntry
+                    {
+                        bindingMode = BindingMode.Overlay,
+                        actionName = "BlinkWeight",
+                        overlaySlot = "missing",
+                    },
+                });
+
+            LogAssert.Expect(
+                LogType.Warning,
+                "[InputSystemAdapterBinding] Overlay binding slot 'missing' is not declared in profile.Slots. skip.");
+
+            AdapterBuildContext ctx = CreateContext(slots: new[] { "blink" });
+
+            _binding.OnStart(in ctx);
+            _bindingStarted = true;
+
+            bool resolved = _registry.TryResolve(slug + ":overlay:missing", out IInputSource source);
+            Assert.IsFalse(resolved, "Slots 未宣言の overlaySlot は overlay source として登録されてはならない。");
+            Assert.IsNull(source);
+        }
+
+        [Test]
         public void OnStart_GazePath_MatchingExpressionId_BuildsGazeProvider()
         {
             _sourceAsset = CreateGazeActionAsset(
@@ -497,10 +567,10 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             return binding;
         }
 
-        private AdapterBuildContext CreateContext(IReadOnlyList<string> blendShapeNames = null)
+        private AdapterBuildContext CreateContext(IReadOnlyList<string> blendShapeNames = null, string[] slots = null)
         {
             return new AdapterBuildContext(
-                profile: new FacialProfile("1.0"),
+                profile: new FacialProfile("1.0", slots: slots),
                 blendShapeNames: blendShapeNames ?? new List<string> { "smile", "frown" },
                 inputSourceRegistry: _registry,
                 timeProvider: new UnityTimeProvider(),
@@ -517,6 +587,18 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             var map = asset.AddActionMap(actionMapName);
             var action = map.AddAction(buttonActionName, InputActionType.Button);
             action.AddBinding(buttonBinding);
+            return asset;
+        }
+
+        private static InputActionAsset CreateValueActionAsset(
+            string actionMapName,
+            string actionName,
+            string binding)
+        {
+            var asset = ScriptableObject.CreateInstance<InputActionAsset>();
+            var map = asset.AddActionMap(actionMapName);
+            var action = map.AddAction(actionName, InputActionType.Value);
+            action.AddBinding(binding);
             return asset;
         }
 

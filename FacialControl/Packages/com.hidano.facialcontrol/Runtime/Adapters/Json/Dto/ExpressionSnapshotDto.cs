@@ -38,7 +38,7 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
 
         /// <summary>
         /// この Expression が宣言する slot 別 overlay binding。
-        /// <see cref="OverlaySlotBindingDto.expressionId"/> が空なら明示 suppress。
+        /// 各 binding は default fallback / suppress / snapshot override の 3 状態を表現する。
         /// </summary>
         public List<OverlaySlotBindingDto> overlays;
     }

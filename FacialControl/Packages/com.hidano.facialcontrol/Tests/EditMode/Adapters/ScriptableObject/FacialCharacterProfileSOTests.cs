@@ -64,6 +64,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
                 });
                 so.RendererPaths.Add("Body");
 
+                var serializedObject = new SerializedObject(so);
+                SerializedProperty slots = serializedObject.FindProperty("_slots");
+                Assert.That(slots, Is.Not.Null);
+                Assert.That(slots.isArray, Is.True);
+                Assert.That(slots.arraySize, Is.EqualTo(0));
+                slots.arraySize = 1;
+                slots.GetArrayElementAtIndex(0).stringValue = "blink";
+                serializedObject.ApplyModifiedProperties();
+
                 var profile = so.BuildFallbackProfile();
 
                 Assert.That(profile.SchemaVersion, Is.EqualTo("1.0"));
@@ -71,6 +80,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
                 Assert.That(profile.Expressions.Length, Is.EqualTo(1));
                 Assert.That(profile.LayerInputSources.Length, Is.EqualTo(1));
                 Assert.That(profile.RendererPaths.Length, Is.EqualTo(1));
+                Assert.That(so.Slots, Is.Not.Null);
+                Assert.That(so.Slots, Has.Count.EqualTo(1));
+                Assert.That(profile.Slots.Length, Is.EqualTo(1));
+                Assert.That(profile.Slots.Span[0], Is.EqualTo("blink"));
             }
             finally
             {

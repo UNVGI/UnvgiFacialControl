@@ -66,6 +66,7 @@ namespace Hidano.FacialControl.Adapters.Json
             if (string.IsNullOrWhiteSpace(json))
                 throw new ArgumentException("JSON 文字列を空にすることはできません。", nameof(json));
 
+            LegacyOverlayFieldDetector.RejectLegacyExpressionIdInOverlays(json);
             preprocessed = PreprocessInputSourceOptions(PreprocessGazeConfigsKey(json));
 
             ProfileSnapshotDto dto;
@@ -106,6 +107,8 @@ namespace Hidano.FacialControl.Adapters.Json
                 dto.layers = new List<LayerDefinitionDto>();
             if (dto.expressions == null)
                 dto.expressions = new List<ExpressionDto>();
+            if (dto.slots == null)
+                dto.slots = new List<string>();
             if (dto.rendererPaths == null)
                 dto.rendererPaths = new List<string>();
             if (dto.gazeConfigs == null)
@@ -623,8 +626,15 @@ namespace Hidano.FacialControl.Adapters.Json
             var rendererPaths = ConvertRendererPaths(dto.rendererPaths);
             var layerInputSources = ConvertLayerInputSources(inputSourceDtos);
             var defaultOverlays = ConvertOverlaySlotBindings(dto.defaultOverlays);
+            var slots = ConvertStringList(dto.slots);
             return new FacialProfile(
-                dto.schemaVersion, layers, expressions, rendererPaths, layerInputSources, defaultOverlays);
+                dto.schemaVersion,
+                layers,
+                expressions,
+                rendererPaths,
+                layerInputSources,
+                defaultOverlays,
+                slots: slots);
         }
 
         private static OverlaySlotBinding[] ConvertOverlaySlotBindings(List<OverlaySlotBindingDto> dtos)
@@ -638,9 +648,102 @@ namespace Hidano.FacialControl.Adapters.Json
                 var d = dtos[i];
                 if (d == null || string.IsNullOrWhiteSpace(d.slot))
                     continue;
-                list.Add(new OverlaySlotBinding(d.slot, d.expressionId));
+
+                if (d.suppress && d.snapshot != null)
+                {
+                    throw new FormatException(
+                        $"OverlaySlotBinding slot='{d.slot}' has invalid state: suppress=true and snapshot is not null.");
+                }
+
+                try
+                {
+                    var snapshot = d.snapshot != null
+                        ? ConvertExpressionSnapshot(d.snapshot, d.slot)
+                        : (ExpressionSnapshot?)null;
+                    list.Add(new OverlaySlotBinding(d.slot, d.suppress, snapshot));
+                }
+                catch (ArgumentException ex)
+                {
+                    throw new FormatException(
+                        $"OverlaySlotBinding slot='{d.slot}' の変換に失敗しました (suppress={d.suppress}, snapshot={(d.snapshot == null ? "null" : "present")})。",
+                        ex);
+                }
             }
             return list.Count == 0 ? null : list.ToArray();
+        }
+
+        private static ExpressionSnapshot ConvertExpressionSnapshot(ExpressionSnapshotDto dto, string fallbackId)
+        {
+            if (dto == null)
+                throw new ArgumentNullException(nameof(dto));
+
+            return new ExpressionSnapshot(
+                fallbackId ?? string.Empty,
+                dto.transitionDuration,
+                ConvertTransitionCurvePreset(dto.transitionCurvePreset),
+                ConvertBlendShapeSnapshots(dto.blendShapes),
+                ConvertBoneSnapshots(dto.bones),
+                ConvertStringList(dto.rendererPaths));
+        }
+
+        private static BlendShapeSnapshot[] ConvertBlendShapeSnapshots(List<BlendShapeSnapshotDto> dtos)
+        {
+            if (dtos == null || dtos.Count == 0)
+                return Array.Empty<BlendShapeSnapshot>();
+
+            var snapshots = new List<BlendShapeSnapshot>(dtos.Count);
+            for (int i = 0; i < dtos.Count; i++)
+            {
+                var d = dtos[i];
+                if (d == null)
+                    continue;
+
+                snapshots.Add(new BlendShapeSnapshot(d.rendererPath, d.name, d.value));
+            }
+
+            return snapshots.Count == 0 ? Array.Empty<BlendShapeSnapshot>() : snapshots.ToArray();
+        }
+
+        private static BoneSnapshot[] ConvertBoneSnapshots(List<BoneSnapshotDto> dtos)
+        {
+            if (dtos == null || dtos.Count == 0)
+                return Array.Empty<BoneSnapshot>();
+
+            var snapshots = new List<BoneSnapshot>(dtos.Count);
+            for (int i = 0; i < dtos.Count; i++)
+            {
+                var d = dtos[i];
+                if (d == null)
+                    continue;
+
+                snapshots.Add(new BoneSnapshot(
+                    d.bonePath,
+                    d.position.x,
+                    d.position.y,
+                    d.position.z,
+                    d.rotationEuler.x,
+                    d.rotationEuler.y,
+                    d.rotationEuler.z,
+                    d.scale.x,
+                    d.scale.y,
+                    d.scale.z));
+            }
+
+            return snapshots.Count == 0 ? Array.Empty<BoneSnapshot>() : snapshots.ToArray();
+        }
+
+        private static string[] ConvertStringList(List<string> values)
+        {
+            if (values == null || values.Count == 0)
+                return Array.Empty<string>();
+
+            var result = new string[values.Count];
+            for (int i = 0; i < values.Count; i++)
+            {
+                result[i] = values[i] ?? string.Empty;
+            }
+
+            return result;
         }
 
         private static InputSourceDeclaration[][] ConvertLayerInputSources(InputSourceDto[][] dtos)
@@ -776,7 +879,14 @@ namespace Hidano.FacialControl.Adapters.Json
                 rendererPaths = new List<string>(),
                 gazeConfigs = new List<GazeBindingConfigDto>(),
                 defaultOverlays = BuildOverlaySlotBindingDtoList(profile.DefaultOverlays.Span),
+                slots = new List<string>(),
             };
+
+            var slotsSpan = profile.Slots.Span;
+            for (int i = 0; i < slotsSpan.Length; i++)
+            {
+                dto.slots.Add(slotsSpan[i]);
+            }
 
             var rendererPathsSpan = profile.RendererPaths.Span;
             for (int i = 0; i < rendererPathsSpan.Length; i++)
@@ -848,10 +958,66 @@ namespace Hidano.FacialControl.Adapters.Json
                 list.Add(new OverlaySlotBindingDto
                 {
                     slot = bindings[i].Slot,
-                    expressionId = bindings[i].ExpressionId,
+                    suppress = bindings[i].Suppress,
+                    snapshot = bindings[i].Snapshot.HasValue
+                        ? BuildExpressionSnapshotDto(bindings[i].Snapshot.Value)
+                        : null,
                 });
             }
             return list;
+        }
+
+        private static ExpressionSnapshotDto BuildExpressionSnapshotDto(ExpressionSnapshot snapshot)
+        {
+            var dto = new ExpressionSnapshotDto
+            {
+                transitionDuration = snapshot.TransitionDuration,
+                transitionCurvePreset = SerializeTransitionCurvePreset(snapshot.TransitionCurvePreset),
+                blendShapes = new List<BlendShapeSnapshotDto>(),
+                bones = new List<BoneSnapshotDto>(),
+                rendererPaths = new List<string>(),
+                overlays = new List<OverlaySlotBindingDto>(),
+            };
+
+            var blendShapeSpan = snapshot.BlendShapes.Span;
+            for (int i = 0; i < blendShapeSpan.Length; i++)
+            {
+                dto.blendShapes.Add(new BlendShapeSnapshotDto
+                {
+                    rendererPath = blendShapeSpan[i].RendererPath,
+                    name = blendShapeSpan[i].Name,
+                    value = blendShapeSpan[i].Value,
+                });
+            }
+
+            var boneSpan = snapshot.Bones.Span;
+            for (int i = 0; i < boneSpan.Length; i++)
+            {
+                dto.bones.Add(new BoneSnapshotDto
+                {
+                    bonePath = boneSpan[i].BonePath,
+                    position = new Vector3(
+                        boneSpan[i].PositionX,
+                        boneSpan[i].PositionY,
+                        boneSpan[i].PositionZ),
+                    rotationEuler = new Vector3(
+                        boneSpan[i].EulerX,
+                        boneSpan[i].EulerY,
+                        boneSpan[i].EulerZ),
+                    scale = new Vector3(
+                        boneSpan[i].ScaleX,
+                        boneSpan[i].ScaleY,
+                        boneSpan[i].ScaleZ),
+                });
+            }
+
+            var rendererPathSpan = snapshot.RendererPaths.Span;
+            for (int i = 0; i < rendererPathSpan.Length; i++)
+            {
+                dto.rendererPaths.Add(rendererPathSpan[i]);
+            }
+
+            return dto;
         }
 
         private static string SerializeExclusionMode(ExclusionMode mode)
@@ -872,6 +1038,33 @@ namespace Hidano.FacialControl.Adapters.Json
                 TransitionCurveType.EaseIn    => "EaseIn",
                 TransitionCurveType.EaseOut   => "EaseOut",
                 TransitionCurveType.EaseInOut => "EaseInOut",
+                _ => "Linear"
+            };
+        }
+
+        private static TransitionCurvePreset ConvertTransitionCurvePreset(string preset)
+        {
+            if (string.IsNullOrEmpty(preset))
+                return TransitionCurvePreset.Linear;
+
+            return preset.Trim() switch
+            {
+                "Linear"    => TransitionCurvePreset.Linear,
+                "EaseIn"    => TransitionCurvePreset.EaseIn,
+                "EaseOut"   => TransitionCurvePreset.EaseOut,
+                "EaseInOut" => TransitionCurvePreset.EaseInOut,
+                _ => TransitionCurvePreset.Linear
+            };
+        }
+
+        private static string SerializeTransitionCurvePreset(TransitionCurvePreset preset)
+        {
+            return preset switch
+            {
+                TransitionCurvePreset.Linear => "Linear",
+                TransitionCurvePreset.EaseIn => "EaseIn",
+                TransitionCurvePreset.EaseOut => "EaseOut",
+                TransitionCurvePreset.EaseInOut => "EaseInOut",
                 _ => "Linear"
             };
         }

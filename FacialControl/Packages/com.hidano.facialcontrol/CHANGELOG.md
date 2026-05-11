@@ -2,10 +2,13 @@
 
 すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
 
-## [Unreleased]
+## [0.1.0-preview.2] - Unreleased
 
 ### Breaking changes
 
+- Overlay は旧 `(slot, expressionId)` 参照モデルを廃止し、`(slot, suppress, snapshot)` の 3 状態モデルへ破壊的に変更しました。`defaultOverlays[]` と `expressions[].snapshot.overlays[]` は `slot` / `suppress` / `snapshot` を保持し、`suppress=false && snapshot=null` は `FacialProfile.DefaultOverlays` への fallback、`suppress=true` は明示抑制、`snapshot` 指定時は個別 overlay override を表します。
+- `OverlaySlotBinding.ExpressionId` および ScriptableObject 側の `expressionId` フィールドは廃止しました。preview.2 では旧 JSON からの自動マイグレーションを提供せず、`defaultOverlays[]` または `expressions[].snapshot.overlays[]` に旧 `expressionId` が残っている場合は `SystemTextJsonParser` が field 名と path を含む `FormatException` で読み込みを拒否します。
+- `FacialProfile.Slots` / JSON ルート `slots[]` / `FacialCharacterProfileSO._slots` を overlay slot 識別子の唯一の宣言元として追加しました。`Expression.Overlays`、`FacialProfile.DefaultOverlays`、Adapter Bindings の `overlaySlot` は、この slots 宣言に存在しない値を不正参照として扱います。
 - GazeConfig は `InputSystemAdapterBinding._gazeConfigs` から `FacialCharacterProfileSO` ルート直下の `_gazeConfigs` へ昇格しました。InputSystem 側は入力結線のみを保持する構造に変わるため、既存 SO YAML は binding 内部の gaze configs を SO ルートへ移植する必要があります。
 - `profile.json` の `schemaVersion` は preview.1 リリース前段階のため `"1.0"` に統一しました。バージョンを別管理しないポリシーに従い、旧開発過程で出現した `"2.0"` / `"2.1"` の JSON は preview 段階の破壊的変更として migration なしで `"1.0"` への hand-edit が必要です。
 - `InputSourceId` の正規表現を `^[a-zA-Z0-9_.-]{1,64}$` から `^[a-zA-Z0-9_.\-:]{1,64}$` に拡張し、`slug:sub` 合成キー（例: `input:analog-expression`）を JSON 経路でも正しく受理するよう修正しました。`AdapterSlug` 自身の regex は `:` 不許可のまま維持。これにより `SystemTextJsonParser` が profile.json 内の `input:analog-expression` を弾いていた警告が解消されます。
@@ -68,6 +71,9 @@
 
 ### Added
 
+- Overlay slot 宣言 (`FacialProfile.Slots` / `ProfileSnapshotDto.slots` / `FacialCharacterProfileSO._slots`) を追加。slot 重複と未宣言 slot 参照を検出する `ValidateSlotReferences()` と `InvalidSlotReference` も追加した。
+- `OverlaySlotBinding` / `OverlaySlotBindingDto` / `OverlaySlotBindingSerializable` を 3 状態 overlay モデルへ更新し、default fallback / suppress / snapshot override を Domain / JSON / SO の全経路で同じ意味として扱うようにした。
+- `FacialCharacterProfileSOInspector` を「表情ライブラリ / レイヤー / ベース表情 / 目線 / Adapter Bindings / Debug」の 6 タブ構成へ再編し、表情ライブラリタブに Slots 宣言、Default Overlays、Expression 行ごとの Overlays UI を追加。Adapter Bindings の `overlaySlot` は Slots 宣言から dropdown 生成される。
 - `Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig` — Vector2 アナログ入力で両目を同時駆動するアナログ表情の汎用 `[Serializable]` 基底クラス。両目ボーン path / 初期回転 / yaw・pitch local 軸 / 可動範囲 (上下＋左右内外) / Look 4 系統 AnimationClip / 焼き付け sample 配列を保持。InputSystem 連携の `GazeExpressionConfig` はこのクラスを継承し `InputActionReference` だけ追加する形に再構成された (inputsystem 側参照)。
 - `Hidano.FacialControl.Adapters.ScriptableObject.GazeBlendShapeSampleEntry` (旧 inputsystem 側から移管) — Look clip の time=0 サンプル結果 1 件 (`blendShapeName` / `weight`)。
 - `Hidano.FacialControl.Adapters.Bone.GazeBonePoseProvider` (旧 inputsystem 側から移管) — `GazeBindingConfig` を毎フレーム評価して左右目ボーンに `localRotation` を直接書込む目線ボーン専用 provider。入力方式に依存しない。
@@ -85,6 +91,9 @@
 
 ### Changed
 
+- `OverlayInputSource` は expressionId 参照ではなく、現在 Expression 内の slot binding と `FacialProfile.DefaultOverlays` から overlay snapshot を解決する方式に変更。通常フレームの追加 GC を発生させない事前解決構造を維持する。
+- `FacialCharacterProfileExporter` は default overlays と Expression overlays の `AnimationClip` を time=0 でサンプリングし、`cachedSnapshot` / JSON の `snapshot` として出力する。`suppress=true` または default fallback の場合は overlay snapshot を空扱いにする。
+- MultiSourceBlendDemo の sample JSON / SO asset を新 overlay schema へ移行し、旧 `blink_overlay` expressionId 参照は `smile` / `smile_closed_eye` の slot overlay snapshot または suppress として inline 化した。
 - `Adapters.Json.Dto.AnalogBindingEntryDto` に `scale: float` / `direction: string` を追加。旧スキーマ JSON は欠落フィールドを default 値 (`scale=1`, `direction="bipolar"`) で fallback する。
 - `Adapters.Json.AnalogInputBindingJsonLoader` で scale / direction の parse / serialize を追加。不正 direction 文字列は warning + Bipolar 扱い。
 - 表情遷移時間のデフォルト値を `0.25 秒` から `1/15 秒 (≒0.0667 秒)` に変更。`Domain.Models.Expression.DefaultTransitionDuration` を新設し、`Expression` / `ExpressionSnapshot` / `ExpressionSerializable` / `ExpressionSnapshotDto` / `ExpressionTriggerInputSourceBase.DefaultReleaseTransitionDuration` / `AnimationClipExpressionSampler.DefaultTransitionDuration` / `ARKitDetector` 既定生成 / `SystemTextJsonParser` snapshot 欠落フォールバック / `Templates/default_profile.json` がすべて参照する。preview 段階のため後方互換は持たない。

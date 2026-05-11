@@ -66,12 +66,15 @@ namespace Hidano.FacialControl.Domain.Models
         public ReadOnlyMemory<BlendShapeMapping> BlendShapeValues { get; }
 
         /// <summary>
-        /// Trigger / Analog 入力で重ね合わせる overlay Expression を slot 単位で宣言する。
-        /// 各要素の <see cref="OverlaySlotBinding.ExpressionId"/> が空の場合は当該 slot を明示的に suppress する。
+        /// Trigger / Analog 入力で重ね合わせる overlay の解決状態を slot 単位で宣言する。
+        /// 各要素は <see cref="OverlaySlotBinding.Suppress"/> と
+        /// <see cref="OverlaySlotBinding.Snapshot"/> の組み合わせで default fallback /
+        /// 明示 suppress / 個別 snapshot override の 3 状態を表す。
         /// </summary>
         /// <remarks>
-        /// 解決経路 (<c>OverlayInputSource</c>) は本フィールドを優先し、未宣言 slot のみ
-        /// <see cref="FacialProfile.DefaultOverlays"/> に fallback する。
+        /// 解決経路 (<c>OverlayInputSource</c>) は本フィールドを優先し、
+        /// 該当 slot が未宣言、または binding が default fallback の場合に
+        /// <see cref="FacialProfile.DefaultOverlays"/> へ fallback する。
         /// </remarks>
         public ReadOnlyMemory<OverlaySlotBinding> Overlays { get; }
 
@@ -188,11 +191,11 @@ namespace Hidano.FacialControl.Domain.Models
         }
 
         /// <summary>
-        /// 指定 slot の <see cref="OverlaySlotBinding"/> を検索する。
+        /// 指定 slot の overlay 解決状態を表す <see cref="OverlaySlotBinding"/> を検索する。
         /// </summary>
         /// <param name="slot">検索対象 slot 名。null / 空文字なら false。</param>
         /// <param name="binding">見つかった binding。見つからなければ default。</param>
-        /// <returns>当該 slot を宣言していれば true（suppress を含む）、未宣言なら false。</returns>
+        /// <returns>当該 slot の binding を宣言していれば true（suppress / snapshot / default fallback を含む）、未宣言なら false。</returns>
         public bool TryGetOverlay(string slot, out OverlaySlotBinding binding)
         {
             binding = default;

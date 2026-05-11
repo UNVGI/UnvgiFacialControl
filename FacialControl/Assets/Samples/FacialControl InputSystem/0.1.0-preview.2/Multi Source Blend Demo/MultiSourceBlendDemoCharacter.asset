@@ -59,6 +59,16 @@ MonoBehaviour:
       bones: []
       rendererPaths:
       - Body
+    overlays:
+    - slot: blink
+      suppress: 0
+      animationClip: {fileID: 0}
+      cachedSnapshot:
+        transitionDuration: 0.25
+        transitionCurvePreset: Linear
+        blendShapes: []
+        bones: []
+        rendererPaths: []
   - id: anger
     name: Anger
     layer: emotion
@@ -131,27 +141,6 @@ MonoBehaviour:
       bones: []
       rendererPaths:
       - Body
-  - id: blink_overlay
-    name: BlinkOverlay
-    layer: emotion
-    isGaze: 0
-    animationClip: {fileID: 0}
-    transitionDuration: 0.05
-    transitionCurve:
-      type: 0
-      keys: []
-    blendShapeValues: []
-    layerOverrideMask: []
-    cachedSnapshot:
-      transitionDuration: 0.05
-      transitionCurvePreset: Linear
-      blendShapes:
-      - rendererPath: Body
-        name: まばたき
-        value: 1.0
-      bones: []
-      rendererPaths:
-      - Body
   - id: smile_closed_eye
     name: SmileClosedEye
     layer: emotion
@@ -181,7 +170,14 @@ MonoBehaviour:
       - Body
     overlays:
     - slot: blink
-      expressionId:
+      suppress: 1
+      animationClip: {fileID: 0}
+      cachedSnapshot:
+        transitionDuration: 0.25
+        transitionCurvePreset: Linear
+        blendShapes: []
+        bones: []
+        rendererPaths: []
   - id: eye_look
     name: 目線
     layer: emotion
@@ -223,9 +219,88 @@ MonoBehaviour:
     lookRightSamples: []
     lookUpSamples: []
     lookDownSamples: []
+  _slots:
+  - blink
   _defaultOverlays:
   - slot: blink
-    expressionId: blink_overlay
+    suppress: 0
+    animationClip: {fileID: 0}
+    cachedSnapshot:
+      transitionDuration: 0.05
+      transitionCurvePreset: Linear
+      blendShapes:
+      - rendererPath: Body
+        name: Looking Up
+        value: 0.0
+      - rendererPath: Body
+        name: Looking Down
+        value: 0.0
+      - rendererPath: Body
+        name: まばたき
+        value: 1.0
+      - rendererPath: Body
+        name: 笑い
+        value: 0.0
+      - rendererPath: Body
+        name: なごみ
+        value: 0.0
+      - rendererPath: Body
+        name: じと目
+        value: 0.0
+      - rendererPath: Body
+        name: はぅ
+        value: 0.0
+      - rendererPath: Body
+        name: びっくり
+        value: 0.0
+      - rendererPath: Body
+        name: ｷﾘｯ
+        value: 0.0
+      - rendererPath: Body
+        name: グルグル
+        value: 0.0
+      - rendererPath: Body
+        name: 星目
+        value: 0.0
+      - rendererPath: Body
+        name: はちゅ目
+        value: 0.0
+      - rendererPath: Body
+        name: はちゅ目縦潰れ
+        value: 0.0
+      - rendererPath: Body
+        name: はちゅ目横潰れ
+        value: 0.0
+      - rendererPath: Body
+        name: はぁと
+        value: 0.0
+      - rendererPath: Body
+        name: 瞳小
+        value: 0.0
+      - rendererPath: Body
+        name: 瞳縦潰れ
+        value: 0.0
+      - rendererPath: Body
+        name: 光小
+        value: 0.0
+      - rendererPath: Body
+        name: ウィンク
+        value: 0.0
+      - rendererPath: Body
+        name: ウィンク右
+        value: 0.0
+      - rendererPath: Body
+        name: ウィンク２
+        value: 100.0
+      - rendererPath: Body
+        name: ｳｨﾝｸ２右
+        value: 100.0
+      - rendererPath: Body
+        name: 下
+        value: 30.0
+      bones: []
+      rendererPaths:
+      - Body
   _adapterBindings:
   - rid: 8000000000000000001
   _referenceModel: {fileID: 0}

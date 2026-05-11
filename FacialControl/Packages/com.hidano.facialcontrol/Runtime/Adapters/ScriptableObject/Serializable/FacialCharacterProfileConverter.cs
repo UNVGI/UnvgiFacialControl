@@ -4,6 +4,7 @@ using Hidano.FacialControl.Adapters.Json;
 using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Domain.Models;
+using UnityEngine;
 
 namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 {
@@ -20,7 +21,13 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             IReadOnlyList<ExpressionSerializable> expressions,
             IReadOnlyList<string> rendererPaths)
         {
-            return ToFacialProfile(schemaVersion, layers, expressions, rendererPaths, defaultOverlays: null);
+            return ToFacialProfile(
+                schemaVersion,
+                layers,
+                expressions,
+                rendererPaths,
+                defaultOverlays: null,
+                slots: null);
         }
 
         public static FacialProfile ToFacialProfile(
@@ -30,6 +37,23 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             IReadOnlyList<string> rendererPaths,
             IReadOnlyList<OverlaySlotBindingSerializable> defaultOverlays)
         {
+            return ToFacialProfile(
+                schemaVersion,
+                layers,
+                expressions,
+                rendererPaths,
+                defaultOverlays,
+                slots: null);
+        }
+
+        public static FacialProfile ToFacialProfile(
+            string schemaVersion,
+            IReadOnlyList<LayerDefinitionSerializable> layers,
+            IReadOnlyList<ExpressionSerializable> expressions,
+            IReadOnlyList<string> rendererPaths,
+            IReadOnlyList<OverlaySlotBindingSerializable> defaultOverlays,
+            IReadOnlyList<string> slots)
+        {
             string version = string.IsNullOrWhiteSpace(schemaVersion)
                 ? SystemTextJsonParser.SchemaVersionV2
                 : schemaVersion;
@@ -38,7 +62,64 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             var expressionArr = ConvertExpressions(expressions, layers);
             var rendererArr = ConvertStrings(rendererPaths);
             var defaultOverlayArr = ConvertOverlays(defaultOverlays);
-            return new FacialProfile(version, layerArr, expressionArr, rendererArr, inputSourceArr, defaultOverlayArr);
+            var slotArr = ConvertStrings(slots);
+            return new FacialProfile(
+                schemaVersion: version,
+                layers: layerArr,
+                expressions: expressionArr,
+                rendererPaths: rendererArr,
+                layerInputSources: inputSourceArr,
+                defaultOverlays: defaultOverlayArr,
+                slots: slotArr);
+        }
+
+        public static ProfileSnapshotDto ToProfileSnapshotDto(FacialProfile profile)
+        {
+            var dto = new ProfileSnapshotDto
+            {
+                schemaVersion = string.IsNullOrEmpty(profile.SchemaVersion)
+                    ? SystemTextJsonParser.SchemaVersionV2
+                    : profile.SchemaVersion,
+                slots = new List<string>(),
+                layers = new List<LayerDefinitionDto>(),
+                expressions = new List<ExpressionDto>(),
+                rendererPaths = new List<string>(),
+                gazeConfigs = new List<GazeBindingConfigDto>(),
+                defaultOverlays = BuildOverlaySlotBindingDtoList(profile.DefaultOverlays.Span),
+            };
+
+            var slotsSpan = profile.Slots.Span;
+            for (int i = 0; i < slotsSpan.Length; i++)
+            {
+                dto.slots.Add(slotsSpan[i] ?? string.Empty);
+            }
+
+            var rendererPathSpan = profile.RendererPaths.Span;
+            for (int i = 0; i < rendererPathSpan.Length; i++)
+            {
+                dto.rendererPaths.Add(rendererPathSpan[i] ?? string.Empty);
+            }
+
+            var layerSpan = profile.Layers.Span;
+            var inputSourcesSpan = profile.LayerInputSources.Span;
+            for (int i = 0; i < layerSpan.Length; i++)
+            {
+                dto.layers.Add(new LayerDefinitionDto
+                {
+                    name = layerSpan[i].Name,
+                    priority = layerSpan[i].Priority,
+                    exclusionMode = SerializeExclusionMode(layerSpan[i].ExclusionMode),
+                    inputSources = BuildInputSourceDtoList(i < inputSourcesSpan.Length ? inputSourcesSpan[i] : null),
+                });
+            }
+
+            var expressionSpan = profile.Expressions.Span;
+            for (int i = 0; i < expressionSpan.Length; i++)
+            {
+                dto.expressions.Add(BuildExpressionDto(expressionSpan[i]));
+            }
+
+            return dto;
         }
 
         /// <summary>
@@ -207,7 +288,17 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             {
                 var s = source[i];
                 if (s == null || string.IsNullOrWhiteSpace(s.slot)) continue;
-                list.Add(new OverlaySlotBinding(s.slot, s.expressionId));
+
+                if (s.suppress)
+                {
+                    list.Add(new OverlaySlotBinding(s.slot, suppress: true, snapshot: null));
+                    continue;
+                }
+
+                ExpressionSnapshot? snapshot = IsSnapshotEmpty(s.cachedSnapshot)
+                    ? (ExpressionSnapshot?)null
+                    : ConvertExpressionSnapshot(s.cachedSnapshot, s.slot);
+                list.Add(new OverlaySlotBinding(s.slot, suppress: false, snapshot: snapshot));
             }
             return list.Count == 0 ? null : list.ToArray();
         }
@@ -238,6 +329,240 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
                 result.Add(new BlendShapeMapping(src.name, src.value, renderer));
             }
             return result.ToArray();
+        }
+
+        private static ExpressionSnapshot ConvertExpressionSnapshot(ExpressionSnapshotDto dto, string fallbackId)
+        {
+            return new ExpressionSnapshot(
+                fallbackId ?? string.Empty,
+                dto != null ? dto.transitionDuration : Expression.DefaultTransitionDuration,
+                ConvertSnapshotTransitionCurvePreset(dto != null ? dto.transitionCurvePreset : null),
+                ConvertBlendShapeSnapshots(dto != null ? dto.blendShapes : null),
+                ConvertBoneSnapshots(dto != null ? dto.bones : null),
+                ConvertSnapshotRendererPaths(dto != null ? dto.rendererPaths : null));
+        }
+
+        private static BlendShapeSnapshot[] ConvertBlendShapeSnapshots(IReadOnlyList<BlendShapeSnapshotDto> snapshots)
+        {
+            if (snapshots == null || snapshots.Count == 0) return Array.Empty<BlendShapeSnapshot>();
+            var result = new List<BlendShapeSnapshot>(snapshots.Count);
+            for (int i = 0; i < snapshots.Count; i++)
+            {
+                var src = snapshots[i];
+                if (src == null || string.IsNullOrEmpty(src.name)) continue;
+                result.Add(new BlendShapeSnapshot(src.rendererPath, src.name, src.value));
+            }
+            return result.Count == 0 ? Array.Empty<BlendShapeSnapshot>() : result.ToArray();
+        }
+
+        private static BoneSnapshot[] ConvertBoneSnapshots(IReadOnlyList<BoneSnapshotDto> snapshots)
+        {
+            if (snapshots == null || snapshots.Count == 0) return Array.Empty<BoneSnapshot>();
+            var result = new List<BoneSnapshot>(snapshots.Count);
+            for (int i = 0; i < snapshots.Count; i++)
+            {
+                var src = snapshots[i];
+                if (src == null || string.IsNullOrEmpty(src.bonePath)) continue;
+                result.Add(new BoneSnapshot(
+                    src.bonePath,
+                    src.position.x,
+                    src.position.y,
+                    src.position.z,
+                    src.rotationEuler.x,
+                    src.rotationEuler.y,
+                    src.rotationEuler.z,
+                    src.scale.x,
+                    src.scale.y,
+                    src.scale.z));
+            }
+            return result.Count == 0 ? Array.Empty<BoneSnapshot>() : result.ToArray();
+        }
+
+        private static string[] ConvertSnapshotRendererPaths(IReadOnlyList<string> rendererPaths)
+        {
+            if (rendererPaths == null || rendererPaths.Count == 0) return Array.Empty<string>();
+            var result = new string[rendererPaths.Count];
+            for (int i = 0; i < rendererPaths.Count; i++)
+            {
+                result[i] = rendererPaths[i] ?? string.Empty;
+            }
+            return result;
+        }
+
+        private static bool IsSnapshotEmpty(ExpressionSnapshotDto snapshot)
+        {
+            return snapshot == null
+                || ((snapshot.blendShapes == null || snapshot.blendShapes.Count == 0)
+                    && (snapshot.bones == null || snapshot.bones.Count == 0));
+        }
+
+        private static TransitionCurvePreset ConvertSnapshotTransitionCurvePreset(string preset)
+        {
+            if (string.IsNullOrEmpty(preset))
+                return TransitionCurvePreset.Linear;
+
+            return preset.Trim() switch
+            {
+                "Linear" => TransitionCurvePreset.Linear,
+                "EaseIn" => TransitionCurvePreset.EaseIn,
+                "EaseOut" => TransitionCurvePreset.EaseOut,
+                "EaseInOut" => TransitionCurvePreset.EaseInOut,
+                _ => TransitionCurvePreset.Linear,
+            };
+        }
+
+        private static ExpressionDto BuildExpressionDto(Expression expression)
+        {
+            var dto = new ExpressionDto
+            {
+                id = expression.Id,
+                name = expression.Name,
+                layer = expression.Layer,
+                layerOverrideMask = new List<string>(),
+                snapshot = new ExpressionSnapshotDto
+                {
+                    transitionDuration = expression.TransitionDuration,
+                    transitionCurvePreset = SerializeTransitionCurvePreset(expression.TransitionCurve),
+                    blendShapes = new List<BlendShapeSnapshotDto>(),
+                    bones = new List<BoneSnapshotDto>(),
+                    rendererPaths = new List<string>(),
+                    overlays = BuildOverlaySlotBindingDtoList(expression.Overlays.Span),
+                },
+            };
+
+            var blendShapeSpan = expression.BlendShapeValues.Span;
+            for (int i = 0; i < blendShapeSpan.Length; i++)
+            {
+                dto.snapshot.blendShapes.Add(new BlendShapeSnapshotDto
+                {
+                    rendererPath = blendShapeSpan[i].Renderer ?? string.Empty,
+                    name = blendShapeSpan[i].Name,
+                    value = blendShapeSpan[i].Value,
+                });
+            }
+
+            return dto;
+        }
+
+        private static List<OverlaySlotBindingDto> BuildOverlaySlotBindingDtoList(
+            ReadOnlySpan<OverlaySlotBinding> bindings)
+        {
+            var list = new List<OverlaySlotBindingDto>(bindings.Length);
+            for (int i = 0; i < bindings.Length; i++)
+            {
+                list.Add(new OverlaySlotBindingDto
+                {
+                    slot = bindings[i].Slot,
+                    suppress = bindings[i].Suppress,
+                    snapshot = bindings[i].Snapshot.HasValue
+                        ? BuildExpressionSnapshotDto(bindings[i].Snapshot.Value)
+                        : null,
+                });
+            }
+            return list;
+        }
+
+        private static ExpressionSnapshotDto BuildExpressionSnapshotDto(ExpressionSnapshot snapshot)
+        {
+            var dto = new ExpressionSnapshotDto
+            {
+                transitionDuration = snapshot.TransitionDuration,
+                transitionCurvePreset = SerializeTransitionCurvePreset(snapshot.TransitionCurvePreset),
+                blendShapes = new List<BlendShapeSnapshotDto>(),
+                bones = new List<BoneSnapshotDto>(),
+                rendererPaths = new List<string>(),
+                overlays = new List<OverlaySlotBindingDto>(),
+            };
+
+            var blendShapeSpan = snapshot.BlendShapes.Span;
+            for (int i = 0; i < blendShapeSpan.Length; i++)
+            {
+                dto.blendShapes.Add(new BlendShapeSnapshotDto
+                {
+                    rendererPath = blendShapeSpan[i].RendererPath ?? string.Empty,
+                    name = blendShapeSpan[i].Name ?? string.Empty,
+                    value = blendShapeSpan[i].Value,
+                });
+            }
+
+            var boneSpan = snapshot.Bones.Span;
+            for (int i = 0; i < boneSpan.Length; i++)
+            {
+                var src = boneSpan[i];
+                dto.bones.Add(new BoneSnapshotDto
+                {
+                    bonePath = src.BonePath ?? string.Empty,
+                    position = new Vector3(src.PositionX, src.PositionY, src.PositionZ),
+                    rotationEuler = new Vector3(src.EulerX, src.EulerY, src.EulerZ),
+                    scale = new Vector3(src.ScaleX, src.ScaleY, src.ScaleZ),
+                });
+            }
+
+            var rendererPathSpan = snapshot.RendererPaths.Span;
+            for (int i = 0; i < rendererPathSpan.Length; i++)
+            {
+                dto.rendererPaths.Add(rendererPathSpan[i] ?? string.Empty);
+            }
+
+            return dto;
+        }
+
+        private static List<InputSourceDto> BuildInputSourceDtoList(InputSourceDeclaration[] declarations)
+        {
+            if (declarations != null && declarations.Length > 0)
+            {
+                var list = new List<InputSourceDto>(declarations.Length);
+                for (int i = 0; i < declarations.Length; i++)
+                {
+                    var declaration = declarations[i];
+                    list.Add(new InputSourceDto
+                    {
+                        id = declaration.Id,
+                        weight = declaration.Weight,
+                        optionsJson = string.IsNullOrEmpty(declaration.OptionsJson) ? null : declaration.OptionsJson,
+                    });
+                }
+                return list;
+            }
+
+            return new List<InputSourceDto>
+            {
+                new InputSourceDto { id = "input", weight = 1.0f },
+            };
+        }
+
+        private static string SerializeExclusionMode(ExclusionMode mode)
+        {
+            return mode switch
+            {
+                ExclusionMode.LastWins => "lastWins",
+                ExclusionMode.Blend => "blend",
+                _ => "lastWins",
+            };
+        }
+
+        private static string SerializeTransitionCurvePreset(TransitionCurve curve)
+        {
+            return curve.Type switch
+            {
+                TransitionCurveType.Linear => "Linear",
+                TransitionCurveType.EaseIn => "EaseIn",
+                TransitionCurveType.EaseOut => "EaseOut",
+                TransitionCurveType.EaseInOut => "EaseInOut",
+                _ => "Linear",
+            };
+        }
+
+        private static string SerializeTransitionCurvePreset(TransitionCurvePreset preset)
+        {
+            return preset switch
+            {
+                TransitionCurvePreset.Linear => "Linear",
+                TransitionCurvePreset.EaseIn => "EaseIn",
+                TransitionCurvePreset.EaseOut => "EaseOut",
+                TransitionCurvePreset.EaseInOut => "EaseInOut",
+                _ => "Linear",
+            };
         }
 
         private static TransitionCurve ConvertTransitionCurve(TransitionCurveSerializable curve)

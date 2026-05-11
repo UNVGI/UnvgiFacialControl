@@ -27,6 +27,12 @@ namespace Hidano.FacialControl.Domain.Models
         public ReadOnlyMemory<Expression> Expressions { get; }
 
         /// <summary>
+        /// Overlay slot 識別子の宣言配列。
+        /// Adapter Bindings の overlaySlot / Expression.Overlays / DefaultOverlays が参照する権威ソース。
+        /// </summary>
+        public ReadOnlyMemory<string> Slots { get; }
+
+        /// <summary>
         /// SkinnedMeshRenderer のヒエラルキーパス配列（モデルルートからの相対パス）
         /// </summary>
         public ReadOnlyMemory<string> RendererPaths { get; }
@@ -39,8 +45,10 @@ namespace Hidano.FacialControl.Domain.Models
         public ReadOnlyMemory<InputSourceDeclaration[]> LayerInputSources { get; }
 
         /// <summary>
-        /// active 表情に slot 宣言が無い場合の fallback 用 default overlay。
-        /// 各要素の <see cref="OverlaySlotBinding.ExpressionId"/> が空なら当該 slot は default でも no-op となる。
+        /// active 表情側で該当 slot が未宣言、または default fallback を宣言している場合に参照される default overlay。
+        /// 各要素は <see cref="OverlaySlotBinding.Suppress"/> と
+        /// <see cref="OverlaySlotBinding.Snapshot"/> の組み合わせで default fallback /
+        /// 明示 suppress / 個別 snapshot override の 3 状態を表す。
         /// </summary>
         public ReadOnlyMemory<OverlaySlotBinding> DefaultOverlays { get; }
 
@@ -55,13 +63,16 @@ namespace Hidano.FacialControl.Domain.Models
         /// レイヤー毎の <c>inputSources</c> 宣言（外側インデックスは <paramref name="layers"/> と揃える想定）。
         /// null の場合は空配列。round-trip 用の担体として Parser が設定する。
         /// </param>
+        /// <param name="defaultOverlays">default overlay の配列。null の場合は空配列。</param>
+        /// <param name="slots">overlay slot 識別子の宣言配列。null の場合は空配列。</param>
         public FacialProfile(
             string schemaVersion,
             LayerDefinition[] layers = null,
             Expression[] expressions = null,
             string[] rendererPaths = null,
             InputSourceDeclaration[][] layerInputSources = null,
-            OverlaySlotBinding[] defaultOverlays = null)
+            OverlaySlotBinding[] defaultOverlays = null,
+            string[] slots = null)
         {
             if (schemaVersion == null)
                 throw new ArgumentNullException(nameof(schemaVersion));
@@ -91,6 +102,17 @@ namespace Hidano.FacialControl.Domain.Models
             else
             {
                 Expressions = Array.Empty<Expression>();
+            }
+
+            if (slots != null)
+            {
+                var slotCopy = new string[slots.Length];
+                Array.Copy(slots, slotCopy, slots.Length);
+                Slots = slotCopy;
+            }
+            else
+            {
+                Slots = Array.Empty<string>();
             }
 
             if (rendererPaths != null)
@@ -141,11 +163,12 @@ namespace Hidano.FacialControl.Domain.Models
         }
 
         /// <summary>
-        /// 指定 slot の <see cref="OverlaySlotBinding"/> を <see cref="DefaultOverlays"/> から検索する。
+        /// 指定 slot の fallback 用 overlay 解決状態を表す <see cref="OverlaySlotBinding"/> を
+        /// <see cref="DefaultOverlays"/> から検索する。
         /// </summary>
         /// <param name="slot">検索対象 slot 名。</param>
         /// <param name="binding">見つかった binding。見つからなければ default。</param>
-        /// <returns>当該 slot の default が宣言されていれば true（suppress を含む）。</returns>
+        /// <returns>当該 slot の fallback binding が宣言されていれば true（suppress / snapshot / default fallback を含む）。</returns>
         public bool TryGetDefaultOverlay(string slot, out OverlaySlotBinding binding)
         {
             binding = default;
@@ -164,6 +187,54 @@ namespace Hidano.FacialControl.Domain.Models
                 }
             }
             return false;
+        }
+
+        /// <summary>
+        /// Slots 宣言の重複と overlay binding からの未宣言 slot 参照を検証する。
+        /// </summary>
+        /// <returns>検出した不正 slot 参照のリスト。問題がない場合は空リスト。</returns>
+        public IReadOnlyList<InvalidSlotReference> ValidateSlotReferences()
+        {
+            var invalidRefs = new List<InvalidSlotReference>();
+            var slotSpan = Slots.Span;
+
+            for (int i = 0; i < slotSpan.Length; i++)
+            {
+                for (int j = i + 1; j < slotSpan.Length; j++)
+                {
+                    if (string.Equals(slotSpan[i], slotSpan[j], StringComparison.Ordinal))
+                    {
+                        invalidRefs.Add(new InvalidSlotReference(
+                            slotSpan[i],
+                            InvalidSlotReference.DuplicateReason));
+                        break;
+                    }
+                }
+            }
+
+            var defaultOverlaySpan = DefaultOverlays.Span;
+            for (int i = 0; i < defaultOverlaySpan.Length; i++)
+            {
+                AddUndeclaredSlotIfNeeded(
+                    invalidRefs,
+                    slotSpan,
+                    defaultOverlaySpan[i].Slot);
+            }
+
+            var exprSpan = Expressions.Span;
+            for (int i = 0; i < exprSpan.Length; i++)
+            {
+                var overlaySpan = exprSpan[i].Overlays.Span;
+                for (int j = 0; j < overlaySpan.Length; j++)
+                {
+                    AddUndeclaredSlotIfNeeded(
+                        invalidRefs,
+                        slotSpan,
+                        overlaySpan[j].Slot);
+                }
+            }
+
+            return invalidRefs;
         }
 
         /// <summary>
@@ -285,6 +356,34 @@ namespace Hidano.FacialControl.Domain.Models
             }
 
             return null;
+        }
+
+        private static void AddUndeclaredSlotIfNeeded(
+            List<InvalidSlotReference> invalidRefs,
+            ReadOnlySpan<string> declaredSlots,
+            string slot)
+        {
+            if (ContainsSlot(declaredSlots, slot))
+            {
+                return;
+            }
+
+            invalidRefs.Add(new InvalidSlotReference(
+                slot,
+                InvalidSlotReference.UndeclaredReason));
+        }
+
+        private static bool ContainsSlot(ReadOnlySpan<string> declaredSlots, string slot)
+        {
+            for (int i = 0; i < declaredSlots.Length; i++)
+            {
+                if (string.Equals(declaredSlots[i], slot, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }
