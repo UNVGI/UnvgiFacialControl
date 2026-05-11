@@ -331,3 +331,65 @@
   - 観測可能な完了条件: CHANGELOG / README が新スキーマを反映し、EditMode + PlayMode テスト結果がすべて Green になること (Req 8.5, 11.9, 11.10)
   - _Requirements: 8.4, 8.5, 11.9, 11.10_
   - _Boundary: Documentation, Test Validation_
+
+## Phase 9: Inspector UI 表情ライブラリ昇格と Default Overlays 簡素化（spec 違反修正）
+
+> 既存 Inspector 実装が Req 6.2 / 6.3 / 6.5 の Acceptance Criteria を満たしていないことが事後判明したため、追加で対応する。新規要件追加ではなく既存要件への適合作業（T44〜T48）。
+>
+> 違反内容:
+> - Req 6.3 違反: 表情ライブラリタブが Slots 宣言 + Default Overlays の 2 セクション構成で、Expression リストが欠落している。Expression は依然として `BuildLayersSection` 内でレイヤーカードに埋め込まれたまま。
+> - Req 6.2 違反: レイヤータブと表情ライブラリタブが Expression リストを完全に分離できていない。
+> - Req 6.5 違反: Default Overlays セクションに 3 状態ラジオ (`Default / Suppress / Override`) が混入。spec は「slot プルダウン + AnimationClip フィールドのみ」を要求している。意味論的にも DefaultOverlays では「Default fallback」と「Suppress」が同じ runtime 結果（overlay 出力なし）になり redundant。
+
+- [ ] 9. Inspector UI を Req 6.2 / 6.3 / 6.5 に適合させる
+
+- [ ] 9.1 (T44) 表情ライブラリタブに Expression リストセクションを新設する
+  - `Editor/Inspector/FacialCharacterProfileSOInspector.cs:204-211` の `CreateInspectorGUI` 内で、表情ライブラリタブの `BuildDefaultOverlaysSection` 呼び出しの直後に `BuildExpressionLibrarySection(expressionLibraryTab.contentContainer)` を追加する
+  - `BuildExpressionLibrarySection(VisualElement root)` を新規実装し、全 Expression を所属レイヤーに依らずフラットに列挙する単一リストとして構築する
+  - 各 row は既存の `BuildExpressionRow(int exprIndex)` を流用するが、Layer プルダウン (`ExpressionRowLayerDropdownName`) を必ず表示する（Req 6.6）。`_layerNameChoices` を choices として動的生成する
+  - 新規 Expression 追加ボタンを Section 末尾に配置し、デフォルト所属レイヤーは `emotion`（未定義の場合は最初のレイヤー）にフォールバックする
+  - `_layersProperty` を `TrackPropertyValue` で監視し、レイヤー追加/削除/リネーム時に全 row の Layer プルダウン choices を即時更新する
+  - 観測可能な完了条件: SO Inspector の表情ライブラリタブを開いたとき、Slots 宣言 / Default Overlays / Expression リストの 3 セクションが順に表示され、Expression リストには全レイヤーの Expression が混在表示されること (Req 6.3)
+  - _Requirements: 6.3, 6.6_
+  - _Boundary: Editor.Inspector_
+
+- [ ] 9.2 (T45) レイヤータブから Expression リスト構築を撤去する
+  - `Editor/Inspector/FacialCharacterProfileSOInspector.cs:1533-1535` 周辺の `BuildLayersSection` 内で、各レイヤーカードに対する `RebuildExpressionRowsForLayer(expressionsContainer, layerName)` 呼び出しを削除する
+  - レイヤーカードはレイヤー定義 (name / priority / exclusionMode / inputSources) の編集 UI のみを保持する
+  - `RebuildExpressionRowsForLayer` メソッド自体は 9.1 の `BuildExpressionLibrarySection` から間接的に利用される可能性がないなら削除、利用するなら refactor して shared helper 化する
+  - 観測可能な完了条件: SO Inspector のレイヤータブを開いたとき、各レイヤーカード内に Expression row が一切表示されず、レイヤー定義のみが表示されること (Req 6.2)
+  - _Requirements: 6.2_
+  - _Boundary: Editor.Inspector_
+
+- [ ] 9.3 (T46) Default Overlays セクションから 3 状態ラジオを撤去する
+  - `Editor/Inspector/FacialCharacterProfileSOInspector.cs:706-713` の `OverlayStateRadioButtonGroup` 生成と関連ハンドラ (`:739-746` の `radio.OnValueAssigned`) を削除する
+  - AnimationClip フィールド (`DefaultOverlayAnimationClipFieldName`) を常時 visible にする（`style.display = DisplayStyle.None` 制御を撤去）
+  - データモデル側のセマンティクスを以下に固定する:
+    - `AnimationClip != null` → `serializable.suppress = false` を強制、Exporter が `cachedSnapshot` をサンプリング結果で埋める（Override 相当）
+    - `AnimationClip == null` → `serializable.suppress = false` を強制、`cachedSnapshot` を空相当にクリア（Default fallback 相当 = overlay 出力なし）
+  - `DefaultOverlayStateRadioName` 定数および `ApplyDefaultOverlayState` メソッドが Inspector 内の他箇所から参照されていないことを確認し、孤立したら削除する
+  - 既存の `_defaultOverlays[i].suppress = true` を持つ .asset/JSON は Exporter 再実行で `suppress = false` に正規化されるが、preview.2 段階のため破壊的変更として許容する
+  - 観測可能な完了条件: SO Inspector の Default Overlays セクションが slot プルダウン + AnimationClip フィールドの 2 要素のみで構成され、3 状態ラジオが UI に存在しないこと (Req 6.5)
+  - _Requirements: 6.5_
+  - _Boundary: Editor.Inspector_
+
+- [ ] 9.4 (T47) Inspector UI テストを 9.1 〜 9.3 の構造変更に合わせて更新する
+  - `Tests/EditMode/Editor/Inspector/OverlaysTabUITests.cs`（6.1 で追加）を以下の観点で拡張する:
+    - (i) 表情ライブラリタブ内に Expression リストセクションが存在し、全レイヤーの Expression が含まれること（Req 6.3）
+    - (ii) Expression row の Layer プルダウンを操作すると `_expressions[i].layer` SerializedProperty が更新されること（Req 6.6）
+    - (iii) レイヤータブを開いたとき、各レイヤーカード内に Expression row 相当の VisualElement (`ExpressionRowNameFieldName` 等) が存在しないこと（Req 6.2）
+    - (iv) Default Overlays セクションの row に `RadioButtonGroup` が存在せず、`ObjectField<AnimationClip>` のみが存在すること（Req 6.5）
+    - (v) Default Overlays の AnimationClip フィールドを null から非 null へ変更したとき `_defaultOverlays[i].suppress` が `false` 維持されること
+  - 既存の Default Overlays 3 状態切替テスト（6.1 で書いた `DefaultOverlayStateRadio` 系）は 9.3 と矛盾するので削除する
+  - 観測可能な完了条件: テストランナー (`-batchmode -nographics -testPlatform EditMode`) で `OverlaysTabUITests` が全件 Green になり、9.1 〜 9.3 の構造変更が回帰検出できること (Req 11.8)
+  - _Requirements: 6.2, 6.3, 6.5, 6.6, 11.8_
+  - _Boundary: Tests/EditMode/Editor/Inspector_
+
+- [ ] 9.5 (T48) Sample データの DefaultOverlays 正規化と Sample 起動回帰確認
+  - `Assets/Samples/FacialControl InputSystem/0.1.0-preview.2/Multi Source Blend Demo/MultiSourceBlendDemoCharacter.asset` の `_defaultOverlays[]` を確認し、`suppress` フィールドが全エントリで `false` であることを確認する（9.3 のセマンティクス変更で `suppress = true` は意味を持たなくなる）
+  - `Assets/StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/profile.json` および `Packages/com.hidano.facialcontrol.inputsystem/Samples~/MultiSourceBlendDemo/StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/profile.json` の `defaultOverlays[].suppress` も同様に `false` で統一されていることを確認する
+  - 7.1 の `SampleAssetsAreInSyncTests` を再実行し、dev 側と Samples~ 側が drift していないことを確認する
+  - Unity Editor で `MultiSourceBlendDemo` Scene を再生し、(i) smile 表示中に blink overlay が乗る、(ii) smile_closed_eye 表示中に blink overlay が抑制される、(iii) Inspector の表情ライブラリタブで全 Expression がフラットに表示される、(iv) Inspector のレイヤータブで Expression リストが表示されない、を目視確認する
+  - 観測可能な完了条件: Sample 再生時の overlay 挙動が Phase 7 完了時点と同等で、`SampleAssetsAreInSyncTests` が Green、Inspector の表示が Req 6.2 / 6.3 / 6.5 に適合していること (Req 7.5, 7.6)
+  - _Requirements: 7.5, 7.6_
+  - _Boundary: Sample.Validation_
