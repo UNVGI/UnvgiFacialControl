@@ -54,9 +54,10 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         public const string SlotsDeclarationFoldoutName = "facial-character-slots-declaration-foldout";
         public const string DefaultOverlaysFoldoutName = "facial-character-default-overlays-foldout";
+        public const string ExpressionLibraryFoldoutName = "facial-character-expression-library-foldout";
+        public const string ExpressionLibraryAddButtonName = "facial-character-expression-library-add-button";
         public const string ExpressionOverlaysSectionName = "expression-row-overlays-section";
         public const string DefaultOverlaySlotDropdownName = "default-overlay-slot-dropdown";
-        public const string DefaultOverlayStateRadioName = "default-overlay-state-radio";
         public const string DefaultOverlayAnimationClipFieldName = "default-overlay-animation-clip-field";
         public const string DefaultOverlayUndeclaredSlotHelpName = "default-overlay-undeclared-slot-help";
         public const string ExpressionOverlayStateRadioName = "expression-overlay-state-radio";
@@ -149,9 +150,11 @@ namespace Hidano.FacialControl.Editor.Inspector
         private HelpBox _expressionsValidationHelp;
         private Label _saveStatusLabel;
         private VisualElement _layersContainer;
+        private VisualElement _expressionLibraryContainer;
         private VisualElement _gazeConfigsContainer;
         private Tab _gazeTab;
         private readonly List<DropdownField> _slotDropdowns = new List<DropdownField>();
+        private readonly List<ExpressionLayerDropdownField> _expressionLayerDropdowns = new List<ExpressionLayerDropdownField>();
 
         // ====================================================================
         // 候補リスト
@@ -204,6 +207,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             var expressionLibraryTab = new Tab("表情ライブラリ") { name = TabExpressionLibraryName };
             BuildSlotsDeclarationSection(expressionLibraryTab.contentContainer);
             BuildDefaultOverlaysSection(expressionLibraryTab.contentContainer);
+            BuildExpressionLibrarySection(expressionLibraryTab.contentContainer);
             tabView.Add(expressionLibraryTab);
 
             var layersTab = new Tab("レイヤー") { name = TabLayersName };
@@ -241,6 +245,10 @@ namespace Hidano.FacialControl.Editor.Inspector
             if (_slotsProperty != null)
             {
                 root.TrackPropertyValue(_slotsProperty, _ => OnSlotsPropertyChanged());
+            }
+            if (_layersProperty != null)
+            {
+                root.TrackPropertyValue(_layersProperty, _ => OnLayersPropertyChanged());
             }
 
 #if UNITY_EDITOR
@@ -660,12 +668,13 @@ namespace Hidano.FacialControl.Editor.Inspector
                 return;
             }
 
+            NormalizeDefaultOverlayBinding(overlayIndex);
+
             var bindingProp = _defaultOverlaysProperty.GetArrayElementAtIndex(overlayIndex);
             var slotProp = bindingProp.FindPropertyRelative("slot");
             var clipProp = bindingProp.FindPropertyRelative("animationClip");
 
             string currentSlot = slotProp != null ? slotProp.stringValue ?? string.Empty : string.Empty;
-            var state = ReadDefaultOverlayBindingState(overlayIndex, bindingProp);
             bool declared = IsDeclaredSlot(currentSlot);
 
             if (!declared)
@@ -703,47 +712,24 @@ namespace Hidano.FacialControl.Editor.Inspector
             });
             row.Add(slotDropdown);
 
-            var radio = new OverlayStateRadioButtonGroup
-            {
-                name = DefaultOverlayStateRadioName,
-                choices = new List<string> { "Default", "Suppress", "Override" },
-            };
-            radio.SetValueWithoutNotify(ToRadioIndex(state));
-            radio.style.minWidth = 240;
-            row.Add(radio);
-
-            var clipField = new ObjectField("AnimationClip")
+            var clipField = new OverlayAnimationClipObjectField("AnimationClip")
             {
                 name = DefaultOverlayAnimationClipFieldName,
                 objectType = typeof(AnimationClip),
                 allowSceneObjects = false,
             };
             clipField.style.flexGrow = 1f;
-            clipField.style.display = state == OverlaySlotBindingState.Override
-                ? DisplayStyle.Flex
-                : DisplayStyle.None;
+            clipField.style.display = DisplayStyle.Flex;
             if (clipProp != null)
             {
                 clipField.SetValueWithoutNotify(clipProp.objectReferenceValue);
-                clipField.RegisterValueChangedCallback(evt =>
-                {
-                    ApplyDefaultOverlayClip(overlayIndex, evt.newValue as AnimationClip);
-                });
+                clipField.OnValueAssigned = clip => ApplyDefaultOverlayClip(overlayIndex, clip);
             }
             else
             {
                 clipField.SetEnabled(false);
             }
             row.Add(clipField);
-
-            radio.OnValueAssigned = value =>
-            {
-                var newState = FromRadioIndex(value);
-                ApplyDefaultOverlayState(overlayIndex, newState, clipField);
-                clipField.style.display = newState == OverlaySlotBindingState.Override
-                    ? DisplayStyle.Flex
-                    : DisplayStyle.None;
-            };
         }
 
         private void InitializeDefaultOverlayRow(int overlayIndex)
@@ -762,51 +748,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             EditorUtility.SetDirty(target);
         }
 
-        private OverlaySlotBindingState ReadDefaultOverlayBindingState(
-            int overlayIndex,
-            SerializedProperty bindingProp)
-        {
-            var binding = GetDefaultOverlayBinding(overlayIndex);
-            if (binding != null)
-            {
-                return binding.GetState();
-            }
-
-            return ReadOverlayBindingState(bindingProp);
-        }
-
-        private void ApplyDefaultOverlayState(
-            int overlayIndex,
-            OverlaySlotBindingState state,
-            ObjectField clipField)
-        {
-            var binding = EnsureDefaultOverlayBinding(overlayIndex);
-            if (binding == null) return;
-
-            Undo.RecordObject(target, "Change Default Overlay State");
-            switch (state)
-            {
-                case OverlaySlotBindingState.Suppress:
-                    binding.suppress = true;
-                    binding.animationClip = null;
-                    binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
-                    if (clipField != null) clipField.SetValueWithoutNotify(null);
-                    break;
-                case OverlaySlotBindingState.Override:
-                    binding.suppress = false;
-                    break;
-                default:
-                    binding.suppress = false;
-                    binding.animationClip = null;
-                    binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
-                    if (clipField != null) clipField.SetValueWithoutNotify(null);
-                    break;
-            }
-
-            EditorUtility.SetDirty(target);
-            serializedObject.Update();
-        }
-
         private void ApplyDefaultOverlayClip(int overlayIndex, AnimationClip clip)
         {
             var binding = EnsureDefaultOverlayBinding(overlayIndex);
@@ -822,6 +763,26 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             EditorUtility.SetDirty(target);
             serializedObject.Update();
+        }
+
+        private void NormalizeDefaultOverlayBinding(int overlayIndex)
+        {
+            var binding = EnsureDefaultOverlayBinding(overlayIndex);
+            if (binding == null) return;
+
+            bool changed = binding.suppress;
+            binding.suppress = false;
+            if (binding.animationClip == null && !BaseExpressionSerializable.IsSnapshotEmpty(binding.cachedSnapshot))
+            {
+                binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                changed = true;
+            }
+
+            if (changed)
+            {
+                EditorUtility.SetDirty(target);
+                serializedObject.Update();
+            }
         }
 
         private OverlaySlotBindingSerializable GetDefaultOverlayBinding(int overlayIndex)
@@ -844,6 +805,76 @@ namespace Hidano.FacialControl.Editor.Inspector
             }
 
             return profileSO.DefaultOverlays[overlayIndex];
+        }
+
+        private void BuildExpressionLibrarySection(VisualElement root)
+        {
+            var foldout = MakeSectionFoldout(ExpressionLibraryFoldoutName, "Expression List", open: true);
+
+            if (_expressionsProperty == null)
+            {
+                foldout.Add(MakeHelpBox("_expressions storage was not found.", HelpBoxMessageType.Warning));
+                root.Add(foldout);
+                return;
+            }
+
+            _expressionLibraryContainer = new VisualElement();
+            _expressionLibraryContainer.style.flexDirection = FlexDirection.Column;
+            foldout.Add(_expressionLibraryContainer);
+
+            RebuildExpressionLibraryUI();
+
+            var addExpressionButton = new Button(() =>
+            {
+                AddExpressionForLayer(ResolveDefaultExpressionLayer(), isGaze: false);
+            })
+            {
+                name = ExpressionLibraryAddButtonName,
+                text = "+ Expression",
+            };
+            addExpressionButton.style.alignSelf = Align.FlexStart;
+            addExpressionButton.style.marginTop = 4;
+            foldout.Add(addExpressionButton);
+
+            root.Add(foldout);
+        }
+
+        private void RebuildExpressionLibraryUI()
+        {
+            if (_expressionLibraryContainer == null) return;
+
+            _expressionLibraryContainer.Clear();
+            if (_expressionsProperty == null) return;
+
+            serializedObject.Update();
+            if (_expressionsProperty.arraySize == 0)
+            {
+                var empty = new Label("No Expressions.");
+                empty.style.color = new StyleColor(new Color(0.55f, 0.55f, 0.55f));
+                _expressionLibraryContainer.Add(empty);
+                return;
+            }
+
+            for (int i = 0; i < _expressionsProperty.arraySize; i++)
+            {
+                _expressionLibraryContainer.Add(BuildExpressionRow(i));
+            }
+        }
+
+        private string ResolveDefaultExpressionLayer()
+        {
+            const string preferredLayer = "emotion";
+
+            RefreshLayerNameChoices();
+            for (int i = 0; i < _layerNameChoices.Count; i++)
+            {
+                if (string.Equals(_layerNameChoices[i], preferredLayer, StringComparison.Ordinal))
+                {
+                    return preferredLayer;
+                }
+            }
+
+            return _layerNameChoices.Count > 0 ? _layerNameChoices[0] : string.Empty;
         }
 
         // ====================================================================
@@ -1318,9 +1349,9 @@ namespace Hidano.FacialControl.Editor.Inspector
                 _gazeConfigsContainer.Query<Button>(GazeConfigAutoAssignButtonName).ForEach(
                     button => button.SetEnabled(hasReferenceModel));
             }
-            if (_layersContainer != null)
+            if (_expressionLibraryContainer != null)
             {
-                _layersContainer.Query<Button>(ExpressionRowGazeAutoAssignButtonName).ForEach(
+                _expressionLibraryContainer.Query<Button>(ExpressionRowGazeAutoAssignButtonName).ForEach(
                     button => button.SetEnabled(hasReferenceModel));
             }
         }
@@ -1411,6 +1442,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             serializedObject.ApplyModifiedProperties();
             RefreshLayerNameChoices();
             RebuildLayersUI();
+            RebuildExpressionLibraryUI();
             RebuildGazeConfigsUI();
             UpdateValidation();
         }
@@ -1473,6 +1505,7 @@ namespace Hidano.FacialControl.Editor.Inspector
                     // レイヤー名は他レイヤーの「上書き対象」候補にも影響するため全体を再構築する
                     RefreshLayerNameChoices();
                     RebuildLayersUI();
+                    RefreshAllExpressionLayerDropdownChoices();
                 });
                 card.Add(nameField);
             }
@@ -1523,34 +1556,6 @@ namespace Hidano.FacialControl.Editor.Inspector
                 inputSourcesField.Bind(serializedObject);
                 card.Add(inputSourcesField);
             }
-
-            // 表情リスト
-            var expressionHeader = new Label("表情");
-            expressionHeader.style.unityFontStyleAndWeight = FontStyle.Normal;
-            expressionHeader.style.marginTop = 8;
-            card.Add(expressionHeader);
-
-            var expressionsContainer = new VisualElement { name = $"layer-expressions-{layerIndex}" };
-            card.Add(expressionsContainer);
-            RebuildExpressionRowsForLayer(expressionsContainer, layerName);
-
-            var expressionAddRow = new VisualElement();
-            expressionAddRow.style.flexDirection = FlexDirection.Row;
-            expressionAddRow.style.marginTop = 4;
-
-            var addExpressionButton = new Button(() => AddExpressionForLayer(layerName, isGaze: false))
-            {
-                text = "+ 表情を追加",
-            };
-            expressionAddRow.Add(addExpressionButton);
-
-            var addGazeButton = new Button(() => AddExpressionForLayer(layerName, isGaze: true))
-            {
-                text = "+ 目線操作の表情を追加",
-            };
-            expressionAddRow.Add(addGazeButton);
-
-            card.Add(expressionAddRow);
 
             // レイヤー削除
             var removeLayerButton = new Button(() => RemoveLayer(layerIndex))
@@ -1643,6 +1648,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             RefreshLayerNameChoices();
             RebuildLayersUI();
+            RebuildExpressionLibraryUI();
             RebuildGazeConfigsUI();
             UpdateValidation();
         }
@@ -1668,6 +1674,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             serializedObject.ApplyModifiedProperties();
 
             RebuildLayersUI();
+            RebuildExpressionLibraryUI();
             RebuildGazeConfigsUI();
             RebuildExpressionIdMapping();
             UpdateValidation();
@@ -1692,26 +1699,9 @@ namespace Hidano.FacialControl.Editor.Inspector
             ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
 
             RebuildLayersUI();
+            RebuildExpressionLibraryUI();
             RebuildExpressionIdMapping();
             UpdateValidation();
-        }
-
-        private void RebuildExpressionRowsForLayer(VisualElement container, string layerName)
-        {
-            container.Clear();
-            if (_expressionsProperty == null) return;
-
-            for (int i = 0; i < _expressionsProperty.arraySize; i++)
-            {
-                int exprIndex = i;
-                var exprProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
-                var lp = exprProp.FindPropertyRelative("layer");
-                if (lp == null) continue;
-                if (!string.Equals(lp.stringValue, layerName, StringComparison.Ordinal)) continue;
-
-                var row = BuildExpressionRow(exprIndex);
-                container.Add(row);
-            }
         }
 
         // ====================================================================
@@ -1790,10 +1780,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             if (layerProp != null)
             {
                 string currentLayer = layerProp.stringValue ?? string.Empty;
-                var layerChoices = BuildLayerDropdownChoices(currentLayer);
-                layerDropdown.choices = layerChoices;
-                layerDropdown.SetValueWithoutNotify(currentLayer);
-                layerDropdown.SetEnabled(layerChoices.Count > 0);
+                RegisterExpressionLayerDropdown(layerDropdown, currentLayer);
                 layerDropdown.OnValueAssigned = value =>
                 {
                     ChangeExpressionLayer(exprIndex, value ?? string.Empty);
@@ -2193,6 +2180,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
 
             RebuildLayersUI();
+            RebuildExpressionLibraryUI();
             RebuildGazeConfigsUI();
             RebuildExpressionIdMapping();
             UpdateValidation();
@@ -2229,6 +2217,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
             RebuildLayersUI();
+            RebuildExpressionLibraryUI();
             RebuildGazeConfigsUI();
             RebuildExpressionIdMapping();
             UpdateValidation();
@@ -2311,6 +2300,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
 
             RebuildLayersUI();
+            RebuildExpressionLibraryUI();
             RebuildGazeConfigsUI();
             RebuildExpressionIdMapping();
             UpdateValidation();
@@ -2762,7 +2752,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             }
 
             // 各行 validation
-            if (_layersContainer != null)
+            if (_expressionLibraryContainer != null)
             {
                 UpdateAllRowValidations();
             }
@@ -2770,29 +2760,13 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         private void UpdateAllRowValidations()
         {
-            for (int i = 0; i < _layersProperty.arraySize; i++)
+            if (_expressionLibraryContainer == null || _expressionsProperty == null) return;
+
+            for (int i = 0; i < _expressionsProperty.arraySize; i++)
             {
-                var lp = _layersProperty.GetArrayElementAtIndex(i);
-                var nameP = lp.FindPropertyRelative("name");
-                if (nameP == null) continue;
-                var layerName = nameP.stringValue ?? string.Empty;
-
-                var container = _layersContainer.Q<VisualElement>($"layer-expressions-{i}");
-                if (container == null) continue;
-
-                int rowIdx = 0;
-                for (int j = 0; j < _expressionsProperty.arraySize; j++)
+                if (i < _expressionLibraryContainer.childCount)
                 {
-                    var ep = _expressionsProperty.GetArrayElementAtIndex(j);
-                    var lP = ep.FindPropertyRelative("layer");
-                    if (lP == null) continue;
-                    if (!string.Equals(lP.stringValue, layerName, StringComparison.Ordinal)) continue;
-
-                    if (rowIdx < container.childCount)
-                    {
-                        UpdateRowValidation(container[rowIdx], j);
-                    }
-                    rowIdx++;
+                    UpdateRowValidation(_expressionLibraryContainer[i], i);
                 }
             }
         }
@@ -3098,6 +3072,45 @@ namespace Hidano.FacialControl.Editor.Inspector
             return choices;
         }
 
+        private void OnLayersPropertyChanged()
+        {
+            RefreshLayerNameChoices();
+            RefreshAllExpressionLayerDropdownChoices();
+        }
+
+        private void RegisterExpressionLayerDropdown(ExpressionLayerDropdownField dropdown, string currentValue)
+        {
+            if (dropdown == null) return;
+            ApplyExpressionLayerDropdownChoices(dropdown, currentValue);
+            if (!_expressionLayerDropdowns.Contains(dropdown))
+            {
+                _expressionLayerDropdowns.Add(dropdown);
+            }
+        }
+
+        private void RefreshAllExpressionLayerDropdownChoices()
+        {
+            for (int i = _expressionLayerDropdowns.Count - 1; i >= 0; i--)
+            {
+                var dropdown = _expressionLayerDropdowns[i];
+                if (dropdown == null || dropdown.parent == null)
+                {
+                    _expressionLayerDropdowns.RemoveAt(i);
+                    continue;
+                }
+
+                ApplyExpressionLayerDropdownChoices(dropdown, dropdown.value);
+            }
+        }
+
+        private void ApplyExpressionLayerDropdownChoices(ExpressionLayerDropdownField dropdown, string currentValue)
+        {
+            var choices = BuildLayerDropdownChoices(currentValue);
+            dropdown.choices = choices;
+            dropdown.SetValueWithoutNotify(currentValue ?? string.Empty);
+            dropdown.SetEnabled(choices.Count > 0);
+        }
+
         private void OnSlotsPropertyChanged()
         {
             RefreshSlotNameChoices();
@@ -3356,6 +3369,30 @@ namespace Hidano.FacialControl.Editor.Inspector
                 {
                     base.value = value;
                     OnValueAssigned?.Invoke(value);
+                }
+            }
+        }
+
+        private sealed class OverlayAnimationClipObjectField : ObjectField
+        {
+            public Action<AnimationClip> OnValueAssigned;
+
+            public OverlayAnimationClipObjectField(string label)
+                : base(label)
+            {
+            }
+
+            public override UnityEngine.Object value
+            {
+                get => base.value;
+                set
+                {
+                    var previous = base.value;
+                    base.value = value;
+                    if (!ReferenceEquals(previous, value))
+                    {
+                        OnValueAssigned?.Invoke(value as AnimationClip);
+                    }
                 }
             }
         }

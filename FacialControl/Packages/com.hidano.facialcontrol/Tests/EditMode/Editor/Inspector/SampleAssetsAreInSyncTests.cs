@@ -79,6 +79,21 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         }
 
         [Test]
+        public void ProfileJson_DefaultOverlaysSuppress_IsFalseInAllSampleCopies()
+        {
+            AssertDefaultOverlaysSuppressFalseInProfile(DevStreamingProfilePath, required: true);
+            AssertDefaultOverlaysSuppressFalseInProfile(PackageSampleProfilePath, required: true);
+            AssertDefaultOverlaysSuppressFalseInProfile(ImportedSampleStreamingProfilePath, required: true);
+        }
+
+        [Test]
+        public void MultiSourceBlendDemoCharacterAsset_DefaultOverlaysSuppress_IsFalseInAllSampleCopies()
+        {
+            AssertDefaultOverlaysSuppressFalseInAsset(ImportedSampleAssetPath, required: true);
+            AssertDefaultOverlaysSuppressFalseInAsset(PackageSampleAssetPath, required: false);
+        }
+
+        [Test]
         public void ProfileJson_ImportedSampleStreamingAssets_AreByteIdenticalToDev()
         {
             // dev `Assets/StreamingAssets/...` と Sample import 配下の同名 profile.json は
@@ -129,6 +144,95 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             // Sample 起動時に blink overlay が見た目に乗らない (Req 7.6 違反)。
             AssertMabatakiNonZeroInDefaultOverlays(ImportedSampleAssetPath, required: true);
             AssertMabatakiNonZeroInDefaultOverlays(PackageSampleAssetPath, required: false);
+        }
+
+        private static void AssertDefaultOverlaysSuppressFalseInProfile(string relativePath, bool required)
+        {
+            string path = ResolveProjectPath(relativePath);
+            if (!File.Exists(path))
+            {
+                if (required)
+                {
+                    Assert.Fail($"Required sample profile is missing: {relativePath}");
+                }
+
+                return;
+            }
+
+            string text = NormalizeLineEndings(File.ReadAllText(path, Encoding.UTF8));
+            string section = ExtractJsonArraySection(text, "\"defaultOverlays\"", relativePath);
+            int suppressCount = 0;
+
+            using (var reader = new StringReader(section))
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    string trimmed = line.Trim();
+                    if (!trimmed.StartsWith("\"suppress\"", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    suppressCount++;
+                    Assert.That(
+                        trimmed,
+                        Does.Contain("false"),
+                        $"{relativePath}: defaultOverlays suppress must be false, but found '{trimmed}'.");
+                    Assert.That(
+                        trimmed,
+                        Does.Not.Contain("true"),
+                        $"{relativePath}: defaultOverlays suppress must not be true.");
+                }
+            }
+
+            Assert.That(
+                suppressCount,
+                Is.GreaterThan(0),
+                $"{relativePath}: defaultOverlays section does not contain a suppress field.");
+        }
+
+        private static void AssertDefaultOverlaysSuppressFalseInAsset(string relativePath, bool required)
+        {
+            string path = ResolveProjectPath(relativePath);
+            if (!File.Exists(path))
+            {
+                if (required)
+                {
+                    Assert.Fail($"Required sample asset is missing: {relativePath}");
+                }
+
+                return;
+            }
+
+            string text = NormalizeLineEndings(File.ReadAllText(path, Encoding.UTF8));
+            string section = ExtractDefaultOverlaysSection(text, relativePath);
+            int suppressCount = 0;
+
+            using (var reader = new StringReader(section))
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    string trimmed = line.Trim();
+                    if (!trimmed.StartsWith("suppress:", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    suppressCount++;
+                    string value = trimmed.Substring("suppress:".Length).Trim();
+                    Assert.That(
+                        value,
+                        Is.EqualTo("0").Or.EqualTo("false"),
+                        $"{relativePath}: _defaultOverlays suppress must be false/0, but found '{value}'.");
+                }
+            }
+
+            Assert.That(
+                suppressCount,
+                Is.GreaterThan(0),
+                $"{relativePath}: _defaultOverlays section does not contain a suppress field.");
         }
 
         private static void AssertMabatakiNonZeroInDefaultOverlays(string relativePath, bool required)
@@ -189,6 +293,85 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
                 value,
                 Is.Not.EqualTo(0f),
                 $"{relativePath}: 'まばたき' value in _defaultOverlays cachedSnapshot is 0 — preview.2 移行で旧 blink_overlay の '{nameof(value)}=1.0' が転写されず blink overlay が機能しません (Req 7.6 違反)。");
+        }
+
+        private static string ExtractDefaultOverlaysSection(string text, string relativePath)
+        {
+            int defaultOverlaysIdx = text.IndexOf("\n  _defaultOverlays:\n", StringComparison.Ordinal);
+            Assert.That(
+                defaultOverlaysIdx,
+                Is.GreaterThanOrEqualTo(0),
+                $"{relativePath}: '_defaultOverlays' section not found in asset YAML.");
+
+            int sectionStart = defaultOverlaysIdx;
+            int sectionEnd = text.IndexOf("\n  _adapterBindings:", sectionStart, StringComparison.Ordinal);
+            if (sectionEnd < 0)
+            {
+                sectionEnd = text.Length;
+            }
+
+            return text.Substring(sectionStart, sectionEnd - sectionStart);
+        }
+
+        private static string ExtractJsonArraySection(string json, string propertyName, string relativePath)
+        {
+            int propertyIdx = json.IndexOf(propertyName, StringComparison.Ordinal);
+            Assert.That(
+                propertyIdx,
+                Is.GreaterThanOrEqualTo(0),
+                $"{relativePath}: JSON property {propertyName} was not found.");
+
+            int bracketStart = json.IndexOf('[', propertyIdx);
+            Assert.That(
+                bracketStart,
+                Is.GreaterThanOrEqualTo(0),
+                $"{relativePath}: JSON property {propertyName} does not start an array.");
+
+            int depth = 0;
+            bool inString = false;
+            bool escaped = false;
+
+            for (int i = bracketStart; i < json.Length; i++)
+            {
+                char c = json[i];
+                if (inString)
+                {
+                    if (escaped)
+                    {
+                        escaped = false;
+                    }
+                    else if (c == '\\')
+                    {
+                        escaped = true;
+                    }
+                    else if (c == '"')
+                    {
+                        inString = false;
+                    }
+
+                    continue;
+                }
+
+                if (c == '"')
+                {
+                    inString = true;
+                }
+                else if (c == '[')
+                {
+                    depth++;
+                }
+                else if (c == ']')
+                {
+                    depth--;
+                    if (depth == 0)
+                    {
+                        return json.Substring(bracketStart, i - bracketStart + 1);
+                    }
+                }
+            }
+
+            Assert.Fail($"{relativePath}: JSON property {propertyName} array was not closed.");
+            return string.Empty;
         }
 
         // gaze_configs セクション (`"gaze_configs": [ ... ]` または `"_gazeConfigs": [ ... ]`) を
