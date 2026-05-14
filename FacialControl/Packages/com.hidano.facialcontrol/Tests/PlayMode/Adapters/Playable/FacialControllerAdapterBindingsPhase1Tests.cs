@@ -1,15 +1,18 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.TestTools;
 using Hidano.FacialControl.Adapters.AdapterBindings.InputSystem;
+using Hidano.FacialControl.Adapters.DependencyInjection;
 using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Models;
+using VContainer;
 using GazeBindingConfig = Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig;
 
 namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Playable
@@ -137,6 +140,41 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Playable
             }
         }
 
+        [UnityTest]
+        public IEnumerator LateUpdate_OutputObserverSubscribedViaChildScope_ReceivesPullPublish()
+        {
+            _controllerGameObject = CreateControllerHost();
+            var controller = _controllerGameObject.AddComponent<FacialController>();
+            var so = ScriptableObject.CreateInstance<TestablePhase1ProfileSO>();
+            var binding = new OutputObservingAdapterBinding { Slug = "output-observer" };
+            so.WritableAdapterBindings.Add(binding);
+            so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "unresolved-gaze" });
+
+            try
+            {
+                controller.CharacterSO = so;
+                controller.Initialize();
+
+                Assert.That(controller.IsInitialized, Is.True);
+                Assert.That(binding.CapturedBus, Is.Not.Null);
+
+                var scope = ReadChildLifetimeScope(controller);
+                Assert.That(scope, Is.Not.Null);
+                Assert.That(scope.Container.TryResolve<IFacialOutputBus>(out var resolvedBus), Is.True);
+                Assert.That(resolvedBus, Is.SameAs(binding.CapturedBus));
+
+                yield return null;
+
+                Assert.That(binding.PublishCount, Is.GreaterThanOrEqualTo(1));
+                Assert.That(binding.LastBlendShapeCount, Is.EqualTo(0));
+                Assert.That(binding.LastGazeCount, Is.EqualTo(0));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(so);
+            }
+        }
+
         // ---------------------------------------------------------------
         // Helpers / Mocks
         // ---------------------------------------------------------------
@@ -188,6 +226,15 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Playable
             return field.GetValue(binding);
         }
 
+        private static FacialControllerLifetimeScope ReadChildLifetimeScope(FacialController controller)
+        {
+            FieldInfo field = typeof(FacialController).GetField(
+                "_childLifetimeScope",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            return (FacialControllerLifetimeScope)field.GetValue(controller);
+        }
+
         [Serializable]
         public sealed class TrackingAdapterBinding : AdapterBindingBase
         {
@@ -208,6 +255,36 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters.Playable
             public override void Dispose()
             {
                 DisposeCount++;
+            }
+        }
+
+        [Serializable]
+        private sealed class OutputObservingAdapterBinding : AdapterBindingBase, IFacialOutputObserver
+        {
+            [NonSerialized] public IFacialOutputBus CapturedBus;
+            [NonSerialized] public int PublishCount;
+            [NonSerialized] public int LastBlendShapeCount;
+            [NonSerialized] public int LastGazeCount;
+
+            public override void OnStart(in AdapterBuildContext ctx)
+            {
+                CapturedBus = ctx.FacialOutputBus;
+                CapturedBus.Subscribe(this);
+            }
+
+            public void OnFacialOutputPublished(
+                ReadOnlySpan<float> postBlendValues,
+                ReadOnlySpan<GazeSnapshot> gazeSnapshots)
+            {
+                PublishCount++;
+                LastBlendShapeCount = postBlendValues.Length;
+                LastGazeCount = gazeSnapshots.Length;
+            }
+
+            public override void Dispose()
+            {
+                CapturedBus?.Unsubscribe(this);
+                CapturedBus = null;
             }
         }
     }

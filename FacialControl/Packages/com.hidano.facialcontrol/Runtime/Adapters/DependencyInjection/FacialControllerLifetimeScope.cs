@@ -102,22 +102,8 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
             LifetimeScope childScope = appScope.CreateChild(
                 (Action<IContainerBuilder>)(builder =>
                 {
-                    InputSourceRegistry registry = new InputSourceRegistry();
-                    builder.RegisterInstance<IInputSourceRegistry>(registry);
-                    IFacialOutputBus facialOutputBus = new FacialOutputBus();
-
-                    ITimeProvider timeProvider = appScope.Container.Resolve<ITimeProvider>();
-                    appScope.Container.TryResolve<ILipSyncProvider>(out ILipSyncProvider lipSyncProvider);
-
-                    AdapterBuildContext ctx = new AdapterBuildContext(
-                        capturedProfile,
-                        capturedBlendShapeNames,
-                        registry,
-                        facialOutputBus,
-                        timeProvider,
-                        capturedHostGameObject,
-                        lipSyncProvider,
-                        capturedActiveProvider);
+                    builder.Register<IInputSourceRegistry, InputSourceRegistry>(Lifetime.Scoped);
+                    builder.Register<IFacialOutputBus, FacialOutputBus>(Lifetime.Scoped);
 
                     for (int i = 0; i < capturedBindings.Count; i++)
                     {
@@ -133,7 +119,14 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
 
                         AdapterBindingBase capturedBinding = binding;
                         builder.RegisterEntryPoint<AdapterBindingHost>(
-                            _ => new AdapterBindingHost(capturedBinding, ctx),
+                            resolver => new AdapterBindingHost(
+                                capturedBinding,
+                                CreateAdapterBuildContext(
+                                    resolver,
+                                    capturedProfile,
+                                    capturedBlendShapeNames,
+                                    capturedHostGameObject,
+                                    capturedActiveProvider)),
                             Lifetime.Scoped);
                     }
                 }),
@@ -141,6 +134,29 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
 
             return new FacialControllerLifetimeScope(childScope);
             }
+        }
+
+        private static AdapterBuildContext CreateAdapterBuildContext(
+            IObjectResolver resolver,
+            FacialProfile profile,
+            IReadOnlyList<string> blendShapeNames,
+            GameObject hostGameObject,
+            IActiveExpressionProvider activeExpressionProvider)
+        {
+            IInputSourceRegistry registry = resolver.Resolve<IInputSourceRegistry>();
+            IFacialOutputBus facialOutputBus = resolver.Resolve<IFacialOutputBus>();
+            ITimeProvider timeProvider = resolver.Resolve<ITimeProvider>();
+            resolver.TryResolve<ILipSyncProvider>(out ILipSyncProvider lipSyncProvider);
+
+            return new AdapterBuildContext(
+                profile,
+                blendShapeNames,
+                registry,
+                facialOutputBus,
+                timeProvider,
+                hostGameObject,
+                lipSyncProvider,
+                activeExpressionProvider);
         }
 
         /// <summary>
