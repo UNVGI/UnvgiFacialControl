@@ -279,6 +279,36 @@
 - **Rationale**: シンプル運用（左右共通の Gaze 駆動）が圧倒的多数の想定。「左目 OSC / 右目 ゲームパッド」のような左右混在ユースケースは preview 段階で必須ではないが、捨てるとあとで再度破壊変更が必要になるため flag による段階的有効化で残す。Drawer UX も既定は 1 フィールド入力で完結、必要な時だけ詳細が現れる段階的開示。
 - **Impact**: design.md の `GazeBindingConfig` セクション全面書き換え、`Cross-binding Slug Convention` セクション新設、Component Summary 更新。requirements.md Req 6.3 / 7 / 12 / 13 を整合修正。InputSystem 側仕様も同調。
 
+### D7: Gaze_ARKit_8BS mode は `leftRightIndependent` フラグに関わらず常に左右別 publish（2026-05-15 第 3 回レビュー）
+- **Context**: D6 (CI3) で「`leftRightIndependent = false` は 1 source として publish」と決めたが、ARKit 8 BS は本質的に左右両方の値を含むため、`false` で 1 source 化すると左右非対称 Gaze（寄り目、片目流し目）情報がサイレントに破棄される問題が第 3 回レビューで検出。
+- **Options**:
+  - E1. mode 別挙動: ARKit_8BS は `false` でも常に `.left` / `.right` 2 keys で publish（採用）
+  - E2. 全 mode 統一で左目代表値（情報損失あり）
+  - E3. 全 mode 統一で左右平均値（中心寄りバイアス）
+- **Decision**: E1 を採用。`Gaze_VRChat_XY` mode は VRChat 規格自体が左右共通 Vector2 なので `false` で 1 source publish が自然だが、`Gaze_ARKit_8BS` mode は 8 BS が左右両方の情報を含むため `leftRightIndependent` フラグの値に関わらず常に左右別の 2 keys で register する。
+- **Rationale**: 「自動マッチで両目駆動」のシンプル運用と「左右非対称 Gaze の忠実再現」が両立する。E2 / E3 は情報損失があり「ARKit 形式の左右独立性」という規格自体の存在意義を毀損する。
+- **Impact**: design.md OscAdapterBinding Implementation Notes（Registry register ロジック）を mode 別表に書き換え。requirements.md Req 12.5 を mode × flag のマトリクス形式に修正。Req 8.5 E2E テストに「ARKit × false 既定でも左右非対称が再現される」ケースを追加。
+
+### D8: 自動マッチで複数 binding が同 expressionId を提供時の決定性ルール（2026-05-15 第 3 回レビュー）
+- **Context**: D6 で「`useDistinctLeftRight = false` 既定時は `expressionId` 自動マッチ」と決めたが、複数 binding が同じ `expressionId` を提供した場合の「先頭採用」の「先頭」が register 順 / SerializeReference 順 / dispatch 順 のどれか未確定で deterministic 性が崩れる問題が検出。
+- **Options**:
+  - F1. SerializeReference 配列順（Inspector 並び順）
+  - F2. `binding.Slug` の Ordinal lexicographic 昇順（採用）
+  - F3. 多重 binding 提供を起動時エラーで拒否
+- **Decision**: F2 を採用。複数 binding が同じ `expressionId` を提供した場合は `binding.Slug` の Ordinal lexicographic 昇順で先頭採用 + 警告ログ。シーン構成 / 起動順 / Inspector 並び替えに依存せず deterministic。
+- **Rationale**: F1 は Inspector 操作に依存し並び替えで意図せず優先順位が変わる隠れバグの温床。F3 は厳しすぎ、preview.3 以降で考えうる冗長構成（複数 sender 受信）に対応不能。F2 は slug 名でユーザー側が制御可能（slug 名を変えれば優先順位が変わる）かつ deterministic でテスト再現性が高い。
+- **Impact**: design.md Cross-binding Slug Convention に「Ordinal lexicographic 昇順」のルールを追記。requirements.md Req 13.2 に同条件を明記。Req 8.5 E2E テストに「OSC + InputSystem 同 expressionId 衝突」ケースを追加。
+
+### D9: Phase 順序入れ替え（Phase 7 を Phase 2 より前に実施）（2026-05-15 第 3 回レビュー）
+- **Context**: 旧設計では Phase 2 (OscAdapterBinding mode 統合、`.left` / `.right` publish 開始) → Phase 7 (GazeBindingConfig 改修、`.left` / `.right` 解決対応) の順だったため、Phase 2 完了時点で OSC 受信側が新規約で publish するが GazeBindingConfig 側が旧構造で解決できない一時的な機能空白が発生する問題が検出。さらに Phase 7 自体が 6 軸（GazeBindingConfig / DTO / Converter / InputSystem / BuildGazeProvider / 既存テスト群）に及び単一 PR では巨大化する。
+- **Options**:
+  - G1. Phase 順序入れ替え（Phase 7 を Phase 2 より前に）（採用）
+  - G2. Phase 7 を 7a / 7b / 7c の 3 PR に分割
+  - G3. Phase 2 + Phase 7 を 1 PR に統合
+- **Decision**: G1 を採用。実施順序を Phase 1 → Phase 7 → Phase 2 → Phase 3 → Phase 4 → Phase 5 → Phase 6 → Phase 8 → Phase 9 に変更。Phase 番号は維持（再番号付けによる外部参照リンク切れを避ける）。Phase 7 内の 3 PR 分割（7a / 7b / 7c）は実装フェーズの判断に委ねる選択肢として保持。
+- **Rationale**: G1 のみで「機能空白回避」と「Phase 7 の粒度問題」の両方を解決できる（Phase 7 内分割は G2 として実装時オプション化）。G3 は PR がさらに巨大化しレビュー負荷が許容範囲を超える。Phase 7 → Phase 2 順により、Phase 7 完了時点で「GazeBindingConfig 側は新構造で待機、OSC 受信側は旧構造（OSC Gaze は一時的に動かないが InputSystem Gaze は動作）」、Phase 2 完了時点で OSC Gaze も即動作する状態へ自然に移行する。
+- **Impact**: design.md Migration Strategy の Mermaid 図と Phase 列挙を `P1 → P7 → P2 → ...` に書き直し。「Phase 7 分割の選択肢」サブセクションを追加。requirements.md Req 10.5 に Phase 実施順序を明記。Req 13.7 に Phase 7 分割時のテスト緑化条件を追記。
+
 ### D3: preview milestone のスコープ分割（uOSC fork を preview.3 送り）
 - **Context**: design.md の Migration Strategy が uOSC fork 3 phase + 本 spec 11 phase の合計 14 phase を一括 preview.2 に積んでおり、当初 preview milestone（2026-02 末）を超過した現状（2026-05-15）でさらに遅延リスクがあった。
 - **Options**:

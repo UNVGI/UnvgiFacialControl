@@ -75,7 +75,7 @@ Gaze Vector2 受信を担う binding（OscAdapterBinding の Gaze 系 mode entry
 | **左右別 2 source**（publisher の `leftRightIndependent = true`） | `(Slug, "{expressionId}.left")` および `(Slug, "{expressionId}.right")` | (a) `useDistinctLeftRight = false` の GazeBindingConfig は `expressionId` 自動マッチで `.left` / `.right` を両方解決 / (b) `useDistinctLeftRight = true` の GazeBindingConfig は `sourceIdLeft` / `sourceIdRight` の完全 slug 文字列で明示 lookup |
 
 - ASCII 接尾辞 `.left` / `.right` は spec 内で予約。ユーザー定義 `expressionId` 内に `.left` / `.right` を含めることは禁止（パース時に警告 + 拒否）。
-- 既定モード（`useDistinctLeftRight = false`）では「`expressionId` 1 個」がユーザー入力の唯一の必須値。複数 binding が同じ `expressionId` を提供する場合は **先頭採用 + 警告ログ**（Req 12 / 13 に反映）。
+- 既定モード（`useDistinctLeftRight = false`）では「`expressionId` 1 個」がユーザー入力の唯一の必須値。複数 binding が同じ `expressionId` を提供する場合は **D8 / CI2 に従い `binding.Slug` の `Ordinal` lexicographic 昇順で先頭採用 + 警告ログ**（deterministic、シーン構成や起動順に依存しない）。例: slug = `"arkit-receiver"` と `"vrchat-receiver"` が同じ `expressionId = "eyeLook"` を提供する場合は `"arkit-receiver"` 配下を採用。
 - 完全 slug の文字列形式は `{binding.Slug}:{sub}` で、`AdapterSlug` 規約（Req 2.8）の文字種に従う。
 
 ## Architecture
@@ -683,9 +683,13 @@ public enum BundleInterpretationMode { AtomicSwap, IndividualMessage }
 - Integration: `OnStart` で `_mappings` を mode 別に分類し、BlendShape entry は OscInputSource / OscDoubleBuffer 経路に、Gaze entry は `GazeVector2InputSource` 経路に振り分け。`OscReceiver.RegisterAnalogListener("/_facialcontrol/sender_id", ...)` と `RegisterAnalogListener("/_facialcontrol/blendshape_names", ...)` を追加（heartbeat は string 配列メッセージとして parse、`research.md` 対応）。
   - **Gaze_VRChat_XY mode**: `{addressPattern}X` / `{addressPattern}Y` の 2 メッセージを 1 つの `GazeVector2InputSource` で集約。
   - **Gaze_ARKit_8BS mode** (D5): `addressPattern` フィールドは無視。`PerfectSyncEyeLook.Names` の固定 8 名（`/ARKit/eyeLookInLeft` 等の ASCII 固定）を listen し `PerfectSyncEyeLook.Decompose` で左右別 Vector2 を構築。
-- Registry register ロジック（D4 / D6 で確定）:
-  - `leftRightIndependent = false`（既定）: 1 つの `GazeVector2InputSource` を `(Slug, expressionId)` 単一キーで register（左右共通 Vector2）。`sourceIdLeft` / `sourceIdRight` は読まない。
-  - `leftRightIndependent = true`: 左目用 / 右目用 2 つの `GazeVector2InputSource` を `(Slug, "{expressionId}.left")` / `(Slug, "{expressionId}.right")` で register。`sourceIdLeft` / `sourceIdRight` は **CI1 の挙動**: いずれか片方でも `string.IsNullOrEmpty` なら entry 全体をスキップ + 警告ログ（両方必須）。
+- Registry register ロジック（D4 / D6 / D7 で確定、mode 別挙動）:
+  - **Normal_BlendShape mode**: 既存 OscInputSource 経路。BlendShape 値を BlendShape index 配列に書き込み、`leftRightIndependent` / `sourceIdLeft` / `sourceIdRight` は無視。
+  - **Gaze_VRChat_XY mode**:
+    - `leftRightIndependent = false`（既定）: 1 つの `GazeVector2InputSource` を `(Slug, expressionId)` 単一キーで register（受信した X/Y Vector2 を 1 source として両目共通駆動）。`sourceIdLeft` / `sourceIdRight` は読まない。
+    - `leftRightIndependent = true`: 左目用 / 右目用 2 つの `GazeVector2InputSource` を `(Slug, "{expressionId}.left")` / `(Slug, "{expressionId}.right")` で register（両 source とも受信 Vector2 と同値を publish。VRChat 規格自体が左右共通の単一 Vector2 なので、true 時の意味は「GazeBindingConfig 側が `.left` / `.right` で lookup する規約に合わせた publish key」のみ。値自体は左右等しい）。
+  - **Gaze_ARKit_8BS mode** (D7 / CI1): `leftRightIndependent` フラグの値に関わらず、**常に `(Slug, "{expressionId}.left")` / `(Slug, "{expressionId}.right")` の 2 keys で左右別の Vector2 を publish**。ARKit 8 BS は本質的に左右非対称情報を含むため、`false` でも代表値選択による情報損失を発生させない。`useDistinctLeftRight = false` の GazeBindingConfig は自動マッチで両 keys を解決し両目別駆動、`useDistinctLeftRight = true` の場合は `sourceIdLeft` / `sourceIdRight` で明示 lookup する。
+  - **両 Gaze mode 共通**: `leftRightIndependent = true` の Gaze entry で `sourceIdLeft` / `sourceIdRight` のいずれか片方でも `string.IsNullOrEmpty` なら entry 全体をスキップ + 警告ログ（D4 / CI1、両方必須）。`false` 時は両 sourceId フィールドを読まないため空でも問題なし。
 - Validation: heartbeat 受信時に `HeartbeatConsistencyChecker` が `_skipMask` を更新。不一致ログは同一不一致セットに対して 1 回のみ出力（hash で重複判定）。
 - Risks:
   - **bundle 終端検出** (R4): `Message.timestamp` を bundle 識別キーに使う設計を採用。`bundleAccumulationTimeoutMs`（既定 5 ms）でフラッシュ。`research.md` の「Bundle Accumulation Timeout」参照。
@@ -932,16 +936,18 @@ Unity 標準ログ（`Debug.Log/Warning/Error/LogException`）のみ使用。カ
 
 ### Scope Partition: preview.2 / preview.3
 
-#### preview.2 必須群（本 spec の機能本体）
-- **Phase 1**: `IFacialOutputBus` / `IFacialOutputObserver` / `GazeSnapshot` / `FacialOutputBus` 新設。`AdapterBuildContext` に `IFacialOutputBus` 追加。`FacialController.LateUpdate` pull 型 Publish フック。
-- **Phase 2**: `OscAdapterBinding` 破壊拡張（`OscMappingEntry` mode 別 entry 統合 + bundle アトミック + フェイルセーフ + ゾンビ排除 + heartbeat 整合性検査）。Gaze Vector2 受信を同 binding 内に統合（旧 `OscGazeReceiverAdapterBinding` 案は廃止）。
-- **Phase 3**: `OscSenderAdapterBinding` 骨格 + 単一 endpoint 送信。
-- **Phase 4**: multi-endpoint + OSC bundle 送信 + heartbeat + 送信元 sender_id。
-- **Phase 5**: アドレスプリセット (VRChat / ARKit) + Gaze 送信（PerfectSync 互換）。
-- **Phase 6**: ループバック抑制ポリシー。
-- **Phase 7**: `GazeBindingConfig` 破壊変更（`sourceIdLeft` / `sourceIdRight` 必須化）+ `InputSystemAdapterBinding` 左右別 actionName + 既存 Gaze テスト一斉改修。**この phase は単独 1 PR**。
-- **Phase 8**: JSON DTO (`OscSenderOptionsDto` / `OscReceiverOptionsDto` / `OscMappingEntryDto`) + Editor Drawer 2 種類 + サンプル (`OscOutputDemo` / `OscReceiverDemo`)。
-- **Phase 9**: E2E / 性能テスト（既存 uOSC 上で GC スパイクは許容、計測のみ）。
+D9 / CI3 で Phase 順序を入れ替え、`GazeBindingConfig` の構造改修（旧 Phase 7）を OscAdapterBinding mode 統合（旧 Phase 2）より **前** に実施する。これにより Phase 2 完了時点で「OSC 受信側は `.left` / `.right` で publish するが GazeBindingConfig 側が解決できない」一時的な機能空白を回避する。再番号付けは行わず、新しい順序を Mermaid と本文で明示する。
+
+#### preview.2 必須群（本 spec の機能本体、新 Phase 順序）
+1. **Phase 1**: `IFacialOutputBus` / `IFacialOutputObserver` / `GazeSnapshot` / `FacialOutputBus` 新設。`AdapterBuildContext` に `IFacialOutputBus` 追加。`FacialController.LateUpdate` pull 型 Publish フック。
+2. **Phase 7**（旧位置から繰り上げ）: `GazeBindingConfig` 破壊変更（`expressionId` 必須化 + `useDistinctLeftRight` flag + 条件付き `sourceIdLeft` / `sourceIdRight`）+ `InputSystemAdapterBinding.ExpressionBindingEntry` 同調 + Cross-binding Slug Convention 実装 + 既存 Gaze テスト一斉改修。InputSystem 側 BuildGazeProvider の左右別 actionName 解決もここで完了する。**この phase は機能空白回避のため Phase 2 より前で実施**。本 phase は範囲が広いため 3 PR に分割する選択肢を保持する（後述「Phase 7 分割の選択肢」参照）が、design.md 上は 1 phase として扱う。
+3. **Phase 2**: `OscAdapterBinding` 破壊拡張（`OscMappingEntry` mode 別 entry 統合 + bundle アトミック + フェイルセーフ + ゾンビ排除 + heartbeat 整合性検査）。Gaze Vector2 受信を同 binding 内に統合（旧 `OscGazeReceiverAdapterBinding` 案は廃止）。`.left` / `.right` publish 規約は Phase 7 で確定済みのため、本 phase 完了時点で OSC Gaze が即動作する。
+4. **Phase 3**: `OscSenderAdapterBinding` 骨格 + 単一 endpoint 送信。
+5. **Phase 4**: multi-endpoint + OSC bundle 送信 + heartbeat + 送信元 sender_id。
+6. **Phase 5**: アドレスプリセット (VRChat / ARKit) + Gaze 送信（PerfectSync 互換）。
+7. **Phase 6**: ループバック抑制ポリシー。
+8. **Phase 8**: JSON DTO (`OscSenderOptionsDto` / `OscReceiverOptionsDto` / `OscMappingEntryDto`) + Editor Drawer 2 種類 + サンプル (`OscOutputDemo` / `OscReceiverDemo`)。
+9. **Phase 9**: E2E / 性能テスト（既存 uOSC 上で GC スパイクは許容、計測のみ）。
 
 #### preview.3 送り群（zero-alloc 化 + facade 整理）
 - **Phase 10**: uOSC vendor copy + fork 化（送信側 zero-alloc → 受信側 zero-alloc）。Req 10.x の zero-alloc 要件達成は本 phase で。
@@ -951,15 +957,15 @@ Unity 標準ログ（`Debug.Log/Warning/Error/LogException`）のみ使用。カ
 flowchart LR
     subgraph preview2[preview.2 milestone]
         P1[Phase 1 FacialOutputBus AdapterBuildContext]
+        P7[Phase 7 GazeBindingConfig + InputSystem - moved earlier]
         P2[Phase 2 OscAdapterBinding mode 統合 Gaze 内包]
         P3[Phase 3 OscSenderAdapterBinding skeleton]
         P4[Phase 4 multi endpoint bundle heartbeat]
         P5[Phase 5 presets and Gaze sender]
         P6[Phase 6 loopback suppression]
-        P7[Phase 7 GazeBindingConfig single PR]
         P8[Phase 8 JSON DTO Drawer samples]
         P9[Phase 9 E2E performance tests]
-        P1 --> P2 --> P3 --> P4 --> P5 --> P6 --> P7 --> P8 --> P9
+        P1 --> P7 --> P2 --> P3 --> P4 --> P5 --> P6 --> P8 --> P9
     end
     subgraph preview3[preview.3 milestone]
         P10[Phase 10 uOSC vendor fork zero alloc]
@@ -969,9 +975,18 @@ flowchart LR
     preview2 --> preview3
 ```
 
+### Phase 7 分割の選択肢
+
+Phase 7 は 6 軸（GazeBindingConfig SerializeField / DTO / Converter / InputSystem 構造 / BuildGazeProvider / 既存テスト群）に及び 1 PR では巨大化するため、必要に応じて以下 3 PR に分割可能とする（実装フェーズの判断に委ねる）:
+- **7a**: `GazeBindingConfig` + `GazeBindingConfigDto` + `FacialCharacterProfileConverter` の構造改修と Round-trip テスト
+- **7b**: `InputSystemAdapterBinding.ExpressionBindingEntry` 同調 + `BuildGazeProvider` 左右別 actionName 解決
+- **7c**: 既存 Gaze テスト群（`FacialCharacterProfileSO_GazeConfigsRoundTripTests` / `FacialCharacterProfileExporter_GazeConfigsTests` / `FacialCharacterProfileSOInspectorGazeConfigsTests` 等）の一斉改修
+
+分割時は 7a → 7b → 7c の順で 1 PR 単位の機能維持を保つ。7a 完了時点で InputSystem 側はビルド可能（旧 API はそのまま）、7b 完了時点で InputSystem の Gaze も新構造で動作、7c で全テストが緑になる。
+
 ### 各 Phase 補足
 - 各 Phase の完了基準は対応 Requirement のテスト緑化。
-- Phase 7 完了時点で `InputSystemAdapterBinding` / SO アセット / 既存 Gaze テストの一斉改修を伴うため、本 phase 単独で 1 PR を切る。
+- Phase 7 → Phase 2 の順序により、Phase 2 中の OscAdapterBinding 改修中に GazeBindingConfig 側は新構造で待機する形を取り、Gaze 機能の一時破綻を回避する。
 - 旧 `OscAdapterBinding` 利用箇所は preview 内のためすべて破棄改修対象、migration ツールは作らない。
 
 ### preview.2 で許容するトレードオフ
