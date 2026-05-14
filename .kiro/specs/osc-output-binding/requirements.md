@@ -131,7 +131,12 @@ FacialControl の OSC 送信機能を AdapterBinding として正式統合する
 #### Acceptance Criteria
 1. The OscSenderOptionsDto shall `OscSenderAdapterBinding` が保持する設定（endpoint 一覧、各 endpoint の IP/port/プリセット/有効フラグ、ループバック抑制ポリシー、BlendShape mapping、Gaze 送信構成、送信元識別子 = 起動時生成 UUID / 起動時刻、BlendShape 名一覧 heartbeat 周期 = 既定 5 秒）を漏れなく表現する `[Serializable]` 型として定義される。
 2. The OscReceiverOptionsDto shall `OscAdapterBinding`（受信側）が保持する設定（listen endpoint、mode 別 `OscMappingEntryDto[]`（BlendShape / Gaze_VRChat_XY / Gaze_ARKit_8BS）、staleness 超過時のフェイルセーフモード = ベース表情復帰 / 値据え置き選択、送信元 ID 検査ポリシー、整合性検査ポリシー = 警告ログ ON/OFF、bundle 解釈モード）を漏れなく表現する `[Serializable]` 型として定義される。
-3. The OscMappingEntryDto shall mode（"blendShape" / "gazeVrchatXy" / "gazeArkit8Bs"）、expressionId、addressPattern、Gaze 用の sourceIdLeft / sourceIdRight / leftRightIndependent フィールドを保持する `[Serializable]` 型として定義され、`OscReceiverOptionsDto.mappings` 配列内に含められる。Gaze Vector2 受信は OscAdapterBinding に統合されたため、別 DTO は設けない。
+3. The OscMappingEntryDto shall mode（"blendShape" / "gazeVrchatXy" / "gazeArkit8Bs"）、expressionId、addressPattern、Gaze 用の sourceIdLeft / sourceIdRight / leftRightIndependent フィールドを保持する `[Serializable]` 型として定義され、`OscReceiverOptionsDto.mappings` 配列内に含められる。各フィールドの mode 別意味論は以下:
+   - **Normal_BlendShape**: `addressPattern` は完全 OSC アドレス。`sourceIdLeft` / `sourceIdRight` / `leftRightIndependent` は無視
+   - **Gaze_VRChat_XY**: `addressPattern` は base アドレス（末尾 X/Y 抜き、内部で `X` / `Y` 末尾付加）
+   - **Gaze_ARKit_8BS**: `addressPattern` は **無視**（`/ARKit/eyeLookInLeft` 等 8 個固定で listen、D5）。DTO で非空の値が来た場合は Info ログ「ignored」+ 既定値扱い
+   - **Gaze 系共通**: `leftRightIndependent` 既定 `false`。`true` 時のみ `sourceIdLeft` / `sourceIdRight` を参照し、いずれかが空文字 / null なら entry 全体スキップ + 警告（D4）
+Gaze Vector2 受信は OscAdapterBinding に統合されたため、別 DTO は設けない。
 4. When 各 DTO が JSON へシリアライズされた時, the JSON 出力 shall human-readable で diff フレンドリーな形式（インデント / 安定キー順）であること。
 5. When 同等内容の JSON が DTO に往復デシリアライズされた時, the round-trip 結果 shall 元の DTO と値レベルで等価である。
 6. If JSON 中に未知のキーが含まれている場合, the DTO デシリアライザ shall 当該キーを無視し、既知キーのみで DTO を構築する。
@@ -149,8 +154,12 @@ FacialControl の OSC 送信機能を AdapterBinding として正式統合する
 3. The OscSenderAdapterBindingDrawer shall ループバック抑制ポリシー（既定: 有効）、BlendShape mapping 名一覧、Gaze 送信対象 `expressionId` 一覧の編集 UI を提供する。送信時のアドレス文字列はプリセットから自動生成されるためインライン編集は不要とする。
 4. The OscSenderAdapterBindingDrawer shall BlendShape 名一覧 heartbeat 周期（秒、既定: 5）と、送信元識別子の表示（読み取り専用: 起動時 UUID、起動時刻）を提供する。
 5. The OscAdapterBindingDrawer（受信側、破壊的変更）shall listen endpoint 編集、`OscMappingEntry[]` の ReorderableList 編集（各 entry は mode selector で BlendShape / Gaze_VRChat_XY / Gaze_ARKit_8BS を切替可能）、staleness 秒数編集、staleness 超過時のフェイルセーフモード切替（**ベース表情復帰** / 値据え置き、既定: ベース表情復帰）、整合性検査の警告ログ ON/OFF、bundle 解釈モードを提供する。
-6. The OscAdapterBindingDrawer shall 各 OscMappingEntry の mode 選択に応じた fold-out UI を提供する。BlendShape 選択時は expressionId + addressPattern のみ、Gaze 系（VRChat_XY / ARKit_8BS）選択時は追加で 左目用 sourceId / 右目用 sourceId / leftRightIndependent トグル（VRChat mode のみ有効）を表示する。Gaze Vector2 受信専用の別 Drawer は設けない。
-7. If 入力された IP / ポート / heartbeat 周期が明らかに不正（空文字 / 範囲外）な場合、または Gaze entry で sourceIdLeft / sourceIdRight 両方が空な場合, the 各 Drawer shall インラインで警告メッセージを表示する。
+6. The OscAdapterBindingDrawer shall 各 OscMappingEntry の mode 選択に応じた fold-out UI を提供する:
+   - **Normal_BlendShape**: expressionId + addressPattern のみ
+   - **Gaze_VRChat_XY**: expressionId + addressPattern（X/Y 末尾抜きの base）+ leftRightIndependent トグル。トグル ON 時のみ sourceIdLeft / sourceIdRight フィールドを表示
+   - **Gaze_ARKit_8BS**: expressionId + leftRightIndependent トグル。トグル ON 時のみ sourceIdLeft / sourceIdRight 表示。**addressPattern フィールドは非表示**（D5 / CI2、固定 8 アドレス listen）
+   - Gaze Vector2 受信専用の別 Drawer は設けない
+7. If 入力された IP / ポート / heartbeat 周期が明らかに不正（空文字 / 範囲外）な場合、または **leftRightIndependent = true の Gaze entry で sourceIdLeft / sourceIdRight のいずれかが空**な場合（D4 / CI1）, the 各 Drawer shall インラインで警告メッセージを表示し、当該 entry を保存時にスキップ対象とマークする。
 8. The 各 Drawer shall Editor 専用 asmdef 配下に実装され、Runtime asmdef へ Editor 参照を漏らさない。
 
 ### Requirement 8: テスト（EditMode 単体 + PlayMode E2E）
@@ -217,26 +226,28 @@ FacialControl の OSC 送信機能を AdapterBinding として正式統合する
 
 #### Acceptance Criteria
 1. The OscAdapterBinding shall `OscMappingEntry.bindingMode` 列挙値 `Gaze_VRChat_XY` および `Gaze_ARKit_8BS` を受け付け、当該 entry の Gaze Vector2 受信を同 binding 内で担当する。Gaze 専用の別 binding（`OscGazeReceiverAdapterBinding` 等）は新設しない。
-2. The OscAdapterBinding shall Gaze 系 mode entry について `expressionId`、`addressPattern`（VRChat mode では `{id}X`/`{id}Y` のベース、ARKit mode では 8 BlendShape のアドレスパターン）、左目用 sourceId、右目用 sourceId、左右独立採用フラグを `OscMappingEntry` の `[Serializable]` フィールドで構成可能にする。
-3. When ARKit 形式の eyeLookXxx 系 8 BlendShape が到着した時, the OscAdapterBinding shall 当該 Gaze_ARKit_8BS entry に対して **左目用 Vector2** `(x_L, y_L) = (eyeLookInLeft - eyeLookOutLeft, eyeLookUpLeft - eyeLookDownLeft)` および **右目用 Vector2** `(x_R, y_R) = (eyeLookOutRight - eyeLookInRight, eyeLookUpRight - eyeLookDownRight)` として逆合成する（符号定義は Design で確定、ここでは規約例として記載）。
-4. When VRChat 形式の `{expressionId}X` / `{expressionId}Y` が到着した時, the OscAdapterBinding shall 当該 Gaze_VRChat_XY entry の Vector2 を組み立て、`leftRightIndependent=false` の場合は左目用 / 右目用 に同一 Vector2 を設定し、`true` の場合は左右別の 2 entry を要求する。
-5. The OscAdapterBinding shall 各 Gaze entry の `expressionId` について **左目用と右目用の 2 つの `IAnalogInputSource`** を `IInputSourceRegistry` に publish（slug は `{binding.Slug}:{expressionId}.left` / `{binding.Slug}:{expressionId}.right` を基本パターンとする）し、`GazeBindingConfig` の入力源解決が左右別に行えるようにする。
-6. The OscMappingEntry の左右独立採用 ON/OFF フラグ shall OFF の場合は VRChat mode entry の単一 Vector2 を左目用 / 右目用 の両方に publish する fallback として機能する。ARKit mode は本質的に左右別の値が届くため、本フラグは Gaze_VRChat_XY mode に対してのみ意味を持つ。
+2. The OscAdapterBinding shall Gaze 系 mode entry について `expressionId`、`addressPattern`（mode 別意味論は Req 6.3 参照）、`leftRightIndependent` フラグ、`sourceIdLeft` / `sourceIdRight`（条件付き必須）を `OscMappingEntry` の `[Serializable]` フィールドで構成可能にする。
+3. When ARKit 形式の eyeLookXxx 系 8 BlendShape が **`/ARKit/eyeLookXxx` の固定 8 アドレス**（D5 / CI2、`addressPattern` は無視）で到着した時, the OscAdapterBinding shall 当該 Gaze_ARKit_8BS entry に対して **左目用 Vector2** `(x_L, y_L) = (eyeLookInLeft - eyeLookOutLeft, eyeLookUpLeft - eyeLookDownLeft)` および **右目用 Vector2** `(x_R, y_R) = (eyeLookOutRight - eyeLookInRight, eyeLookUpRight - eyeLookDownRight)` として逆合成する（符号定義は Design で確定、ここでは規約例として記載）。
+4. When VRChat 形式の `{addressPattern}X` / `{addressPattern}Y` が到着した時, the OscAdapterBinding shall 当該 Gaze_VRChat_XY entry の Vector2 を組み立てる。
+5. The OscAdapterBinding shall 各 Gaze entry を `leftRightIndependent` フラグの値に応じて以下のように `IInputSourceRegistry` に publish する（D6 / Cross-binding Slug Convention）:
+   - `false`（既定）: `(binding.Slug, expressionId)` の単一キーで 1 つの `IAnalogInputSource` を register（VRChat mode は同一 Vector2、ARKit mode は左目 Vector2 を代表値として使用）
+   - `true`: `(binding.Slug, "{expressionId}.left")` / `(binding.Slug, "{expressionId}.right")` の 2 キーで左右別の `IAnalogInputSource` を register
+6. The OscAdapterBinding shall `leftRightIndependent = true` の Gaze entry で `sourceIdLeft` または `sourceIdRight` のいずれかが空文字 / null である場合（D4 / CI1）、entry 全体をスキップし警告ログを Unity 標準で出力する。`leftRightIndependent = false` の場合は `sourceIdLeft` / `sourceIdRight` フィールドを読まないため空でも警告は出さない。
 7. The OscAdapterBinding shall Gaze 系 entry に対して **角度制限を適用しない**。`GazeBindingConfig.outerYawAngle` / `innerYawAngle` / `lookUpAngle` / `lookDownAngle` は `GazeBonePoseProvider`（描画段）が適用する責務とし、本 binding は正規化 Vector2 を素通しする。
 8. The OscAdapterBinding shall Gaze 系 entry の Vector2 を OscDoubleBuffer から読み取るホットパスで GC アロケーションを発生させない。
 9. The OscAdapterBinding shall 自身が staleness 超過 / フェイルセーフ復帰状態にある時、Gaze 系 entry に対しても左右 Vector2 とも `(0, 0)` を publish し、視線がセンターへ自然遷移する（受信側 `GazeBindingConfig` が中央復帰）。binding 内部での状態伝播のため、別 binding 間の依存解決機構（旧設計の cross-binding lookup）は不要。
 
-### Requirement 13: `GazeBindingConfig` の左右別 Vector2 入力対応（破壊的変更、後方互換なし）
-**Objective:** As a Gaze の左右独立駆動を可能にしたいモデル制作者, I want `GazeBindingConfig` が左目用 sourceId と右目用 sourceId を必須で受け取る構造, so that OSC 経由でも InputSystem 経由でも左右非対称な視線を含む完全な視線同期が可能になり、設計が一系統に統一されてバグ余地が減る
+### Requirement 13: `GazeBindingConfig` の左右独立 Vector2 入力対応（破壊的変更、後方互換なし、D6 で D3 設計を採用）
+**Objective:** As a Gaze の左右独立駆動を可能にしたいモデル制作者, I want `GazeBindingConfig` が **既定では expressionId 1 個だけで両目を自動解決**し、左右で異なる入力源を混ぜたい高度ケースでは flag を立てて左右別 sourceId を明示できる構造, so that シンプル運用時のユーザー入力が最小化され、左右独立採用時のみ詳細フィールドが現れて段階的に複雑度を上げられる
 
 #### Acceptance Criteria
-1. The 拡張後 `GazeBindingConfig` shall **左目用 sourceId / 右目用 sourceId の 2 つを必須フィールド**として保持し、単一 sourceId 入力モードは削除する（後方互換なし）。
-2. When 両方の sourceId が解決済みの時, the GazeBonePoseProvider shall 左目ボーンには左目用 Vector2、右目ボーンには右目用 Vector2 を入力としてボーン回転を計算する。
-3. When 片方の sourceId のみが解決された時、または両方とも解決されない時, the GazeBonePoseProvider shall Unity 標準ログで警告を出力し、解決されている方の Vector2 を左右両目の入力に fallback させる（両方未解決の場合はベース姿勢を維持）。
+1. The 拡張後 `GazeBindingConfig` shall 必須フィールドとして `expressionId`（string）を保持し、既存の単一 `sourceId` フィールドは削除する（破壊変更、後方互換なし）。任意フィールドとして `useDistinctLeftRight: bool`（既定 `false`）、および `useDistinctLeftRight = true` 時のみ意味を持つ `sourceIdLeft` / `sourceIdRight` を保持する。
+2. When `useDistinctLeftRight = false`（既定）の時, the GazeBindingConfig 解決経路 shall `expressionId` を `IInputSourceRegistry` のあらゆる binding slug 配下で自動探索し、`{any}:{expressionId}.left` および `{any}:{expressionId}.right` の両方が見つかれば左右別 publish 経路で接続、片方のみ見つかれば fallback で両目に流用、両方無ければ `{any}:{expressionId}` を 1 source として試す（D6 / Cross-binding Slug Convention）。
+3. When `useDistinctLeftRight = true` の時, the GazeBindingConfig 解決経路 shall `sourceIdLeft` / `sourceIdRight` の完全 slug 文字列で `IInputSourceRegistry` を直接 lookup する。片方のみ解決時は警告 + 解決済み側を両目 fallback、両方未解決時はベース姿勢を維持する。
 4. The 拡張後 `GazeBindingConfig` shall 角度制限フィールド（`outerYawAngle` / `innerYawAngle` / `lookUpAngle` / `lookDownAngle`）を **左目 / 右目に対して左右別に適用** する責務を保持する。「向かって左に視線」と「向かって右に視線」で左目・右目それぞれの内側・外側角度が選択される既存ロジック（`GazeBindingConfig.cs` のコメント参照）を本拡張でも維持する。
-5. The 拡張後 `InputSystemAdapterBinding.BuildGazeProvider` shall 左目用 actionName と右目用 actionName を `ExpressionBindingEntry`（bindingMode = Gaze）から解決して左右別 `IAnalogInputSource` を構築する。同一 actionName を左右両方に割り当てれば従来の「単一 Vector2 で両目駆動」と同等の動作になる。
-6. The 拡張後 `GazeBindingConfigDto` および `FacialCharacterProfileConverter` の JSON 表現 shall 左目用 / 右目用 sourceId を必須フィールドとして表現する。後方互換のための optional フィールド扱いは行わず、`InputSystemAdapterBinding` の `ExpressionBindingEntry` についても左右別 actionName 構造に破壊的変更する。
-7. The osc-output-binding 実装 shall 既存 Gaze 関連テスト（`FacialCharacterProfileSO_GazeConfigsRoundTripTests`、`FacialCharacterProfileExporter_GazeConfigsTests`、`FacialCharacterProfileSOInspectorGazeConfigsTests` 等）を新構造に合わせて改修し、すべて緑にする。
+5. The 拡張後 `InputSystemAdapterBinding.ExpressionBindingEntry`（bindingMode = Gaze）shall 同じく `useDistinctLeftRight` フラグを持ち、`false` 既定時は単一 `actionName` を左右共通として両目駆動、`true` 時のみ `actionNameLeft` / `actionNameRight` を持ち左右別 InputAction を解決する。
+6. The 拡張後 `GazeBindingConfigDto` および `FacialCharacterProfileConverter` の JSON 表現 shall `expressionId` を必須フィールド、`useDistinctLeftRight` を任意（既定 `false`）、`sourceIdLeft` / `sourceIdRight` を `useDistinctLeftRight = true` 時のみ意味を持つフィールドとして表現する。`InputSystemAdapterBinding.ExpressionBindingEntry` も同じ構造の破壊的変更を行う。
+7. The osc-output-binding 実装 shall 既存 Gaze 関連テスト（`FacialCharacterProfileSO_GazeConfigsRoundTripTests`、`FacialCharacterProfileExporter_GazeConfigsTests`、`FacialCharacterProfileSOInspectorGazeConfigsTests` 等）を新構造に合わせて改修し、`useDistinctLeftRight = false` 既定パスと `true` パスの両方を網羅したうえですべて緑にする。
 
 ### Requirement 14: 送信元識別ヘッダ / heartbeat の送信仕様
 **Objective:** As a 複数送信元 / ゾンビ排除と BlendShape 名整合性検査を成立させたい運用者, I want 送信側が起動時生成 UUID / 起動時刻、および BlendShape 名一覧 heartbeat を一定周期で送出する仕様, so that 受信側が allowlist と heartbeat に基づいて正規の送信元を選別し、不一致 BlendShape を検出できる

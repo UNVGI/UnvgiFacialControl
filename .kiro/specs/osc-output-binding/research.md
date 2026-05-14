@@ -252,6 +252,33 @@
 - **Rationale**: 既にコードベース内に「1 binding が複数 mode の入力を統合して扱う」前例（`InputSystemAdapterBinding`）が存在し、Inspector の Add ドロップダウンも 2 binding（Sender + Receiver）に統一されてユーザー設定がシンプル。要件 12 / 6.3 / 7 / 10 の文言を整合性のため修正。
 - **Impact**: design.md / requirements.md / spec.json を更新。`OscGazeReceiverAdapterBinding.cs` / `OscGazeReceiverAdapterBindingDrawer.cs` / `OscGazeReceiverOptionsDto.cs` / `osc-gaze-receiver-options.md` の新設は不要となり、代わりに `OscMappingEntry` / `OscMappingMode` / `OscMappingEntryDto` を新規追加。
 
+### D4: Gaze entry の `sourceIdLeft` / `sourceIdRight` 片方欠落の挙動（2026-05-15 再レビュー）
+- **Context**: `OscMappingEntry` の `leftRightIndependent = true` 時、左右別の sourceId を 2 フィールド持つが「片方だけ空」の挙動が design.md / requirements.md / Drawer 仕様で食い違っていた。
+- **Options**:
+  - A1. entry 全体スキップ（両方必須）（採用）
+  - A2. 解決した側だけ register、Req 13.3 fallback で他方に流用
+- **Decision**: A1 を採用。`leftRightIndependent = true` の Gaze entry で `sourceIdLeft` または `sourceIdRight` のいずれかが空文字 / null なら、entry 全体をスキップ + 警告ログ。`leftRightIndependent = false`（既定）時は両 sourceId フィールドを読まないため空でも問題なし。
+- **Rationale**: シンプルなデバッグ挙動。「片方だけ書く」のは意図不明な設定ミスと判定して早期に弾く。空 slug が `IInputSourceRegistry` に積まれて他 binding と衝突する事故も同時に防げる。Req 13.3 の fallback は別のシナリオ（明示指定したが register が未完了 / 未存在）で発火する責任分担に。
+
+### D5: Gaze_ARKit_8BS mode の `addressPattern` の扱い
+- **Context**: `OscMappingEntry.addressPattern` は Normal_BlendShape では完全 OSC アドレス、Gaze_VRChat_XY では base アドレス（X/Y 末尾抜き）として使う一方、Gaze_ARKit_8BS mode での意味が design.md / DTO / Drawer の各箇所で未定義だった。
+- **Options**:
+  - B1. プレフィクスのみ可変（例: `addressPattern = "/ARKit/"`）
+  - B2. addressPattern を無視、`/ARKit/eyeLookXxx` 固定 8 個を listen（採用）
+  - B3. テンプレート形式（`/ARKit/{name}` で `{name}` を 8 名置換）
+- **Decision**: B2 を採用。Gaze_ARKit_8BS mode では `addressPattern` を読まず、`PerfectSyncEyeLook.Names` の固定 8 名（ASCII、`eyeLookInLeft` 等）に `/ARKit/` プレフィクスを付けた 8 アドレスを必ず listen。Drawer は ARKit mode 選択時に `addressPattern` 欄を非表示、DTO で非空の値が来た場合は Info ログ「ignored」+ 既定値扱い。
+- **Rationale**: VRChat / ARKit プリセットを strict に定義し受信側も同規格を期待することで仕様の予測可能性を高める。プレフィクス可変（B1）は preview.3 以降の拡張要求として `docs/backlog.md` に逃がす。
+
+### D6: `GazeBindingConfig` の左右独立フラグ + 既定 expressionId 自動マッチ（D3 採用）
+- **Context**: 元設計（Req 13.1）は `sourceIdLeft` / `sourceIdRight` を 2 つとも必須フィールドとし、ユーザーが完全 slug 文字列を毎回手書きする UX。「ユーザーが書く必要が本当にあるのか」というレビュー指摘を受け再設計。
+- **Options**:
+  - D1. 完全 convention-based（sourceIdLeft / sourceIdRight 廃止、expressionId のみで自動解決）
+  - D2. Drawer dropdown 入力（フィールド残すが UI 改善）
+  - D3. 既定は D1 + `useDistinctLeftRight` ON 時のみ詳細フィールド出現（採用）
+- **Decision**: D3 を採用。`GazeBindingConfig` は `expressionId` を必須キー、`useDistinctLeftRight` を既定 `false` の任意フィールド、`sourceIdLeft` / `sourceIdRight` を `useDistinctLeftRight = true` 時のみ意味を持つ条件付きフィールドとする。OSC 側 `OscMappingEntry.leftRightIndependent` と意味論を統一（slug 規約を Cross-binding Slug Convention で正準定義）。`InputSystemAdapterBinding.ExpressionBindingEntry` も同じ構造（`useDistinctLeftRight` + `actionName` / `actionNameLeft` / `actionNameRight`）に揃える。
+- **Rationale**: シンプル運用（左右共通の Gaze 駆動）が圧倒的多数の想定。「左目 OSC / 右目 ゲームパッド」のような左右混在ユースケースは preview 段階で必須ではないが、捨てるとあとで再度破壊変更が必要になるため flag による段階的有効化で残す。Drawer UX も既定は 1 フィールド入力で完結、必要な時だけ詳細が現れる段階的開示。
+- **Impact**: design.md の `GazeBindingConfig` セクション全面書き換え、`Cross-binding Slug Convention` セクション新設、Component Summary 更新。requirements.md Req 6.3 / 7 / 12 / 13 を整合修正。InputSystem 側仕様も同調。
+
 ### D3: preview milestone のスコープ分割（uOSC fork を preview.3 送り）
 - **Context**: design.md の Migration Strategy が uOSC fork 3 phase + 本 spec 11 phase の合計 14 phase を一括 preview.2 に積んでおり、当初 preview milestone（2026-02 末）を超過した現状（2026-05-15）でさらに遅延リスクがあった。
 - **Options**:
