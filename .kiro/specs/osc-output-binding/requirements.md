@@ -4,44 +4,54 @@
 FacialControl の OSC 送信機能を AdapterBinding として正式統合する spec。
 
 ## 背景
-現状 com.hidano.facialcontrol.osc には OscSender / OscSenderHost クラスが実装済みで、uOSC クライアントをラップした実 UDP 送信機構（SendAll / SendSingle）と PlayMode ループバックテストは存在する。一方、これらは AdapterBinding として結線されておらず、Inspector の Add ドロップダウンから選択できず、FacialController の合成後 BlendShape 値や Gaze 入力 Vector2 を吸い出す経路も無いため、プロダクション統合は未完了の状態にある。
+現状 `com.hidano.facialcontrol.osc` には `OscSender` / `OscSenderHost` クラスが実装済みで、uOSC クライアントをラップした実 UDP 送信機構（`SendAll` / `SendSingle`）と PlayMode ループバックテストは存在する。一方、これらは AdapterBinding として結線されておらず、Inspector の Add ドロップダウンから選択できず、FacialController の合成後 BlendShape 値や Gaze 入力 Vector2 を吸い出す経路も無いため、プロダクション統合は未完了の状態にある。
+
+加えて、受信側 (`OscAdapterBinding`) には通信瞬断時の "値据え置き" 挙動はあるが「ベース表情への自動復帰」機構や、複数送信元 / ゾンビプロセス排除、BlendShape 名一覧の整合性検査、OSC bundle によるフレームアトミック性、Gaze Vector2 受信といった構造化された相互運用機能が無い。本 spec で受信側 binding にもこれらを破壊的変更として導入する（OSC binding はまだプロダクション運用に乗っていないため preview.2 内での breaking change を許容する）。
 
 ## ユースケース
 - VTuber 配信などで「ひとつの表情システム → 複数のキャラ描画システム」へリアルタイム配信し、描画側を冗長構成にする
 - Unity でキャプチャ／編集した表情を UnrealEngine など Unity 外プラットフォームへ転送し、クロスエンジンでの表情同期を実現する
+- 送信元アプリの瞬断・落ち時にも受信側がベース表情に自動復帰し、配信全体の破綻を防ぐ
+- ゾンビプロセスから古い値が流れ込んでも、現役送信元の値だけを採用して安定描画する
 
 ## スコープ（実装すべきもの）
-1. **Domain 層**: FacialController の合成後 BlendShape 値、および各 GazeBindingConfig に対応する Gaze 入力 Vector2 を観察できる仕組み（`IFacialOutputObserver` / `FacialOutputBus` 的なもの）を Domain 純度を保ったまま新設。GC-free（`ReadOnlySpan<float>` および軽量構造体ベース受け渡し）。
-2. **OscSenderAdapterBinding**: `[Serializable]` + `[FacialAdapterBinding(displayName: "OSC Sender")]` 具象。OnStart で `OscSenderHost` を AddComponent + Configure、Domain bus を購読し OnLateTick 等で BlendShape 配列と Gaze Vector2 群を SendAll。
-3. **複数送信先**: 1 binding で複数 endpoint への同報送信に対応（`List<EndpointConfig>` 形式）。BlendShape も Gaze も同じ endpoint 群へ流す。
-4. **アドレス形式プリセット（案 B）**: mapping エントリは BlendShape 名 / Gaze expressionId のみを保持し、送信時に endpoint のプリセット enum と組み合わせて完全な OSC アドレス文字列を組み立てる。BlendShape は `/avatar/parameters/{name}`（VRChat 互換）/ `/ARKit/{name}`（ARKit 互換）等、Gaze Vector2 は各プリセットに対応した別アドレス規約で送信する。
-5. **ループ防止**: 同一プロセス内で OSC 受信 binding と送信 binding が同居した場合に無限ループしないための loopback 抑制ポリシー（**既定 ON / 明示無効化可能**）。
-6. **JSON 永続化**: `OscSenderOptionsDto` + 既存 System.Text.Json 経路への統合、JSON スキーマドキュメント追記。Gaze 送信構成も DTO に含める。
-7. **Editor**: `OscSenderAdapterBindingDrawer`（UI Toolkit / PropertyDrawer）で endpoint 一覧、BlendShape mapping、Gaze 送信構成を編集。
-8. **テスト**: EditMode（DTO 往復、Domain bus 単体、BlendShape / Gaze 双方の通知）、PlayMode（FacialController → OscSender → OscReceiver E2E、複数 endpoint 同報、loopback 抑制、Gaze Vector2 送信検証）。
-9. **サンプル**: `Samples~/OscOutputDemo`（および `Assets/Samples` 二重管理）と README / CHANGELOG / docs/work-procedure.md 更新。
+1. **Domain 層**: FacialController の合成後 BlendShape 値、および各 `GazeBindingConfig` に対応する Gaze 入力 Vector2 を観察できる仕組み（`IFacialOutputObserver` / `FacialOutputBus` 的なもの）を Domain 純度を保ったまま新設。GC-free（`ReadOnlySpan<float>` および軽量構造体ベース受け渡し）。通知タイミングは `OnLateTick` の **直前**、同フレーム送信完結を保証。
+2. **OscSenderAdapterBinding**（送信側 binding 新規）: `[Serializable]` + `[FacialAdapterBinding(displayName: "OSC Sender")]` 具象。OnStart で `OscSenderHost` を AddComponent + Configure、Domain bus を購読し OnLateTick で BlendShape 配列と Gaze Vector2 群を **OSC bundle として 1 フレームアトミックに**送出。
+3. **OscAdapterBinding 拡張**（受信側 binding 破壊的変更）: staleness 超過時の **ベース表情への自動フェイルセーフ復帰**、**IP allowlist + 送信元 UUID 識別**によるゾンビ排除、**OSC bundle のフレーム単位アトミック処理**、送信側 heartbeat に基づく **BlendShape 名一覧整合性検査**を実装。
+4. **Gaze Vector2 受信 binding**（新規）: ARKit プリセット時の eyeLookXxx 系 8 BlendShape を **左目用 / 右目用 の 2 つの Vector2** に逆合成し、左右非対称を許容する形で `IAnalogInputSource` として publish。
+5. **`GazeBindingConfig` 拡張**: 入力源解決を「単一 Vector2 入力」から「左右別 Vector2 入力」に拡張（OSC 経由でのみ左右別を扱い、既存 InputSystem 経路は単一 Vector2 のまま動作させる互換策を Design で確定）。**角度制限は受信側で適用**（送信側は正規化 Vector2 を分解した 8 BlendShape を制限なしで送る）。
+6. **複数送信先**: 1 binding で複数 endpoint への同報送信に対応（`List<EndpointConfig>` 形式）。BlendShape も Gaze も同じ endpoint 群へ流す。
+7. **アドレス形式プリセット（案 B）**: mapping エントリは BlendShape 名 / Gaze `expressionId` のみを保持し、送信時に endpoint のプリセット enum と組み合わせて完全な OSC アドレスを組み立てる。
+   - VRChat 形式: BlendShape `/avatar/parameters/{name}`、Gaze `/avatar/parameters/{expressionId}X` `/avatar/parameters/{expressionId}Y`
+   - ARKit 形式: BlendShape `/ARKit/{name}`、Gaze は **PerfectSync 互換**として eyeLookXxx 系 8 BlendShape に分解して送信（案 II）
+8. **ループ防止**: 同一プロセス内で OSC 受信 binding と送信 binding が同居した場合に無限ループしないための loopback 抑制ポリシー（**既定 ON / 明示無効化可能**）。
+9. **JSON 永続化**: `OscSenderOptionsDto` / `OscReceiverOptionsDto` + 既存 System.Text.Json 経路への統合、JSON スキーマドキュメント追記。allowlist、heartbeat 周期、整合性検査ポリシーも DTO に含める。
+10. **Editor**: 送信 / 受信 / Gaze Vector2 受信の各 Drawer（UI Toolkit / PropertyDrawer）。allowlist、整合性検査ポリシー、heartbeat 周期、Gaze 設定を含む。
+11. **テスト**: EditMode（DTO 往復、Domain bus 単体、Vector2 ⇔ 8 BlendShape 双方向変換）、PlayMode（FacialController → OscSender → OscReceiver E2E、複数 endpoint 同報、ループバック抑制、bundle アトミック性、フェイルセーフ復帰、ゾンビ排除、heartbeat 整合性検査、Gaze 左右非対称受信）。
+12. **サンプル**: `Samples~/OscOutputDemo`（送信側）+ `Samples~/OscReceiverDemo`（受信専用、最小 SO 構成）を `Assets/Samples` 二重管理で配置。README / CHANGELOG / `docs/work-procedure.md` 更新。
 
 ## Non-Goals
 - VRM 対応（別マイルストーン）
 - UDP multicast / broadcast の独自実装（unicast 複数送信先で代替）
 - 音声ストリーム / リップシンク音声の OSC 送出（リップシンク値のみ対象）
-- OSC bundle / timetag の高度な対応（個別メッセージ送信で十分）
-- 既存 OscReceiver / OscAdapterBinding（受信側）の仕様変更
-- **Gaze Vector2 の OSC 受信側 binding の実装は本 spec の対象外**。送信フォーマット仕様は本 spec で確定するが、Vector2 を受け取って `GazeBindingConfig` を駆動する受信 binding は後続 spec で別途実装する
-- ボーンの世界回転 / 位置値そのものの OSC 送出（Gaze は入力 Vector2 ベースのみ。受け側はその Vector2 から自モデルのボーン姿勢を再合成する責務を持つ）
+- OSC timetag による未来時刻スケジューリング（bundle は採用するが timetag の time-shift 機能は使わない）
+- ボーンの世界回転 / 位置値そのものの OSC 送出（Gaze は Vector2 / 8 BlendShape 経由でのみ送る）
 
 ## 制約
 - 既存パッケージ `com.hidano.facialcontrol.osc` に追加実装する形を取る（新パッケージは切らない）
 - クリーンアーキテクチャ（Domain / Application / Adapters）の依存方向を維持。Domain は Unity / uOSC 非依存
 - 毎フレームのヒープ確保ゼロを目標
 - preview.2 以降の機能として位置付ける（preview.1 ターゲットには含めない）
+- OSC binding はまだプロダクション運用に乗っていないため、本 spec 内の受信側 / `GazeBindingConfig` への破壊的変更を許容する（migration 不要）
 
 ## 参考ファイル
 - 既存送信機構: `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/OSC/OscSender.cs`, `OscSenderHost.cs`
-- 既存受信 binding（実装ひな型として参考）: `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/AdapterBindings/OscAdapterBinding.cs`
+- 受信 binding（拡張対象）: `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/AdapterBindings/OscAdapterBinding.cs`
+- 既存 staleness 機構: `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/InputSources/OscInputSource.cs:81-104`
 - AdapterBinding 基底: `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Adapters/AdapterBindingBase.cs`
 - Gaze 仕様: `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Adapters/ScriptableObject/GazeBindingConfig.cs`, `Runtime/Adapters/Bone/GazeBoneBinding.cs`
-- 既存ループバックテスト: `FacialControl/Packages/com.hidano.facialcontrol.osc/Tests/PlayMode/Integration/OscSendReceiveTests.cs`
+- FacialController 初期化: `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Adapters/Playable/FacialController.cs:108-247`
+- PerfectSync 8 BlendShape リスト: `FacialControl/Packages/com.hidano.facialcontrol.osc/Tests/PlayMode/Adapters/InputSources/ArKitOscAnalogSourceTests.cs:53-56`
 
 ## Requirements
 
@@ -50,16 +60,15 @@ FacialControl の OSC 送信機能を AdapterBinding として正式統合する
 
 #### Acceptance Criteria
 1. The Facial Output Bus shall be defined in `Hidano.FacialControl.Domain` namespace and shall not reference any UnityEngine, uOSC, or Adapters-layer type.
-2. When FacialController が 1 フレームのレイヤー合成を完了した直後, the Facial Output Bus shall 全 BlendShape の合成後値を `ReadOnlySpan<float>` として登録済みオブザーバへ通知する。
-3. When FacialController が 1 フレームの Gaze 入力評価を完了した直後, the Facial Output Bus shall 各 `GazeBindingConfig` の `expressionId` と対応する Vector2 (x, y) のスナップショットを登録済みオブザーバへ通知する。
-4. The Facial Output Bus shall Gaze Vector2 を Domain 表現の軽量構造体（例: `(float x, float y)` ペア or Domain 専用 `GazeSnapshot` 構造体）として表現し、`UnityEngine.Vector2` を Domain 層へ持ち込まない。
-5. The Facial Output Bus shall BlendShape 値配列および Gaze スナップショットコレクションを内部バッファとして再利用し、毎フレームのヒープ確保をゼロにする。
-6. When 利用者がオブザーバ（`IFacialOutputObserver` 相当）を登録/解除する API を呼び出した時, the Facial Output Bus shall 当該フレームの通知タイミング前後で安全に追加/削除を反映し、列挙中の並行変更例外を発生させない。
-7. While オブザーバが 1 件も登録されていない, the Facial Output Bus shall 通知処理を skip し、合成後値配列のコピーや Gaze スナップショット構築、列挙コストを発生させない。
-8. If 通知対象のオブザーバが例外をスローした場合, the Facial Output Bus shall その例外を Unity 標準ログ（`Debug.LogException` 相当の Adapters 層フック）に渡したうえで他オブザーバへの通知を継続する。
-9. The Facial Output Bus shall BlendShape インデックスの並び順を FacialController の内部順序と一致させ、`OscMapping` 配列とインデックス対応で参照可能にする。
-10. The Facial Output Bus shall Gaze Vector2 スナップショットを `expressionId`（`GazeBindingConfig.expressionId` と同値）でキー付けし、Adapters 層が任意の `GazeBindingConfig` 集合と join できるよう構造化する。
-11. The Facial Output Bus shall Gaze 入力源が未接続のフレームでは当該 `expressionId` のスナップショットを通知対象から除外する（または「未更新」フラグを付与する）方針を一貫して採用する。
+2. When FacialController が 1 フレームのレイヤー合成および Gaze 入力評価を完了した直後、かつ `AdapterBindingHost.OnLateTick` が dispatch される直前, the Facial Output Bus shall 全 BlendShape の合成後値（`ReadOnlySpan<float>`）と Gaze 入力 Vector2 スナップショットを登録済みオブザーバへ通知し、観察→送信→UDP 発射が同一フレーム内に完結することを保証する。
+3. The Facial Output Bus shall Gaze Vector2 を Domain 表現の軽量構造体（例: `(float x, float y)` ペア or Domain 専用 `GazeSnapshot` 構造体）として表現し、`UnityEngine.Vector2` を Domain 層へ持ち込まない。
+4. The Facial Output Bus shall BlendShape 値配列および Gaze スナップショットコレクションを内部バッファとして再利用し、毎フレームのヒープ確保をゼロにする。
+5. When 利用者がオブザーバ（`IFacialOutputObserver` 相当）を登録/解除する API を呼び出した時, the Facial Output Bus shall 当該フレームの通知タイミング前後で安全に追加/削除を反映し、列挙中の並行変更例外を発生させない。
+6. While オブザーバが 1 件も登録されていない, the Facial Output Bus shall 通知処理を skip し、合成後値配列のコピーや Gaze スナップショット構築、列挙コストを発生させない。
+7. If 通知対象のオブザーバが例外をスローした場合, the Facial Output Bus shall その例外を Unity 標準ログ（`Debug.LogException` 相当の Adapters 層フック）に渡したうえで他オブザーバへの通知を継続する。
+8. The Facial Output Bus shall BlendShape インデックスの並び順を FacialController の内部順序（`_blendShapeNames`）と一致させ、`OscMapping` 配列とインデックス対応で参照可能にする。
+9. The Facial Output Bus shall Gaze Vector2 スナップショットを `expressionId`（`GazeBindingConfig.expressionId` と同値）でキー付けし、Adapters 層が任意の `GazeBindingConfig` 集合と join できるよう構造化する。
+10. The Facial Output Bus shall Gaze 入力源が未接続のフレームでは当該 `expressionId` のスナップショットを通知対象から除外する（送信側は何も送らない方針、フェイルセーフは受信側の責務）。
 
 ### Requirement 2: OscSenderAdapterBinding の AdapterBinding lifecycle 結線
 **Objective:** As a FacialControl 利用者, I want OSC 送信機能を Inspector の Add ドロップダウンから他の binding と同じ手順で追加・除去できるよう, so that 既存 `OscAdapterBinding`（受信側）と対称な UX で OSC 送信を有効化できる
@@ -70,43 +79,45 @@ FacialControl の OSC 送信機能を AdapterBinding として正式統合する
 3. When `OnStart(in AdapterBuildContext ctx)` が呼び出された時, the OscSenderAdapterBinding shall `ctx.HostGameObject` に `OscSenderHost` を `AddComponent` し、`Configure(endpoint, port, mappings)` を呼び出して送信機構を起動する。
 4. When `OnStart` 後に Domain 層の Facial Output Bus が利用可能な状態である時, the OscSenderAdapterBinding shall 自身を `IFacialOutputObserver` として登録し、合成後 BlendShape 値および Gaze Vector2 の双方の購読を開始する。
 5. If `ctx.HostGameObject` が null、または BlendShape mapping と Gaze 送信構成が両方とも空の場合, the OscSenderAdapterBinding shall 送信を開始せず Unity 標準ログに警告を出力し、`OnStart` を no-op として安全に終了する。
-6. When `OnLateTick(deltaTime)` が呼び出された時, the OscSenderAdapterBinding shall 直近フレームで受信した post-blend BlendShape 値配列を `OscSenderHost.SendAll(...)` で全送信先に同報送信する。
-7. When `OnLateTick(deltaTime)` が呼び出された時, the OscSenderAdapterBinding shall 直近フレームで受信した Gaze Vector2 群を、各 endpoint のアドレス形式プリセットに従って構築した OSC アドレスに同報送信する。
-8. When `Dispose()` が呼び出された時, the OscSenderAdapterBinding shall Facial Output Bus からのオブザーバ登録を解除し、`OscSenderHost` を `Object.Destroy` で破棄したうえで内部状態を初期化済みフラグごとリセットする。
-9. The OscSenderAdapterBinding shall `Slug` を `AdapterBindingBase.Slug` 規約に従って保持し、空 / 規約違反の場合は警告ログを出力したうえで起動を断念する。
+6. When `OnLateTick(deltaTime)` が呼び出された時, the OscSenderAdapterBinding shall 直近フレームで受信した post-blend BlendShape 値配列、Gaze 関連メッセージ群、および送信元識別ヘッダを **1 つの OSC bundle にまとめて** `OscSenderHost` 経由で全送信先に同報送信する。
+7. When `Dispose()` が呼び出された時, the OscSenderAdapterBinding shall Facial Output Bus からのオブザーバ登録を解除し、`OscSenderHost` を `Object.Destroy` で破棄したうえで内部状態を初期化済みフラグごとリセットする。
+8. The OscSenderAdapterBinding shall `Slug` を `AdapterBindingBase.Slug` 規約に従って保持し、空 / 規約違反の場合は警告ログを出力したうえで起動を断念する。
 
-### Requirement 3: 複数送信先（multi-endpoint unicast）の同報送信
-**Objective:** As a VTuber 配信向け冗長構成を構築する Unity エンジニア, I want 1 つの OSC 送信 binding に複数の送信先（IP/port）を登録して BlendShape 値と Gaze Vector2 を同時に配れる仕組み, so that マルチキャスト / ブロードキャスト機構を使わずに複数描画システムへリアルタイム配信できる
+### Requirement 3: 複数送信先（multi-endpoint unicast）の同報送信と OSC bundle アトミック性
+**Objective:** As a VTuber 配信向け冗長構成を構築する Unity エンジニア, I want 1 つの OSC 送信 binding に複数の送信先（IP/port）を登録して BlendShape 値と Gaze Vector2 を同時に配り、各フレームの値が受信側で部分更新（フレーム跨ぎ）にならない仕組み, so that マルチキャスト / ブロードキャスト機構を使わずに複数描画システムへリアルタイム配信でき、Gaze の x / y が片方だけ届いて視線が斜めに歪むような事故を防げる
 
 #### Acceptance Criteria
 1. The OscSenderAdapterBinding shall 送信先を `List<EndpointConfig>`（または同等の `[Serializable]` コレクション）として保持し、任意件数の unicast endpoint を構成可能にする。
 2. The EndpointConfig shall 少なくとも IP/host 文字列、UDP ポート番号、有効/無効フラグ、アドレス形式プリセット（VRChat 形式 / ARKit 形式）を保持する。
 3. When 利用者が複数の endpoint を有効化した状態で `OnLateTick` が呼び出された時, the OscSenderAdapterBinding shall 各 endpoint に対して同一フレームの合成後 BlendShape 値および Gaze Vector2 を unicast で送信する。
-4. The OscSenderAdapterBinding shall endpoint ごとに独立した `OscSenderHost` インスタンス（または同等の送信スロット）を確保し、1 endpoint の起動失敗が他 endpoint の送信を阻害しないようにする。
-5. If 同一 endpoint（IP+port の組）が複数登録された場合, the OscSenderAdapterBinding shall 1 回の警告ログを出力したうえで重複を 1 つに正規化して送信する。
-6. Where endpoint が無効化フラグで disabled に設定されている場合, the OscSenderAdapterBinding shall その endpoint への送信を skip し、他 endpoint への送信は継続する。
-7. The OscSenderAdapterBinding shall 送信先件数が 0 件の場合に Unity 標準ログで警告を出力し、`OnStart` を no-op として終了する。
-8. The OscSenderAdapterBinding shall UDP multicast / broadcast アドレスを独自に解決・送信する処理を実装しない（unicast での複数 endpoint 構成のみで要求を満たす）。
+4. The OscSenderAdapterBinding shall 1 フレーム分の全 OSC メッセージ（BlendShape 値、Gaze 関連、送信元識別ヘッダを含む）を **単一の OSC bundle** にまとめ、bundle 単位で UDP 送信する。
+5. The OSC bundle shall 1 つの UDP データグラムに収まる範囲を上限とし、収まらない場合は Design で確定する分割ポリシー（複数 bundle に分割、または warning 出力）に従って動作する。
+6. The OscSenderAdapterBinding shall endpoint ごとに独立した `OscSenderHost` インスタンス（または同等の送信スロット）を確保し、1 endpoint の起動失敗が他 endpoint の送信を阻害しないようにする。
+7. If 同一 endpoint（IP+port の組）が複数登録された場合, the OscSenderAdapterBinding shall 1 回の警告ログを出力したうえで重複を 1 つに正規化して送信する。
+8. Where endpoint が無効化フラグで disabled に設定されている場合, the OscSenderAdapterBinding shall その endpoint への送信を skip し、他 endpoint への送信は継続する。
+9. The OscSenderAdapterBinding shall 送信先件数が 0 件の場合に Unity 標準ログで警告を出力し、`OnStart` を no-op として終了する。
+10. The OscSenderAdapterBinding shall UDP multicast / broadcast アドレスを独自に解決・送信する処理を実装しない（unicast での複数 endpoint 構成のみで要求を満たす）。
 
-### Requirement 4: アドレス形式プリセット（案 B: プリセット enum + 名前から組み立て）
-**Objective:** As a 既存 VRChat / ARKit エコシステムと相互運用する Unity エンジニア, I want endpoint ごとに OSC アドレス形式（VRChat / ARKit）をプリセットで切り替えると BlendShape も Gaze も全自動で対応するアドレス文字列が組み立てられる仕組み, so that 「endpoint A は VRChat 互換、endpoint B は ARKit 互換」を 1 クリックで切り替えられる
+### Requirement 4: アドレス形式プリセット（案 B + 案 II: VRChat / ARKit + PerfectSync 互換 Gaze）
+**Objective:** As a 既存 VRChat / ARKit / PerfectSync エコシステムと相互運用する Unity エンジニア, I want endpoint ごとに OSC アドレス形式をプリセットで切り替えると BlendShape も Gaze も全自動で対応するアドレス文字列が組み立てられる仕組み, so that 「endpoint A は VRChat 互換、endpoint B は ARKit / PerfectSync 互換」を 1 クリックで切り替えられる
 
 #### Acceptance Criteria
 1. The OscSenderAdapterBinding shall mapping 1 件あたり完全な OSC アドレスを保存せず、BlendShape 名（および Gaze の場合は `expressionId`）のみを保存し、送信時に endpoint のプリセット enum と組み合わせて完全なアドレス文字列を組み立てる（案 B）。
 2. The OscSenderAdapterBinding shall endpoint ごとに「VRChat 形式」「ARKit 形式」を選択可能なプリセット enum を提供する。
 3. When endpoint のプリセットが VRChat 形式に設定されている時, the OscSenderAdapterBinding shall その endpoint への BlendShape 送信アドレスを `/avatar/parameters/{BlendShape 名}` の形式で構築する。
 4. When endpoint のプリセットが ARKit 形式に設定されている時, the OscSenderAdapterBinding shall その endpoint への BlendShape 送信アドレスを `/ARKit/{BlendShape 名}` の形式で構築する。
-5. When endpoint のプリセットが VRChat 形式に設定されている時, the OscSenderAdapterBinding shall Gaze Vector2 を VRChat 互換のアドレス規約（x 成分と y 成分の 2 メッセージ、`expressionId` をパラメータ名へ反映する）で送信する。具体的なアドレス文字列規約は Design フェーズで確定する。
-6. When endpoint のプリセットが ARKit 形式に設定されている時, the OscSenderAdapterBinding shall Gaze Vector2 を ARKit 互換のアドレス規約（x 成分と y 成分の 2 メッセージ、ARKit 系統のパス階層に揃える）で送信する。具体的なアドレス文字列規約は Design フェーズで確定する。
-7. The OscSenderAdapterBinding shall BlendShape 名および `expressionId` にマルチバイト文字（日本語等）および記号（`_`, `.` 等）が含まれてもアドレス文字列を正しく構築できる（ASCII 限定の正規化を強制しない）。
-8. The OscSenderAdapterBinding shall プリセット切り替え時に BlendShape および Gaze の両系統でアドレス文字列を再構築し、`OscSenderHost.Configure(...)` へ渡す送信テーブルへ反映する。
-9. Where 将来的に追加プリセットが必要になった場合, the OscSenderAdapterBinding shall 新規プリセットを enum 値の追加と分岐 1 か所の修正（BlendShape 用 + Gaze 用）で拡張可能な構造を維持する。
+5. When endpoint のプリセットが VRChat 形式に設定され、Gaze 送信が有効な時, the OscSenderAdapterBinding shall Gaze Vector2 を `/avatar/parameters/{expressionId}X` および `/avatar/parameters/{expressionId}Y` の 2 メッセージとして送信する。
+6. When endpoint のプリセットが ARKit 形式に設定され、Gaze 送信が有効な時, the OscSenderAdapterBinding shall Gaze Vector2 を **PerfectSync 互換の 8 BlendShape**（`eyeLookInLeft`, `eyeLookOutLeft`, `eyeLookUpLeft`, `eyeLookDownLeft`, `eyeLookInRight`, `eyeLookOutRight`, `eyeLookUpRight`, `eyeLookDownRight`）に分解し、各 BlendShape を `/ARKit/{eyeLook 名}` 形式で送信する（案 II）。
+7. The ARKit プリセットでの Vector2 → 8 BlendShape 分解 shall **正規化済み Vector2 をそのまま** 分解し、`GazeBindingConfig` の角度制限（`outerYawAngle` / `innerYawAngle` / `lookUpAngle` / `lookDownAngle`）を送信側では適用しない。角度制限の適用は受信側の責務とする。
+8. The OscSenderAdapterBinding shall BlendShape 名および `expressionId` にマルチバイト文字（日本語等）および記号（`_`, `.` 等）が含まれてもアドレス文字列を正しく構築できる（ASCII 限定の正規化を強制しない）。ただし PerfectSync 互換の `eyeLookXxx` 名は ARKit 規格の固定 ASCII 名を使用する。
+9. The OscSenderAdapterBinding shall プリセット切り替え時に BlendShape および Gaze の両系統でアドレス文字列を再構築し、`OscSenderHost.Configure(...)` へ渡す送信テーブルへ反映する。
+10. Where 将来的に追加プリセットが必要になった場合, the OscSenderAdapterBinding shall 新規プリセットを enum 値の追加と分岐 1 か所の修正（BlendShape 用 + Gaze 用）で拡張可能な構造を維持する。
 
 ### Requirement 5: 同一プロセス内の OSC 受信 → 送信ループバック抑制
 **Objective:** As a 同じ Unity プロセスで OSC 受信 binding と送信 binding を同居させる利用者, I want 受信した値をそのまま同じ endpoint に送り返して無限ループする事故を防ぐ仕組み, so that ローカル配信検証やループバックテストでも暴走を起こさず安心して結線できる
 
 #### Acceptance Criteria
-1. The OscSenderAdapterBinding shall 既存 `OscAdapterBinding`（受信側）の仕様や API を変更せずに、送信側のみでループバック抑制ポリシーを実装する。
+1. The OscSenderAdapterBinding shall ループバック抑制ポリシーを送信側のみで実装する（受信側 `OscAdapterBinding` 拡張とは独立した責務）。
 2. The OscSenderAdapterBinding shall ループバック抑制ポリシーを `[Serializable]` フィールドとして保持し、その既定値を「有効（抑制 ON）」とする。
 3. While 同一プロセス内に `OscAdapterBinding`（受信）と `OscSenderAdapterBinding`（送信）が同時に有効、かつ抑制が ON, the OscSenderAdapterBinding shall 各送信 endpoint が受信側 binding の listen endpoint（IP+port）と一致するかを起動時に検査する。
 4. If 送信先 endpoint が受信 binding の listen endpoint と一致した場合（抑制 ON 時）, the OscSenderAdapterBinding shall その endpoint への送信を抑制し、Unity 標準ログで警告を出力する。
@@ -114,66 +125,128 @@ FacialControl の OSC 送信機能を AdapterBinding として正式統合する
 6. When ループバック抑制が有効な状態で全 endpoint が抑制対象になった場合, the OscSenderAdapterBinding shall 送信を行わずに Unity 標準ログで警告を出力し、binding 自体は live 状態を維持する。
 7. The OscSenderAdapterBinding shall 抑制判定を毎フレームではなく `OnStart` および endpoint 構成変更時にのみ行い、`OnLateTick` のホットパスに比較処理を入れない。
 
-### Requirement 6: JSON 永続化（OscSenderOptionsDto）とスキーマドキュメント
-**Objective:** As a JSON ファースト永続化を採用するプロジェクトの利用者, I want OSC 送信 binding の設定（endpoint 一覧 / BlendShape mapping / Gaze 送信構成 / 抑制ポリシー）を JSON で往復シリアライズできる仕組み, so that ビルド後でも JSON で送信設定を差し替え、スキーマドキュメントで仕様を共有できる
+### Requirement 6: JSON 永続化（送信 / 受信 DTO）とスキーマドキュメント
+**Objective:** As a JSON ファースト永続化を採用するプロジェクトの利用者, I want OSC 送信 / 受信 binding の設定（endpoint 一覧 / BlendShape mapping / Gaze 送信構成 / 抑制ポリシー / allowlist / heartbeat 周期 / 整合性検査ポリシー）を JSON で往復シリアライズできる仕組み, so that ビルド後でも JSON で送受信設定を差し替え、スキーマドキュメントで仕様を共有できる
 
 #### Acceptance Criteria
-1. The OscSenderOptionsDto shall `OscSenderAdapterBinding` が保持する設定（endpoint 一覧、各 endpoint の IP/port/プリセット/有効フラグ、ループバック抑制ポリシー、BlendShape mapping、Gaze 送信構成）を漏れなく表現する `[Serializable]` 型として定義される。
-2. The OscSenderOptionsDto shall Gaze 送信構成として、送信対象 `expressionId` の集合と送信有効フラグを最低限保持する（具体的フィールド設計は Design で確定）。
-3. When OscSenderOptionsDto が JSON へシリアライズされた時, the JSON 出力 shall human-readable で diff フレンドリーな形式（インデント / 安定キー順）であること。
-4. When 同等内容の JSON が OscSenderOptionsDto に往復デシリアライズされた時, the round-trip 結果 shall 元の OscSenderOptionsDto と値レベルで等価である。
-5. If JSON 中に未知のキーが含まれている場合, the OscSenderOptionsDto デシリアライザ shall 当該キーを無視し、既知キーのみで OscSenderOptionsDto を構築する。
-6. If JSON 中に必須キーの欠落 / 型不一致がある場合, the OscSenderOptionsDto デシリアライザ shall Unity 標準ログで警告を出力し、当該フィールドは既定値で補ったうえで構築を継続する。
-7. The OscSenderOptionsDto shall パッケージ内 `Documentation~/` 配下に JSON スキーマ仕様（フィールド一覧、型、既定値、サンプル JSON）を Markdown で提供し、Gaze 送信構成も例示する。
-8. The OscSenderOptionsDto shall 既存 `com.hidano.facialcontrol.osc` パッケージ内に追加実装され、新パッケージを切らずに JSON ロード／セーブ経路へ統合する。
-9. The OscSenderOptionsDto shall 既存 JSON 経路で採用されている `SystemTextJsonParser`（`System.Text.Json` ベース）と整合する形で実装され、`JsonUtility` を新規に持ち込まない。
+1. The OscSenderOptionsDto shall `OscSenderAdapterBinding` が保持する設定（endpoint 一覧、各 endpoint の IP/port/プリセット/有効フラグ、ループバック抑制ポリシー、BlendShape mapping、Gaze 送信構成、送信元識別子 = 起動時生成 UUID / 起動時刻、BlendShape 名一覧 heartbeat 周期 = 既定 5 秒）を漏れなく表現する `[Serializable]` 型として定義される。
+2. The OscReceiverOptionsDto shall `OscAdapterBinding`（受信側）が保持する設定（listen endpoint、BlendShape mapping、staleness 超過時のフェイルセーフモード = ベース表情復帰 / 値据え置き選択、IP allowlist、送信元 ID 検査ポリシー、整合性検査ポリシー = 警告ログ ON/OFF）を漏れなく表現する `[Serializable]` 型として定義される。
+3. The Gaze Vector2 受信 binding shall 受信元 binding slug、対象 `expressionId` 一覧、左右独立採用 ON/OFF などを `[Serializable]` 型で永続化する。
+4. When 各 DTO が JSON へシリアライズされた時, the JSON 出力 shall human-readable で diff フレンドリーな形式（インデント / 安定キー順）であること。
+5. When 同等内容の JSON が DTO に往復デシリアライズされた時, the round-trip 結果 shall 元の DTO と値レベルで等価である。
+6. If JSON 中に未知のキーが含まれている場合, the DTO デシリアライザ shall 当該キーを無視し、既知キーのみで DTO を構築する。
+7. If JSON 中に必須キーの欠落 / 型不一致がある場合, the DTO デシリアライザ shall Unity 標準ログで警告を出力し、当該フィールドは既定値で補ったうえで構築を継続する。
+8. The 各 DTO shall パッケージ内 `Documentation~/` 配下に JSON スキーマ仕様（フィールド一覧、型、既定値、サンプル JSON）を Markdown で提供し、Gaze 送信構成 / フェイルセーフモード / allowlist / heartbeat 周期 / 整合性検査ポリシーも例示する。
+9. The 各 DTO shall 既存 `com.hidano.facialcontrol.osc` パッケージ内に追加実装され、新パッケージを切らずに JSON ロード／セーブ経路へ統合する。
+10. The 各 DTO shall 既存 JSON 経路で採用されている `SystemTextJsonParser`（`System.Text.Json` ベース）と整合する形で実装され、`JsonUtility` を新規に持ち込まない。
 
-### Requirement 7: Editor 拡張（OscSenderAdapterBindingDrawer / UI Toolkit）
-**Objective:** As a Inspector から OSC 送信を構成する Unity エンジニア, I want endpoint 一覧、BlendShape mapping、Gaze 送信構成を視覚的に編集できる UI Toolkit ベースの PropertyDrawer, so that 設定ファイルを直接編集せずに送信先の追加・並べ替え・削除・プリセット切替・Gaze 送信切替を行える
+### Requirement 7: Editor 拡張（送信 / 受信 / Gaze 受信の各 Drawer / UI Toolkit）
+**Objective:** As a Inspector から OSC 送受信を構成する Unity エンジニア, I want endpoint 一覧、BlendShape mapping、Gaze 送信構成、フェイルセーフモード、allowlist、heartbeat 周期、整合性検査ポリシーを視覚的に編集できる UI Toolkit ベースの PropertyDrawer, so that 設定ファイルを直接編集せずに送信先 / 受信構成を統一 UX で設定できる
 
 #### Acceptance Criteria
-1. The OscSenderAdapterBindingDrawer shall UI Toolkit ベースで実装され、IMGUI を新規 UI コードに混入させない。
-2. The OscSenderAdapterBindingDrawer shall endpoint 一覧を ReorderableList 相当の UI で表示し、追加 / 削除 / 並べ替え操作を提供する。
-3. The OscSenderAdapterBindingDrawer shall 各 endpoint について IP/host、ポート、プリセット（VRChat / ARKit）、有効/無効を編集できるフォーム要素を提供する。
-4. The OscSenderAdapterBindingDrawer shall ループバック抑制ポリシー（有効 / 無効、既定: 有効）の編集 UI を提供する。
-5. The OscSenderAdapterBindingDrawer shall BlendShape mapping 編集 UI（BlendShape 名一覧、追加 / 削除）を提供する。送信時のアドレス文字列はプリセットから自動生成されるためインライン編集は不要とする。
-6. The OscSenderAdapterBindingDrawer shall Gaze 送信構成 UI（送信対象 `expressionId` 一覧、送信有効フラグの切替）を提供する。
-7. If 入力された IP / ポートが明らかに不正（空文字 / 範囲外ポート）な場合, the OscSenderAdapterBindingDrawer shall インラインで警告メッセージを表示する。
-8. The OscSenderAdapterBindingDrawer shall Editor 専用 asmdef 配下に実装され、Runtime asmdef へ Editor 参照を漏らさない。
+1. The 各 AdapterBindingDrawer shall UI Toolkit ベースで実装され、IMGUI を新規 UI コードに混入させない。
+2. The OscSenderAdapterBindingDrawer shall endpoint 一覧を ReorderableList 相当の UI で表示し、追加 / 削除 / 並べ替え、各 endpoint の IP/host・ポート・プリセット（VRChat / ARKit）・有効/無効を編集できるフォーム要素を提供する。
+3. The OscSenderAdapterBindingDrawer shall ループバック抑制ポリシー（既定: 有効）、BlendShape mapping 名一覧、Gaze 送信対象 `expressionId` 一覧の編集 UI を提供する。送信時のアドレス文字列はプリセットから自動生成されるためインライン編集は不要とする。
+4. The OscSenderAdapterBindingDrawer shall BlendShape 名一覧 heartbeat 周期（秒、既定: 5）と、送信元識別子の表示（読み取り専用: 起動時 UUID、起動時刻）を提供する。
+5. The OscAdapterBindingDrawer（受信側、破壊的変更）shall listen endpoint 編集、BlendShape mapping 編集、staleness 秒数編集、staleness 超過時のフェイルセーフモード切替（**ベース表情復帰** / 値据え置き、既定: ベース表情復帰）、**IP allowlist** 編集、整合性検査の警告ログ ON/OFF を提供する。
+6. The Gaze Vector2 受信 binding Drawer shall 受信元 binding slug 参照、対象 `expressionId` 一覧編集、左右独立採用 ON/OFF を提供する。
+7. If 入力された IP / ポート / heartbeat 周期が明らかに不正（空文字 / 範囲外）な場合, the 各 Drawer shall インラインで警告メッセージを表示する。
+8. The 各 Drawer shall Editor 専用 asmdef 配下に実装され、Runtime asmdef へ Editor 参照を漏らさない。
 
 ### Requirement 8: テスト（EditMode 単体 + PlayMode E2E）
-**Objective:** As a TDD で実装する開発者, I want EditMode / PlayMode の役割分担と検証観点を仕様として明文化した状態, so that Red-Green-Refactor サイクルで安全に OSC 送信 binding を構築できる
+**Objective:** As a TDD で実装する開発者, I want EditMode / PlayMode の役割分担と検証観点を仕様として明文化した状態, so that Red-Green-Refactor サイクルで安全に OSC 送信 / 受信 binding および Gaze 経路を構築できる
 
 #### Acceptance Criteria
-1. The osc-output-binding spec shall EditMode テストで OscSenderOptionsDto の JSON 往復（BlendShape mapping + Gaze 送信構成を含む）、未知キー無視、必須キー欠落時の既定値補完を検証する。
+1. The osc-output-binding spec shall EditMode テストで `OscSenderOptionsDto` / `OscReceiverOptionsDto` / Gaze 受信 DTO の JSON 往復、未知キー無視、必須キー欠落時の既定値補完を検証する。
 2. The osc-output-binding spec shall EditMode テストで Domain 層 Facial Output Bus のオブザーバ登録 / 解除、列挙中変更、空オブザーバ時 skip、例外伝播のログ化を BlendShape 通知と Gaze 通知の両方で検証する。
-3. The osc-output-binding spec shall PlayMode テストで `FacialController` → Facial Output Bus → `OscSenderAdapterBinding` → 実 UDP → `OscReceiver` の E2E 経路で post-blend BlendShape 値が到達することを検証する。
-4. The osc-output-binding spec shall PlayMode テストで Gaze 入力 Vector2 が同一の E2E 経路で受信側に到達し、x / y 成分が誤差範囲で再現されることを検証する。
-5. The osc-output-binding spec shall PlayMode テストで 1 つの `OscSenderAdapterBinding` から複数 endpoint へ unicast 同報送信した結果が 2 系統の `OscReceiver` で受信されることを BlendShape と Gaze の両方で検証する。
-6. The osc-output-binding spec shall PlayMode テストで 同一プロセス内の `OscAdapterBinding`（受信）と `OscSenderAdapterBinding`（送信）が同居した状態でループバック抑制ポリシーが期待通り（既定 ON 時は送信されず、明示 OFF 時は送信される）に動作することを検証する。
-7. The osc-output-binding spec shall PlayMode テストで `OnLateTick` のホットパスに GC アロケーションが発生しないことを `Profiler.GetTotalAllocatedMemoryLong` 差分等で監視する（BlendShape のみ送信ケースと Gaze 同送ケースの両方）。
-8. The osc-output-binding spec shall テスト命名を `{Target}Tests` / `{Method}_{Condition}_{Expected}` 規約に従って配置する。
+3. The osc-output-binding spec shall EditMode テストで Vector2 → 8 BlendShape 分解および 8 BlendShape → 左右別 Vector2 逆合成の双方向変換が、左右非対称入力（例: 寄り目、片目流し目）を含む代表ケースで誤差範囲内に再現できることを検証する。
+4. The osc-output-binding spec shall PlayMode テストで `FacialController` → Facial Output Bus → `OscSenderAdapterBinding` → 実 UDP → `OscAdapterBinding`（拡張版）の E2E 経路で post-blend BlendShape 値が到達することを検証する。
+5. The osc-output-binding spec shall PlayMode テストで Gaze Vector2（左右非対称）が ARKit 形式（8 BlendShape）/ VRChat 形式（X/Y 2 メッセージ）双方の経路で受信側に到達し、誤差範囲で再現されることを検証する。
+6. The osc-output-binding spec shall PlayMode テストで 1 つの `OscSenderAdapterBinding` から複数 endpoint へ unicast 同報送信した結果が 2 系統の受信側で BlendShape と Gaze の両方について受信されることを検証する。
+7. The osc-output-binding spec shall PlayMode テストで **OSC bundle のフレームアトミック性**（1 フレーム分の全メッセージが受信側で同一フレームに反映されること）を検証する。
+8. The osc-output-binding spec shall PlayMode テストで 同一プロセス内のループバック抑制ポリシー（既定 ON 時は送信されず、明示 OFF 時は送信される）を検証する。
+9. The osc-output-binding spec shall PlayMode テストで **staleness 超過時のフェイルセーフ復帰**（送信側を停止して staleness 秒数経過後に受信側がベース表情へ復帰すること、送信再開後に表情が復元すること）を検証する。
+10. The osc-output-binding spec shall PlayMode テストで **ゾンビ送信元排除**（IP allowlist 不一致 / 送信元 UUID が allowlist 内で複数存在する場合に、最も新しい起動時刻の送信元のみが採用されること）を検証する。
+11. The osc-output-binding spec shall PlayMode テストで **BlendShape 名一覧整合性検査**（送信側 heartbeat 受信後、不一致 BlendShape のみ反映されず警告ログが出ること）を検証する。
+12. The osc-output-binding spec shall PlayMode テストで `OnLateTick` のホットパスに GC アロケーションが発生しないことを `Profiler.GetTotalAllocatedMemoryLong` 差分等で監視する（BlendShape のみ送信ケース、Gaze 同送ケース、bundle 化ケース、heartbeat 含むケース）。
+13. The osc-output-binding spec shall テスト命名を `{Target}Tests` / `{Method}_{Condition}_{Expected}` 規約に従って配置する。
 
-### Requirement 9: サンプル（Samples~/OscOutputDemo）とドキュメント更新
-**Objective:** As a UPM 経由でパッケージを Import する利用者, I want OSC 送信 binding を 1 シーンで動かせる完結したサンプル（BlendShape + Gaze）, so that Inspector 設定例と JSON 例を見ながら自分のプロジェクトに導入できる
+### Requirement 9: サンプル（送信 + 受信専用最小構成）とドキュメント更新
+**Objective:** As a UPM 経由でパッケージを Import する利用者, I want OSC 送信 binding と受信専用最小構成を分けて動かせる完結したサンプル, so that Inspector 設定例と JSON 例を見ながら配信側 / 描画側それぞれの導入経路を理解できる
 
 #### Acceptance Criteria
-1. The osc-output-binding spec shall `com.hidano.facialcontrol.osc` の `Samples~/OscOutputDemo` に Scene / FacialProfileSO / OscSenderOptions JSON / README をまとめて配置する。
-2. The osc-output-binding spec shall OscOutputDemo サンプルで BlendShape 送信と Gaze Vector2 送信の双方を含む構成例を提示する。
-3. The osc-output-binding spec shall 同名のサンプル一式を `FacialControl/Assets/Samples/` 配下にも二重管理として配置し、dev プロジェクトで Scene 結線して動作確認できる状態にする。
-4. When `Samples~` または `Assets/Samples` のいずれかが編集された時, the osc-output-binding spec の作業手順 shall もう一方を同期コピーする手順を `docs/work-procedure.md` に明記する。
-5. The osc-output-binding spec shall `com.hidano.facialcontrol.osc` の `package.json` の `samples` 配列に OscOutputDemo を登録する。
-6. The osc-output-binding spec shall `com.hidano.facialcontrol.osc` の `CHANGELOG.md` および `README.md` に OSC 送信 binding 機能（BlendShape + Gaze Vector2）の追加を記載する。
-7. The osc-output-binding spec shall `docs/work-procedure.md` にこの spec の作業手順を追加し、`docs/backlog.md` から OSC 送信関連の積み残しを引き上げて整理する。
+1. The osc-output-binding spec shall `com.hidano.facialcontrol.osc` の `Samples~/OscOutputDemo`（送信側）に Scene / FacialProfileSO / OscSenderOptions JSON / README をまとめて配置する。
+2. The OscOutputDemo サンプル shall BlendShape 送信、Gaze Vector2 送信（VRChat 形式と ARKit 形式の両方）、複数 endpoint 同報、ループバック抑制設定例を含む。
+3. The osc-output-binding spec shall `com.hidano.facialcontrol.osc` の `Samples~/OscReceiverDemo`（受信専用、最小 SO 構成）に Scene / 受信専用最小 FacialProfileSO（OSC 入力源を素通しする 1 Layer のみ、Expression 定義不要）/ OscReceiverOptions JSON / Gaze 受信 binding 設定 / README をまとめて配置する。
+4. The osc-output-binding spec shall 上記 2 サンプル一式を `FacialControl/Assets/Samples/` 配下にも二重管理として配置し、dev プロジェクトで Scene 結線して動作確認できる状態にする。
+5. When `Samples~` または `Assets/Samples` のいずれかが編集された時, the osc-output-binding spec の作業手順 shall もう一方を同期コピーする手順を `docs/work-procedure.md` に明記する。
+6. The osc-output-binding spec shall `com.hidano.facialcontrol.osc` の `package.json` の `samples` 配列に OscOutputDemo / OscReceiverDemo の両方を登録する。
+7. The osc-output-binding spec shall `com.hidano.facialcontrol.osc` の `CHANGELOG.md` および `README.md` に OSC 送信 / 受信拡張 / Gaze Vector2 受信機能の追加と既存 `OscAdapterBinding` への破壊的変更を記載する。
+8. The osc-output-binding spec shall `docs/work-procedure.md` にこの spec の作業手順を追加し、`docs/backlog.md` から OSC 送信関連の積み残しを引き上げて整理する。
 
 ### Requirement 10: パフォーマンス・アーキテクチャ制約
-**Objective:** As a 性能設計指針（毎フレーム GC ゼロ、クリーンアーキテクチャ、preview.2 以降）に従う必要のあるプロジェクト, I want OSC 送信 binding が全レイヤーの規約を破らないこと, so that 既存 contract に違反せず preview.2 以降にマージできる
+**Objective:** As a 性能設計指針（毎フレーム GC ゼロ、クリーンアーキテクチャ、preview.2 以降）に従う必要のあるプロジェクト, I want OSC 送信 / 受信 binding が全レイヤーの規約を破らないこと, so that 既存 contract に違反せず preview.2 以降にマージできる
 
 #### Acceptance Criteria
-1. The OscSenderAdapterBinding shall `OnLateTick` のホットパス（毎フレーム実行経路、BlendShape と Gaze の両系統）でヒープ確保を行わず、配列・バッファは `OnStart` 時点で確保し再利用する。
-2. The OscSenderAdapterBinding shall Adapters 層（`Hidano.FacialControl.Adapters.OSC` 名前空間相当）に配置され、Domain / Application 層へ Unity / uOSC 参照を漏らさない。
+1. The OscSenderAdapterBinding および拡張後の OscAdapterBinding shall `OnLateTick` / `OnFixedTick` のホットパス（毎フレーム実行経路、BlendShape と Gaze の両系統、bundle 構築 / 解釈含む）でヒープ確保を行わず、配列・バッファは `OnStart` 時点で確保し再利用する。
+2. The 各 binding shall Adapters 層（`Hidano.FacialControl.Adapters.OSC` 名前空間相当）に配置され、Domain / Application 層へ Unity / uOSC 参照を漏らさない。
 3. The Facial Output Bus shall `Hidano.FacialControl.Domain` 配下に配置され、`Unity.Collections` 以外の Engine 参照を持たない。Gaze Vector2 の通知データ型も Domain 純度を保つ（`UnityEngine.Vector2` を Domain に持ち込まず、`(float x, float y)` などの Domain 表現を使う）。
 4. The osc-output-binding 実装 shall 新規パッケージを切らず、既存 `com.hidano.facialcontrol.osc` パッケージへの追加実装として完結する。
 5. The osc-output-binding 実装 shall preview.2 以降の機能として位置付け、preview.1 ターゲットの破壊的変更を発生させない。
 6. The osc-output-binding 実装 shall Windows PC 環境を主たる検証対象とし、モバイル / WebGL / VR 固有のコードパスを必須にしない（将来拡張の余地は契約として残す）。
 7. The osc-output-binding 実装 shall エラーハンドリングを Unity 標準ログ（`Debug.Log/Warning/Error/LogException`）のみで行い、カスタム例外型を新規追加しない。
+
+### Requirement 11: OscAdapterBinding（受信側）の破壊的拡張 — フェイルセーフ / ゾンビ排除 / bundle 解釈 / 整合性検査
+**Objective:** As a 配信を受信して描画する Unity プロセスの運用者, I want 送信元の瞬断 / 落ちで受信側がベース表情へ復帰し、複数の送信元（ゾンビ含む）から流入する値の中から正規の 1 つだけを採用し、フレーム単位の値をアトミックに反映する受信 binding, so that 配信全体の安定性と表情破綻の防止が両立できる
+
+#### Acceptance Criteria
+1. The 拡張後 `OscAdapterBinding` shall 既存 binding と互換 API（slug、endpoint、staleness 等）を維持しつつ、本要件で追加する設定（フェイルセーフモード、IP allowlist、整合性検査ポリシー、bundle 解釈モード）を `[Serializable]` フィールドとして追加する。OSC binding はまだプロダクション運用に乗っていないため、既存利用箇所への migration は不要とし、API 形状の breaking change を許容する。
+2. When 受信が継続している間, the 拡張後 `OscAdapterBinding` shall 既存と同じく `OscDoubleBuffer` 経由で BlendShape 値を `IInputSourceRegistry` に publish する。
+3. When `OscInputSource.TryWriteValues` が staleness 超過で false を返した時、かつフェイルセーフモードが「ベース表情復帰」に設定されている場合, the 拡張後 `OscAdapterBinding` shall 当該入力源の BlendShape 値配列を **全要素 0.0** で publish し、レイヤー合成がベース表情の状態へ自然遷移するよう経路を切り替える。
+4. When staleness 超過後に新規パケットを受信した時, the 拡張後 `OscAdapterBinding` shall フェイルセーフ状態を解除し、通常の受信値 publish に復帰する。
+5. The 拡張後 `OscAdapterBinding` shall **IP allowlist**（許可された送信元 IP 文字列のリスト）を保持し、allowlist が空でないとき allowlist 外の送信元から到着したパケットを廃棄する。allowlist が空のときは全送信元を受け付ける。
+6. The 拡張後 `OscAdapterBinding` shall 送信側が bundle 先頭に同梱する **送信元識別ヘッダ**（送信元 UUID + 起動時刻、Design で具体的 OSC アドレスを確定）を読み取り、複数の送信元 UUID が allowlist 内で同時に観測された場合は **最も新しい起動時刻の送信元** のみを採用する（ゾンビ排除）。
+7. The 拡張後 `OscAdapterBinding` shall 採用送信元の切替が発生した時に Unity 標準ログで情報ログ（採用前後の UUID / 起動時刻 / 送信元 IP）を出力する。
+8. The 拡張後 `OscAdapterBinding` shall 受信した OSC bundle を **1 フレーム単位のアトミック更新**として扱い、bundle 内全メッセージの書き込みが完了してから `OscDoubleBuffer.Swap` を実行する。bundle 外の bare メッセージは受信時刻順にバッファへ書き込み、次の `OnFixedTick.Swap` で公開する。
+9. The 拡張後 `OscAdapterBinding` shall 送信側 heartbeat（既定 5 秒間隔の BlendShape 名一覧）を別 OSC アドレスで受信し、自身の BlendShape mapping と照合する。
+10. If heartbeat の BlendShape 名一覧と自身の mapping が部分不一致である場合, the 拡張後 `OscAdapterBinding` shall **不一致 BlendShape のみ反映を停止**し、一致分の更新は継続する（解釈 C: 部分不一致時は部分反映）。
+11. When heartbeat 不一致を検出した時, the 拡張後 `OscAdapterBinding` shall 不一致内容（送信側にあるが受信側に無い名前 / 受信側にあるが送信側に無い名前）を Unity 標準ログで警告出力する。同一不一致セットに対するログ抑制は Design で確定する。
+12. The 拡張後 `OscAdapterBinding` shall allowlist / 整合性検査の判定を `OnFixedTick.Swap` の準備処理で行い、`OscInputSource.TryWriteValues` のホットパス（GC ゼロ目標）に重い文字列比較を入れない。
+
+### Requirement 12: Gaze Vector2 受信 binding（8 BlendShape → 左右別 Vector2 逆合成）
+**Objective:** As a 受信側で送信元の視線を再現したい Unity エンジニア, I want OSC で届く eyeLookXxx 系 8 BlendShape または VRChat 形式の Vector2 を左右別 Vector2 として `GazeBindingConfig` の入力源に流し込める受信 binding, so that 寄り目や片目だけの流し目など左右非対称の視線も含めて忠実に再現でき、角度制限は受信側で自由に調整できる
+
+#### Acceptance Criteria
+1. The Gaze Vector2 受信 binding shall `[Serializable]` + `[FacialAdapterBinding(displayName: "OSC Gaze Receiver")]` 属性を付与した `AdapterBindingBase` の sealed 具象として実装される。
+2. The Gaze Vector2 受信 binding shall 参照する OSC 受信元（同一 `FacialCharacterProfileSO` 内の `OscAdapterBinding` slug、または独自受信スロット）を `[Serializable]` フィールドで構成可能にする。
+3. When ARKit 形式の eyeLookXxx 系 8 BlendShape が受信元から到着した時, the Gaze Vector2 受信 binding shall **左目用 Vector2** `(x_L, y_L) = (eyeLookInLeft - eyeLookOutLeft, eyeLookUpLeft - eyeLookDownLeft)` および **右目用 Vector2** `(x_R, y_R) = (eyeLookOutRight - eyeLookInRight, eyeLookUpRight - eyeLookDownRight)` として逆合成する（符号定義は Design で確定、ここでは規約例として記載）。
+4. When VRChat 形式の `{expressionId}X` / `{expressionId}Y` が受信元から到着した時, the Gaze Vector2 受信 binding shall 当該 Vector2 を左右共通の入力として扱い、左目用 / 右目用 の値を同一 Vector2 に設定する。
+5. The Gaze Vector2 受信 binding shall 各 `expressionId` について **左目用と右目用の 2 つの `IAnalogInputSource`** を `IInputSourceRegistry` に publish し、`GazeBindingConfig` の入力源解決が左右別に行えるようにする。
+6. The Gaze Vector2 受信 binding shall 左右独立採用 ON/OFF フラグを `[Serializable]` フィールドで保持し、OFF の場合は左目用と右目用に同一 Vector2（左右の平均、または左目値のみ）を publish する fallback を提供する。
+7. The Gaze Vector2 受信 binding shall **角度制限を適用しない**。`GazeBindingConfig.outerYawAngle` / `innerYawAngle` / `lookUpAngle` / `lookDownAngle` は `GazeBonePoseProvider`（描画段）が適用する責務とし、本 binding は正規化 Vector2 を素通しする。
+8. The Gaze Vector2 受信 binding shall 受信元の OscDoubleBuffer から値を読み取るホットパスで GC アロケーションを発生させない。
+9. The Gaze Vector2 受信 binding shall 受信元 binding が staleness 超過 / フェイルセーフ復帰状態にある時は、左右 Vector2 とも `(0, 0)` を publish し、視線がセンターへ自然遷移する（受信側 `GazeBindingConfig` が中央復帰）。
+
+### Requirement 13: `GazeBindingConfig` の左右別 Vector2 入力対応
+**Objective:** As a Gaze の左右独立駆動を可能にしたいモデル制作者, I want `GazeBindingConfig` が単一 Vector2 入力だけでなく左右別 Vector2 入力源を受け付ける拡張, so that OSC 経由で左右非対称な視線を受信したときに各目に別々の Vector2 で姿勢を計算でき、既存の InputSystem 経路（単一 Vector2）も引き続き動く
+
+#### Acceptance Criteria
+1. The 拡張後 `GazeBindingConfig` shall 既存の単一 sourceId 解決経路を維持する後方互換モード、および新規の **左目用 sourceId / 右目用 sourceId** を別々に解決する左右別モードの両方を構造的に保持できる。具体的フィールド設計（sourceId フィールドの個数 / モード切替フラグ / 内部に左右ペアを並べる方式）は Design で確定する。
+2. When 左右別モードが選択され、両方の sourceId が解決済みの時, the GazeBonePoseProvider shall 左目ボーンには左目用 Vector2、右目ボーンには右目用 Vector2 を入力としてボーン回転を計算する。
+3. When 左右別モードで片方の sourceId のみが解決された時, the GazeBonePoseProvider shall 解決済みの Vector2 を左右両目の入力として fallback 動作させ、警告ログを出力する。
+4. The 拡張後 `GazeBindingConfig` shall 角度制限フィールド（`outerYawAngle` / `innerYawAngle` / `lookUpAngle` / `lookDownAngle`）を **左目 / 右目に対して左右別に適用** する責務を保持する。「向かって左に視線」と「向かって右に視線」で左目・右目それぞれの内側・外側角度が選択される既存ロジック（`GazeBindingConfig.cs` のコメント参照）を本拡張でも維持する。
+5. The 拡張後 `GazeBindingConfig` shall InputSystem 経路（単一 Vector2 入力）でも従来通り両目を駆動できることを破壊しない。後方互換は構造的に確保し、Design で互換シナリオ（既存 SO ファイル / JSON が壊れないこと）を確定する。
+6. The 拡張後 `GazeBindingConfig` の JSON 表現 shall 左右別モードのフィールドを optional として追加し、既存 JSON（左右別フィールドなし）は単一 Vector2 入力モードとして既定動作する。
+
+### Requirement 14: 送信元識別ヘッダ / heartbeat の送信仕様
+**Objective:** As a 複数送信元 / ゾンビ排除と BlendShape 名整合性検査を成立させたい運用者, I want 送信側が起動時生成 UUID / 起動時刻、および BlendShape 名一覧 heartbeat を一定周期で送出する仕様, so that 受信側が allowlist と heartbeat に基づいて正規の送信元を選別し、不一致 BlendShape を検出できる
+
+#### Acceptance Criteria
+1. The OscSenderAdapterBinding shall `OnStart` 時に **起動時生成 UUID**（プロセスごとにユニーク、再起動で変化）と **起動時刻**（UTC、Unix 秒 or ISO 8601）を生成し、内部状態として保持する。
+2. The OscSenderAdapterBinding shall 各フレームの OSC bundle 先頭に **送信元識別ヘッダ**（UUID + 起動時刻、Design で具体的 OSC アドレスを確定）を 1 メッセージとして同梱する。
+3. The OscSenderAdapterBinding shall **BlendShape 名一覧 heartbeat** を **起動時 1 回 + 5 秒間隔（既定、Drawer から変更可）** で送信する（方式 β-2）。
+4. The BlendShape 名一覧 heartbeat shall 当該 binding が送信対象としている BlendShape 名のリスト（順序保持）を 1 つの OSC bundle 内で送出する。
+5. The BlendShape 名一覧 heartbeat shall 通常の毎フレーム bundle と同じ送信先 endpoint 群へ送られる。
+6. The OscSenderAdapterBinding shall heartbeat 周期が極端に短く設定された場合（例: 0.1 秒未満）に警告ログを出力し、最小値（Design で確定）にクランプする。
+7. When ループバック抑制が有効で送信先が全 endpoint 抑制対象の場合, the OscSenderAdapterBinding shall heartbeat も送信しない。
+8. The OscSenderAdapterBinding shall 送信元識別ヘッダ / heartbeat の構築・送信処理でも `OnLateTick` のホットパス GC ゼロを維持する（heartbeat の名前リストは `OnStart` 時に確保し再利用）。
