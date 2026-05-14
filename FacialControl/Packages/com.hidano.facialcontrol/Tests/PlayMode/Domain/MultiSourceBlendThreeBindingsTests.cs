@@ -46,6 +46,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Domain
                 profile,
                 blendShapeNames,
                 adapterRegistry,
+                new FacialOutputBus(),
                 new ManualTimeProvider(),
                 _hostGameObject,
                 new FakeLipSyncProvider(new[] { 0.4f, 0.8f, 1.0f, 0.6f }));

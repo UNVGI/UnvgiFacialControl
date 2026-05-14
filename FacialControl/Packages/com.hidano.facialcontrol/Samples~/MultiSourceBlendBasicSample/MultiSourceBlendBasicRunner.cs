@@ -46,6 +46,7 @@ namespace Hidano.FacialControl.Samples.MultiSourceBlendBasicSample
                     profile,
                     BlendShapeNames,
                     registry,
+                    new FacialOutputBus(),
                     new SampleTimeProvider(),
                     host,
                     null);

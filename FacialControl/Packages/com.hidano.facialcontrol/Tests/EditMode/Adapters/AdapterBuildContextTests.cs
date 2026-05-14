@@ -38,16 +38,34 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
                 throw new NotImplementedException();
         }
 
+        private sealed class StubFacialOutputBus : IFacialOutputBus
+        {
+            public bool HasObservers => false;
+
+            public void Subscribe(IFacialOutputObserver observer) =>
+                throw new NotImplementedException();
+
+            public void Unsubscribe(IFacialOutputObserver observer) =>
+                throw new NotImplementedException();
+
+            public void Publish(
+                ReadOnlySpan<float> postBlendValues,
+                ReadOnlySpan<GazeSnapshot> gazeSnapshots) =>
+                throw new NotImplementedException();
+        }
+
         private static AdapterBuildContext CreateValidContext(
             out FacialProfile profile,
             out IReadOnlyList<string> blendShapeNames,
             out IInputSourceRegistry registry,
+            out IFacialOutputBus facialOutputBus,
             out ITimeProvider timeProvider,
             out GameObject host)
         {
             profile = new FacialProfile("1.0");
             blendShapeNames = new List<string> { "A", "B" };
             registry = new StubInputSourceRegistry();
+            facialOutputBus = new StubFacialOutputBus();
             timeProvider = new ManualTimeProvider();
             host = new GameObject("AdapterBuildContextHost");
 
@@ -55,6 +73,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
                 profile,
                 blendShapeNames,
                 registry,
+                facialOutputBus,
                 timeProvider,
                 host,
                 lipSyncProvider: null);
@@ -67,6 +86,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             int count = 0;
             if (ctx.BlendShapeNames != null) count++;
             if (ctx.InputSourceRegistry != null) count++;
+            if (ctx.FacialOutputBus != null) count++;
             if (ctx.TimeProvider != null) count++;
             if (ctx.HostGameObject != null) count++;
             // LipSyncProvider は null 許容
@@ -83,6 +103,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
                 out var profile,
                 out var blendShapeNames,
                 out var registry,
+                out var facialOutputBus,
                 out var timeProvider,
                 out var host);
 
@@ -91,6 +112,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
                 Assert.That(ctx.Profile.SchemaVersion, Is.EqualTo(profile.SchemaVersion));
                 Assert.That(ctx.BlendShapeNames, Is.SameAs(blendShapeNames));
                 Assert.That(ctx.InputSourceRegistry, Is.SameAs(registry));
+                Assert.That(ctx.FacialOutputBus, Is.SameAs(facialOutputBus));
                 Assert.That(ctx.TimeProvider, Is.SameAs(timeProvider));
                 Assert.That(ctx.HostGameObject, Is.SameAs(host));
                 Assert.That(ctx.LipSyncProvider, Is.Null);
@@ -116,6 +138,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
                         profile,
                         blendShapeNames: null,
                         inputSourceRegistry: registry,
+                        facialOutputBus: new StubFacialOutputBus(),
                         timeProvider: timeProvider,
                         hostGameObject: host,
                         lipSyncProvider: null));
@@ -141,6 +164,34 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
                         profile,
                         blendShapeNames,
                         inputSourceRegistry: null,
+                        facialOutputBus: new StubFacialOutputBus(),
+                        timeProvider: timeProvider,
+                        hostGameObject: host,
+                        lipSyncProvider: null));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
+        public void Constructor_NullFacialOutputBus_Throws()
+        {
+            var profile = new FacialProfile("1.0");
+            IReadOnlyList<string> blendShapeNames = new List<string>();
+            var registry = new StubInputSourceRegistry();
+            ITimeProvider timeProvider = new ManualTimeProvider();
+            var host = new GameObject("AdapterBuildContextHost_NullFacialOutputBus");
+
+            try
+            {
+                Assert.Throws<ArgumentNullException>(
+                    () => new AdapterBuildContext(
+                        profile,
+                        blendShapeNames,
+                        inputSourceRegistry: registry,
+                        facialOutputBus: null,
                         timeProvider: timeProvider,
                         hostGameObject: host,
                         lipSyncProvider: null));
@@ -166,6 +217,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
                         profile,
                         blendShapeNames,
                         inputSourceRegistry: registry,
+                        facialOutputBus: new StubFacialOutputBus(),
                         timeProvider: null,
                         hostGameObject: host,
                         lipSyncProvider: null));
@@ -189,6 +241,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
                     profile,
                     blendShapeNames,
                     inputSourceRegistry: registry,
+                    facialOutputBus: new StubFacialOutputBus(),
                     timeProvider: timeProvider,
                     hostGameObject: null,
                     lipSyncProvider: null));
@@ -198,6 +251,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         public void Constructor_NullLipSyncProvider_IsAllowed()
         {
             var ctx = CreateValidContext(
+                out _,
                 out _,
                 out _,
                 out _,
@@ -222,6 +276,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
                 out _,
                 out _,
                 out _,
+                out _,
                 out var host);
 
             try
@@ -229,7 +284,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
                 // in 引数経由で全 field を読み取れることを確認。
                 // readonly struct + 直接 field アクセスのため boxing は発生しない（コンパイル時に確認）。
                 int readCount = CountFieldRead(in ctx);
-                Assert.That(readCount, Is.EqualTo(6));
+                Assert.That(readCount, Is.EqualTo(7));
             }
             finally
             {
@@ -246,6 +301,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             AdapterBuildContext ctx = default;
             Assert.That(ctx.BlendShapeNames, Is.Null);
             Assert.That(ctx.InputSourceRegistry, Is.Null);
+            Assert.That(ctx.FacialOutputBus, Is.Null);
             Assert.That(ctx.TimeProvider, Is.Null);
             Assert.That(ctx.HostGameObject, Is.Null);
             Assert.That(ctx.LipSyncProvider, Is.Null);

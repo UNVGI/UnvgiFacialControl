@@ -4,6 +4,7 @@ using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
 using Unity.Profiling;
 using UnityEngine;
 using VContainer;
@@ -103,6 +104,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
                 {
                     InputSourceRegistry registry = new InputSourceRegistry();
                     builder.RegisterInstance<IInputSourceRegistry>(registry);
+                    IFacialOutputBus facialOutputBus = new FacialOutputBus();
 
                     ITimeProvider timeProvider = appScope.Container.Resolve<ITimeProvider>();
                     appScope.Container.TryResolve<ILipSyncProvider>(out ILipSyncProvider lipSyncProvider);
@@ -111,6 +113,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
                         capturedProfile,
                         capturedBlendShapeNames,
                         registry,
+                        facialOutputBus,
                         timeProvider,
                         capturedHostGameObject,
                         lipSyncProvider,

@@ -6,6 +6,7 @@ using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
 using Hidano.FacialControl.LipSync.Adapters;
 using Hidano.FacialControl.LipSync.Adapters.Devices;
 using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
@@ -199,6 +200,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.HotSwap
                 profile: new FacialProfile("1.0"),
                 blendShapeNames: new List<string> { BlendShapeName },
                 inputSourceRegistry: _registry,
+                facialOutputBus: new FacialOutputBus(),
                 timeProvider: new UnityTimeProvider(),
                 hostGameObject: _hostGameObject,
                 lipSyncProvider: null);

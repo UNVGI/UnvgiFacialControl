@@ -6,6 +6,7 @@ using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
 using Hidano.FacialControl.Tests.Shared;
 using NUnit.Framework;
 using UnityEngine;
@@ -129,6 +130,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
                 new FacialProfile("1.0"),
                 new List<string> { "A", "B" },
                 new StubInputSourceRegistry(),
+                new FacialOutputBus(),
                 new ManualTimeProvider(),
                 _hostGameObject,
                 lipSyncProvider: null);
