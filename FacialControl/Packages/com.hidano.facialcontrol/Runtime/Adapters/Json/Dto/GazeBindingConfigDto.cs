@@ -6,6 +6,9 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
     public sealed class GazeBindingConfigDto
     {
         public string expressionId;
+        public bool useDistinctLeftRight;
+        public string sourceIdLeft;
+        public string sourceIdRight;
 
         public string leftEyeBonePath;
         public Vector3 leftEyeInitialRotation;

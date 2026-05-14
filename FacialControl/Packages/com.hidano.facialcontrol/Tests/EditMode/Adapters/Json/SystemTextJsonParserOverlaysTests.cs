@@ -33,6 +33,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 
             Assert.AreEqual(1, dto.gazeConfigs.Count);
             Assert.AreEqual("look_left", dto.gazeConfigs[0].expressionId);
+            Assert.AreEqual(false, dto.gazeConfigs[0].useDistinctLeftRight);
         }
 
         [Test]

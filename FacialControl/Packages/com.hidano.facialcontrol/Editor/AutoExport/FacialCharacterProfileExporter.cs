@@ -394,34 +394,7 @@ namespace Hidano.FacialControl.Editor.AutoExport
 
         private static List<GazeBindingConfigDto> ConvertGazeConfigsToDto(IReadOnlyList<GazeBindingConfig> configs)
         {
-            if (configs == null || configs.Count == 0)
-                return new List<GazeBindingConfigDto>();
-
-            var result = new List<GazeBindingConfigDto>(configs.Count);
-            for (int i = 0; i < configs.Count; i++)
-            {
-                var src = configs[i];
-                if (src == null) continue;
-
-                result.Add(new GazeBindingConfigDto
-                {
-                    expressionId = src.expressionId,
-                    leftEyeBonePath = src.leftEyeBonePath,
-                    leftEyeInitialRotation = src.leftEyeInitialRotation,
-                    leftEyeYawAxisLocal = src.leftEyeYawAxisLocal,
-                    leftEyePitchAxisLocal = src.leftEyePitchAxisLocal,
-                    rightEyeBonePath = src.rightEyeBonePath,
-                    rightEyeInitialRotation = src.rightEyeInitialRotation,
-                    rightEyeYawAxisLocal = src.rightEyeYawAxisLocal,
-                    rightEyePitchAxisLocal = src.rightEyePitchAxisLocal,
-                    lookUpAngle = src.lookUpAngle,
-                    lookDownAngle = src.lookDownAngle,
-                    outerYawAngle = src.outerYawAngle,
-                    innerYawAngle = src.innerYawAngle,
-                });
-            }
-
-            return result;
+            return FacialCharacterProfileConverter.ToGazeConfigDtos(configs);
         }
 
         private static ExpressionSnapshotDto ConvertSnapshotToDto(ExpressionSnapshot snapshot)

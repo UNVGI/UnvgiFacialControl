@@ -56,6 +56,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
 
                 string json = File.ReadAllText(profilePath);
                 StringAssert.Contains("\"gaze_configs\"", json, "JSON root 直下の \"gaze_configs\" キーが必要");
+                StringAssert.Contains("\"useDistinctLeftRight\"", json, "Gaze JSON must carry the distinct left/right mode flag.");
+                StringAssert.Contains("\"sourceIdLeft\"", json, "Gaze JSON must carry the left source id field.");
+                StringAssert.Contains("\"sourceIdRight\"", json, "Gaze JSON must carry the right source id field.");
                 StringAssert.DoesNotContain("\"_gazeConfigs\"", json, "Unity SerializedField 接頭辞は JSON に出力されないはず");
 
                 var parser = new SystemTextJsonParser();
@@ -150,6 +153,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
                 new GazeBindingConfig
                 {
                     expressionId = "eye_look",
+                    useDistinctLeftRight = false,
+                    sourceIdLeft = string.Empty,
+                    sourceIdRight = string.Empty,
                     leftEyeBonePath = "Armature/Hips/Head/LeftEye",
                     leftEyeInitialRotation = new Vector3(1f, 2f, 3f),
                     leftEyeYawAxisLocal = new Vector3(0f, 1f, 0f),
@@ -166,6 +172,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
                 new GazeBindingConfig
                 {
                     expressionId = "secondary_look",
+                    useDistinctLeftRight = true,
+                    sourceIdLeft = "input:secondary_look.left",
+                    sourceIdRight = "osc:secondary_look.right",
                     leftEyeBonePath = "Armature/Spine/Head/L_Eye",
                     leftEyeInitialRotation = new Vector3(-2f, 0f, 4f),
                     leftEyeYawAxisLocal = new Vector3(0f, 1f, 0.1f),
@@ -186,6 +195,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
         {
             Assert.That(actual, Is.Not.Null, "[" + label + "] restored entry must not be null");
             Assert.That(actual.expressionId, Is.EqualTo(expected.expressionId), "[" + label + "] expressionId");
+            Assert.That(actual.useDistinctLeftRight, Is.EqualTo(expected.useDistinctLeftRight), "[" + label + "] useDistinctLeftRight");
+            Assert.That(actual.sourceIdLeft, Is.EqualTo(expected.sourceIdLeft), "[" + label + "] sourceIdLeft");
+            Assert.That(actual.sourceIdRight, Is.EqualTo(expected.sourceIdRight), "[" + label + "] sourceIdRight");
             Assert.That(actual.leftEyeBonePath, Is.EqualTo(expected.leftEyeBonePath), "[" + label + "] leftEyeBonePath");
             Assert.That(actual.leftEyeInitialRotation, Is.EqualTo(expected.leftEyeInitialRotation), "[" + label + "] leftEyeInitialRotation");
             Assert.That(actual.leftEyeYawAxisLocal, Is.EqualTo(expected.leftEyeYawAxisLocal), "[" + label + "] leftEyeYawAxisLocal");

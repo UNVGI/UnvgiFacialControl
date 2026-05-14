@@ -253,6 +253,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
                     new GazeBindingConfigDto
                     {
                         expressionId = "eye_look",
+                        useDistinctLeftRight = true,
+                        sourceIdLeft = "input:eye_look.left",
+                        sourceIdRight = "osc:eye_look.right",
                         leftEyeBonePath = "Armature/Hips/Head/LeftEye",
                         leftEyeInitialRotation = new Vector3(1f, 2f, 3f),
                         leftEyeYawAxisLocal = new Vector3(0f, 1f, 0f),
@@ -274,6 +277,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
             Assert.That(configs, Has.Count.EqualTo(1));
             GazeBindingConfig config = configs[0];
             Assert.That(config.expressionId, Is.EqualTo("eye_look"));
+            Assert.That(config.useDistinctLeftRight, Is.True);
+            Assert.That(config.sourceIdLeft, Is.EqualTo("input:eye_look.left"));
+            Assert.That(config.sourceIdRight, Is.EqualTo("osc:eye_look.right"));
             Assert.That(config.leftEyeBonePath, Is.EqualTo("Armature/Hips/Head/LeftEye"));
             Assert.That(config.leftEyeInitialRotation, Is.EqualTo(new Vector3(1f, 2f, 3f)));
             Assert.That(config.leftEyeYawAxisLocal, Is.EqualTo(new Vector3(0f, 1f, 0f)));
@@ -294,6 +300,52 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
             Assert.That(config.lookRightSamples, Is.Empty);
             Assert.That(config.lookUpSamples, Is.Empty);
             Assert.That(config.lookDownSamples, Is.Empty);
+        }
+
+        [Test]
+        public void ToGazeConfigDtos_DefaultAndDistinctModes_MapsEveryValueToDto()
+        {
+            var configs = new List<GazeBindingConfig>
+            {
+                new GazeBindingConfig
+                {
+                    expressionId = "eye_default",
+                    useDistinctLeftRight = false,
+                    leftEyeBonePath = "Head/LeftEye",
+                    rightEyeBonePath = "Head/RightEye",
+                },
+                new GazeBindingConfig
+                {
+                    expressionId = "eye_distinct",
+                    useDistinctLeftRight = true,
+                    sourceIdLeft = "input:eye_distinct.left",
+                    sourceIdRight = "osc:eye_distinct.right",
+                    leftEyeBonePath = "Armature/LeftEye",
+                    rightEyeBonePath = "Armature/RightEye",
+                    lookUpAngle = 20f,
+                    lookDownAngle = 10f,
+                    outerYawAngle = 21f,
+                    innerYawAngle = 11f,
+                },
+            };
+
+            List<GazeBindingConfigDto> dtos = FacialCharacterProfileConverter.ToGazeConfigDtos(configs);
+
+            Assert.That(dtos, Has.Count.EqualTo(2));
+            Assert.That(dtos[0].expressionId, Is.EqualTo("eye_default"));
+            Assert.That(dtos[0].useDistinctLeftRight, Is.False);
+            Assert.That(dtos[0].sourceIdLeft, Is.EqualTo(string.Empty));
+            Assert.That(dtos[0].sourceIdRight, Is.EqualTo(string.Empty));
+            Assert.That(dtos[0].leftEyeBonePath, Is.EqualTo("Head/LeftEye"));
+            Assert.That(dtos[0].rightEyeBonePath, Is.EqualTo("Head/RightEye"));
+            Assert.That(dtos[1].expressionId, Is.EqualTo("eye_distinct"));
+            Assert.That(dtos[1].useDistinctLeftRight, Is.True);
+            Assert.That(dtos[1].sourceIdLeft, Is.EqualTo("input:eye_distinct.left"));
+            Assert.That(dtos[1].sourceIdRight, Is.EqualTo("osc:eye_distinct.right"));
+            Assert.That(dtos[1].lookUpAngle, Is.EqualTo(20f));
+            Assert.That(dtos[1].lookDownAngle, Is.EqualTo(10f));
+            Assert.That(dtos[1].outerYawAngle, Is.EqualTo(21f));
+            Assert.That(dtos[1].innerYawAngle, Is.EqualTo(11f));
         }
 
         [Test]

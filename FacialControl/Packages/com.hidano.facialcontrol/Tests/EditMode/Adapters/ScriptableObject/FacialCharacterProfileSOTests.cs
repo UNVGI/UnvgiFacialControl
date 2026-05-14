@@ -132,6 +132,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
 
                 SerializedProperty entry = gazeConfigs.GetArrayElementAtIndex(0);
                 Assert.That(entry.FindPropertyRelative("expressionId").stringValue, Is.EqualTo("eye_look"));
+                Assert.That(entry.FindPropertyRelative("useDistinctLeftRight").boolValue, Is.False);
+                Assert.That(entry.FindPropertyRelative("sourceIdLeft").stringValue, Is.EqualTo(string.Empty));
+                Assert.That(entry.FindPropertyRelative("sourceIdRight").stringValue, Is.EqualTo(string.Empty));
                 Assert.That(entry.FindPropertyRelative("leftEyeBonePath").stringValue, Is.EqualTo("LeftEye"));
             }
             finally
