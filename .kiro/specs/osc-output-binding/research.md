@@ -207,7 +207,7 @@
 - **R5 — SystemTextJsonParser の命名 vs 実装の乖離**: design.md 内で「既存 JSON 経路と整合、新ライブラリ持ち込まない」と再表現。本 spec で命名変更は行わない（別 spec で対処、`docs/backlog.md` に追記）。
 - **R6 — GazeBindingConfig 破壊変更の波及**: preview 段階 migration 不要のため許容。`InputSystemAdapterBinding.BuildGazeProvider` / `FacialCharacterProfileConverter` / 既存 Gaze テスト一斉改修を Phase 7 で 1 PR にまとめる。
 - **R7 — Sample 二重管理**: `docs/work-procedure.md` に「Samples~ と Assets/Samples の同期手順」を明文化。CLAUDE.md の Samples 二重管理ルールに従う。
-- **R8 — 受信側 binding 依存解決順**: 遅延 resolve で対応。テスト (`OscGazeReceiverAdapterBindingTests`) で SO リスト順両方向 (sender 先 / receiver 先) を検証。
+- **R8 — 受信側 binding 依存解決順（解決済み）**: 2026-05-15 のレビューで Gaze Vector2 受信を別 binding に分割せず `OscAdapterBinding` 内の mode 別 entry として統合する判断に変更。`InputSystemAdapterBinding` の単一 binding 内 mode 集約パターン（`ExpressionBindingEntry.bindingMode`）を踏襲。これにより binding 間 cross-lookup（`AdapterBuildContext.OscBindingProvider` 案）は不要となり、フェイルセーフ時の状態伝播も同一 binding 内の内部呼出で完結する。`OscGazeReceiverAdapterBindingTests` は `OscAdapterBindingTests` の Gaze 系 mode シナリオに統合する。
 - **R9 — MTU 超過時の bundle 分割**: 同一 timestamp を継承した複数 bundle に分割。受信側 accumulator は timestamp ベースで集約する既存設計でそのまま吸収可能。
 - **R10 — heartbeat 大規模 mapping (>500 BS)**: 1 メッセージで送れない場合は複数 heartbeat メッセージに分割。実装時 Phase 4 で確定。
 - **R11 — Profiler 差分テストの flakiness**: 初回 JIT / domain reload 直後の alloc を warm-up フェーズで除外。10 サンプル中下位 9 個の中央値で評価。
@@ -229,4 +229,36 @@
 - 関連 steering ドキュメント:
   - `D:\Personal\Repositries\FacialControl\.kiro\steering\product.md`
   - `D:\Personal\Repositries\FacialControl\.kiro\steering\tech.md`
+
+## Decision Log（2026-05-15 設計レビュー追記）
+
+### D1: `AdapterBuildContext` に `IFacialOutputBus` を直接追加
+- **Context**: `OscSenderAdapterBinding.OnStart` で post-blend bus を取得する DI 経路が未確定。
+- **Options**:
+  - A. `AdapterBuildContext` 構造体に `IFacialOutputBus` フィールド追加（採用）
+  - B. `AdapterBindingHost` 側で `IFacialOutputObserver` 実装 binding を pattern match で自動 Subscribe
+  - C. ctx に汎用 `IBindingScopeResolver` を 1 つ追加（Service Locator）
+- **Decision**: A 案を採用。ctx の最小拡張で完結し、既存 binding は当該フィールドを参照しないため動作影響なし。design.md の Revalidation Triggers L67 に「本 spec 内で 1 度実施済」と注記。
+- **Rationale**: Domain 純度を保ち、boxing 無し（readonly struct + in 渡し）。VContainer の child scope register 経路に lifetime = Scoped で挿せば既存 DI フローと整合。
+
+### D2: Gaze Vector2 受信を `OscAdapterBinding` に統合（OscGazeReceiverAdapterBinding 廃止）
+- **Context**: 元設計では `OscGazeReceiverAdapterBinding`（新規）が `OscAdapterBinding` の `OscDoubleBuffer` を slug で参照する構造で、gap-analysis R8（受信側 binding 依存解決順）が未確定だった。
+- **Options**:
+  - α. ctx に OSC 専用 locator 追加し binding 実体を直接参照
+  - β. `IInputSourceRegistry` 経由で受信元が 8 BS / X-Y を `IAnalogInputSource` として publish、Gaze receiver は slug で subscribe
+  - γ. ctx に IBindingScope 列挙 interface を新設
+  - **δ. `OscAdapterBinding` 自体に mode 別 entry（BlendShape / Gaze_VRChat_XY / Gaze_ARKit_8BS）を導入し、Gaze 受信を 1 binding 内に統合（採用）**
+- **Decision**: δ 案を採用。`InputSystemAdapterBinding` が単一 binding 内で Trigger + Analog + Gaze（`ExpressionBindingEntry.bindingMode`）を扱う既存パターンを踏襲。R8（binding 間依存解決）自体が消滅し、フェイルセーフ時の状態伝播も内部呼出で完結する。
+- **Rationale**: 既にコードベース内に「1 binding が複数 mode の入力を統合して扱う」前例（`InputSystemAdapterBinding`）が存在し、Inspector の Add ドロップダウンも 2 binding（Sender + Receiver）に統一されてユーザー設定がシンプル。要件 12 / 6.3 / 7 / 10 の文言を整合性のため修正。
+- **Impact**: design.md / requirements.md / spec.json を更新。`OscGazeReceiverAdapterBinding.cs` / `OscGazeReceiverAdapterBindingDrawer.cs` / `OscGazeReceiverOptionsDto.cs` / `osc-gaze-receiver-options.md` の新設は不要となり、代わりに `OscMappingEntry` / `OscMappingMode` / `OscMappingEntryDto` を新規追加。
+
+### D3: preview milestone のスコープ分割（uOSC fork を preview.3 送り）
+- **Context**: design.md の Migration Strategy が uOSC fork 3 phase + 本 spec 11 phase の合計 14 phase を一括 preview.2 に積んでおり、当初 preview milestone（2026-02 末）を超過した現状（2026-05-15）でさらに遅延リスクがあった。
+- **Options**:
+  - A. 最小実装サブセットで preview.2 を切る（Phase 1/3/7/8/9 + uOSC 一部のみ）
+  - B. full scope 維持で preview milestone を 2026 年末まで延期
+  - C. **uOSC fork（zero-alloc 化）を preview.3 送り、機能本体は preview.2 で完結（採用）**
+- **Decision**: C 案を採用。本 spec の Phase 1〜9（機能本体）を preview.2、Phase 10（uOSC fork zero-alloc）+ Phase 11（uOSC 互換 facade 撤去）を preview.3 に分割。
+- **Rationale**: 機能完成度を保ったまま preview.2 を確実に切ることを優先。GC スパイクは preview.2 で一時許容し、Req 10.1 の zero-alloc 完全達成は preview.3 で実現。Gaze 左右独立（Req 13）は preview.2 必須（後ろ送りすると再度破壊変更が必要なため）。
+- **Impact**: design.md の Migration Strategy を 2 milestone 分割の Mermaid に書き直し。requirements.md Req 10.1 / 10.5 を milestone 分割に整合させる文言に修正。
   - `D:\Personal\Repositries\FacialControl\.kiro\steering\structure.md`
