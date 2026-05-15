@@ -57,7 +57,7 @@ namespace Hidano.FacialControl.Adapters.OSC
             _sender.Initialize(mappings);
             _sender.StartSending();
 
-            _client = _sender.GetComponent<uOSC.uOscClient>();
+            _client = _sender.Client;
             _configured = true;
         }
 

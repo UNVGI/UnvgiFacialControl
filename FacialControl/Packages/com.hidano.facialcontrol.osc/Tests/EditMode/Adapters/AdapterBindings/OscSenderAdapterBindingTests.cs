@@ -67,6 +67,101 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         }
 
         [Test]
+        public void OnStart_MultipleEnabledEndpoints_AddsIndependentHosts()
+        {
+            var bus = new RecordingFacialOutputBus();
+            var binding = new OscSenderAdapterBinding { Slug = "osc-sender" };
+            int firstPort = AllocatePort();
+            int secondPort = AllocatePort();
+            binding.ConfigureEndpoints(new[]
+            {
+                new OscSenderEndpointConfig("127.0.0.1", firstPort),
+                new OscSenderEndpointConfig("127.0.0.1", secondPort)
+            });
+            var host = new GameObject("OscSenderAdapterBindingMultiEndpointTests");
+
+            try
+            {
+                binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
+
+                Assert.That(binding.IsStarted, Is.True);
+                Assert.That(binding.HelperHostCount, Is.EqualTo(2));
+                Assert.That(binding.GetHelperHost(0).Port, Is.EqualTo(firstPort));
+                Assert.That(binding.GetHelperHost(1).Port, Is.EqualTo(secondPort));
+                Assert.That(binding.GetHelperHost(0), Is.Not.SameAs(binding.GetHelperHost(1)));
+                Assert.That(host.GetComponents<uOSC.uOscClient>().Length, Is.EqualTo(2));
+                Assert.That(bus.Observer, Is.SameAs(binding));
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
+        public void OnStart_DuplicateEndpoint_NormalizesToOneHostAndWarnsOnce()
+        {
+            var bus = new RecordingFacialOutputBus();
+            var binding = new OscSenderAdapterBinding { Slug = "osc-sender" };
+            int port = AllocatePort();
+            binding.ConfigureEndpoints(new[]
+            {
+                new OscSenderEndpointConfig(" 127.0.0.1 ", port),
+                new OscSenderEndpointConfig("127.0.0.1", port),
+                new OscSenderEndpointConfig("127.0.0.1", AllocatePort())
+            });
+            var host = new GameObject("OscSenderAdapterBindingDuplicateEndpointTests");
+
+            LogAssert.Expect(
+                LogType.Warning,
+                $"[OscSenderAdapterBinding] Duplicate endpoint '127.0.0.1:{port}' was normalized to one send slot.");
+
+            try
+            {
+                binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
+
+                Assert.That(binding.IsStarted, Is.True);
+                Assert.That(binding.HelperHostCount, Is.EqualTo(2));
+                Assert.That(binding.GetHelperHost(0).Port, Is.EqualTo(port));
+                Assert.That(bus.Observer, Is.SameAs(binding));
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
+        public void OnStart_NoEnabledEndpoints_WarnsAndDoesNotSubscribe()
+        {
+            var bus = new RecordingFacialOutputBus();
+            var binding = new OscSenderAdapterBinding { Slug = "osc-sender" };
+            binding.ConfigureEndpoints(new[]
+            {
+                new OscSenderEndpointConfig("127.0.0.1", AllocatePort(), enabled: false)
+            });
+            var host = new GameObject("OscSenderAdapterBindingNoEndpointTests");
+
+            LogAssert.Expect(LogType.Warning, "[OscSenderAdapterBinding] No enabled endpoints. OSC Sender will not start.");
+
+            try
+            {
+                binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
+
+                Assert.That(binding.IsStarted, Is.False);
+                Assert.That(binding.HelperHostCount, Is.EqualTo(0));
+                Assert.That(bus.Observer, Is.Null);
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
         public void OnStart_InvalidSlug_WarnsAndDoesNotSubscribe()
         {
             var bus = new RecordingFacialOutputBus();

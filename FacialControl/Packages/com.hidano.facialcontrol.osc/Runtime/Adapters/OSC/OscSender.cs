@@ -54,6 +54,9 @@ namespace Hidano.FacialControl.Adapters.OSC
         /// </summary>
         public bool IsRunning => _client != null && _client.isRunning;
 
+        /// <summary>uOSC client owned by this sender after StartSending.</summary>
+        public uOSC.uOscClient Client => _client;
+
         /// <summary>
         /// 初期化済みかどうか。
         /// </summary>
@@ -234,14 +237,9 @@ namespace Hidano.FacialControl.Adapters.OSC
             if (_client != null)
                 return;
 
-            _client = GetComponent<uOSC.uOscClient>();
-            if (_client == null)
-            {
-                // uOscClient は OnEnable で自動的に StartClient() を呼ぶ。
-                // 追加直後に即停止して、手動制御に切り替える。
-                _client = gameObject.AddComponent<uOSC.uOscClient>();
-                _client.StopClient();
-            }
+            // Each OscSender owns a client so multiple sender hosts on one GameObject stay independent.
+            _client = gameObject.AddComponent<uOSC.uOscClient>();
+            _client.StopClient();
         }
 
         private void OnDestroy()

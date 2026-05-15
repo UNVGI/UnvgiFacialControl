@@ -9,14 +9,17 @@ using UnityEngine;
 namespace Hidano.FacialControl.Adapters.AdapterBindings
 {
     /// <summary>
-    /// FacialController の post-blend 出力を OSC bundle として単一 endpoint へ送信する binding。
+    /// Sends FacialController post-blend output to multiple OSC endpoints as bundles.
     /// </summary>
     [Serializable]
     [FacialAdapterBinding(displayName: "OSC Sender")]
     public sealed class OscSenderAdapterBinding : AdapterBindingBase, IFacialOutputObserver
     {
         [SerializeField]
-        private OscSenderEndpointConfig _endpoint = new OscSenderEndpointConfig();
+        private List<OscSenderEndpointConfig> _endpoints = new List<OscSenderEndpointConfig>
+        {
+            new OscSenderEndpointConfig()
+        };
 
         [SerializeField]
         private List<string> _blendShapeNames = new List<string>();
@@ -25,22 +28,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         private IFacialOutputBus _facialOutputBus;
 
         [NonSerialized]
-        private OscSenderHost _helperHost;
-
-        [NonSerialized]
-        private OscMapping[] _runtimeMappings;
-
-        [NonSerialized]
-        private int[] _sourceBlendShapeIndices;
-
-        [NonSerialized]
-        private float[] _scratchPostBlendValues = Array.Empty<float>();
+        private List<SendSlot> _sendSlots;
 
         [NonSerialized]
         private GazeSnapshot[] _scratchGazeSnapshots = Array.Empty<GazeSnapshot>();
-
-        [NonSerialized]
-        private int _scratchPostBlendCount;
 
         [NonSerialized]
         private int _scratchGazeCount;
@@ -64,7 +55,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         private bool _started;
 
         /// <summary>
-        /// Inspector の Add ドロップダウンから Activator.CreateInstance で生成できるようにする。
+        /// Supports Activator.CreateInstance from the inspector add dropdown.
         /// </summary>
         public OscSenderAdapterBinding()
         {
@@ -74,14 +65,31 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         {
             get
             {
-                if (_endpoint == null)
+                List<OscSenderEndpointConfig> endpoints = EnsureEndpointList();
+                if (endpoints.Count == 0)
                 {
-                    _endpoint = new OscSenderEndpointConfig();
+                    endpoints.Add(new OscSenderEndpointConfig());
                 }
 
-                return _endpoint;
+                if (endpoints[0] == null)
+                {
+                    endpoints[0] = new OscSenderEndpointConfig();
+                }
+
+                return endpoints[0];
             }
-            set => _endpoint = value ?? new OscSenderEndpointConfig();
+            set
+            {
+                List<OscSenderEndpointConfig> endpoints = EnsureEndpointList();
+                endpoints.Clear();
+                endpoints.Add(value ?? new OscSenderEndpointConfig());
+            }
+        }
+
+        public List<OscSenderEndpointConfig> Endpoints
+        {
+            get => EnsureEndpointList();
+            set => _endpoints = value ?? new List<OscSenderEndpointConfig>();
         }
 
         public List<string> BlendShapeNames
@@ -90,21 +98,49 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             set => _blendShapeNames = value ?? new List<string>();
         }
 
-        public OscSenderHost HelperHost => _helperHost;
+        public OscSenderHost HelperHost => _sendSlots != null && _sendSlots.Count > 0
+            ? _sendSlots[0].Host
+            : null;
+
+        public int HelperHostCount => _sendSlots != null ? _sendSlots.Count : 0;
 
         public SenderIdentity Identity => _identity;
 
         public bool IsStarted => _started;
 
+        public OscSenderHost GetHelperHost(int index)
+        {
+            if (_sendSlots == null)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
+
+            return _sendSlots[index].Host;
+        }
+
         public void Configure(string endpoint, int port)
         {
-            Endpoint.endpoint = endpoint;
-            Endpoint.port = port;
+            List<OscSenderEndpointConfig> endpoints = EnsureEndpointList();
+            endpoints.Clear();
+            endpoints.Add(new OscSenderEndpointConfig(endpoint, port));
         }
 
         public void Configure(string endpoint, int port, IReadOnlyList<string> blendShapeNames)
         {
             Configure(endpoint, port);
+            SetBlendShapeNames(blendShapeNames);
+        }
+
+        public void ConfigureEndpoints(IReadOnlyList<OscSenderEndpointConfig> endpoints)
+        {
+            SetEndpoints(endpoints);
+        }
+
+        public void ConfigureEndpoints(
+            IReadOnlyList<OscSenderEndpointConfig> endpoints,
+            IReadOnlyList<string> blendShapeNames)
+        {
+            SetEndpoints(endpoints);
             SetBlendShapeNames(blendShapeNames);
         }
 
@@ -128,31 +164,58 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return;
             }
 
-            OscSenderEndpointConfig endpoint = Endpoint;
-            if (!endpoint.enabled)
+            if (!TryBuildEndpointPlan(out List<OscSenderEndpointConfig> endpoints))
             {
-                Debug.LogWarning("[OscSenderAdapterBinding] Endpoint is disabled. OSC Sender will not start.");
                 return;
             }
 
-            if (!TryBuildMappings(ctx.BlendShapeNames, endpoint.preset, out _runtimeMappings, out _sourceBlendShapeIndices))
+            var sendSlots = new List<SendSlot>(endpoints.Count);
+            for (int i = 0; i < endpoints.Count; i++)
             {
-                Debug.LogWarning(
-                    $"[OscSenderAdapterBinding] BlendShape mapping is empty. OSC Sender will not start. Slug='{Slug}'");
+                OscSenderEndpointConfig endpoint = endpoints[i];
+                if (!TryBuildMappings(
+                        ctx.BlendShapeNames,
+                        endpoint.preset,
+                        out OscMapping[] mappings,
+                        out int[] sourceBlendShapeIndices))
+                {
+                    Debug.LogWarning(
+                        $"[OscSenderAdapterBinding] BlendShape mapping is empty for endpoint '{endpoint.endpoint}:{endpoint.port}'. Skipping endpoint.");
+                    continue;
+                }
+
+                OscSenderHost host = null;
+                try
+                {
+                    host = ctx.HostGameObject.AddComponent<OscSenderHost>();
+                    host.Configure(endpoint.endpoint, endpoint.port, mappings);
+                    sendSlots.Add(new SendSlot(host, sourceBlendShapeIndices));
+                }
+                catch (Exception ex)
+                {
+                    if (host != null)
+                    {
+                        UnityEngine.Object.Destroy(host);
+                    }
+
+                    Debug.LogWarning(
+                        $"[OscSenderAdapterBinding] Failed to start endpoint '{endpoint.endpoint}:{endpoint.port}'. {ex.Message}");
+                }
+            }
+
+            if (sendSlots.Count == 0)
+            {
+                Debug.LogWarning("[OscSenderAdapterBinding] No endpoint could be started. OSC Sender will not start.");
                 return;
             }
 
-            _scratchPostBlendValues = new float[_runtimeMappings.Length];
-            _scratchPostBlendCount = 0;
+            _sendSlots = sendSlots;
             _scratchGazeSnapshots = Array.Empty<GazeSnapshot>();
             _scratchGazeCount = 0;
             _hasPublishedFrame = false;
             _identity = SenderIdentityGenerator.Generate();
             _identityUuidBytes = _identity.Uuid.ToByteArray();
             _identityStartedAtUnixMs = _identity.StartedAtUnixMs.ToString(CultureInfo.InvariantCulture);
-
-            _helperHost = ctx.HostGameObject.AddComponent<OscSenderHost>();
-            _helperHost.Configure(endpoint.endpoint, endpoint.port, _runtimeMappings);
 
             _facialOutputBus = ctx.FacialOutputBus;
             _facialOutputBus.Subscribe(this);
@@ -162,16 +225,25 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         public override void OnLateTick(float deltaTime)
         {
-            if (!_started || !_hasPublishedFrame || _helperHost == null)
+            if (!_started || !_hasPublishedFrame || _sendSlots == null)
             {
                 return;
             }
 
-            _helperHost.SendBundle(
-                _identityUuidBytes,
-                _identityStartedAtUnixMs,
-                _scratchPostBlendValues,
-                _scratchPostBlendCount);
+            for (int i = 0; i < _sendSlots.Count; i++)
+            {
+                SendSlot slot = _sendSlots[i];
+                if (slot.Host == null)
+                {
+                    continue;
+                }
+
+                slot.Host.SendBundle(
+                    _identityUuidBytes,
+                    _identityStartedAtUnixMs,
+                    slot.ScratchPostBlendValues,
+                    slot.ScratchPostBlendCount);
+            }
         }
 
         public override void Dispose()
@@ -184,17 +256,21 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _subscribed = false;
             _facialOutputBus = null;
 
-            if (_helperHost != null)
+            if (_sendSlots != null)
             {
-                UnityEngine.Object.Destroy(_helperHost);
-                _helperHost = null;
+                for (int i = 0; i < _sendSlots.Count; i++)
+                {
+                    OscSenderHost host = _sendSlots[i].Host;
+                    if (host != null)
+                    {
+                        UnityEngine.Object.Destroy(host);
+                    }
+                }
+
+                _sendSlots = null;
             }
 
-            _runtimeMappings = null;
-            _sourceBlendShapeIndices = null;
-            _scratchPostBlendValues = Array.Empty<float>();
             _scratchGazeSnapshots = Array.Empty<GazeSnapshot>();
-            _scratchPostBlendCount = 0;
             _scratchGazeCount = 0;
             _identity = default;
             _identityUuidBytes = null;
@@ -207,22 +283,27 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             ReadOnlySpan<float> postBlendValues,
             ReadOnlySpan<GazeSnapshot> gazeSnapshots)
         {
-            if (!_started || _sourceBlendShapeIndices == null)
+            if (!_started || _sendSlots == null)
             {
                 return;
             }
 
-            EnsurePostBlendCapacity(_sourceBlendShapeIndices.Length);
-            for (int i = 0; i < _sourceBlendShapeIndices.Length; i++)
+            for (int slotIndex = 0; slotIndex < _sendSlots.Count; slotIndex++)
             {
-                int sourceIndex = _sourceBlendShapeIndices[i];
-                _scratchPostBlendValues[i] =
-                    sourceIndex >= 0 && sourceIndex < postBlendValues.Length
-                        ? postBlendValues[sourceIndex]
-                        : 0f;
-            }
+                SendSlot slot = _sendSlots[slotIndex];
+                int[] sourceBlendShapeIndices = slot.SourceBlendShapeIndices;
+                slot.EnsurePostBlendCapacity(sourceBlendShapeIndices.Length);
+                for (int i = 0; i < sourceBlendShapeIndices.Length; i++)
+                {
+                    int sourceIndex = sourceBlendShapeIndices[i];
+                    slot.ScratchPostBlendValues[i] =
+                        sourceIndex >= 0 && sourceIndex < postBlendValues.Length
+                            ? postBlendValues[sourceIndex]
+                            : 0f;
+                }
 
-            _scratchPostBlendCount = _sourceBlendShapeIndices.Length;
+                slot.ScratchPostBlendCount = sourceBlendShapeIndices.Length;
+            }
 
             EnsureGazeCapacity(gazeSnapshots.Length);
             for (int i = 0; i < gazeSnapshots.Length; i++)
@@ -232,6 +313,88 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
             _scratchGazeCount = gazeSnapshots.Length;
             _hasPublishedFrame = true;
+        }
+
+        private List<OscSenderEndpointConfig> EnsureEndpointList()
+        {
+            if (_endpoints == null)
+            {
+                _endpoints = new List<OscSenderEndpointConfig>();
+            }
+
+            return _endpoints;
+        }
+
+        private void SetEndpoints(IReadOnlyList<OscSenderEndpointConfig> endpoints)
+        {
+            List<OscSenderEndpointConfig> target = EnsureEndpointList();
+            target.Clear();
+            if (endpoints == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < endpoints.Count; i++)
+            {
+                OscSenderEndpointConfig endpoint = endpoints[i];
+                target.Add(endpoint == null
+                    ? null
+                    : new OscSenderEndpointConfig(
+                        endpoint.endpoint,
+                        endpoint.port,
+                        endpoint.enabled,
+                        endpoint.preset));
+            }
+        }
+
+        private bool TryBuildEndpointPlan(out List<OscSenderEndpointConfig> endpoints)
+        {
+            List<OscSenderEndpointConfig> configuredEndpoints = EnsureEndpointList();
+            endpoints = new List<OscSenderEndpointConfig>(configuredEndpoints.Count);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            bool loggedDuplicate = false;
+
+            for (int i = 0; i < configuredEndpoints.Count; i++)
+            {
+                OscSenderEndpointConfig configuredEndpoint = configuredEndpoints[i];
+                if (configuredEndpoint == null)
+                {
+                    continue;
+                }
+
+                if (!configuredEndpoint.enabled)
+                {
+                    continue;
+                }
+
+                string endpoint = NormalizeEndpoint(configuredEndpoint.endpoint);
+                string key = endpoint + "\n" + configuredEndpoint.port.ToString(CultureInfo.InvariantCulture);
+                if (!seen.Add(key))
+                {
+                    if (!loggedDuplicate)
+                    {
+                        Debug.LogWarning(
+                            $"[OscSenderAdapterBinding] Duplicate endpoint '{endpoint}:{configuredEndpoint.port}' was normalized to one send slot.");
+                        loggedDuplicate = true;
+                    }
+
+                    continue;
+                }
+
+                endpoints.Add(new OscSenderEndpointConfig(
+                    endpoint,
+                    configuredEndpoint.port,
+                    enabled: true,
+                    configuredEndpoint.preset));
+            }
+
+            if (endpoints.Count == 0)
+            {
+                Debug.LogWarning("[OscSenderAdapterBinding] No enabled endpoints. OSC Sender will not start.");
+                return false;
+            }
+
+            return true;
         }
 
         private void SetBlendShapeNames(IReadOnlyList<string> blendShapeNames)
@@ -329,12 +492,14 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             return -1;
         }
 
-        private void EnsurePostBlendCapacity(int count)
+        private static string NormalizeEndpoint(string endpoint)
         {
-            if (_scratchPostBlendValues == null || _scratchPostBlendValues.Length < count)
+            if (string.IsNullOrWhiteSpace(endpoint))
             {
-                _scratchPostBlendValues = new float[count];
+                return OscSenderEndpointConfig.DefaultEndpoint;
             }
+
+            return endpoint.Trim();
         }
 
         private void EnsureGazeCapacity(int count)
@@ -342,6 +507,33 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             if (_scratchGazeSnapshots == null || _scratchGazeSnapshots.Length < count)
             {
                 _scratchGazeSnapshots = new GazeSnapshot[count];
+            }
+        }
+
+        private sealed class SendSlot
+        {
+            public readonly OscSenderHost Host;
+            public readonly int[] SourceBlendShapeIndices;
+            public float[] ScratchPostBlendValues;
+            public int ScratchPostBlendCount;
+
+            public SendSlot(
+                OscSenderHost host,
+                int[] sourceBlendShapeIndices)
+            {
+                Host = host;
+                SourceBlendShapeIndices = sourceBlendShapeIndices;
+                ScratchPostBlendValues = sourceBlendShapeIndices.Length == 0
+                    ? Array.Empty<float>()
+                    : new float[sourceBlendShapeIndices.Length];
+            }
+
+            public void EnsurePostBlendCapacity(int count)
+            {
+                if (ScratchPostBlendValues == null || ScratchPostBlendValues.Length < count)
+                {
+                    ScratchPostBlendValues = new float[count];
+                }
             }
         }
     }
