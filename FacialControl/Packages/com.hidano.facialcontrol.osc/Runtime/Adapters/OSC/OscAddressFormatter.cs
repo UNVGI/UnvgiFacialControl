@@ -106,6 +106,35 @@ namespace Hidano.FacialControl.Adapters.OSC
             return GetGazePrefix(preset).ToString() + (expressionId ?? string.Empty) + axis;
         }
 
+        public static byte[] FormatGazeAddressUtf8(AddressPresetKind preset, string expressionId, char axis)
+        {
+            return Encoding.UTF8.GetBytes(FormatGazeAddress(preset, expressionId, axis));
+        }
+
+        public static byte[] GetOrAddGazeAddressUtf8(
+            Dictionary<(string name, AddressPresetKind preset), byte[]> addressBytesPool,
+            AddressPresetKind preset,
+            string expressionId,
+            char axis)
+        {
+            if (addressBytesPool == null)
+            {
+                throw new ArgumentNullException(nameof(addressBytesPool));
+            }
+
+            ValidateGazeAxis(axis);
+            string name = (expressionId ?? string.Empty) + axis;
+            var key = (name, preset);
+            if (addressBytesPool.TryGetValue(key, out byte[] addressBytes))
+            {
+                return addressBytes;
+            }
+
+            addressBytes = FormatGazeAddressUtf8(preset, expressionId, axis);
+            addressBytesPool.Add(key, addressBytes);
+            return addressBytes;
+        }
+
         private static ReadOnlySpan<char> GetBlendShapePrefix(AddressPresetKind preset)
         {
             switch (preset)

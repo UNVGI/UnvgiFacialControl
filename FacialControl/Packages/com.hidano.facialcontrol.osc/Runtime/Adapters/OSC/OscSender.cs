@@ -241,13 +241,56 @@ namespace Hidano.FacialControl.Adapters.OSC
             string[] heartbeatNames,
             int heartbeatNameCount)
         {
+            SendBundle(
+                senderUuidBytes,
+                startedAtUnixMs,
+                _oscAddressUtf8,
+                values,
+                count,
+                heartbeatNames,
+                heartbeatNameCount);
+        }
+
+        /// <summary>
+        /// Sends a frame bundle using a caller-provided address table. This is used when the
+        /// current frame contains a compact subset of the configured sender mappings.
+        /// </summary>
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            byte[][] addressUtf8,
+            float[] values,
+            int count)
+        {
+            SendBundle(
+                senderUuidBytes,
+                startedAtUnixMs,
+                addressUtf8,
+                values,
+                count,
+                heartbeatNames: null,
+                heartbeatNameCount: 0);
+        }
+
+        /// <summary>
+        /// Sends a frame bundle using a caller-provided address table plus an optional heartbeat.
+        /// </summary>
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            byte[][] addressUtf8,
+            float[] values,
+            int count,
+            string[] heartbeatNames,
+            int heartbeatNameCount)
+        {
             if (!_initialized || _client == null || !_client.isRunning)
                 return;
 
             if (senderUuidBytes == null || senderUuidBytes.Length != SenderIdentity.UuidByteLength)
                 return;
 
-            if (string.IsNullOrEmpty(startedAtUnixMs) || values == null)
+            if (string.IsNullOrEmpty(startedAtUnixMs) || addressUtf8 == null || values == null)
                 return;
 
             bool includeHeartbeat = heartbeatNames != null;
@@ -257,7 +300,7 @@ namespace Hidano.FacialControl.Adapters.OSC
                 return;
             }
 
-            int messageCount = Math.Min(Math.Min(Math.Max(count, 0), values.Length), _oscAddresses.Length);
+            int messageCount = Math.Min(Math.Min(Math.Max(count, 0), values.Length), addressUtf8.Length);
             ulong timestamp = Timestamp.Now.value;
             int packetCount = includeHeartbeat
                 ? _bundleBuilder.BuildFrameBundle(
@@ -265,7 +308,7 @@ namespace Hidano.FacialControl.Adapters.OSC
                     SenderIdentityAddressUtf8,
                     senderUuidBytes,
                     startedAtUnixMs,
-                    _oscAddressUtf8,
+                    addressUtf8,
                     values,
                     messageCount,
                     BlendShapeNamesAddressUtf8,
@@ -276,7 +319,7 @@ namespace Hidano.FacialControl.Adapters.OSC
                     SenderIdentityAddressUtf8,
                     senderUuidBytes,
                     startedAtUnixMs,
-                    _oscAddressUtf8,
+                    addressUtf8,
                     values,
                     messageCount);
 

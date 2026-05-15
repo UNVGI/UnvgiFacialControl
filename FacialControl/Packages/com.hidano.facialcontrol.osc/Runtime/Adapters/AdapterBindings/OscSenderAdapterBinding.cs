@@ -29,6 +29,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         private List<string> _blendShapeNames = new List<string>();
 
         [SerializeField]
+        private List<string> _gazeExpressionIds = new List<string>();
+
+        [SerializeField]
         private float _heartbeatIntervalSeconds = DefaultHeartbeatIntervalSeconds;
 
         [NonSerialized]
@@ -54,9 +57,6 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         [NonSerialized]
         private string _identityStartedAtUnixMs;
-
-        [NonSerialized]
-        private string[] _heartbeatBlendShapeNames = Array.Empty<string>();
 
         [NonSerialized]
         private float _heartbeatElapsedSeconds;
@@ -117,6 +117,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             set => _blendShapeNames = value ?? new List<string>();
         }
 
+        public List<string> GazeExpressionIds
+        {
+            get => EnsureGazeExpressionIdList();
+            set => _gazeExpressionIds = value ?? new List<string>();
+        }
+
         public float HeartbeatIntervalSeconds
         {
             get => _heartbeatIntervalSeconds;
@@ -169,6 +175,11 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             SetBlendShapeNames(blendShapeNames);
         }
 
+        public void ConfigureGazeExpressionIds(IReadOnlyList<string> gazeExpressionIds)
+        {
+            SetGazeExpressionIds(gazeExpressionIds);
+        }
+
         public override void OnStart(in AdapterBuildContext ctx)
         {
             if (_started)
@@ -205,10 +216,11 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                         out OscMapping[] mappings,
                         out byte[][] addressUtf8,
                         out int[] sourceBlendShapeIndices,
-                        out string[] heartbeatBlendShapeNames))
+                        out string[] heartbeatBlendShapeNames,
+                        out string[] gazeExpressionIds))
                 {
                     Debug.LogWarning(
-                        $"[OscSenderAdapterBinding] BlendShape mapping is empty for endpoint '{endpoint.endpoint}:{endpoint.port}'. Skipping endpoint.");
+                        $"[OscSenderAdapterBinding] OSC mapping is empty for endpoint '{endpoint.endpoint}:{endpoint.port}'. Skipping endpoint.");
                     continue;
                 }
 
@@ -217,7 +229,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 {
                     host = ctx.HostGameObject.AddComponent<OscSenderHost>();
                     host.Configure(endpoint.endpoint, endpoint.port, mappings, addressUtf8);
-                    sendSlots.Add(new SendSlot(host, sourceBlendShapeIndices, heartbeatBlendShapeNames));
+                    sendSlots.Add(new SendSlot(
+                        host,
+                        addressUtf8,
+                        sourceBlendShapeIndices,
+                        heartbeatBlendShapeNames,
+                        gazeExpressionIds));
                 }
                 catch (Exception ex)
                 {
@@ -239,7 +256,6 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             _sendSlots = sendSlots;
-            _heartbeatBlendShapeNames = sendSlots[0].HeartbeatBlendShapeNames;
             _heartbeatIntervalSeconds = ClampHeartbeatInterval(_heartbeatIntervalSeconds, logWarning: true);
             _heartbeatElapsedSeconds = 0f;
             _sendHeartbeatOnNextTick = true;
@@ -283,18 +299,20 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                     slot.Host.SendBundle(
                         _identityUuidBytes,
                         _identityStartedAtUnixMs,
-                        slot.ScratchPostBlendValues,
-                        _hasPublishedFrame ? slot.ScratchPostBlendCount : 0,
-                        _heartbeatBlendShapeNames,
-                        _heartbeatBlendShapeNames.Length);
+                        slot.ScratchAddressUtf8,
+                        slot.ScratchFloatValues,
+                        _hasPublishedFrame ? slot.ScratchFloatCount : 0,
+                        slot.HeartbeatBlendShapeNames,
+                        slot.HeartbeatBlendShapeNames.Length);
                 }
                 else
                 {
                     slot.Host.SendBundle(
                         _identityUuidBytes,
                         _identityStartedAtUnixMs,
-                        slot.ScratchPostBlendValues,
-                        slot.ScratchPostBlendCount);
+                        slot.ScratchAddressUtf8,
+                        slot.ScratchFloatValues,
+                        slot.ScratchFloatCount);
                 }
 
                 sentAny = true;
@@ -337,7 +355,6 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _identityUuidBytes = null;
             _identityStartedAtUnixMs = null;
             _addressBytesPool = null;
-            _heartbeatBlendShapeNames = Array.Empty<string>();
             _heartbeatElapsedSeconds = 0f;
             _sendHeartbeatOnNextTick = false;
             _hasPublishedFrame = false;
@@ -353,23 +370,6 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return;
             }
 
-            for (int slotIndex = 0; slotIndex < _sendSlots.Count; slotIndex++)
-            {
-                SendSlot slot = _sendSlots[slotIndex];
-                int[] sourceBlendShapeIndices = slot.SourceBlendShapeIndices;
-                slot.EnsurePostBlendCapacity(sourceBlendShapeIndices.Length);
-                for (int i = 0; i < sourceBlendShapeIndices.Length; i++)
-                {
-                    int sourceIndex = sourceBlendShapeIndices[i];
-                    slot.ScratchPostBlendValues[i] =
-                        sourceIndex >= 0 && sourceIndex < postBlendValues.Length
-                            ? postBlendValues[sourceIndex]
-                            : 0f;
-                }
-
-                slot.ScratchPostBlendCount = sourceBlendShapeIndices.Length;
-            }
-
             EnsureGazeCapacity(gazeSnapshots.Length);
             for (int i = 0; i < gazeSnapshots.Length; i++)
             {
@@ -377,6 +377,28 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             _scratchGazeCount = gazeSnapshots.Length;
+
+            for (int slotIndex = 0; slotIndex < _sendSlots.Count; slotIndex++)
+            {
+                SendSlot slot = _sendSlots[slotIndex];
+                int[] sourceBlendShapeIndices = slot.SourceBlendShapeIndices;
+                slot.EnsureScratchCapacity();
+                int writeIndex = 0;
+                for (int i = 0; i < sourceBlendShapeIndices.Length; i++)
+                {
+                    int sourceIndex = sourceBlendShapeIndices[i];
+                    slot.ScratchAddressUtf8[writeIndex] = slot.ConfiguredAddressUtf8[i];
+                    slot.ScratchFloatValues[writeIndex] =
+                        sourceIndex >= 0 && sourceIndex < postBlendValues.Length
+                            ? postBlendValues[sourceIndex]
+                            : 0f;
+                    writeIndex++;
+                }
+
+                AppendGazeMessages(slot, ref writeIndex);
+                slot.ScratchFloatCount = writeIndex;
+            }
+
             _hasPublishedFrame = true;
         }
 
@@ -388,6 +410,16 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             return _endpoints;
+        }
+
+        private List<string> EnsureGazeExpressionIdList()
+        {
+            if (_gazeExpressionIds == null)
+            {
+                _gazeExpressionIds = new List<string>();
+            }
+
+            return _gazeExpressionIds;
         }
 
         private void SetEndpoints(IReadOnlyList<OscSenderEndpointConfig> endpoints)
@@ -481,72 +513,177 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
         }
 
+        private void SetGazeExpressionIds(IReadOnlyList<string> gazeExpressionIds)
+        {
+            List<string> target = EnsureGazeExpressionIdList();
+            target.Clear();
+            if (gazeExpressionIds == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < gazeExpressionIds.Count; i++)
+            {
+                target.Add(gazeExpressionIds[i]);
+            }
+        }
+
         private bool TryBuildMappings(
             IReadOnlyList<string> contextBlendShapeNames,
             AddressPresetKind preset,
             out OscMapping[] mappings,
             out byte[][] addressUtf8,
             out int[] sourceIndices,
-            out string[] heartbeatBlendShapeNames)
+            out string[] heartbeatBlendShapeNames,
+            out string[] gazeExpressionIds)
         {
             IReadOnlyList<string> names = _blendShapeNames != null && _blendShapeNames.Count > 0
                 ? _blendShapeNames
                 : contextBlendShapeNames;
 
-            if (names == null || names.Count == 0)
+            int blendShapeCapacity = names != null ? names.Count : 0;
+            int gazeCapacity = _gazeExpressionIds != null ? _gazeExpressionIds.Count : 0;
+            var mappingList = new List<OscMapping>(blendShapeCapacity + (gazeCapacity * 2));
+            var addressBytesList = new List<byte[]>(blendShapeCapacity + (gazeCapacity * 2));
+            var indexList = new List<int>(blendShapeCapacity);
+            var heartbeatNameList = new List<string>(blendShapeCapacity);
+            var gazeExpressionIdList = new List<string>(gazeCapacity);
+
+            if (names != null)
             {
-                mappings = Array.Empty<OscMapping>();
-                addressUtf8 = Array.Empty<byte[]>();
-                sourceIndices = Array.Empty<int>();
-                heartbeatBlendShapeNames = Array.Empty<string>();
-                return false;
+                for (int i = 0; i < names.Count; i++)
+                {
+                    string blendShapeName = names[i];
+                    if (string.IsNullOrEmpty(blendShapeName))
+                    {
+                        continue;
+                    }
+
+                    int sourceIndex = ResolveSourceIndex(contextBlendShapeNames, blendShapeName, i);
+                    if (sourceIndex < 0)
+                    {
+                        Debug.LogWarning(
+                            $"[OscSenderAdapterBinding] BlendShape '{blendShapeName}' was not found in context. Skipping.");
+                        continue;
+                    }
+
+                    string address;
+                    try
+                    {
+                        address = OscAddressFormatter.FormatBlendShapeAddress(preset, blendShapeName);
+                    }
+                    catch (NotSupportedException ex)
+                    {
+                        Debug.LogWarning($"[OscSenderAdapterBinding] {ex.Message}");
+                        continue;
+                    }
+
+                    mappingList.Add(new OscMapping(address, blendShapeName, string.Empty));
+                    addressBytesList.Add(OscAddressFormatter.GetOrAddBlendShapeAddressUtf8(
+                        _addressBytesPool,
+                        preset,
+                        blendShapeName));
+                    indexList.Add(sourceIndex);
+                    heartbeatNameList.Add(blendShapeName);
+                }
             }
 
-            var mappingList = new List<OscMapping>(names.Count);
-            var addressBytesList = new List<byte[]>(names.Count);
-            var indexList = new List<int>(names.Count);
-            var heartbeatNameList = new List<string>(names.Count);
-            for (int i = 0; i < names.Count; i++)
-            {
-                string blendShapeName = names[i];
-                if (string.IsNullOrEmpty(blendShapeName))
-                {
-                    continue;
-                }
-
-                int sourceIndex = ResolveSourceIndex(contextBlendShapeNames, blendShapeName, i);
-                if (sourceIndex < 0)
-                {
-                    Debug.LogWarning(
-                        $"[OscSenderAdapterBinding] BlendShape '{blendShapeName}' was not found in context. Skipping.");
-                    continue;
-                }
-
-                string address;
-                try
-                {
-                    address = OscAddressFormatter.FormatBlendShapeAddress(preset, blendShapeName);
-                }
-                catch (NotSupportedException ex)
-                {
-                    Debug.LogWarning($"[OscSenderAdapterBinding] {ex.Message}");
-                    continue;
-                }
-
-                mappingList.Add(new OscMapping(address, blendShapeName, string.Empty));
-                addressBytesList.Add(OscAddressFormatter.GetOrAddBlendShapeAddressUtf8(
-                    _addressBytesPool,
-                    preset,
-                    blendShapeName));
-                indexList.Add(sourceIndex);
-                heartbeatNameList.Add(blendShapeName);
-            }
+            AppendVrChatGazeMappings(preset, mappingList, addressBytesList, gazeExpressionIdList);
 
             mappings = mappingList.ToArray();
             addressUtf8 = addressBytesList.ToArray();
             sourceIndices = indexList.ToArray();
             heartbeatBlendShapeNames = heartbeatNameList.ToArray();
+            gazeExpressionIds = gazeExpressionIdList.ToArray();
             return mappings.Length > 0;
+        }
+
+        private void AppendVrChatGazeMappings(
+            AddressPresetKind preset,
+            List<OscMapping> mappingList,
+            List<byte[]> addressBytesList,
+            List<string> gazeExpressionIdList)
+        {
+            if (preset != AddressPresetKind.VRChat || _gazeExpressionIds == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < _gazeExpressionIds.Count; i++)
+            {
+                string expressionId = _gazeExpressionIds[i];
+                if (string.IsNullOrEmpty(expressionId))
+                {
+                    continue;
+                }
+
+                string xAddress = OscAddressFormatter.FormatGazeAddress(
+                    preset,
+                    expressionId,
+                    OscAddressFormatter.VRChatGazeXAxis);
+                string yAddress = OscAddressFormatter.FormatGazeAddress(
+                    preset,
+                    expressionId,
+                    OscAddressFormatter.VRChatGazeYAxis);
+
+                mappingList.Add(new OscMapping(xAddress, expressionId + "X", string.Empty));
+                addressBytesList.Add(OscAddressFormatter.GetOrAddGazeAddressUtf8(
+                    _addressBytesPool,
+                    preset,
+                    expressionId,
+                    OscAddressFormatter.VRChatGazeXAxis));
+
+                mappingList.Add(new OscMapping(yAddress, expressionId + "Y", string.Empty));
+                addressBytesList.Add(OscAddressFormatter.GetOrAddGazeAddressUtf8(
+                    _addressBytesPool,
+                    preset,
+                    expressionId,
+                    OscAddressFormatter.VRChatGazeYAxis));
+
+                gazeExpressionIdList.Add(expressionId);
+            }
+        }
+
+        private void AppendGazeMessages(SendSlot slot, ref int writeIndex)
+        {
+            string[] gazeIds = slot.GazeExpressionIds;
+            if (gazeIds.Length == 0 || _scratchGazeCount == 0)
+            {
+                return;
+            }
+
+            int addressIndex = slot.SourceBlendShapeIndices.Length;
+            for (int i = 0; i < gazeIds.Length; i++)
+            {
+                if (TryFindGazeSnapshot(gazeIds[i], out GazeSnapshot snapshot))
+                {
+                    slot.ScratchAddressUtf8[writeIndex] = slot.ConfiguredAddressUtf8[addressIndex];
+                    slot.ScratchFloatValues[writeIndex] = snapshot.X;
+                    writeIndex++;
+
+                    slot.ScratchAddressUtf8[writeIndex] = slot.ConfiguredAddressUtf8[addressIndex + 1];
+                    slot.ScratchFloatValues[writeIndex] = snapshot.Y;
+                    writeIndex++;
+                }
+
+                addressIndex += 2;
+            }
+        }
+
+        private bool TryFindGazeSnapshot(string expressionId, out GazeSnapshot snapshot)
+        {
+            for (int i = 0; i < _scratchGazeCount; i++)
+            {
+                GazeSnapshot candidate = _scratchGazeSnapshots[i];
+                if (string.Equals(candidate.ExpressionId, expressionId, StringComparison.Ordinal))
+                {
+                    snapshot = candidate;
+                    return true;
+                }
+            }
+
+            snapshot = default;
+            return false;
         }
 
         private bool ShouldSendHeartbeat(float deltaTime)
@@ -633,29 +770,46 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         private sealed class SendSlot
         {
             public readonly OscSenderHost Host;
+            public readonly byte[][] ConfiguredAddressUtf8;
             public readonly int[] SourceBlendShapeIndices;
             public readonly string[] HeartbeatBlendShapeNames;
-            public float[] ScratchPostBlendValues;
-            public int ScratchPostBlendCount;
+            public readonly string[] GazeExpressionIds;
+            public byte[][] ScratchAddressUtf8;
+            public float[] ScratchFloatValues;
+            public int ScratchFloatCount;
 
             public SendSlot(
                 OscSenderHost host,
+                byte[][] configuredAddressUtf8,
                 int[] sourceBlendShapeIndices,
-                string[] heartbeatBlendShapeNames)
+                string[] heartbeatBlendShapeNames,
+                string[] gazeExpressionIds)
             {
                 Host = host;
-                SourceBlendShapeIndices = sourceBlendShapeIndices;
+                ConfiguredAddressUtf8 = configuredAddressUtf8 ?? Array.Empty<byte[]>();
+                SourceBlendShapeIndices = sourceBlendShapeIndices ?? Array.Empty<int>();
                 HeartbeatBlendShapeNames = heartbeatBlendShapeNames ?? Array.Empty<string>();
-                ScratchPostBlendValues = sourceBlendShapeIndices.Length == 0
+                GazeExpressionIds = gazeExpressionIds ?? Array.Empty<string>();
+                int scratchCapacity = SourceBlendShapeIndices.Length + (GazeExpressionIds.Length * 2);
+                ScratchAddressUtf8 = scratchCapacity == 0
+                    ? Array.Empty<byte[]>()
+                    : new byte[scratchCapacity][];
+                ScratchFloatValues = scratchCapacity == 0
                     ? Array.Empty<float>()
-                    : new float[sourceBlendShapeIndices.Length];
+                    : new float[scratchCapacity];
             }
 
-            public void EnsurePostBlendCapacity(int count)
+            public void EnsureScratchCapacity()
             {
-                if (ScratchPostBlendValues == null || ScratchPostBlendValues.Length < count)
+                int required = SourceBlendShapeIndices.Length + (GazeExpressionIds.Length * 2);
+                if (ScratchAddressUtf8 == null || ScratchAddressUtf8.Length < required)
                 {
-                    ScratchPostBlendValues = new float[count];
+                    ScratchAddressUtf8 = new byte[required][];
+                }
+
+                if (ScratchFloatValues == null || ScratchFloatValues.Length < required)
+                {
+                    ScratchFloatValues = new float[required];
                 }
             }
         }

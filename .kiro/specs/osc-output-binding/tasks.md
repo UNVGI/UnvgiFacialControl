@@ -235,7 +235,7 @@
   - _Boundary: Adapters.OSC.OscAddressFormatter preset switching_
   - _Depends: 4.1_
 
-- [ ] 6.2 Gaze 送信パス（VRChat 形式 X/Y 2 メッセージ）
+- [x] 6.2 Gaze 送信パス（VRChat 形式 X/Y 2 メッセージ）
   - VRChat 形式 endpoint で Gaze 送信が有効な時、Gaze Vector2 を `/avatar/parameters/{expressionId}X` および `/avatar/parameters/{expressionId}Y` の 2 メッセージとして送信する
   - 送信対象 `gazeExpressionIds : List<string>` を `[Serializable]` フィールドとして保持する
   - `OnFacialOutputPublished` から受け取った Gaze スナップショットを scratch に格納し、`OnLateTick` で bundle に同梱する

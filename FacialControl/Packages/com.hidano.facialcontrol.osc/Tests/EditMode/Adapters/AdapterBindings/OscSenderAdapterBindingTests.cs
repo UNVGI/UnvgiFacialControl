@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
@@ -51,6 +52,18 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
             Assert.That(
                 binding.HeartbeatIntervalSeconds,
                 Is.EqualTo(OscSenderAdapterBinding.DefaultHeartbeatIntervalSeconds));
+        }
+
+        [Test]
+        public void Type_GazeExpressionIds_IsSerializableListField()
+        {
+            FieldInfo field = typeof(OscSenderAdapterBinding).GetField(
+                "_gazeExpressionIds",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            Assert.That(field, Is.Not.Null);
+            Assert.That(field.FieldType, Is.EqualTo(typeof(List<string>)));
+            Assert.That(field.GetCustomAttribute<SerializeField>(), Is.Not.Null);
         }
 
         [Test]
@@ -185,6 +198,88 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 Assert.That(Encoding.UTF8.GetString(firstArKitBytes[0]), Is.EqualTo(arkitAddresses[0]));
                 Assert.That(firstArKitBytes[0], Is.SameAs(secondArKitBytes[0]));
                 Assert.That(firstArKitBytes[0], Is.Not.SameAs(vrchatBytes[0]));
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
+        public void OnStart_VRChatGazeExpressionIds_BuildsXAndYGazeAddresses()
+        {
+            var bus = new RecordingFacialOutputBus();
+            var binding = new OscSenderAdapterBinding { Slug = "osc-sender" };
+            binding.ConfigureEndpoints(new[]
+            {
+                new OscSenderEndpointConfig("127.0.0.1", AllocatePort(), preset: AddressPresetKind.VRChat)
+            });
+            binding.GazeExpressionIds.Add("eyeLook");
+            var host = new GameObject("OscSenderAdapterBindingVrchatGazeAddressTests");
+
+            try
+            {
+                binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
+
+                Assert.That(binding.IsStarted, Is.True);
+                string[] addresses = GetPrivateField<string[]>(
+                    binding.HelperHost.Sender,
+                    "_oscAddresses");
+
+                CollectionAssert.AreEqual(
+                    new[]
+                    {
+                        "/avatar/parameters/smile",
+                        "/avatar/parameters/eyeLookX",
+                        "/avatar/parameters/eyeLookY"
+                    },
+                    addresses);
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
+        public void OnFacialOutputPublished_VRChatGazeSnapshot_WritesXAndYToScratchFrame()
+        {
+            var bus = new RecordingFacialOutputBus();
+            var binding = new OscSenderAdapterBinding { Slug = "osc-sender" };
+            binding.ConfigureEndpoints(new[]
+            {
+                new OscSenderEndpointConfig("127.0.0.1", AllocatePort(), preset: AddressPresetKind.VRChat)
+            });
+            binding.GazeExpressionIds.Add("eyeLook");
+            var host = new GameObject("OscSenderAdapterBindingVrchatGazeScratchTests");
+
+            try
+            {
+                binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
+
+                bus.Publish(
+                    new[] { 0.25f },
+                    new[]
+                    {
+                        new GazeSnapshot("eyeLook", -0.4f, 0.6f),
+                        new GazeSnapshot("ignored", 1f, 1f)
+                    });
+
+                IList slots = GetPrivateField<IList>(binding, "_sendSlots");
+                object slot = slots[0];
+                int count = GetPrivateField<int>(slot, "ScratchFloatCount");
+                byte[][] addresses = GetPrivateField<byte[][]>(slot, "ScratchAddressUtf8");
+                float[] values = GetPrivateField<float[]>(slot, "ScratchFloatValues");
+
+                Assert.That(count, Is.EqualTo(3));
+                Assert.That(Encoding.UTF8.GetString(addresses[0]), Is.EqualTo("/avatar/parameters/smile"));
+                Assert.That(Encoding.UTF8.GetString(addresses[1]), Is.EqualTo("/avatar/parameters/eyeLookX"));
+                Assert.That(Encoding.UTF8.GetString(addresses[2]), Is.EqualTo("/avatar/parameters/eyeLookY"));
+                Assert.That(values[0], Is.EqualTo(0.25f).Within(0.0001f));
+                Assert.That(values[1], Is.EqualTo(-0.4f).Within(0.0001f));
+                Assert.That(values[2], Is.EqualTo(0.6f).Within(0.0001f));
             }
             finally
             {
