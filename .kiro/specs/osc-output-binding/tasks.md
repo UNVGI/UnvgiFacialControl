@@ -130,7 +130,7 @@
   - _Requirements: 12.5, 12.8, 12.9_
   - _Boundary: Adapters.InputSources.GazeVector2InputSource_
 
-- [ ] 3.7 `OscAdapterBinding` 本体の破壊的拡張（mode 別 entry 統合 + lifecycle + Gaze 受信 + bundle アトミック + ゾンビ排除 + heartbeat 連携）
+- [x] 3.7 `OscAdapterBinding` 本体の破壊的拡張（mode 別 entry 統合 + lifecycle + Gaze 受信 + bundle アトミック + ゾンビ排除 + heartbeat 連携）
   - 既存 SerializeField（endpoint / port / stalenessSeconds）を維持しつつ、`_mappings : List<OscMappingEntry>` / `_failSafeMode` / `_consistencyCheckWarnLog` / `_bundleMode` / `_bundleAccumulationTimeoutMs` を追加する
   - `OnStart` で `_mappings` を mode 別に分類し、`Normal_BlendShape` は OscInputSource / OscDoubleBuffer 経路へ、`Gaze_VRChat_XY` / `Gaze_ARKit_8BS` は `GazeVector2InputSource` 経路へ振り分ける
   - `Gaze_VRChat_XY` の `{addressPattern}X` / `{addressPattern}Y` を 1 つの `GazeVector2InputSource` に集約、`Gaze_ARKit_8BS` は `addressPattern` 無視で `/ARKit/eyeLookXxx` 固定 8 アドレスを listen し `PerfectSyncEyeLook.Decompose` で左右別 Vector2 を構築する

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Threading;
 using Hidano.FacialControl.Adapters.OSC;
 using Hidano.FacialControl.Domain.Interfaces;
@@ -36,9 +37,13 @@ namespace Hidano.FacialControl.Adapters.InputSources
         private readonly OscDoubleBuffer _buffer;
         private readonly ITimeProvider _timeProvider;
         private readonly float _stalenessSeconds;
+        private readonly FailSafeMode _failSafeMode;
+        private readonly BitArray _skipMask;
+        private readonly BitArray _contributeMask;
 
         private int _lastObservedTick;
         private double _lastDataTime;
+        private bool _isStale;
 
         /// <summary>
         /// <see cref="OscInputSource"/> を構築する。
@@ -50,7 +55,13 @@ namespace Hidano.FacialControl.Adapters.InputSources
         /// <param name="timeProvider">現在時刻の供給元。Adapters 層では <c>UnityTimeProvider</c> を DI する。</param>
         /// <exception cref="ArgumentNullException"><paramref name="buffer"/> または <paramref name="timeProvider"/> が null。</exception>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="stalenessSeconds"/> が負。</exception>
-        public OscInputSource(OscDoubleBuffer buffer, float stalenessSeconds, ITimeProvider timeProvider)
+        public OscInputSource(
+            OscDoubleBuffer buffer,
+            float stalenessSeconds,
+            ITimeProvider timeProvider,
+            FailSafeMode failSafeMode = FailSafeMode.HoldLastValue,
+            BitArray skipMask = null,
+            BitArray contributeMask = null)
             : base(InputSourceId.Parse(ReservedId), buffer != null ? buffer.Size : 0)
         {
             if (buffer == null)
@@ -70,9 +81,16 @@ namespace Hidano.FacialControl.Adapters.InputSources
             _buffer = buffer;
             _timeProvider = timeProvider;
             _stalenessSeconds = stalenessSeconds;
+            _failSafeMode = failSafeMode;
+            _skipMask = skipMask;
+            _contributeMask = contributeMask;
             _lastObservedTick = 0;
             _lastDataTime = timeProvider.UnscaledTimeSeconds;
         }
+
+        public bool IsStale => _isStale;
+
+        public override BitArray ContributeMask => _contributeMask ?? base.ContributeMask;
 
         /// <summary>
         /// OSC 受信バッファの内容を <paramref name="output"/> に書込む。
@@ -90,14 +108,28 @@ namespace Hidano.FacialControl.Adapters.InputSources
             if (_stalenessSeconds > 0f &&
                 _timeProvider.UnscaledTimeSeconds - _lastDataTime > _stalenessSeconds)
             {
+                _isStale = true;
+                if (_failSafeMode == FailSafeMode.RevertToBase)
+                {
+                    for (int i = 0; i < output.Length; i++)
+                    {
+                        output[i] = 0f;
+                    }
+
+                    return true;
+                }
+
                 return false;
             }
 
+            _isStale = false;
             NativeArray<float>.ReadOnly readBuffer = _buffer.GetReadBuffer();
             int copyLength = output.Length < readBuffer.Length ? output.Length : readBuffer.Length;
             for (int i = 0; i < copyLength; i++)
             {
-                output[i] = readBuffer[i];
+                output[i] = _skipMask != null && i < _skipMask.Length && _skipMask[i]
+                    ? 0f
+                    : readBuffer[i];
             }
 
             return true;

@@ -44,6 +44,9 @@ namespace Hidano.FacialControl.Adapters.OSC
         // マッピング情報を保持（レイヤー分配のため）
         private OscMapping[] _mappings;
 
+        // binding 統合用: sender_id / heartbeat / Gaze など、float routing 前のメッセージ判定。
+        private Func<uOSC.Message, bool> _messageFilter;
+
         // analog-input-binding 用: 任意 OSC アドレスごとの float リスナー (加算的拡張)
         private readonly object _analogListenersLock = new object();
         private Dictionary<string, Action<float>> _analogListeners;
@@ -68,6 +71,11 @@ namespace Hidano.FacialControl.Adapters.OSC
         public OscDoubleBuffer Buffer => _buffer;
 
         public OscBundleAccumulator BundleAccumulator => _bundleAccumulator;
+
+        public void SetMessageFilter(Func<uOSC.Message, bool> filter)
+        {
+            _messageFilter = filter;
+        }
 
         /// <summary>
         /// OscReceiver を初期化する。
@@ -154,6 +162,25 @@ namespace Hidano.FacialControl.Adapters.OSC
 
             if (string.IsNullOrEmpty(message.address))
                 return;
+
+            if (_messageFilter != null)
+            {
+                bool shouldContinue;
+                try
+                {
+                    shouldContinue = _messageFilter.Invoke(message);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogException(ex);
+                    return;
+                }
+
+                if (!shouldContinue)
+                {
+                    return;
+                }
+            }
 
             if (message.values == null || message.values.Length == 0)
                 return;
