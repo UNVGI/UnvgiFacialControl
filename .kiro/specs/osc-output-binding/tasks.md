@@ -349,7 +349,7 @@
 
 - [ ] 9. PlayMode E2E と性能テスト（GC 計測）を実装する
 
-- [ ] 9.1 (P) `OscSendReceiveE2ETests`（BlendShape 経路 E2E）
+- [x] 9.1 (P) `OscSendReceiveE2ETests`（BlendShape 経路 E2E）
   - `FacialController` → `FacialOutputBus` → `OscSenderAdapterBinding` → 実 UDP → `OscAdapterBinding`（拡張版）→ `LayerUseCase` への post-blend 到達を検証する
   - テスト命名 `{Target}Tests` / `{Method}_{Condition}_{Expected}` 規約に従う
   - 観察完了状態: PlayMode テストランナーで全ケース緑
