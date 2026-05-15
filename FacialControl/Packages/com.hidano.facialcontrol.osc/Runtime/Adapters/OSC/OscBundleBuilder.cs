@@ -42,6 +42,8 @@ namespace Hidano.FacialControl.Adapters.OSC
 
         private const int DefaultPacketCapacity = 64;
         private const int FloatMessageTypeCount = 1;
+        private const int SenderIdentityMessageTypeCount = 2;
+        private const byte TypeBlob = (byte)'b';
         private const byte TypeFloat = (byte)'f';
         private const byte TypeString = (byte)'s';
 
@@ -179,6 +181,58 @@ namespace Hidano.FacialControl.Adapters.OSC
             return _packetCount;
         }
 
+        public int BuildFrameBundle(
+            ulong timestamp,
+            byte[] senderIdentityAddressUtf8,
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            byte[][] floatAddressUtf8,
+            float[] floatValues,
+            int floatCount)
+        {
+            ThrowIfDisposed();
+            ValidateAddress(senderIdentityAddressUtf8, nameof(senderIdentityAddressUtf8));
+
+            if (senderUuidBytes == null)
+            {
+                throw new ArgumentNullException(nameof(senderUuidBytes));
+            }
+
+            if (startedAtUnixMs == null)
+            {
+                throw new ArgumentNullException(nameof(startedAtUnixMs));
+            }
+
+            if (floatAddressUtf8 == null)
+            {
+                throw new ArgumentNullException(nameof(floatAddressUtf8));
+            }
+
+            if (floatValues == null)
+            {
+                throw new ArgumentNullException(nameof(floatValues));
+            }
+
+            if (floatCount < 0 || floatCount > floatAddressUtf8.Length || floatCount > floatValues.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(floatCount));
+            }
+
+            ResetBuildState();
+            BeginPacket(timestamp);
+            AddSenderIdentityMessage(timestamp, senderIdentityAddressUtf8, senderUuidBytes, startedAtUnixMs);
+
+            for (int i = 0; i < floatCount; i++)
+            {
+                byte[] address = floatAddressUtf8[i];
+                ValidateAddress(address, nameof(floatAddressUtf8));
+                AddFloatMessage(timestamp, address, floatValues[i]);
+            }
+
+            LogMtuSplitIfNeeded();
+            return _packetCount;
+        }
+
         public int BuildHeartbeatBundle(
             ulong timestamp,
             byte[] addressUtf8,
@@ -281,6 +335,21 @@ namespace Hidano.FacialControl.Adapters.OSC
             CompleteMessage(packetIndex, messageStart, messageSize);
         }
 
+        private void AddSenderIdentityMessage(
+            ulong timestamp,
+            byte[] addressUtf8,
+            byte[] senderUuidBytes,
+            string startedAtUnixMs)
+        {
+            int messageSize = GetSenderIdentityMessageSize(
+                addressUtf8.Length,
+                senderUuidBytes.Length,
+                startedAtUnixMs);
+            BeginMessage(timestamp, messageSize, out int packetIndex, out int messageStart);
+            WriteSenderIdentityMessage(packetIndex, addressUtf8, senderUuidBytes, startedAtUnixMs);
+            CompleteMessage(packetIndex, messageStart, messageSize);
+        }
+
         private void AddStringMessage(ulong timestamp, byte[] addressUtf8, ReadOnlySpan<string> values)
         {
             int messageSize = GetStringMessageSize(addressUtf8.Length, values);
@@ -350,6 +419,23 @@ namespace Hidano.FacialControl.Adapters.OSC
             _lengths[packetIndex] = offset;
         }
 
+        private void WriteSenderIdentityMessage(
+            int packetIndex,
+            byte[] addressUtf8,
+            byte[] senderUuidBytes,
+            string startedAtUnixMs)
+        {
+            byte[] buffer = _buffers[packetIndex];
+            int offset = _lengths[packetIndex];
+
+            WriteOscString(buffer, ref offset, addressUtf8);
+            WriteTypeTags(buffer, ref offset, TypeBlob, TypeString);
+            WriteBlob(buffer, ref offset, senderUuidBytes);
+            WriteOscString(buffer, ref offset, startedAtUnixMs);
+
+            _lengths[packetIndex] = offset;
+        }
+
         private void WriteStringMessage(int packetIndex, byte[] addressUtf8, ReadOnlySpan<string> values)
         {
             byte[] buffer = _buffers[packetIndex];
@@ -403,6 +489,18 @@ namespace Hidano.FacialControl.Adapters.OSC
                 + 4;
         }
 
+        private int GetSenderIdentityMessageSize(
+            int addressByteCount,
+            int senderUuidByteCount,
+            string startedAtUnixMs)
+        {
+            return GetOscStringSize(addressByteCount)
+                + GetOscStringSize(1 + SenderIdentityMessageTypeCount)
+                + 4
+                + GetAlignedSize(senderUuidByteCount)
+                + GetOscStringSize(GetUtf8ByteCount(startedAtUnixMs));
+        }
+
         private int GetStringMessageSize(int addressByteCount, ReadOnlySpan<string> values)
         {
             int size = GetOscStringSize(addressByteCount) + GetOscStringSize(1 + values.Length);
@@ -417,6 +515,11 @@ namespace Hidano.FacialControl.Adapters.OSC
         private static int GetOscStringSize(int utf8ByteCount)
         {
             return (utf8ByteCount + 4) & ~0x3;
+        }
+
+        private static int GetAlignedSize(int byteCount)
+        {
+            return (byteCount + 3) & ~0x3;
         }
 
         private static int GetUtf8ByteCount(string value)
@@ -452,6 +555,25 @@ namespace Hidano.FacialControl.Adapters.OSC
             }
 
             WriteZeroPadding(buffer, ref offset, GetOscStringSize(1 + count) - (1 + count));
+        }
+
+        private static void WriteTypeTags(byte[] buffer, ref int offset, byte firstType, byte secondType)
+        {
+            buffer[offset++] = (byte)',';
+            buffer[offset++] = firstType;
+            buffer[offset++] = secondType;
+            WriteZeroPadding(
+                buffer,
+                ref offset,
+                GetOscStringSize(1 + SenderIdentityMessageTypeCount) - (1 + SenderIdentityMessageTypeCount));
+        }
+
+        private static void WriteBlob(byte[] buffer, ref int offset, byte[] value)
+        {
+            WriteInt32BigEndian(buffer, ref offset, value.Length);
+            Buffer.BlockCopy(value, 0, buffer, offset, value.Length);
+            offset += value.Length;
+            WriteZeroPadding(buffer, ref offset, GetAlignedSize(value.Length) - value.Length);
         }
 
         private static void WriteZeroPadding(byte[] buffer, ref int offset, int count)

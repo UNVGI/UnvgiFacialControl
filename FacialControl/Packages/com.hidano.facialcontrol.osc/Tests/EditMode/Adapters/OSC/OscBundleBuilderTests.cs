@@ -74,6 +74,40 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         }
 
         [Test]
+        public void BuildFrameBundle_SenderIdentityAndFloats_WritesSingleTimestampedBundle()
+        {
+            using var builder = new OscBundleBuilder();
+            const ulong timestamp = 0x0000000600000000UL;
+            byte[] senderUuid = Guid.NewGuid().ToByteArray();
+            byte[][] addresses =
+            {
+                Utf8("/avatar/parameters/Joy"),
+                Utf8("/avatar/parameters/Angry")
+            };
+            float[] values = { 0.25f, 0.75f };
+
+            int packetCount = builder.BuildFrameBundle(
+                timestamp,
+                Utf8(SenderIdentity.OscAddress),
+                senderUuid,
+                "123456789",
+                addresses,
+                values,
+                values.Length);
+
+            Assert.AreEqual(1, packetCount);
+            List<uOSC.Message> parsed = ParseMessages(builder.GetPacket(0));
+            Assert.AreEqual(3, parsed.Count);
+            Assert.AreEqual(SenderIdentity.OscAddress, parsed[0].address);
+            Assert.AreEqual(timestamp, parsed[0].timestamp.value);
+            Assert.AreEqual(2, parsed[0].values.Length);
+            CollectionAssert.AreEqual(senderUuid, (byte[])parsed[0].values[0]);
+            Assert.AreEqual("123456789", parsed[0].values[1]);
+            AssertFloatMessage(parsed[1], "/avatar/parameters/Joy", 0.25f, timestamp);
+            AssertFloatMessage(parsed[2], "/avatar/parameters/Angry", 0.75f, timestamp);
+        }
+
+        [Test]
         public void BuildHeartbeatBundle_StringValues_WritesParseableStringMessage()
         {
             using var builder = new OscBundleBuilder();

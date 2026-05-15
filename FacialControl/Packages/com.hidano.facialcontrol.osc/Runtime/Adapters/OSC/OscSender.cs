@@ -1,5 +1,8 @@
 using System;
 using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using Hidano.FacialControl.Domain.Models;
 using UnityEngine;
 using uOSC;
@@ -12,6 +15,9 @@ namespace Hidano.FacialControl.Adapters.OSC
     /// </summary>
     public class OscSender : MonoBehaviour
     {
+        private static readonly byte[] SenderIdentityAddressUtf8 =
+            Encoding.UTF8.GetBytes(SenderIdentity.OscAddress);
+
         [SerializeField]
         private string _address = "127.0.0.1";
 
@@ -22,11 +28,17 @@ namespace Hidano.FacialControl.Adapters.OSC
         private bool _autoStart = true;
 
         private uOSC.uOscClient _client;
+        private UdpClient _bundleClient;
+        private IPEndPoint _bundleEndpoint;
+        private string _bundleEndpointAddress;
+        private int _bundleEndpointPort;
+        private OscBundleBuilder _bundleBuilder;
         private bool _initialized;
         private bool _sending;
 
         // マッピング情報: インデックス → OSC アドレス
         private string[] _oscAddresses;
+        private byte[][] _oscAddressUtf8;
 
         // マッピング情報を保持
         private OscMapping[] _mappings;
@@ -79,10 +91,18 @@ namespace Hidano.FacialControl.Adapters.OSC
 
             _mappings = mappings;
             _oscAddresses = new string[mappings.Length];
+            _oscAddressUtf8 = new byte[mappings.Length][];
             for (int i = 0; i < mappings.Length; i++)
             {
                 _oscAddresses[i] = mappings[i].OscAddress;
+                _oscAddressUtf8[i] = Encoding.UTF8.GetBytes(_oscAddresses[i]);
             }
+
+            if (_bundleBuilder == null)
+            {
+                _bundleBuilder = new OscBundleBuilder();
+            }
+
             _initialized = true;
         }
 
@@ -117,6 +137,7 @@ namespace Hidano.FacialControl.Adapters.OSC
                 return;
 
             EnsureClient();
+            EnsureBundleClient();
             _client.address = _address;
             _client.port = _port;
 
@@ -138,6 +159,8 @@ namespace Hidano.FacialControl.Adapters.OSC
             {
                 _client.StopClient();
             }
+
+            CloseBundleClient();
             _sending = false;
         }
 
@@ -193,14 +216,22 @@ namespace Hidano.FacialControl.Adapters.OSC
                 return;
 
             int messageCount = Math.Min(Math.Min(Math.Max(count, 0), values.Length), _oscAddresses.Length);
-            var bundle = new Bundle(Timestamp.Now);
-            bundle.Add(new Message(SenderIdentity.OscAddress, senderUuidBytes, startedAtUnixMs));
-            for (int i = 0; i < messageCount; i++)
-            {
-                bundle.Add(new Message(_oscAddresses[i], values[i]));
-            }
+            ulong timestamp = Timestamp.Now.value;
+            int packetCount = _bundleBuilder.BuildFrameBundle(
+                timestamp,
+                SenderIdentityAddressUtf8,
+                senderUuidBytes,
+                startedAtUnixMs,
+                _oscAddressUtf8,
+                values,
+                messageCount);
 
-            _client.Send(bundle);
+            EnsureBundleClient();
+            for (int i = 0; i < packetCount; i++)
+            {
+                OscBundlePacket packet = _bundleBuilder.GetPacket(i);
+                _bundleClient.Send(packet.Buffer, packet.Length, _bundleEndpoint);
+            }
         }
 
         /// <summary>
@@ -242,9 +273,76 @@ namespace Hidano.FacialControl.Adapters.OSC
             _client.StopClient();
         }
 
+        private void EnsureBundleClient()
+        {
+            if (_bundleEndpoint == null ||
+                _bundleEndpointPort != _port ||
+                !string.Equals(_bundleEndpointAddress, _address, StringComparison.Ordinal))
+            {
+                IPAddress ipAddress = ResolveIpAddress(_address);
+                IPEndPoint endpoint = new IPEndPoint(ipAddress, _port);
+
+                if (_bundleClient != null && _bundleClient.Client.AddressFamily != ipAddress.AddressFamily)
+                {
+                    CloseBundleClient();
+                }
+
+                _bundleEndpoint = endpoint;
+                _bundleEndpointAddress = _address;
+                _bundleEndpointPort = _port;
+            }
+
+            if (_bundleClient == null)
+            {
+                _bundleClient = new UdpClient(_bundleEndpoint.AddressFamily);
+            }
+        }
+
+        private static IPAddress ResolveIpAddress(string address)
+        {
+            if (IPAddress.TryParse(address, out IPAddress parsed))
+            {
+                return parsed;
+            }
+
+            IPAddress[] addresses = Dns.GetHostAddresses(address);
+            for (int i = 0; i < addresses.Length; i++)
+            {
+                if (addresses[i].AddressFamily == AddressFamily.InterNetwork)
+                {
+                    return addresses[i];
+                }
+            }
+
+            if (addresses.Length > 0)
+            {
+                return addresses[0];
+            }
+
+            throw new ArgumentException($"OSC endpoint address '{address}' could not be resolved.", nameof(address));
+        }
+
+        private void CloseBundleClient()
+        {
+            if (_bundleClient != null)
+            {
+                _bundleClient.Close();
+                _bundleClient = null;
+            }
+
+            _bundleEndpoint = null;
+            _bundleEndpointAddress = null;
+            _bundleEndpointPort = 0;
+        }
+
         private void OnDestroy()
         {
             StopSending();
+            if (_bundleBuilder != null)
+            {
+                _bundleBuilder.Dispose();
+                _bundleBuilder = null;
+            }
         }
     }
 }
