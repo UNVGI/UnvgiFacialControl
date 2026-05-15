@@ -49,7 +49,6 @@
   - Timeline 統合
   - テクスチャ切替 / UV アニメーションの JSON 対応
   - ホットリロード自動検知
-  - OSC マッピング Editor UI
 - **方針**: 各機能について preview.2 着手時に独立 spec を切る。本 backlog では存在のみ記録し、詳細は technical-spec.md 1.5 節と各 spec の Non-Goals を権威にする。
 
 ### M-2: Addressables / プロファイル JSON ロード経路抽象化
@@ -87,11 +86,6 @@
 - **内容**: preview.1 のアナログマッピング編集は「読取専用 Inspector + JSON Import/Export + Humanoid 自動割当ボタン」に留める。フル GUI（curve エディタ統合）は preview.2 以降。
 - **トリガ**: ユーザーから「JSON 直編集が辛い」というフィードバックが集まったとき
 
-### M-10: OSC アダプタの mapping 移植（schema v2.0 / mapping 撤去への追従）
-- **出典**: [`.kiro/specs/inspector-and-data-model-redesign/research.md`](../.kiro/specs/inspector-and-data-model-redesign/research.md) Topic / [`.kiro/specs/inspector-and-data-model-redesign/design.md`](../.kiro/specs/inspector-and-data-model-redesign/design.md) §「OSC 別 spec」
-- **内容**: 直近の Domain 改修で `AnalogBindingEntry.Mapping` field と `AnalogMappingFunction` / `AnalogMappingEvaluator` を物理削除した。OSC アダプタ（`com.hidano.facialcontrol.osc`）は本仕様の影響を受けないが、OSC 側で別途 mapping 相当の処理を再実装する将来作業が発生する。
-- **トリガ**: OSC 経由の VRChat 連携でアナログ表現が必要になったとき / `InputSourceCategory` enum を OSC 用に再導入する判断が出たとき
-
 ### M-11: スキーマ migration パス（preview の破壊変更を 1.0 で吸収）
 - **出典**: [`.kiro/specs/analog-input-binding/design.md`](../.kiro/specs/analog-input-binding/design.md) `version` field の扱い
 - **内容**: preview 中は JSON スキーマの破壊的変更を許容している（CLAUDE.md / 要件方針）。1.0 リリースに向けて `schemaVersion` ベースの migration パスを設計する。analog binding profile の `version` field は preview 中は文字列保持のみで分岐なしの状態。
@@ -118,7 +112,7 @@
   - 候補対応: (a) `ARKitDetector` → `BlendShapeNamingDetector` リネーム + 命名規約データセットを `IBlendShapeNamingScheme` 抽象化、(b) `ARKitUseCase.GenerateOscMapping` を OSC パッケージへ移管、(c) Editor ツール (`ARKitDetectorWindow`) を `BlendShapeNamingDetectorWindow` 化、(d) 将来別 UPM (`com.hidano.facialcontrol.arkit-detection`) への切り出しは現状の規模ではオーバーキルなので不採用。
 - **トリガ**: ARKit 以外の命名規約サポート要望が出たとき（VRoid / VRM Standard Expressions / iFacialMocap 独自命名等） / 1.0 リリース前の Public API 凍結タイミング（preview 中なら破壊的リネーム可）
 - **影響範囲**: `Runtime/Domain/Services/ARKitDetector.cs`, `Runtime/Application/UseCases/ARKitUseCase.cs`, `Editor/Windows/ARKitDetectorWindow.cs`, `Editor/Tools/ARKitEditorService.cs`, 対応 EditMode テスト（`Tests/EditMode/Domain/ARKitDetectorTests.cs`, `Tests/EditMode/Application/ARKitUseCaseTests.cs`）、Public API 名変更による下流影響
-- **関連**: M-10（OSC アダプタの mapping 移植 — `GenerateOscMapping` の移管先と整合させる必要あり）
+- **関連**: `osc-output-binding` spec（OSC 側の mode 別 mapping / Drawer / Samples は同 spec で回収済み。`GenerateOscMapping` の core 残置を将来リネームする場合のみ再検討）
 
 ### M-14: Domain への「動的 Expression driver」概念導入
 - **出典**: `.kiro/specs/gaze-config-promotion/` セッションでの user 指摘（2026-05-06）
@@ -136,7 +130,7 @@
 | spec | follow-up が記載されている節 |
 |------|-----------------------------|
 | `layer-input-source-blending` | research.md Topic 1 / 3 / 4 / 6 / 7（asmdef CI 確認、深度超過テスト、診断 UI、要件文書注記、`using BulkScope` パターン）|
-| `inspector-and-data-model-redesign` | research.md Topic で AnimationEvent 経由メタデータ書き戻し / schema v1.0 拒否 / Custom keyframe / OSC adaptor 経路（M-10 と重複）|
+| `inspector-and-data-model-redesign` | research.md Topic で AnimationEvent 経由メタデータ書き戻し / schema v1.0 拒否 / Custom keyframe / OSC adaptor 経路（OSC 側 mapping は `osc-output-binding` spec で回収済み）|
 | `analog-input-binding` | research.md Topic 4 / 9 / 10 / 14（curve エディタ → M-9、bone-control internal API、OscRouter 抽出、ARKit native → M-3、Binder 分割 → M-12 等）|
 | `bone-control` | research.md §「LateUpdate 競合」「Quaternion.Euler 一致誤差」「BonePoseSO 独立化 → M-6」「Burst → M-8」「BoneWriter 必須化」|
 
@@ -159,4 +153,5 @@
 - 2026-05-06: spec `gaze-config-promotion` 設計セッションで preview.1 スコープ外と確定した 2 件を追加（M-13: 複数 Vector2 入力源での gaze 同時駆動、M-14: Domain への動的 Expression driver 概念導入）。
 - 2026-05-10: ユーザー指示で「LipSync の AnimationClip 形式が動かない件の根本対応」を S-9 として追加（凌ぎの診断ログ / HelpBox は既に main に入っている）。
 - 2026-05-14: アーキ確認セッションで M-15（ARKit 検出機能の責務分離 / 命名規約データセット抽象化）を追加。SDK 依存はゼロだが、クラス名 ARKit 固定 / `GenerateOscMapping` の core 残置という整理候補が確認されたもの。
+- 2026-05-15: `osc-output-binding` spec へ OSC 送信 / 受信 mode mapping / Drawer / Samples を引き上げたため、M-1 の「OSC マッピング Editor UI」と M-10（OSC アダプタの mapping 移植）を backlog から削除。
 - 2026-05-10: 本セッションで以下を消化して削除: S-1（ボーン参照を相対 path / 単純名併用に拡張）、S-2（旧 schema field 残置なしを確認）、S-3（PlayMode 統合テスト追加）、S-4（Fork 先で確認済みのため不要と判断）、S-6（README に VContainer 依存と OpenUPM 設定例を追記）、S-8（slug 編集 UI を candidate ドロップダウン + 手動 override テキストの 2 段に変更）、M-7（同名ボーン衝突時の警告を追加。S-1 と同 PR で実装）。

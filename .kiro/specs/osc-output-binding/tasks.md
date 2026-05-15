@@ -334,7 +334,7 @@
   - _Requirements: 9.3, 9.4_
   - _Boundary: com.hidano.facialcontrol.osc Samples~/OscReceiverDemo, Assets/Samples mirror_
 
-- [ ] 8.8 `package.json` samples 配列登録 + CHANGELOG / README / work-procedure / backlog 更新
+- [x] 8.8 `package.json` samples 配列登録 + CHANGELOG / README / work-procedure / backlog 更新
   - `com.hidano.facialcontrol.osc/package.json` の `samples` 配列に `OscOutputDemo` / `OscReceiverDemo` を登録する
   - `com.hidano.facialcontrol.osc/CHANGELOG.md` および `README.md` に OSC 送信 / 受信拡張 / Gaze Vector2 受信機能の追加と既存 `OscAdapterBinding` への破壊的変更を記載する
   - `docs/work-procedure.md` に本 spec の作業手順 + Samples~ と Assets/Samples 同期コピー手順を追記し、`docs/backlog.md` から OSC 送信関連の積み残しを引き上げて整理する
