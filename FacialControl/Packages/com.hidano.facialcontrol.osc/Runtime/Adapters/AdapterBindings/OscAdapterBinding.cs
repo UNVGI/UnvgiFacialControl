@@ -64,6 +64,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         private OscDoubleBuffer _buffer;
 
         [NonSerialized]
+        private OscBundleAccumulator _bundleAccumulator;
+
+        [NonSerialized]
         private OscInputSource _inputSource;
 
         [NonSerialized]
@@ -131,6 +134,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         /// <summary>OnStart で確保した helper MonoBehaviour（テスト/診断用、未開始は null）。</summary>
         public OscReceiverHost HelperHost => _helperHost;
 
+        public OscDoubleBuffer Buffer => _buffer;
+
+        public OscBundleAccumulator BundleAccumulator => _bundleAccumulator;
+
         /// <summary>OnStart で構築した <see cref="OscInputSource"/>（テスト/診断用、未開始は null）。</summary>
         public OscInputSource InputSource => _inputSource;
 
@@ -183,9 +190,17 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             _buffer = new OscDoubleBuffer(runtimeMappings.Length);
+            _bundleAccumulator = new OscBundleAccumulator(_buffer, _bundleAccumulationTimeoutMs);
 
             _helperHost = ctx.HostGameObject.AddComponent<OscReceiverHost>();
-            _helperHost.Configure(_endpoint, _port, _buffer, runtimeMappings);
+            _helperHost.Configure(
+                _endpoint,
+                _port,
+                _buffer,
+                runtimeMappings,
+                _bundleMode == BundleInterpretationMode.AtomicSwap ? _bundleAccumulator : null,
+                _bundleMode,
+                ctx.TimeProvider);
 
             _inputSource = new OscInputSource(_buffer, _stalenessSeconds, ctx.TimeProvider);
             ctx.InputSourceRegistry.Register(slug, _inputSource);
@@ -225,6 +240,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 _buffer.Dispose();
                 _buffer = null;
             }
+
+            _bundleAccumulator = null;
 
             _started = false;
         }

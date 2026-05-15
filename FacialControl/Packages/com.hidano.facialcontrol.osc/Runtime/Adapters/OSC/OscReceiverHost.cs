@@ -1,4 +1,5 @@
 using System;
+using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using UnityEngine;
 
@@ -29,9 +30,12 @@ namespace Hidano.FacialControl.Adapters.OSC
         private OscReceiver _receiver;
         private uOSC.uOscServer _server;
         private OscDoubleBuffer _buffer;
+        private OscBundleAccumulator _bundleAccumulator;
         private OscMapping[] _mappings;
+        private ITimeProvider _timeProvider;
         private string _endpoint;
         private int _port;
+        private BundleInterpretationMode _bundleMode;
         private bool _configured;
 
         /// <summary>受信に用いる内部 <see cref="OscReceiver"/> 参照（テスト/デバッグ用）。</summary>
@@ -39,6 +43,8 @@ namespace Hidano.FacialControl.Adapters.OSC
 
         /// <summary>受信ダブルバッファ参照（binding 側で <see cref="OscDoubleBuffer.Swap"/> を呼ぶ）。</summary>
         public OscDoubleBuffer Buffer => _buffer;
+
+        public OscBundleAccumulator BundleAccumulator => _bundleAccumulator;
 
         /// <summary>bind 対象のローカルエンドポイント（IP/host）。現状ログ/診断用途。</summary>
         public string Endpoint => _endpoint;
@@ -56,7 +62,14 @@ namespace Hidano.FacialControl.Adapters.OSC
         /// <param name="port">UDP 受信ポート。</param>
         /// <param name="buffer">受信値の書き込み先 <see cref="OscDoubleBuffer"/>。</param>
         /// <param name="mappings">OSC アドレス ↔ BlendShape マッピング配列。</param>
-        public void Configure(string endpoint, int port, OscDoubleBuffer buffer, OscMapping[] mappings)
+        public void Configure(
+            string endpoint,
+            int port,
+            OscDoubleBuffer buffer,
+            OscMapping[] mappings,
+            OscBundleAccumulator bundleAccumulator = null,
+            BundleInterpretationMode bundleMode = BundleInterpretationMode.IndividualMessage,
+            ITimeProvider timeProvider = null)
         {
             if (buffer == null) throw new ArgumentNullException(nameof(buffer));
             if (mappings == null) throw new ArgumentNullException(nameof(mappings));
@@ -64,14 +77,17 @@ namespace Hidano.FacialControl.Adapters.OSC
             _endpoint = endpoint;
             _port = port;
             _buffer = buffer;
+            _bundleAccumulator = bundleAccumulator;
             _mappings = mappings;
+            _bundleMode = bundleMode;
+            _timeProvider = timeProvider;
 
             if (_receiver == null)
             {
                 _receiver = gameObject.AddComponent<OscReceiver>();
             }
             _receiver.Port = port;
-            _receiver.Initialize(buffer, mappings);
+            _receiver.Initialize(buffer, mappings, bundleAccumulator, bundleMode, timeProvider);
             _receiver.StartReceiving();
 
             _server = _receiver.GetComponent<uOSC.uOscServer>();
@@ -84,10 +100,19 @@ namespace Hidano.FacialControl.Adapters.OSC
         /// </summary>
         public void Tick()
         {
-            if (_buffer != null)
+            if (_bundleMode == BundleInterpretationMode.AtomicSwap && _bundleAccumulator != null)
+            {
+                _bundleAccumulator.FlushDue(GetCurrentTimeSeconds());
+            }
+            else if (_buffer != null)
             {
                 _buffer.Swap();
             }
+        }
+
+        private double GetCurrentTimeSeconds()
+        {
+            return _timeProvider != null ? _timeProvider.UnscaledTimeSeconds : Time.unscaledTimeAsDouble;
         }
 
         private void OnDestroy()
