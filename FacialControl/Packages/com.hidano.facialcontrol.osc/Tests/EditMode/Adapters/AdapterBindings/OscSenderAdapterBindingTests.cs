@@ -55,6 +55,14 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         }
 
         [Test]
+        public void Ctor_SuppressLoopback_DefaultsToTrue()
+        {
+            var binding = new OscSenderAdapterBinding();
+
+            Assert.That(binding.SuppressLoopback, Is.True);
+        }
+
+        [Test]
         public void Type_GazeExpressionIds_IsSerializableListField()
         {
             FieldInfo field = typeof(OscSenderAdapterBinding).GetField(
@@ -63,6 +71,18 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
 
             Assert.That(field, Is.Not.Null);
             Assert.That(field.FieldType, Is.EqualTo(typeof(List<string>)));
+            Assert.That(field.GetCustomAttribute<SerializeField>(), Is.Not.Null);
+        }
+
+        [Test]
+        public void Type_SuppressLoopback_IsSerializableBoolField()
+        {
+            FieldInfo field = typeof(OscSenderAdapterBinding).GetField(
+                "_suppressLoopback",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            Assert.That(field, Is.Not.Null);
+            Assert.That(field.FieldType, Is.EqualTo(typeof(bool)));
             Assert.That(field.GetCustomAttribute<SerializeField>(), Is.Not.Null);
         }
 
@@ -411,6 +431,88 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         }
 
         [Test]
+        public void OnStart_SuppressLoopbackMatchingReceiverEndpoint_RemainsLiveWithoutSenderHost()
+        {
+            var bus = new RecordingFacialOutputBus();
+            int port = AllocatePort();
+            var receiver = new OscAdapterBinding
+            {
+                Slug = "osc-receiver",
+                Endpoint = "127.0.0.1",
+                Port = port
+            };
+            var binding = new OscSenderAdapterBinding { Slug = "osc-sender" };
+            binding.Configure("127.0.0.1", port);
+            var host = new GameObject("OscSenderAdapterBindingLoopbackSuppressionTests");
+
+            LogAssert.Expect(
+                LogType.Warning,
+                $"[OscSenderAdapterBinding] Endpoint '127.0.0.1:{port}' matches an OSC receiver in the same child scope and was suppressed.");
+            LogAssert.Expect(
+                LogType.Warning,
+                "[OscSenderAdapterBinding] All endpoints were suppressed by loopback policy. OSC Sender remains live without sending.");
+
+            try
+            {
+                binding.OnStart(CreateContext(
+                    bus,
+                    host,
+                    new[] { "smile" },
+                    new AdapterBindingBase[] { receiver, binding }));
+
+                Assert.That(binding.IsStarted, Is.True);
+                Assert.That(binding.HelperHostCount, Is.EqualTo(0));
+                Assert.That(bus.Observer, Is.SameAs(binding));
+                Assert.That(binding.LoopbackPolicy, Is.Not.Null);
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
+        public void OnStart_SuppressLoopbackDisabledForMatchingReceiverEndpoint_StartsHost()
+        {
+            var bus = new RecordingFacialOutputBus();
+            int port = AllocatePort();
+            var receiver = new OscAdapterBinding
+            {
+                Slug = "osc-receiver",
+                Endpoint = "127.0.0.1",
+                Port = port
+            };
+            var binding = new OscSenderAdapterBinding
+            {
+                Slug = "osc-sender",
+                SuppressLoopback = false
+            };
+            binding.Configure("127.0.0.1", port);
+            var host = new GameObject("OscSenderAdapterBindingLoopbackDisabledTests");
+
+            try
+            {
+                binding.OnStart(CreateContext(
+                    bus,
+                    host,
+                    new[] { "smile" },
+                    new AdapterBindingBase[] { receiver, binding }));
+
+                Assert.That(binding.IsStarted, Is.True);
+                Assert.That(binding.HelperHostCount, Is.EqualTo(1));
+                Assert.That(binding.HelperHost.Port, Is.EqualTo(port));
+                Assert.That(bus.Observer, Is.SameAs(binding));
+                Assert.That(binding.LoopbackPolicy, Is.Null);
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
         public void OnStart_NoEnabledEndpoints_WarnsAndDoesNotSubscribe()
         {
             var bus = new RecordingFacialOutputBus();
@@ -491,7 +593,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         private static AdapterBuildContext CreateContext(
             IFacialOutputBus bus,
             GameObject host,
-            IReadOnlyList<string> blendShapeNames)
+            IReadOnlyList<string> blendShapeNames,
+            IReadOnlyList<AdapterBindingBase> adapterBindings = null)
         {
             return new AdapterBuildContext(
                 new FacialProfile("2.0.0"),
@@ -500,7 +603,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 bus,
                 new ManualTimeProvider(),
                 host,
-                lipSyncProvider: null);
+                lipSyncProvider: null,
+                activeExpressionProvider: null,
+                adapterBindings: adapterBindings);
         }
 
         private static int AllocatePort()

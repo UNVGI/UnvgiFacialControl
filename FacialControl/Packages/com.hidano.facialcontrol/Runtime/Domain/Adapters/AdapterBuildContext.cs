@@ -45,6 +45,11 @@ namespace Hidano.FacialControl.Domain.Adapters
         public readonly IFacialOutputBus FacialOutputBus;
 
         /// <summary>
+        /// Adapter bindings registered in the same FacialController child scope.
+        /// </summary>
+        public readonly IReadOnlyList<AdapterBindingBase> AdapterBindings;
+
+        /// <summary>
         /// <c>Time.timeScale</c> の影響を受けない経過秒数を提供する時刻抽象。
         /// </summary>
         public readonly ITimeProvider TimeProvider;
@@ -88,7 +93,8 @@ namespace Hidano.FacialControl.Domain.Adapters
             ITimeProvider timeProvider,
             GameObject hostGameObject,
             ILipSyncProvider lipSyncProvider,
-            IActiveExpressionProvider activeExpressionProvider = null)
+            IActiveExpressionProvider activeExpressionProvider = null,
+            IReadOnlyList<AdapterBindingBase> adapterBindings = null)
         {
             if (blendShapeNames == null)
             {
@@ -115,6 +121,7 @@ namespace Hidano.FacialControl.Domain.Adapters
             BlendShapeNames = blendShapeNames;
             InputSourceRegistry = inputSourceRegistry;
             FacialOutputBus = facialOutputBus;
+            AdapterBindings = adapterBindings ?? Array.Empty<AdapterBindingBase>();
             TimeProvider = timeProvider;
             HostGameObject = hostGameObject;
             LipSyncProvider = lipSyncProvider;

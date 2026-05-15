@@ -255,7 +255,7 @@
 
 ### Phase 6: ループバック抑制ポリシー
 
-- [ ] 7. 同一プロセス内 OSC 受信 binding と送信 binding の loopback 抑制ポリシーを実装する
+- [x] 7. 同一プロセス内 OSC 受信 binding と送信 binding の loopback 抑制ポリシーを実装する
   - `LoopbackSuppressionPolicy` を新設し、同一 child scope の `OscAdapterBinding` を `OnStart` 時に列挙、`(Endpoint, Port)` を抑制集合に追加する
   - `_suppressLoopback : bool`（既定 ON）を `OscSenderAdapterBinding` の `[Serializable]` フィールドとして追加
   - 抑制 ON 時に各送信 endpoint が受信 binding の listen endpoint (IP+port) と一致するかを `OnStart` および構成変更時のみ検査し、`OnLateTick` ホットパスに比較処理を入れない

@@ -36,6 +36,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         [SerializeField]
         private float _heartbeatIntervalSeconds = DefaultHeartbeatIntervalSeconds;
 
+        [SerializeField]
+        private bool _suppressLoopback = true;
+
         [NonSerialized]
         private IFacialOutputBus _facialOutputBus;
 
@@ -44,6 +47,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         [NonSerialized]
         private Dictionary<(string name, AddressPresetKind preset), byte[]> _addressBytesPool;
+
+        [NonSerialized]
+        private LoopbackSuppressionPolicy _loopbackSuppressionPolicy;
 
         [NonSerialized]
         private GazeSnapshot[] _scratchGazeSnapshots = Array.Empty<GazeSnapshot>();
@@ -131,6 +137,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             set => _heartbeatIntervalSeconds = value;
         }
 
+        public bool SuppressLoopback
+        {
+            get => _suppressLoopback;
+            set => _suppressLoopback = value;
+        }
+
         public OscSenderHost HelperHost => _sendSlots != null && _sendSlots.Count > 0
             ? _sendSlots[0].Host
             : null;
@@ -138,6 +150,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         public int HelperHostCount => _sendSlots != null ? _sendSlots.Count : 0;
 
         public SenderIdentity Identity => _identity;
+
+        public LoopbackSuppressionPolicy LoopbackPolicy => _loopbackSuppressionPolicy;
 
         public bool IsStarted => _started;
 
@@ -202,7 +216,14 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return;
             }
 
-            if (!TryBuildEndpointPlan(out List<OscSenderEndpointConfig> endpoints))
+            _loopbackSuppressionPolicy = _suppressLoopback
+                ? LoopbackSuppressionPolicy.FromBindings(ctx.AdapterBindings)
+                : null;
+
+            if (!TryBuildEndpointPlan(
+                    _loopbackSuppressionPolicy,
+                    out List<OscSenderEndpointConfig> endpoints,
+                    out bool allEndpointsSuppressed))
             {
                 return;
             }
@@ -253,31 +274,30 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
             if (sendSlots.Count == 0)
             {
+                if (allEndpointsSuppressed)
+                {
+                    _addressBytesPool = null;
+                    CompleteStart(in ctx, sendSlots);
+                    return;
+                }
+
                 _addressBytesPool = null;
+                _loopbackSuppressionPolicy = null;
                 Debug.LogWarning("[OscSenderAdapterBinding] No endpoint could be started. OSC Sender will not start.");
                 return;
             }
 
-            _sendSlots = sendSlots;
-            _heartbeatIntervalSeconds = ClampHeartbeatInterval(_heartbeatIntervalSeconds, logWarning: true);
-            _heartbeatElapsedSeconds = 0f;
-            _sendHeartbeatOnNextTick = true;
-            _scratchGazeSnapshots = Array.Empty<GazeSnapshot>();
-            _scratchGazeCount = 0;
-            _hasPublishedFrame = false;
-            _identity = SenderIdentityGenerator.Generate();
-            _identityUuidBytes = _identity.Uuid.ToByteArray();
-            _identityStartedAtUnixMs = _identity.StartedAtUnixMs.ToString(CultureInfo.InvariantCulture);
-
-            _facialOutputBus = ctx.FacialOutputBus;
-            _facialOutputBus.Subscribe(this);
-            _subscribed = true;
-            _started = true;
+            CompleteStart(in ctx, sendSlots);
         }
 
         public override void OnLateTick(float deltaTime)
         {
             if (!_started || _sendSlots == null)
+            {
+                return;
+            }
+
+            if (_sendSlots.Count == 0)
             {
                 return;
             }
@@ -358,6 +378,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _identityUuidBytes = null;
             _identityStartedAtUnixMs = null;
             _addressBytesPool = null;
+            _loopbackSuppressionPolicy = null;
             _heartbeatElapsedSeconds = 0f;
             _sendHeartbeatOnNextTick = false;
             _hasPublishedFrame = false;
@@ -447,12 +468,37 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
         }
 
-        private bool TryBuildEndpointPlan(out List<OscSenderEndpointConfig> endpoints)
+        private void CompleteStart(in AdapterBuildContext ctx, List<SendSlot> sendSlots)
+        {
+            _sendSlots = sendSlots;
+            _heartbeatIntervalSeconds = ClampHeartbeatInterval(_heartbeatIntervalSeconds, logWarning: true);
+            _heartbeatElapsedSeconds = 0f;
+            _sendHeartbeatOnNextTick = true;
+            _scratchGazeSnapshots = Array.Empty<GazeSnapshot>();
+            _scratchGazeCount = 0;
+            _hasPublishedFrame = false;
+            _identity = SenderIdentityGenerator.Generate();
+            _identityUuidBytes = _identity.Uuid.ToByteArray();
+            _identityStartedAtUnixMs = _identity.StartedAtUnixMs.ToString(CultureInfo.InvariantCulture);
+
+            _facialOutputBus = ctx.FacialOutputBus;
+            _facialOutputBus.Subscribe(this);
+            _subscribed = true;
+            _started = true;
+        }
+
+        private bool TryBuildEndpointPlan(
+            LoopbackSuppressionPolicy loopbackPolicy,
+            out List<OscSenderEndpointConfig> endpoints,
+            out bool allEndpointsSuppressed)
         {
             List<OscSenderEndpointConfig> configuredEndpoints = EnsureEndpointList();
             endpoints = new List<OscSenderEndpointConfig>(configuredEndpoints.Count);
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             bool loggedDuplicate = false;
+            int distinctEnabledCount = 0;
+            int suppressedCount = 0;
+            allEndpointsSuppressed = false;
 
             for (int i = 0; i < configuredEndpoints.Count; i++)
             {
@@ -481,6 +527,15 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                     continue;
                 }
 
+                distinctEnabledCount++;
+                if (loopbackPolicy != null && loopbackPolicy.IsSuppressed(endpoint, configuredEndpoint.port))
+                {
+                    Debug.LogWarning(
+                        $"[OscSenderAdapterBinding] Endpoint '{endpoint}:{configuredEndpoint.port}' matches an OSC receiver in the same child scope and was suppressed.");
+                    suppressedCount++;
+                    continue;
+                }
+
                 endpoints.Add(new OscSenderEndpointConfig(
                     endpoint,
                     configuredEndpoint.port,
@@ -488,10 +543,17 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                     configuredEndpoint.preset));
             }
 
-            if (endpoints.Count == 0)
+            if (distinctEnabledCount == 0)
             {
                 Debug.LogWarning("[OscSenderAdapterBinding] No enabled endpoints. OSC Sender will not start.");
                 return false;
+            }
+
+            if (endpoints.Count == 0 && suppressedCount == distinctEnabledCount)
+            {
+                allEndpointsSuppressed = true;
+                Debug.LogWarning(
+                    "[OscSenderAdapterBinding] All endpoints were suppressed by loopback policy. OSC Sender remains live without sending.");
             }
 
             return true;

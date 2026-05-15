@@ -87,6 +87,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             if (ctx.BlendShapeNames != null) count++;
             if (ctx.InputSourceRegistry != null) count++;
             if (ctx.FacialOutputBus != null) count++;
+            if (ctx.AdapterBindings != null) count++;
             if (ctx.TimeProvider != null) count++;
             if (ctx.HostGameObject != null) count++;
             // LipSyncProvider は null 許容
@@ -113,6 +114,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
                 Assert.That(ctx.BlendShapeNames, Is.SameAs(blendShapeNames));
                 Assert.That(ctx.InputSourceRegistry, Is.SameAs(registry));
                 Assert.That(ctx.FacialOutputBus, Is.SameAs(facialOutputBus));
+                Assert.That(ctx.AdapterBindings, Is.Empty);
                 Assert.That(ctx.TimeProvider, Is.SameAs(timeProvider));
                 Assert.That(ctx.HostGameObject, Is.SameAs(host));
                 Assert.That(ctx.LipSyncProvider, Is.Null);
@@ -284,7 +286,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
                 // in 引数経由で全 field を読み取れることを確認。
                 // readonly struct + 直接 field アクセスのため boxing は発生しない（コンパイル時に確認）。
                 int readCount = CountFieldRead(in ctx);
-                Assert.That(readCount, Is.EqualTo(7));
+                Assert.That(readCount, Is.EqualTo(8));
             }
             finally
             {
@@ -302,6 +304,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             Assert.That(ctx.BlendShapeNames, Is.Null);
             Assert.That(ctx.InputSourceRegistry, Is.Null);
             Assert.That(ctx.FacialOutputBus, Is.Null);
+            Assert.That(ctx.AdapterBindings, Is.Null);
             Assert.That(ctx.TimeProvider, Is.Null);
             Assert.That(ctx.HostGameObject, Is.Null);
             Assert.That(ctx.LipSyncProvider, Is.Null);

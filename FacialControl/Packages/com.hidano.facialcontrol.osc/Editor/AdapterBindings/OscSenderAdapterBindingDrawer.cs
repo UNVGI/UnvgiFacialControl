@@ -12,7 +12,9 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
         private const string SlugFieldName = "Slug";
         private const string EndpointsFieldName = "_endpoints";
         private const string BlendShapeNamesFieldName = "_blendShapeNames";
+        private const string GazeExpressionIdsFieldName = "_gazeExpressionIds";
         private const string HeartbeatIntervalSecondsFieldName = "_heartbeatIntervalSeconds";
+        private const string SuppressLoopbackFieldName = "_suppressLoopback";
 
         public const string RootClassName = "facial-control-osc-sender-adapter-binding";
 
@@ -23,7 +25,9 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
 
             AddSlugField(root, property);
             AddBoundField(root, property, EndpointsFieldName, "Endpoints");
+            AddBoundField(root, property, SuppressLoopbackFieldName, "Suppress Loopback");
             AddBoundField(root, property, BlendShapeNamesFieldName, "BlendShape Names");
+            AddBoundField(root, property, GazeExpressionIdsFieldName, "Gaze Expression Ids");
             AddHeartbeatIntervalField(root, property);
 
             return root;

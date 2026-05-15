@@ -125,6 +125,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
                                     resolver,
                                     capturedProfile,
                                     capturedBlendShapeNames,
+                                    capturedBindings,
                                     capturedHostGameObject,
                                     capturedActiveProvider)),
                             Lifetime.Scoped);
@@ -140,6 +141,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
             IObjectResolver resolver,
             FacialProfile profile,
             IReadOnlyList<string> blendShapeNames,
+            IReadOnlyList<AdapterBindingBase> bindings,
             GameObject hostGameObject,
             IActiveExpressionProvider activeExpressionProvider)
         {
@@ -156,7 +158,8 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
                 timeProvider,
                 hostGameObject,
                 lipSyncProvider,
-                activeExpressionProvider);
+                activeExpressionProvider,
+                bindings);
         }
 
         /// <summary>
