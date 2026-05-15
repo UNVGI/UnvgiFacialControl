@@ -163,7 +163,7 @@
   - _Requirements: 14.1, 14.2_
   - _Boundary: Adapters.OSC.SenderIdentity, Adapters.OSC.SenderIdentityGenerator_
 
-- [ ] 4.3 `OscSenderAdapterBinding` 骨格（`[FacialAdapterBinding(displayName: "OSC Sender")]` + lifecycle + FacialOutputBus 購読 + 単一 endpoint 送信）
+- [x] 4.3 `OscSenderAdapterBinding` 骨格（`[FacialAdapterBinding(displayName: "OSC Sender")]` + lifecycle + FacialOutputBus 購読 + 単一 endpoint 送信）
   - `[Serializable]` + `[FacialAdapterBinding(displayName: "OSC Sender")]` 属性付き `AdapterBindingBase` sealed 具象として実装し、パラメータレスコンストラクタで Inspector の Add ドロップダウンから生成可能にする
   - `OnStart`: `ctx.HostGameObject` に `OscSenderHost` を `AddComponent` + Configure、`ctx.FacialOutputBus.Subscribe(this)` で post-blend 観察開始、`SenderIdentityGenerator.Generate()` で Identity 発行
   - `OnFacialOutputPublished`: `postBlendValues` / `gazeSnapshots` を scratch buffer にコピー（zero-alloc 設計、Phase 10 で uOSC fork 化により完全達成）

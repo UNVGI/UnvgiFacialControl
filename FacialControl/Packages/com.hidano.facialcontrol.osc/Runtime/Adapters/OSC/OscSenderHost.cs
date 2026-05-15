@@ -83,6 +83,21 @@ namespace Hidano.FacialControl.Adapters.OSC
             }
         }
 
+        /// <summary>
+        /// 送信元識別ヘッダと BlendShape 値群を 1 つの OSC bundle として送信する。
+        /// </summary>
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            float[] values,
+            int count)
+        {
+            if (_sender != null)
+            {
+                _sender.SendBundle(senderUuidBytes, startedAtUnixMs, values, count);
+            }
+        }
+
         private void OnDestroy()
         {
             if (_sender != null)

@@ -1,6 +1,8 @@
 using System;
+using System.Globalization;
 using Hidano.FacialControl.Domain.Models;
 using UnityEngine;
+using uOSC;
 
 namespace Hidano.FacialControl.Adapters.OSC
 {
@@ -155,6 +157,47 @@ namespace Hidano.FacialControl.Adapters.OSC
             {
                 _client.Send(_oscAddresses[i], values[i]);
             }
+        }
+
+        /// <summary>
+        /// 送信元識別ヘッダと BlendShape 値群を 1 つの OSC bundle として送信する。
+        /// </summary>
+        public void SendBundle(SenderIdentity identity, float[] values, int count)
+        {
+            SendBundle(
+                identity.Uuid.ToByteArray(),
+                identity.StartedAtUnixMs.ToString(CultureInfo.InvariantCulture),
+                values,
+                count);
+        }
+
+        /// <summary>
+        /// 事前構築済みの送信元識別 payload と BlendShape 値群を 1 つの OSC bundle として送信する。
+        /// </summary>
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            float[] values,
+            int count)
+        {
+            if (!_initialized || _client == null || !_client.isRunning)
+                return;
+
+            if (senderUuidBytes == null || senderUuidBytes.Length != SenderIdentity.UuidByteLength)
+                return;
+
+            if (string.IsNullOrEmpty(startedAtUnixMs) || values == null)
+                return;
+
+            int messageCount = Math.Min(Math.Min(Math.Max(count, 0), values.Length), _oscAddresses.Length);
+            var bundle = new Bundle(Timestamp.Now);
+            bundle.Add(new Message(SenderIdentity.OscAddress, senderUuidBytes, startedAtUnixMs));
+            for (int i = 0; i < messageCount; i++)
+            {
+                bundle.Add(new Message(_oscAddresses[i], values[i]));
+            }
+
+            _client.Send(bundle);
         }
 
         /// <summary>
