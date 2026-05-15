@@ -89,7 +89,7 @@
   - _Requirements: 11.1, 12.1, 12.2_
   - _Boundary: Adapters.OSC enums/state types_
 
-- [ ] 3.2 `PerfectSyncEyeLook` 双方向変換 helper（Compose / Decompose）と符号定義テスト
+- [x] 3.2 `PerfectSyncEyeLook` 双方向変換 helper（Compose / Decompose）と符号定義テスト
   - 8 名（`eyeLookInLeft` / `eyeLookOutLeft` / `eyeLookUpLeft` / `eyeLookDownLeft` / `eyeLookInRight` / `eyeLookOutRight` / `eyeLookUpRight` / `eyeLookDownRight`）を ASCII 固定で静的配列に保持し、UTF-8 byte 化済みアドレスバッファを事前計算する
   - `Decompose`: 受信 8 float の `ReadOnlySpan<float>` から左目 / 右目の Vector2（`x_L = eyeLookOutLeft - eyeLookInLeft`, `y_L = eyeLookUpLeft - eyeLookDownLeft`, `x_R = eyeLookOutRight - eyeLookInRight`, `y_R = eyeLookUpRight - eyeLookDownRight`）を out 引数で返す
   - `Compose`: 左目 / 右目 Vector2 を 8 float の `Span<float>` に書き出す（GC ゼロ）
