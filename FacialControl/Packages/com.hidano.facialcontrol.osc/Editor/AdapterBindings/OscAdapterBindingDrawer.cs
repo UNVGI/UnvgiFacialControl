@@ -38,6 +38,11 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
         private const string EndpointFieldName = "_endpoint";
         private const string PortFieldName = "_port";
         private const string StalenessFieldName = "_stalenessSeconds";
+        private const string MappingsFieldName = "_mappings";
+        private const string FailSafeModeFieldName = "_failSafeMode";
+        private const string ConsistencyCheckWarnLogFieldName = "_consistencyCheckWarnLog";
+        private const string BundleModeFieldName = "_bundleMode";
+        private const string BundleAccumulationTimeoutMsFieldName = "_bundleAccumulationTimeoutMs";
 
         public const string RootClassName = "facial-control-osc-adapter-binding";
 
@@ -51,6 +56,11 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
             AddBoundField(root, property, EndpointFieldName, "Endpoint");
             AddBoundField(root, property, PortFieldName, "Port");
             AddBoundField(root, property, StalenessFieldName, "Staleness Seconds");
+            AddBoundField(root, property, MappingsFieldName, "Mappings");
+            AddBoundField(root, property, FailSafeModeFieldName, "Fail Safe Mode");
+            AddBoundField(root, property, ConsistencyCheckWarnLogFieldName, "Consistency Check Warn Log");
+            AddBoundField(root, property, BundleModeFieldName, "Bundle Mode");
+            AddBoundField(root, property, BundleAccumulationTimeoutMsFieldName, "Bundle Accumulation Timeout Ms");
 
             return root;
         }

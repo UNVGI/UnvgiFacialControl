@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.OSC;
 using Hidano.FacialControl.Domain.Adapters;
@@ -38,8 +39,23 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         [SerializeField]
         private float _stalenessSeconds;
 
+        [SerializeField]
+        private List<OscMappingEntry> _mappings = new List<OscMappingEntry>();
+
+        [SerializeField]
+        private FailSafeMode _failSafeMode = FailSafeMode.RevertToBase;
+
+        [SerializeField]
+        private bool _consistencyCheckWarnLog = true;
+
+        [SerializeField]
+        private BundleInterpretationMode _bundleMode = BundleInterpretationMode.AtomicSwap;
+
+        [SerializeField]
+        private float _bundleAccumulationTimeoutMs = 5f;
+
         [NonSerialized]
-        private OscMapping[] _mappings;
+        private OscMapping[] _runtimeMappings;
 
         [NonSerialized]
         private OscReceiverHost _helperHost;
@@ -82,6 +98,36 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             set => _stalenessSeconds = value;
         }
 
+        public List<OscMappingEntry> Mappings
+        {
+            get => _mappings;
+            set => _mappings = value ?? new List<OscMappingEntry>();
+        }
+
+        public FailSafeMode FailSafeMode
+        {
+            get => _failSafeMode;
+            set => _failSafeMode = value;
+        }
+
+        public bool ConsistencyCheckWarnLog
+        {
+            get => _consistencyCheckWarnLog;
+            set => _consistencyCheckWarnLog = value;
+        }
+
+        public BundleInterpretationMode BundleMode
+        {
+            get => _bundleMode;
+            set => _bundleMode = value;
+        }
+
+        public float BundleAccumulationTimeoutMs
+        {
+            get => _bundleAccumulationTimeoutMs;
+            set => _bundleAccumulationTimeoutMs = value;
+        }
+
         /// <summary>OnStart で確保した helper MonoBehaviour（テスト/診断用、未開始は null）。</summary>
         public OscReceiverHost HelperHost => _helperHost;
 
@@ -104,7 +150,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
             _endpoint = endpoint;
             _port = port;
-            _mappings = mappings;
+            _runtimeMappings = mappings;
         }
 
         /// <inheritdoc />
@@ -121,7 +167,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return;
             }
 
-            if (_mappings == null || _mappings.Length == 0)
+            OscMapping[] runtimeMappings = _runtimeMappings ?? CreateNormalBlendShapeMappings(_mappings);
+            if (runtimeMappings == null || runtimeMappings.Length == 0)
             {
                 Debug.LogWarning(
                     $"[OscAdapterBinding] OSC mappings が未設定のため入力源を登録しません。slug='{Slug}'");
@@ -135,10 +182,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return;
             }
 
-            _buffer = new OscDoubleBuffer(_mappings.Length);
+            _buffer = new OscDoubleBuffer(runtimeMappings.Length);
 
             _helperHost = ctx.HostGameObject.AddComponent<OscReceiverHost>();
-            _helperHost.Configure(_endpoint, _port, _buffer, _mappings);
+            _helperHost.Configure(_endpoint, _port, _buffer, runtimeMappings);
 
             _inputSource = new OscInputSource(_buffer, _stalenessSeconds, ctx.TimeProvider);
             ctx.InputSourceRegistry.Register(slug, _inputSource);
@@ -180,6 +227,33 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             _started = false;
+        }
+
+        private static OscMapping[] CreateNormalBlendShapeMappings(List<OscMappingEntry> mappings)
+        {
+            if (mappings == null || mappings.Count == 0)
+            {
+                return Array.Empty<OscMapping>();
+            }
+
+            var result = new List<OscMapping>(mappings.Count);
+            for (int i = 0; i < mappings.Count; i++)
+            {
+                OscMappingEntry entry = mappings[i];
+                if (entry == null || entry.mode != OscMappingMode.Normal_BlendShape)
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(entry.expressionId) || string.IsNullOrEmpty(entry.addressPattern))
+                {
+                    continue;
+                }
+
+                result.Add(new OscMapping(entry.addressPattern, entry.expressionId, string.Empty));
+            }
+
+            return result.ToArray();
         }
     }
 }
