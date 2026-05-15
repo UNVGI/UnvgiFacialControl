@@ -279,7 +279,7 @@
   - _Requirements: 6.1, 6.4, 6.5, 6.6, 6.7, 6.9, 6.10_
   - _Boundary: Adapters.Json.Dto.OscSenderOptionsDto, Adapters.Json.Dto.OscSenderEndpointDto_
 
-- [ ] 8.2 (P) `OscReceiverOptionsDto` / `OscMappingEntryDto`（受信側 JSON DTO + mode 別 entry）
+- [x] 8.2 (P) `OscReceiverOptionsDto` / `OscMappingEntryDto`（受信側 JSON DTO + mode 別 entry）
   - `OscReceiverOptionsDto` を `[Serializable]` 型として定義し、listenEndpoint / listenPort / mappings（`OscMappingEntryDto[]`）/ stalenessSeconds / failSafeMode / consistencyCheckWarnLog / bundleMode / bundleAccumulationTimeoutMs を保持する
   - `OscMappingEntryDto` を `[Serializable]` 型として定義し、mode（"blendShape" / "gazeVrchatXy" / "gazeArkit8Bs"）/ expressionId / addressPattern / sourceIdLeft / sourceIdRight / leftRightIndependent を保持する
   - mode 別意味論を実装: `Normal_BlendShape` は完全 OSC アドレス、`Gaze_VRChat_XY` は base アドレス（末尾 X/Y 抜き）、`Gaze_ARKit_8BS` は addressPattern 無視（Info ログ「ignored」+ 既定値扱い）
