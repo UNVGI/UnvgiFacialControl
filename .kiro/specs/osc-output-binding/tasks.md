@@ -147,7 +147,7 @@
 
 - [ ] 4. `OscSenderAdapterBinding` の AdapterBinding lifecycle 結線骨格を構築し、単一 endpoint への BlendShape 送信を成立させる
 
-- [ ] 4.1 (P) `OscSenderEndpointConfig`（[Serializable] endpoint 設定）と `OscAddressFormatter`（zero-alloc アドレス組立）
+- [x] 4.1 (P) `OscSenderEndpointConfig`（[Serializable] endpoint 設定）と `OscAddressFormatter`（zero-alloc アドレス組立）
   - `OscSenderEndpointConfig` を `[Serializable]` クラスとして定義し、IP/host 文字列 / UDP port / 有効/無効 flag / `AddressPresetKind` を保持する
   - `OscAddressFormatter` を新設し、プリセットと BlendShape 名 / `expressionId` から完全 OSC アドレス文字列を組み立てる API を提供する（Phase 5 でプリセット切替対応を完成、ここでは VRChat 形式の base 実装のみ）
   - BlendShape 名にマルチバイト文字 / 記号が含まれてもアドレス文字列を正しく構築できることを EditMode テストで確認する
