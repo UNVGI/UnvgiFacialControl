@@ -114,7 +114,7 @@
   - _Requirements: 11.5, 11.6_
   - _Boundary: Adapters.OSC.ZombieEvictionPolicy_
 
-- [ ] 3.5 (P) `HeartbeatConsistencyChecker`（名前一覧差分検出 + 部分反映マスク + 重複ログ抑制）
+- [x] 3.5 (P) `HeartbeatConsistencyChecker`（名前一覧差分検出 + 部分反映マスク + 重複ログ抑制）
   - heartbeat 受信時に送信側 BlendShape 名一覧と自身の mapping を比較し、不一致 BlendShape のみ反映を停止する `_skipMask : BitArray` を更新する
   - 不一致内容（送信側にあるが受信側に無い名前 / 受信側にあるが送信側に無い名前）を Unity 標準 Warning ログに出力する
   - 同一不一致セットに対するログ抑制を hash で重複判定し、同じ不一致では 1 回のみログを出す
