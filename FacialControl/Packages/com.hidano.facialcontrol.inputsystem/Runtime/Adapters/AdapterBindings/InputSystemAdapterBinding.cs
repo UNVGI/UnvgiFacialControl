@@ -326,10 +326,26 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             {
                 var entry = _expressionBindings[i];
                 if (entry == null) continue;
-                if (entry.bindingMode != BindingMode.Gaze
-                    && entry.bindingMode != BindingMode.Analog
-                    && entry.bindingMode != BindingMode.Overlay) continue;
-                TryRegisterAnalogSource(ctx, slug, entry.actionName, registered);
+
+                if (entry.bindingMode == BindingMode.Gaze)
+                {
+                    if (entry.useDistinctLeftRight)
+                    {
+                        TryRegisterAnalogSource(ctx, slug, entry.actionNameLeft, registered);
+                        TryRegisterAnalogSource(ctx, slug, entry.actionNameRight, registered);
+                    }
+                    else
+                    {
+                        TryRegisterAnalogSource(ctx, slug, entry.actionName, registered);
+                    }
+                    continue;
+                }
+
+                if (entry.bindingMode == BindingMode.Analog
+                    || entry.bindingMode == BindingMode.Overlay)
+                {
+                    TryRegisterAnalogSource(ctx, slug, entry.actionName, registered);
+                }
             }
         }
 
@@ -546,12 +562,15 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                     continue;
                 }
 
-                if (!TryFindAnalogSource(binding.actionName, out InputActionAnalogSource source))
+                if (!TryResolveGazeSources(
+                    binding,
+                    out InputActionAnalogSource leftSource,
+                    out InputActionAnalogSource rightSource))
                 {
                     continue;
                 }
 
-                gazeBoneBindings.Add(new GazeBoneBinding(config, source));
+                gazeBoneBindings.Add(new GazeBoneBinding(config, leftSource, rightSource));
             }
 
             if (gazeBoneBindings.Count == 0)
@@ -636,6 +655,43 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             }
 
             return false;
+        }
+
+        private bool TryResolveGazeSources(
+            ExpressionBindingEntry binding,
+            out InputActionAnalogSource leftSource,
+            out InputActionAnalogSource rightSource)
+        {
+            leftSource = null;
+            rightSource = null;
+            if (binding == null)
+            {
+                return false;
+            }
+
+            if (!binding.useDistinctLeftRight)
+            {
+                if (!TryFindAnalogSource(binding.actionName, out InputActionAnalogSource sharedSource))
+                {
+                    return false;
+                }
+
+                leftSource = sharedSource;
+                rightSource = sharedSource;
+                return true;
+            }
+
+            TryFindAnalogSource(binding.actionNameLeft, out leftSource);
+            TryFindAnalogSource(binding.actionNameRight, out rightSource);
+
+            if (leftSource == null && rightSource == null)
+            {
+                return false;
+            }
+
+            leftSource ??= rightSource;
+            rightSource ??= leftSource;
+            return true;
         }
 
         private bool TryFindAnalogSource(
