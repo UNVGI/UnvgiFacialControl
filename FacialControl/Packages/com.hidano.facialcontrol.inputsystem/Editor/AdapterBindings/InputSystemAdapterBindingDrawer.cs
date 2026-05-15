@@ -465,15 +465,91 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 }
                 RefreshModeMismatchHint();
             });
+            useDistinctLeftRightToggle.RegisterValueChangedCallback(evt =>
+            {
+                BindingMode m = bindingModeProp != null
+                    ? (BindingMode)bindingModeProp.enumValueIndex
+                    : BindingMode.Normal;
+                UpdateGazeActionFieldVisibility(
+                    actionDropdown,
+                    useDistinctLeftRightToggle,
+                    actionLeftDropdown,
+                    actionRightDropdown,
+                    m,
+                    evt.newValue);
+                RefreshModeMismatchHint();
+            });
+            actionLeftDropdown.RegisterValueChangedCallback(evt =>
+            {
+                var so = bindingProperty.serializedObject;
+                so.Update();
+                var list = bindingProperty.FindPropertyRelative(ExpressionBindingsFieldName);
+                if (list == null || index < 0 || index >= list.arraySize) return;
+                var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("actionNameLeft");
+                if (prop != null)
+                {
+                    prop.stringValue = evt.newValue ?? string.Empty;
+                    so.ApplyModifiedProperties();
+                }
+            });
+            actionRightDropdown.RegisterValueChangedCallback(evt =>
+            {
+                var so = bindingProperty.serializedObject;
+                so.Update();
+                var list = bindingProperty.FindPropertyRelative(ExpressionBindingsFieldName);
+                if (list == null || index < 0 || index >= list.arraySize) return;
+                var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("actionNameRight");
+                if (prop != null)
+                {
+                    prop.stringValue = evt.newValue ?? string.Empty;
+                    so.ApplyModifiedProperties();
+                }
+            });
             bindingModeField.RegisterValueChangedCallback(evt =>
             {
                 if (evt.newValue is BindingMode mode)
                 {
                     UpdateTriggerModeVisibility(triggerModeField, mode);
                     UpdateOverlayFieldVisibility(overlaySlotField, overlayTargetLayerField, mode);
+                    UpdateGazeActionFieldVisibility(
+                        actionDropdown,
+                        useDistinctLeftRightToggle,
+                        actionLeftDropdown,
+                        actionRightDropdown,
+                        mode,
+                        useDistinctLeftRightToggle.value);
                 }
                 RefreshModeMismatchHint();
             });
+        }
+
+        private static void UpdateGazeActionFieldVisibility(
+            VisualElement actionField,
+            VisualElement useDistinctLeftRightField,
+            VisualElement leftActionField,
+            VisualElement rightActionField,
+            BindingMode mode,
+            bool useDistinctLeftRight)
+        {
+            bool isGaze = mode == BindingMode.Gaze;
+            if (actionField != null)
+            {
+                actionField.style.display = !isGaze || !useDistinctLeftRight
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+            }
+            if (useDistinctLeftRightField != null)
+            {
+                useDistinctLeftRightField.style.display = isGaze
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+            }
+
+            DisplayStyle distinctDisplay = isGaze && useDistinctLeftRight
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+            if (leftActionField != null) leftActionField.style.display = distinctDisplay;
+            if (rightActionField != null) rightActionField.style.display = distinctDisplay;
         }
 
         private static void UpdateOverlayFieldVisibility(
