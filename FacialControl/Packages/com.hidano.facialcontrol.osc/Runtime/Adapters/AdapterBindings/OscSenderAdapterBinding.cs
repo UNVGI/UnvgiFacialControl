@@ -15,6 +15,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
     [FacialAdapterBinding(displayName: "OSC Sender")]
     public sealed class OscSenderAdapterBinding : AdapterBindingBase, IFacialOutputObserver
     {
+        public const float DefaultHeartbeatIntervalSeconds = 5f;
+        public const float MinHeartbeatIntervalSeconds = 0.5f;
+        public const float MaxHeartbeatIntervalSeconds = 60f;
+
         [SerializeField]
         private List<OscSenderEndpointConfig> _endpoints = new List<OscSenderEndpointConfig>
         {
@@ -23,6 +27,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         [SerializeField]
         private List<string> _blendShapeNames = new List<string>();
+
+        [SerializeField]
+        private float _heartbeatIntervalSeconds = DefaultHeartbeatIntervalSeconds;
 
         [NonSerialized]
         private IFacialOutputBus _facialOutputBus;
@@ -44,6 +51,15 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         [NonSerialized]
         private string _identityStartedAtUnixMs;
+
+        [NonSerialized]
+        private string[] _heartbeatBlendShapeNames = Array.Empty<string>();
+
+        [NonSerialized]
+        private float _heartbeatElapsedSeconds;
+
+        [NonSerialized]
+        private bool _sendHeartbeatOnNextTick;
 
         [NonSerialized]
         private bool _hasPublishedFrame;
@@ -96,6 +112,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         {
             get => _blendShapeNames;
             set => _blendShapeNames = value ?? new List<string>();
+        }
+
+        public float HeartbeatIntervalSeconds
+        {
+            get => _heartbeatIntervalSeconds;
+            set => _heartbeatIntervalSeconds = value;
         }
 
         public OscSenderHost HelperHost => _sendSlots != null && _sendSlots.Count > 0
@@ -177,7 +199,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                         ctx.BlendShapeNames,
                         endpoint.preset,
                         out OscMapping[] mappings,
-                        out int[] sourceBlendShapeIndices))
+                        out int[] sourceBlendShapeIndices,
+                        out string[] heartbeatBlendShapeNames))
                 {
                     Debug.LogWarning(
                         $"[OscSenderAdapterBinding] BlendShape mapping is empty for endpoint '{endpoint.endpoint}:{endpoint.port}'. Skipping endpoint.");
@@ -189,7 +212,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 {
                     host = ctx.HostGameObject.AddComponent<OscSenderHost>();
                     host.Configure(endpoint.endpoint, endpoint.port, mappings);
-                    sendSlots.Add(new SendSlot(host, sourceBlendShapeIndices));
+                    sendSlots.Add(new SendSlot(host, sourceBlendShapeIndices, heartbeatBlendShapeNames));
                 }
                 catch (Exception ex)
                 {
@@ -210,6 +233,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             _sendSlots = sendSlots;
+            _heartbeatBlendShapeNames = sendSlots[0].HeartbeatBlendShapeNames;
+            _heartbeatIntervalSeconds = ClampHeartbeatInterval(_heartbeatIntervalSeconds, logWarning: true);
+            _heartbeatElapsedSeconds = 0f;
+            _sendHeartbeatOnNextTick = true;
             _scratchGazeSnapshots = Array.Empty<GazeSnapshot>();
             _scratchGazeCount = 0;
             _hasPublishedFrame = false;
@@ -225,11 +252,18 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         public override void OnLateTick(float deltaTime)
         {
-            if (!_started || !_hasPublishedFrame || _sendSlots == null)
+            if (!_started || _sendSlots == null)
             {
                 return;
             }
 
+            bool sendHeartbeat = ShouldSendHeartbeat(deltaTime);
+            if (!_hasPublishedFrame && !sendHeartbeat)
+            {
+                return;
+            }
+
+            bool sentAny = false;
             for (int i = 0; i < _sendSlots.Count; i++)
             {
                 SendSlot slot = _sendSlots[i];
@@ -238,11 +272,32 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                     continue;
                 }
 
-                slot.Host.SendBundle(
-                    _identityUuidBytes,
-                    _identityStartedAtUnixMs,
-                    slot.ScratchPostBlendValues,
-                    slot.ScratchPostBlendCount);
+                if (sendHeartbeat)
+                {
+                    slot.Host.SendBundle(
+                        _identityUuidBytes,
+                        _identityStartedAtUnixMs,
+                        slot.ScratchPostBlendValues,
+                        _hasPublishedFrame ? slot.ScratchPostBlendCount : 0,
+                        _heartbeatBlendShapeNames,
+                        _heartbeatBlendShapeNames.Length);
+                }
+                else
+                {
+                    slot.Host.SendBundle(
+                        _identityUuidBytes,
+                        _identityStartedAtUnixMs,
+                        slot.ScratchPostBlendValues,
+                        slot.ScratchPostBlendCount);
+                }
+
+                sentAny = true;
+            }
+
+            if (sendHeartbeat && sentAny)
+            {
+                _sendHeartbeatOnNextTick = false;
+                _heartbeatElapsedSeconds = 0f;
             }
         }
 
@@ -275,6 +330,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _identity = default;
             _identityUuidBytes = null;
             _identityStartedAtUnixMs = null;
+            _heartbeatBlendShapeNames = Array.Empty<string>();
+            _heartbeatElapsedSeconds = 0f;
+            _sendHeartbeatOnNextTick = false;
             _hasPublishedFrame = false;
             _started = false;
         }
@@ -420,7 +478,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             IReadOnlyList<string> contextBlendShapeNames,
             AddressPresetKind preset,
             out OscMapping[] mappings,
-            out int[] sourceIndices)
+            out int[] sourceIndices,
+            out string[] heartbeatBlendShapeNames)
         {
             IReadOnlyList<string> names = _blendShapeNames != null && _blendShapeNames.Count > 0
                 ? _blendShapeNames
@@ -430,11 +489,13 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             {
                 mappings = Array.Empty<OscMapping>();
                 sourceIndices = Array.Empty<int>();
+                heartbeatBlendShapeNames = Array.Empty<string>();
                 return false;
             }
 
             var mappingList = new List<OscMapping>(names.Count);
             var indexList = new List<int>(names.Count);
+            var heartbeatNameList = new List<string>(names.Count);
             for (int i = 0; i < names.Count; i++)
             {
                 string blendShapeName = names[i];
@@ -464,11 +525,55 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
                 mappingList.Add(new OscMapping(address, blendShapeName, string.Empty));
                 indexList.Add(sourceIndex);
+                heartbeatNameList.Add(blendShapeName);
             }
 
             mappings = mappingList.ToArray();
             sourceIndices = indexList.ToArray();
+            heartbeatBlendShapeNames = heartbeatNameList.ToArray();
             return mappings.Length > 0;
+        }
+
+        private bool ShouldSendHeartbeat(float deltaTime)
+        {
+            if (_sendHeartbeatOnNextTick)
+            {
+                return true;
+            }
+
+            if (deltaTime > 0f)
+            {
+                _heartbeatElapsedSeconds += deltaTime;
+            }
+
+            return _heartbeatElapsedSeconds >= _heartbeatIntervalSeconds;
+        }
+
+        private static float ClampHeartbeatInterval(float intervalSeconds, bool logWarning)
+        {
+            if (float.IsNaN(intervalSeconds) || intervalSeconds < MinHeartbeatIntervalSeconds)
+            {
+                if (logWarning)
+                {
+                    Debug.LogWarning(
+                        $"[OscSenderAdapterBinding] heartbeatIntervalSeconds {intervalSeconds.ToString(CultureInfo.InvariantCulture)} is below {MinHeartbeatIntervalSeconds.ToString(CultureInfo.InvariantCulture)} and was clamped.");
+                }
+
+                return MinHeartbeatIntervalSeconds;
+            }
+
+            if (float.IsInfinity(intervalSeconds) || intervalSeconds > MaxHeartbeatIntervalSeconds)
+            {
+                if (logWarning)
+                {
+                    Debug.LogWarning(
+                        $"[OscSenderAdapterBinding] heartbeatIntervalSeconds {intervalSeconds.ToString(CultureInfo.InvariantCulture)} is above {MaxHeartbeatIntervalSeconds.ToString(CultureInfo.InvariantCulture)} and was clamped.");
+                }
+
+                return MaxHeartbeatIntervalSeconds;
+            }
+
+            return intervalSeconds;
         }
 
         private static int ResolveSourceIndex(
@@ -514,15 +619,18 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         {
             public readonly OscSenderHost Host;
             public readonly int[] SourceBlendShapeIndices;
+            public readonly string[] HeartbeatBlendShapeNames;
             public float[] ScratchPostBlendValues;
             public int ScratchPostBlendCount;
 
             public SendSlot(
                 OscSenderHost host,
-                int[] sourceBlendShapeIndices)
+                int[] sourceBlendShapeIndices,
+                string[] heartbeatBlendShapeNames)
             {
                 Host = host;
                 SourceBlendShapeIndices = sourceBlendShapeIndices;
+                HeartbeatBlendShapeNames = heartbeatBlendShapeNames ?? Array.Empty<string>();
                 ScratchPostBlendValues = sourceBlendShapeIndices.Length == 0
                     ? Array.Empty<float>()
                     : new float[sourceBlendShapeIndices.Length];

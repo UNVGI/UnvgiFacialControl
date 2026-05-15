@@ -15,8 +15,13 @@ namespace Hidano.FacialControl.Adapters.OSC
     /// </summary>
     public class OscSender : MonoBehaviour
     {
+        private const string BlendShapeNamesAddress = "/_facialcontrol/blendshape_names";
+
         private static readonly byte[] SenderIdentityAddressUtf8 =
             Encoding.UTF8.GetBytes(SenderIdentity.OscAddress);
+
+        private static readonly byte[] BlendShapeNamesAddressUtf8 =
+            Encoding.UTF8.GetBytes(BlendShapeNamesAddress);
 
         [SerializeField]
         private string _address = "127.0.0.1";
@@ -206,6 +211,26 @@ namespace Hidano.FacialControl.Adapters.OSC
             float[] values,
             int count)
         {
+            SendBundle(
+                senderUuidBytes,
+                startedAtUnixMs,
+                values,
+                count,
+                heartbeatNames: null,
+                heartbeatNameCount: 0);
+        }
+
+        /// <summary>
+        /// 事前構築済みの送信元識別 payload、BlendShape 値群、必要なら heartbeat を 1 つの OSC bundle として送信する。
+        /// </summary>
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            float[] values,
+            int count,
+            string[] heartbeatNames,
+            int heartbeatNameCount)
+        {
             if (!_initialized || _client == null || !_client.isRunning)
                 return;
 
@@ -215,16 +240,35 @@ namespace Hidano.FacialControl.Adapters.OSC
             if (string.IsNullOrEmpty(startedAtUnixMs) || values == null)
                 return;
 
+            bool includeHeartbeat = heartbeatNames != null;
+            if (includeHeartbeat &&
+                (heartbeatNameCount < 0 || heartbeatNameCount > heartbeatNames.Length))
+            {
+                return;
+            }
+
             int messageCount = Math.Min(Math.Min(Math.Max(count, 0), values.Length), _oscAddresses.Length);
             ulong timestamp = Timestamp.Now.value;
-            int packetCount = _bundleBuilder.BuildFrameBundle(
-                timestamp,
-                SenderIdentityAddressUtf8,
-                senderUuidBytes,
-                startedAtUnixMs,
-                _oscAddressUtf8,
-                values,
-                messageCount);
+            int packetCount = includeHeartbeat
+                ? _bundleBuilder.BuildFrameBundle(
+                    timestamp,
+                    SenderIdentityAddressUtf8,
+                    senderUuidBytes,
+                    startedAtUnixMs,
+                    _oscAddressUtf8,
+                    values,
+                    messageCount,
+                    BlendShapeNamesAddressUtf8,
+                    heartbeatNames,
+                    heartbeatNameCount)
+                : _bundleBuilder.BuildFrameBundle(
+                    timestamp,
+                    SenderIdentityAddressUtf8,
+                    senderUuidBytes,
+                    startedAtUnixMs,
+                    _oscAddressUtf8,
+                    values,
+                    messageCount);
 
             EnsureBundleClient();
             for (int i = 0; i < packetCount; i++)

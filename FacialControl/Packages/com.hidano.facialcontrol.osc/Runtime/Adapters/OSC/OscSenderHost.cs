@@ -92,9 +92,35 @@ namespace Hidano.FacialControl.Adapters.OSC
             float[] values,
             int count)
         {
+            SendBundle(
+                senderUuidBytes,
+                startedAtUnixMs,
+                values,
+                count,
+                heartbeatNames: null,
+                heartbeatNameCount: 0);
+        }
+
+        /// <summary>
+        /// 送信元識別ヘッダ、BlendShape 値群、必要なら heartbeat を 1 つの OSC bundle として送信する。
+        /// </summary>
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            float[] values,
+            int count,
+            string[] heartbeatNames,
+            int heartbeatNameCount)
+        {
             if (_sender != null)
             {
-                _sender.SendBundle(senderUuidBytes, startedAtUnixMs, values, count);
+                _sender.SendBundle(
+                    senderUuidBytes,
+                    startedAtUnixMs,
+                    values,
+                    count,
+                    heartbeatNames,
+                    heartbeatNameCount);
             }
         }
 

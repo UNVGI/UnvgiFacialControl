@@ -108,6 +108,96 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         }
 
         [Test]
+        public void BuildFrameBundle_WithHeartbeat_WritesSenderIdentityFloatsThenHeartbeat()
+        {
+            using var builder = new OscBundleBuilder();
+            const ulong timestamp = 0x0000000700000000UL;
+            byte[] senderUuid = Guid.NewGuid().ToByteArray();
+            byte[][] addresses =
+            {
+                Utf8("/avatar/parameters/Joy"),
+                Utf8("/avatar/parameters/Angry")
+            };
+            float[] values = { 0.25f, 0.75f };
+            string[] names = { "Joy", "Angry" };
+
+            int packetCount = builder.BuildFrameBundle(
+                timestamp,
+                Utf8(SenderIdentity.OscAddress),
+                senderUuid,
+                "123456789",
+                addresses,
+                values,
+                values.Length,
+                Utf8("/_facialcontrol/blendshape_names"),
+                names,
+                names.Length);
+
+            Assert.AreEqual(1, packetCount);
+            List<uOSC.Message> parsed = ParseMessages(builder.GetPacket(0));
+            Assert.AreEqual(4, parsed.Count);
+            Assert.AreEqual(SenderIdentity.OscAddress, parsed[0].address);
+            AssertFloatMessage(parsed[1], "/avatar/parameters/Joy", 0.25f, timestamp);
+            AssertFloatMessage(parsed[2], "/avatar/parameters/Angry", 0.75f, timestamp);
+            Assert.AreEqual("/_facialcontrol/blendshape_names", parsed[3].address);
+            Assert.AreEqual(timestamp, parsed[3].timestamp.value);
+            CollectionAssert.AreEqual(names, parsed[3].values);
+        }
+
+        [Test]
+        public void BuildFrameBundle_LargeHeartbeat_SplitsWithSenderIdentityAtEachPacketHead()
+        {
+            using var builder = new OscBundleBuilder();
+            const ulong timestamp = 0x0000000800000000UL;
+            byte[] senderUuid = Guid.NewGuid().ToByteArray();
+            byte[][] addresses = { Utf8("/avatar/parameters/Joy") };
+            float[] values = { 0.25f };
+            string[] names = new string[300];
+            for (int i = 0; i < names.Length; i++)
+            {
+                names[i] = "BlendShape_" + i.ToString("D4", CultureInfo.InvariantCulture);
+            }
+
+            LogAssert.Expect(LogType.Warning, new Regex("OscBundleBuilder.*MTU.*split"));
+            int packetCount = builder.BuildFrameBundle(
+                timestamp,
+                Utf8(SenderIdentity.OscAddress),
+                senderUuid,
+                "123456789",
+                addresses,
+                values,
+                values.Length,
+                Utf8("/_facialcontrol/blendshape_names"),
+                names,
+                names.Length);
+
+            Assert.Greater(packetCount, 1);
+            var parsedNames = new List<string>(names.Length);
+            for (int i = 0; i < packetCount; i++)
+            {
+                List<uOSC.Message> parsed = ParseMessages(builder.GetPacket(i));
+                Assert.Greater(parsed.Count, 0);
+                Assert.AreEqual(SenderIdentity.OscAddress, parsed[0].address);
+                Assert.AreEqual(timestamp, parsed[0].timestamp.value);
+
+                for (int messageIndex = 1; messageIndex < parsed.Count; messageIndex++)
+                {
+                    if (parsed[messageIndex].address != "/_facialcontrol/blendshape_names")
+                    {
+                        continue;
+                    }
+
+                    for (int valueIndex = 0; valueIndex < parsed[messageIndex].values.Length; valueIndex++)
+                    {
+                        parsedNames.Add((string)parsed[messageIndex].values[valueIndex]);
+                    }
+                }
+            }
+
+            CollectionAssert.AreEqual(names, parsedNames);
+        }
+
+        [Test]
         public void BuildHeartbeatBundle_StringValues_WritesParseableStringMessage()
         {
             using var builder = new OscBundleBuilder();

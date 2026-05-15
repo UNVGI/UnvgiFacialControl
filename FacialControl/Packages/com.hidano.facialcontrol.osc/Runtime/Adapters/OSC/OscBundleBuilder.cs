@@ -63,6 +63,9 @@ namespace Hidano.FacialControl.Adapters.OSC
         private bool _disposed;
         private bool _splitInCurrentBuild;
         private bool _hasLoggedMtuSplitWarning;
+        private byte[] _frameSenderIdentityAddressUtf8;
+        private byte[] _frameSenderUuidBytes;
+        private string _frameStartedAtUnixMs;
 
         public OscBundleBuilder(
             int maxPacketSize = DefaultMaxPacketSize,
@@ -190,6 +193,31 @@ namespace Hidano.FacialControl.Adapters.OSC
             float[] floatValues,
             int floatCount)
         {
+            return BuildFrameBundle(
+                timestamp,
+                senderIdentityAddressUtf8,
+                senderUuidBytes,
+                startedAtUnixMs,
+                floatAddressUtf8,
+                floatValues,
+                floatCount,
+                heartbeatAddressUtf8: null,
+                heartbeatNames: null,
+                heartbeatNameCount: 0);
+        }
+
+        public int BuildFrameBundle(
+            ulong timestamp,
+            byte[] senderIdentityAddressUtf8,
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            byte[][] floatAddressUtf8,
+            float[] floatValues,
+            int floatCount,
+            byte[] heartbeatAddressUtf8,
+            string[] heartbeatNames,
+            int heartbeatNameCount)
+        {
             ThrowIfDisposed();
             ValidateAddress(senderIdentityAddressUtf8, nameof(senderIdentityAddressUtf8));
 
@@ -218,19 +246,54 @@ namespace Hidano.FacialControl.Adapters.OSC
                 throw new ArgumentOutOfRangeException(nameof(floatCount));
             }
 
-            ResetBuildState();
-            BeginPacket(timestamp);
-            AddSenderIdentityMessage(timestamp, senderIdentityAddressUtf8, senderUuidBytes, startedAtUnixMs);
-
-            for (int i = 0; i < floatCount; i++)
+            bool includeHeartbeat = heartbeatAddressUtf8 != null;
+            if (includeHeartbeat)
             {
-                byte[] address = floatAddressUtf8[i];
-                ValidateAddress(address, nameof(floatAddressUtf8));
-                AddFloatMessage(timestamp, address, floatValues[i]);
+                ValidateAddress(heartbeatAddressUtf8, nameof(heartbeatAddressUtf8));
+
+                if (heartbeatNames == null)
+                {
+                    throw new ArgumentNullException(nameof(heartbeatNames));
+                }
+
+                if (heartbeatNameCount < 0 || heartbeatNameCount > heartbeatNames.Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(heartbeatNameCount));
+                }
+            }
+            else if (heartbeatNames != null || heartbeatNameCount != 0)
+            {
+                throw new ArgumentException(
+                    "Heartbeat address must be provided when heartbeat names are provided.",
+                    nameof(heartbeatAddressUtf8));
             }
 
-            LogMtuSplitIfNeeded();
-            return _packetCount;
+            ResetBuildState();
+            SetFrameSplitSenderIdentity(senderIdentityAddressUtf8, senderUuidBytes, startedAtUnixMs);
+            try
+            {
+                BeginPacket(timestamp);
+                AddSenderIdentityMessage(timestamp, senderIdentityAddressUtf8, senderUuidBytes, startedAtUnixMs);
+
+                for (int i = 0; i < floatCount; i++)
+                {
+                    byte[] address = floatAddressUtf8[i];
+                    ValidateAddress(address, nameof(floatAddressUtf8));
+                    AddFloatMessage(timestamp, address, floatValues[i]);
+                }
+
+                if (includeHeartbeat)
+                {
+                    AddHeartbeatMessages(timestamp, heartbeatAddressUtf8, heartbeatNames, heartbeatNameCount);
+                }
+
+                LogMtuSplitIfNeeded();
+                return _packetCount;
+            }
+            finally
+            {
+                ClearFrameSplitSenderIdentity();
+            }
         }
 
         public int BuildHeartbeatBundle(
@@ -287,6 +350,34 @@ namespace Hidano.FacialControl.Adapters.OSC
             return BuildHeartbeatBundle(timestamp, addressUtf8, new ReadOnlySpan<string>(names, 0, count));
         }
 
+        private void AddHeartbeatMessages(
+            ulong timestamp,
+            byte[] addressUtf8,
+            string[] names,
+            int count)
+        {
+            if (count == 0)
+            {
+                AddStringMessage(timestamp, addressUtf8, ReadOnlySpan<string>.Empty);
+                return;
+            }
+
+            ReadOnlySpan<string> nameSpan = new ReadOnlySpan<string>(names, 0, count);
+            int index = 0;
+            while (index < nameSpan.Length)
+            {
+                int chunkCount = GetFittingStringChunkCount(addressUtf8.Length, nameSpan, index);
+                if (chunkCount <= 0)
+                {
+                    throw new InvalidOperationException(
+                        "A single OSC heartbeat string message exceeds the configured packet size.");
+                }
+
+                AddStringMessage(timestamp, addressUtf8, nameSpan.Slice(index, chunkCount));
+                index += chunkCount;
+            }
+        }
+
         public void Dispose()
         {
             if (_disposed)
@@ -312,6 +403,7 @@ namespace Hidano.FacialControl.Adapters.OSC
         {
             _packetCount = 0;
             _splitInCurrentBuild = false;
+            ClearFrameSplitSenderIdentity();
         }
 
         private void BeginPacket(ulong timestamp)
@@ -379,6 +471,13 @@ namespace Hidano.FacialControl.Adapters.OSC
                 _splitInCurrentBuild = true;
                 BeginPacket(timestamp);
                 packetIndex = _packetCount - 1;
+                AddFrameSenderIdentityToSplitPacket(timestamp);
+                packetIndex = _packetCount - 1;
+                if (_lengths[packetIndex] + elementSize > _maxPacketSize)
+                {
+                    throw new InvalidOperationException(
+                        "A single OSC bundle element plus sender identity exceeds the configured packet size.");
+                }
             }
 
             int offset = _lengths[packetIndex];
@@ -458,7 +557,10 @@ namespace Hidano.FacialControl.Adapters.OSC
         {
             int count = 0;
             int stringsSize = 0;
-            int maxElementPayloadSize = _maxPacketSize - BundleHeaderSize - 4;
+            int maxElementPayloadSize = _maxPacketSize
+                - BundleHeaderSize
+                - 4
+                - GetFrameSplitSenderIdentityElementSize();
 
             for (int i = startIndex; i < values.Length; i++)
             {
@@ -480,6 +582,50 @@ namespace Hidano.FacialControl.Adapters.OSC
             }
 
             return count;
+        }
+
+        private void SetFrameSplitSenderIdentity(
+            byte[] addressUtf8,
+            byte[] senderUuidBytes,
+            string startedAtUnixMs)
+        {
+            _frameSenderIdentityAddressUtf8 = addressUtf8;
+            _frameSenderUuidBytes = senderUuidBytes;
+            _frameStartedAtUnixMs = startedAtUnixMs;
+        }
+
+        private void ClearFrameSplitSenderIdentity()
+        {
+            _frameSenderIdentityAddressUtf8 = null;
+            _frameSenderUuidBytes = null;
+            _frameStartedAtUnixMs = null;
+        }
+
+        private void AddFrameSenderIdentityToSplitPacket(ulong timestamp)
+        {
+            if (_frameSenderIdentityAddressUtf8 == null)
+            {
+                return;
+            }
+
+            AddSenderIdentityMessage(
+                timestamp,
+                _frameSenderIdentityAddressUtf8,
+                _frameSenderUuidBytes,
+                _frameStartedAtUnixMs);
+        }
+
+        private int GetFrameSplitSenderIdentityElementSize()
+        {
+            if (_frameSenderIdentityAddressUtf8 == null)
+            {
+                return 0;
+            }
+
+            return 4 + GetSenderIdentityMessageSize(
+                _frameSenderIdentityAddressUtf8.Length,
+                _frameSenderUuidBytes.Length,
+                _frameStartedAtUnixMs);
         }
 
         private int GetFloatMessageSize(int addressByteCount)

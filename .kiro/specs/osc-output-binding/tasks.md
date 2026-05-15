@@ -206,7 +206,7 @@
   - _Boundary: Adapters.AdapterBindings.OscSenderAdapterBinding bundle path_
   - _Depends: 5.1, 5.2_
 
-- [ ] 5.4 heartbeat（BlendShape 名一覧）周期送信と sender_id 同梱
+- [x] 5.4 heartbeat（BlendShape 名一覧）周期送信と sender_id 同梱
   - heartbeat 周期を `[Serializable]` フィールド `heartbeatIntervalSeconds`（既定 5 秒）として保持し、Drawer から 0.5〜60 秒範囲で設定可能にする
   - 0.5 秒未満は警告ログ + 最小値（0.5 秒）にクランプ
   - 起動時 1 回 + 周期で `/_facialcontrol/blendshape_names`（string 配列メッセージ）を当該 binding の送信対象 BlendShape 名リスト（順序保持）として送出する

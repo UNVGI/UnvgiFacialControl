@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Hidano.FacialControl.Adapters.AdapterBindings;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.OSC;
@@ -38,6 +39,47 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
             Assert.That(type.IsSealed, Is.True);
             Assert.That(typeof(AdapterBindingBase).IsAssignableFrom(type), Is.True);
             Assert.That(type.GetConstructor(Type.EmptyTypes), Is.Not.Null);
+        }
+
+        [Test]
+        public void Ctor_HeartbeatIntervalSeconds_DefaultsToFiveSeconds()
+        {
+            var binding = new OscSenderAdapterBinding();
+
+            Assert.That(
+                binding.HeartbeatIntervalSeconds,
+                Is.EqualTo(OscSenderAdapterBinding.DefaultHeartbeatIntervalSeconds));
+        }
+
+        [Test]
+        public void OnStart_HeartbeatIntervalBelowMinimum_ClampsAndWarns()
+        {
+            var bus = new RecordingFacialOutputBus();
+            var binding = new OscSenderAdapterBinding
+            {
+                Slug = "osc-sender",
+                HeartbeatIntervalSeconds = 0.1f
+            };
+            binding.Configure("127.0.0.1", AllocatePort());
+            var host = new GameObject("OscSenderAdapterBindingHeartbeatClampTests");
+
+            LogAssert.Expect(
+                LogType.Warning,
+                new Regex("heartbeatIntervalSeconds 0\\.1.*below 0\\.5.*clamped"));
+
+            try
+            {
+                binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
+
+                Assert.That(
+                    binding.HeartbeatIntervalSeconds,
+                    Is.EqualTo(OscSenderAdapterBinding.MinHeartbeatIntervalSeconds));
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
         }
 
         [Test]
