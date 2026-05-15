@@ -1,0 +1,172 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
+using Hidano.FacialControl.Adapters.OSC;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
+
+namespace Hidano.FacialControl.Tests.EditMode.Adapters
+{
+    [TestFixture]
+    public sealed class OscBundleBuilderTests
+    {
+        [Test]
+        public void BuildFloatBundle_PreencodedAddresses_WritesParseableOscBundle()
+        {
+            using var builder = new OscBundleBuilder();
+            const ulong timestamp = 0x0000000200000000UL;
+            var messages = new[]
+            {
+                new OscEncodedFloat(Utf8("/avatar/parameters/Joy"), 0.25f),
+                new OscEncodedFloat(Utf8("/avatar/parameters/Angry"), 0.75f)
+            };
+
+            int packetCount = builder.BuildFloatBundle(timestamp, messages);
+
+            Assert.AreEqual(1, packetCount);
+            OscBundlePacket packet = builder.GetPacket(0);
+            Assert.LessOrEqual(packet.Length, OscBundleBuilder.DefaultMaxPacketSize);
+
+            List<uOSC.Message> parsed = ParseMessages(packet);
+            Assert.AreEqual(2, parsed.Count);
+            AssertFloatMessage(parsed[0], "/avatar/parameters/Joy", 0.25f, timestamp);
+            AssertFloatMessage(parsed[1], "/avatar/parameters/Angry", 0.75f, timestamp);
+        }
+
+        [Test]
+        public void BuildFloatBundle_MtuExceeded_SplitsPacketsWithSameTimestamp()
+        {
+            using var builder = new OscBundleBuilder();
+            const ulong timestamp = 0x0000000300000000UL;
+            var messages = new OscEncodedFloat[1000];
+            for (int i = 0; i < messages.Length; i++)
+            {
+                string address = "/avatar/parameters/BlendShape_" + i.ToString("D4", CultureInfo.InvariantCulture);
+                messages[i] = new OscEncodedFloat(Utf8(address), i / 1000f);
+            }
+
+            LogAssert.Expect(LogType.Warning, new Regex("OscBundleBuilder.*MTU.*split"));
+            int packetCount = builder.BuildFloatBundle(timestamp, messages);
+
+            Assert.Greater(packetCount, 1);
+            Assert.AreEqual(packetCount - 1, builder.ContinuationCount);
+
+            int parsedCount = 0;
+            for (int i = 0; i < packetCount; i++)
+            {
+                OscBundlePacket packet = builder.GetPacket(i);
+                Assert.LessOrEqual(packet.Length, OscBundleBuilder.DefaultMaxPacketSize);
+                Assert.AreEqual(timestamp, packet.Timestamp);
+                Assert.Greater(packet.MessageCount, 0);
+
+                List<uOSC.Message> parsed = ParseMessages(packet);
+                parsedCount += parsed.Count;
+                for (int messageIndex = 0; messageIndex < parsed.Count; messageIndex++)
+                {
+                    Assert.AreEqual(timestamp, parsed[messageIndex].timestamp.value);
+                }
+            }
+
+            Assert.AreEqual(messages.Length, parsedCount);
+        }
+
+        [Test]
+        public void BuildHeartbeatBundle_StringValues_WritesParseableStringMessage()
+        {
+            using var builder = new OscBundleBuilder();
+            const ulong timestamp = 0x0000000400000000UL;
+            string[] names = { "Happy", "Angry", "Sad" };
+
+            int packetCount = builder.BuildHeartbeatBundle(
+                timestamp,
+                Utf8("/_facialcontrol/blendshape_names"),
+                names,
+                names.Length);
+
+            Assert.AreEqual(1, packetCount);
+            List<uOSC.Message> parsed = ParseMessages(builder.GetPacket(0));
+            Assert.AreEqual(1, parsed.Count);
+            Assert.AreEqual("/_facialcontrol/blendshape_names", parsed[0].address);
+            Assert.AreEqual(timestamp, parsed[0].timestamp.value);
+            CollectionAssert.AreEqual(names, parsed[0].values);
+        }
+
+        [Test]
+        public void BuildHeartbeatBundle_LargeNameList_SplitsIntoParseableMessages()
+        {
+            using var builder = new OscBundleBuilder();
+            const ulong timestamp = 0x0000000500000000UL;
+            string[] names = new string[300];
+            for (int i = 0; i < names.Length; i++)
+            {
+                names[i] = "BlendShape_" + i.ToString("D4", CultureInfo.InvariantCulture);
+            }
+
+            LogAssert.Expect(LogType.Warning, new Regex("OscBundleBuilder.*MTU.*split"));
+            int packetCount = builder.BuildHeartbeatBundle(
+                timestamp,
+                Utf8("/_facialcontrol/blendshape_names"),
+                names,
+                names.Length);
+
+            Assert.Greater(packetCount, 1);
+            var parsedNames = new List<string>(names.Length);
+            for (int i = 0; i < packetCount; i++)
+            {
+                OscBundlePacket packet = builder.GetPacket(i);
+                Assert.LessOrEqual(packet.Length, OscBundleBuilder.DefaultMaxPacketSize);
+
+                List<uOSC.Message> parsed = ParseMessages(packet);
+                for (int messageIndex = 0; messageIndex < parsed.Count; messageIndex++)
+                {
+                    Assert.AreEqual("/_facialcontrol/blendshape_names", parsed[messageIndex].address);
+                    Assert.AreEqual(timestamp, parsed[messageIndex].timestamp.value);
+                    for (int valueIndex = 0; valueIndex < parsed[messageIndex].values.Length; valueIndex++)
+                    {
+                        parsedNames.Add((string)parsed[messageIndex].values[valueIndex]);
+                    }
+                }
+            }
+
+            CollectionAssert.AreEqual(names, parsedNames);
+        }
+
+        private static byte[] Utf8(string value)
+        {
+            return Encoding.UTF8.GetBytes(value);
+        }
+
+        private static List<uOSC.Message> ParseMessages(OscBundlePacket packet)
+        {
+            var data = new byte[packet.Length];
+            Buffer.BlockCopy(packet.Buffer, 0, data, 0, packet.Length);
+
+            var parser = new uOSC.Parser();
+            int pos = 0;
+            parser.Parse(data, ref pos, packet.Length);
+
+            var messages = new List<uOSC.Message>();
+            while (parser.messageCount > 0)
+            {
+                messages.Add(parser.Dequeue());
+            }
+
+            return messages;
+        }
+
+        private static void AssertFloatMessage(
+            uOSC.Message message,
+            string expectedAddress,
+            float expectedValue,
+            ulong expectedTimestamp)
+        {
+            Assert.AreEqual(expectedAddress, message.address);
+            Assert.AreEqual(expectedTimestamp, message.timestamp.value);
+            Assert.AreEqual(1, message.values.Length);
+            Assert.AreEqual(expectedValue, (float)message.values[0], 0.0001f);
+        }
+    }
+}

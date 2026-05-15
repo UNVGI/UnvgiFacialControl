@@ -1,0 +1,567 @@
+using System;
+using System.Buffers;
+using System.Text;
+using UnityEngine;
+
+namespace Hidano.FacialControl.Adapters.OSC
+{
+    public readonly struct OscEncodedFloat
+    {
+        public readonly byte[] AddressUtf8;
+        public readonly float Value;
+
+        public OscEncodedFloat(byte[] addressUtf8, float value)
+        {
+            AddressUtf8 = addressUtf8 ?? throw new ArgumentNullException(nameof(addressUtf8));
+            Value = value;
+        }
+    }
+
+    public readonly struct OscBundlePacket
+    {
+        public readonly byte[] Buffer;
+        public readonly int Length;
+        public readonly ulong Timestamp;
+        public readonly int MessageCount;
+
+        public OscBundlePacket(byte[] buffer, int length, ulong timestamp, int messageCount)
+        {
+            Buffer = buffer ?? throw new ArgumentNullException(nameof(buffer));
+            Length = length;
+            Timestamp = timestamp;
+            MessageCount = messageCount;
+        }
+
+        public ReadOnlySpan<byte> Span => new ReadOnlySpan<byte>(Buffer, 0, Length);
+    }
+
+    public sealed class OscBundleBuilder : IDisposable
+    {
+        public const int DefaultMaxPacketSize = 1472;
+        public const int BundleHeaderSize = 16;
+
+        private const int DefaultPacketCapacity = 64;
+        private const int FloatMessageTypeCount = 1;
+        private const byte TypeFloat = (byte)'f';
+        private const byte TypeString = (byte)'s';
+
+        private static readonly byte[] BundleIdentifierBytes =
+        {
+            (byte)'#', (byte)'b', (byte)'u', (byte)'n', (byte)'d', (byte)'l', (byte)'e'
+        };
+
+        private readonly ArrayPool<byte> _bytePool;
+        private readonly int _maxPacketSize;
+
+        private byte[][] _buffers;
+        private int[] _lengths;
+        private int[] _messageCounts;
+        private ulong[] _timestamps;
+        private int _packetCount;
+        private bool _disposed;
+        private bool _splitInCurrentBuild;
+        private bool _hasLoggedMtuSplitWarning;
+
+        public OscBundleBuilder(
+            int maxPacketSize = DefaultMaxPacketSize,
+            int initialPacketCapacity = DefaultPacketCapacity,
+            ArrayPool<byte> bytePool = null)
+        {
+            if (maxPacketSize <= BundleHeaderSize + 4)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(maxPacketSize),
+                    maxPacketSize,
+                    "OSC bundle packet size must be larger than the bundle header.");
+            }
+
+            if (initialPacketCapacity <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(initialPacketCapacity));
+            }
+
+            _maxPacketSize = maxPacketSize;
+            _bytePool = bytePool ?? ArrayPool<byte>.Shared;
+            _buffers = new byte[initialPacketCapacity][];
+            _lengths = new int[initialPacketCapacity];
+            _messageCounts = new int[initialPacketCapacity];
+            _timestamps = new ulong[initialPacketCapacity];
+        }
+
+        public int MaxPacketSize => _maxPacketSize;
+
+        public int PacketCount => _packetCount;
+
+        public int ContinuationCount => _packetCount > 0 ? _packetCount - 1 : 0;
+
+        public OscBundlePacket GetPacket(int index)
+        {
+            ThrowIfDisposed();
+
+            if ((uint)index >= (uint)_packetCount)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
+
+            return new OscBundlePacket(
+                _buffers[index],
+                _lengths[index],
+                _timestamps[index],
+                _messageCounts[index]);
+        }
+
+        public ReadOnlySpan<byte> GetPacketSpan(int index)
+        {
+            OscBundlePacket packet = GetPacket(index);
+            return packet.Span;
+        }
+
+        public int BuildFloatBundle(ulong timestamp, ReadOnlySpan<OscEncodedFloat> messages)
+        {
+            ThrowIfDisposed();
+            ResetBuildState();
+
+            if (messages.Length == 0)
+            {
+                return 0;
+            }
+
+            BeginPacket(timestamp);
+            for (int i = 0; i < messages.Length; i++)
+            {
+                OscEncodedFloat message = messages[i];
+                ValidateAddress(message.AddressUtf8, nameof(messages));
+                AddFloatMessage(timestamp, message.AddressUtf8, message.Value);
+            }
+
+            LogMtuSplitIfNeeded();
+            return _packetCount;
+        }
+
+        public int BuildFloatBundle(
+            ulong timestamp,
+            byte[][] addressUtf8,
+            float[] values,
+            int count)
+        {
+            ThrowIfDisposed();
+
+            if (addressUtf8 == null)
+            {
+                throw new ArgumentNullException(nameof(addressUtf8));
+            }
+
+            if (values == null)
+            {
+                throw new ArgumentNullException(nameof(values));
+            }
+
+            if (count < 0 || count > addressUtf8.Length || count > values.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(count));
+            }
+
+            ResetBuildState();
+            if (count == 0)
+            {
+                return 0;
+            }
+
+            BeginPacket(timestamp);
+            for (int i = 0; i < count; i++)
+            {
+                byte[] address = addressUtf8[i];
+                ValidateAddress(address, nameof(addressUtf8));
+                AddFloatMessage(timestamp, address, values[i]);
+            }
+
+            LogMtuSplitIfNeeded();
+            return _packetCount;
+        }
+
+        public int BuildHeartbeatBundle(
+            ulong timestamp,
+            byte[] addressUtf8,
+            ReadOnlySpan<string> names)
+        {
+            ThrowIfDisposed();
+            ValidateAddress(addressUtf8, nameof(addressUtf8));
+            ResetBuildState();
+            BeginPacket(timestamp);
+
+            if (names.Length == 0)
+            {
+                AddStringMessage(timestamp, addressUtf8, ReadOnlySpan<string>.Empty);
+                return _packetCount;
+            }
+
+            int index = 0;
+            while (index < names.Length)
+            {
+                int chunkCount = GetFittingStringChunkCount(addressUtf8.Length, names, index);
+                if (chunkCount <= 0)
+                {
+                    throw new InvalidOperationException(
+                        "A single OSC heartbeat string message exceeds the configured packet size.");
+                }
+
+                ReadOnlySpan<string> chunk = names.Slice(index, chunkCount);
+                AddStringMessage(timestamp, addressUtf8, chunk);
+                index += chunkCount;
+            }
+
+            LogMtuSplitIfNeeded();
+            return _packetCount;
+        }
+
+        public int BuildHeartbeatBundle(
+            ulong timestamp,
+            byte[] addressUtf8,
+            string[] names,
+            int count)
+        {
+            if (names == null)
+            {
+                throw new ArgumentNullException(nameof(names));
+            }
+
+            if (count < 0 || count > names.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(count));
+            }
+
+            return BuildHeartbeatBundle(timestamp, addressUtf8, new ReadOnlySpan<string>(names, 0, count));
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            for (int i = 0; i < _buffers.Length; i++)
+            {
+                byte[] buffer = _buffers[i];
+                if (buffer != null)
+                {
+                    _bytePool.Return(buffer);
+                    _buffers[i] = null;
+                }
+            }
+
+            _packetCount = 0;
+            _disposed = true;
+        }
+
+        private void ResetBuildState()
+        {
+            _packetCount = 0;
+            _splitInCurrentBuild = false;
+        }
+
+        private void BeginPacket(ulong timestamp)
+        {
+            int index = _packetCount;
+            EnsurePacketSlot(index);
+            EnsurePacketBuffer(index);
+
+            _timestamps[index] = timestamp;
+            _messageCounts[index] = 0;
+            _lengths[index] = 0;
+            WriteBundleHeader(index, timestamp);
+            _packetCount++;
+        }
+
+        private void AddFloatMessage(ulong timestamp, byte[] addressUtf8, float value)
+        {
+            int messageSize = GetFloatMessageSize(addressUtf8.Length);
+            BeginMessage(timestamp, messageSize, out int packetIndex, out int messageStart);
+            WriteFloatMessage(packetIndex, addressUtf8, value);
+            CompleteMessage(packetIndex, messageStart, messageSize);
+        }
+
+        private void AddStringMessage(ulong timestamp, byte[] addressUtf8, ReadOnlySpan<string> values)
+        {
+            int messageSize = GetStringMessageSize(addressUtf8.Length, values);
+            BeginMessage(timestamp, messageSize, out int packetIndex, out int messageStart);
+            WriteStringMessage(packetIndex, addressUtf8, values);
+            CompleteMessage(packetIndex, messageStart, messageSize);
+        }
+
+        private void BeginMessage(ulong timestamp, int messageSize, out int packetIndex, out int messageStart)
+        {
+            int elementSize = 4 + messageSize;
+            if (elementSize > _maxPacketSize - BundleHeaderSize)
+            {
+                throw new InvalidOperationException(
+                    "A single OSC bundle element exceeds the configured packet size.");
+            }
+
+            packetIndex = _packetCount - 1;
+            if (_lengths[packetIndex] + elementSize > _maxPacketSize)
+            {
+                if (_messageCounts[packetIndex] == 0)
+                {
+                    throw new InvalidOperationException(
+                        "A single OSC bundle element exceeds the configured packet size.");
+                }
+
+                _splitInCurrentBuild = true;
+                BeginPacket(timestamp);
+                packetIndex = _packetCount - 1;
+            }
+
+            int offset = _lengths[packetIndex];
+            WriteInt32BigEndian(_buffers[packetIndex], ref offset, messageSize);
+            messageStart = offset;
+            _lengths[packetIndex] = offset;
+        }
+
+        private void CompleteMessage(int packetIndex, int messageStart, int messageSize)
+        {
+            int written = _lengths[packetIndex] - messageStart;
+            if (written != messageSize)
+            {
+                throw new InvalidOperationException("OSC message writer produced an unexpected byte count.");
+            }
+
+            _messageCounts[packetIndex]++;
+        }
+
+        private void WriteBundleHeader(int packetIndex, ulong timestamp)
+        {
+            byte[] buffer = _buffers[packetIndex];
+            int offset = 0;
+            WriteOscString(buffer, ref offset, BundleIdentifierBytes);
+            WriteUInt64BigEndian(buffer, ref offset, timestamp);
+            _lengths[packetIndex] = offset;
+        }
+
+        private void WriteFloatMessage(int packetIndex, byte[] addressUtf8, float value)
+        {
+            byte[] buffer = _buffers[packetIndex];
+            int offset = _lengths[packetIndex];
+
+            WriteOscString(buffer, ref offset, addressUtf8);
+            WriteTypeTags(buffer, ref offset, TypeFloat, FloatMessageTypeCount);
+            WriteFloatBigEndian(buffer, ref offset, value);
+
+            _lengths[packetIndex] = offset;
+        }
+
+        private void WriteStringMessage(int packetIndex, byte[] addressUtf8, ReadOnlySpan<string> values)
+        {
+            byte[] buffer = _buffers[packetIndex];
+            int offset = _lengths[packetIndex];
+
+            WriteOscString(buffer, ref offset, addressUtf8);
+            WriteTypeTags(buffer, ref offset, TypeString, values.Length);
+            for (int i = 0; i < values.Length; i++)
+            {
+                WriteOscString(buffer, ref offset, values[i]);
+            }
+
+            _lengths[packetIndex] = offset;
+        }
+
+        private int GetFittingStringChunkCount(
+            int addressByteCount,
+            ReadOnlySpan<string> values,
+            int startIndex)
+        {
+            int count = 0;
+            int stringsSize = 0;
+            int maxElementPayloadSize = _maxPacketSize - BundleHeaderSize - 4;
+
+            for (int i = startIndex; i < values.Length; i++)
+            {
+                int nextStringSize = GetOscStringSize(GetUtf8ByteCount(values[i]));
+                int nextCount = count + 1;
+                int nextMessageSize =
+                    GetOscStringSize(addressByteCount) +
+                    GetOscStringSize(1 + nextCount) +
+                    stringsSize +
+                    nextStringSize;
+
+                if (nextMessageSize > maxElementPayloadSize)
+                {
+                    break;
+                }
+
+                stringsSize += nextStringSize;
+                count = nextCount;
+            }
+
+            return count;
+        }
+
+        private int GetFloatMessageSize(int addressByteCount)
+        {
+            return GetOscStringSize(addressByteCount)
+                + GetOscStringSize(1 + FloatMessageTypeCount)
+                + 4;
+        }
+
+        private int GetStringMessageSize(int addressByteCount, ReadOnlySpan<string> values)
+        {
+            int size = GetOscStringSize(addressByteCount) + GetOscStringSize(1 + values.Length);
+            for (int i = 0; i < values.Length; i++)
+            {
+                size += GetOscStringSize(GetUtf8ByteCount(values[i]));
+            }
+
+            return size;
+        }
+
+        private static int GetOscStringSize(int utf8ByteCount)
+        {
+            return (utf8ByteCount + 4) & ~0x3;
+        }
+
+        private static int GetUtf8ByteCount(string value)
+        {
+            return string.IsNullOrEmpty(value) ? 0 : Encoding.UTF8.GetByteCount(value);
+        }
+
+        private static void WriteOscString(byte[] buffer, ref int offset, byte[] utf8Bytes)
+        {
+            Buffer.BlockCopy(utf8Bytes, 0, buffer, offset, utf8Bytes.Length);
+            offset += utf8Bytes.Length;
+            WriteZeroPadding(buffer, ref offset, GetOscStringSize(utf8Bytes.Length) - utf8Bytes.Length);
+        }
+
+        private static void WriteOscString(byte[] buffer, ref int offset, string value)
+        {
+            int byteCount = GetUtf8ByteCount(value);
+            if (byteCount > 0)
+            {
+                Encoding.UTF8.GetBytes(value, 0, value.Length, buffer, offset);
+            }
+
+            offset += byteCount;
+            WriteZeroPadding(buffer, ref offset, GetOscStringSize(byteCount) - byteCount);
+        }
+
+        private static void WriteTypeTags(byte[] buffer, ref int offset, byte type, int count)
+        {
+            buffer[offset++] = (byte)',';
+            for (int i = 0; i < count; i++)
+            {
+                buffer[offset++] = type;
+            }
+
+            WriteZeroPadding(buffer, ref offset, GetOscStringSize(1 + count) - (1 + count));
+        }
+
+        private static void WriteZeroPadding(byte[] buffer, ref int offset, int count)
+        {
+            Array.Clear(buffer, offset, count);
+            offset += count;
+        }
+
+        private static void WriteInt32BigEndian(byte[] buffer, ref int offset, int value)
+        {
+            buffer[offset++] = (byte)((value >> 24) & 0xff);
+            buffer[offset++] = (byte)((value >> 16) & 0xff);
+            buffer[offset++] = (byte)((value >> 8) & 0xff);
+            buffer[offset++] = (byte)(value & 0xff);
+        }
+
+        private static void WriteUInt64BigEndian(byte[] buffer, ref int offset, ulong value)
+        {
+            buffer[offset++] = (byte)((value >> 56) & 0xff);
+            buffer[offset++] = (byte)((value >> 48) & 0xff);
+            buffer[offset++] = (byte)((value >> 40) & 0xff);
+            buffer[offset++] = (byte)((value >> 32) & 0xff);
+            buffer[offset++] = (byte)((value >> 24) & 0xff);
+            buffer[offset++] = (byte)((value >> 16) & 0xff);
+            buffer[offset++] = (byte)((value >> 8) & 0xff);
+            buffer[offset++] = (byte)(value & 0xff);
+        }
+
+        private static void WriteFloatBigEndian(byte[] buffer, ref int offset, float value)
+        {
+            var union = new FloatIntUnion { FloatValue = value };
+            WriteInt32BigEndian(buffer, ref offset, union.IntValue);
+        }
+
+        private void EnsurePacketSlot(int index)
+        {
+            if (index < _buffers.Length)
+            {
+                return;
+            }
+
+            int newLength = _buffers.Length;
+            while (newLength <= index)
+            {
+                newLength *= 2;
+            }
+
+            Array.Resize(ref _buffers, newLength);
+            Array.Resize(ref _lengths, newLength);
+            Array.Resize(ref _messageCounts, newLength);
+            Array.Resize(ref _timestamps, newLength);
+        }
+
+        private void EnsurePacketBuffer(int index)
+        {
+            byte[] buffer = _buffers[index];
+            if (buffer != null && buffer.Length >= _maxPacketSize)
+            {
+                return;
+            }
+
+            if (buffer != null)
+            {
+                _bytePool.Return(buffer);
+            }
+
+            _buffers[index] = _bytePool.Rent(_maxPacketSize);
+        }
+
+        private void LogMtuSplitIfNeeded()
+        {
+            if (!_splitInCurrentBuild || _hasLoggedMtuSplitWarning)
+            {
+                return;
+            }
+
+            _hasLoggedMtuSplitWarning = true;
+            Debug.LogWarning(
+                $"[OscBundleBuilder] OSC bundle exceeded MTU payload {_maxPacketSize} bytes and was split into {_packetCount} bundles with the same timestamp.");
+        }
+
+        private static void ValidateAddress(byte[] addressUtf8, string paramName)
+        {
+            if (addressUtf8 == null)
+            {
+                throw new ArgumentNullException(paramName);
+            }
+
+            if (addressUtf8.Length == 0 || addressUtf8[0] != (byte)'/')
+            {
+                throw new ArgumentException("OSC address must be a non-empty UTF-8 byte array starting with '/'.", paramName);
+            }
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(OscBundleBuilder));
+            }
+        }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Explicit)]
+        private struct FloatIntUnion
+        {
+            [System.Runtime.InteropServices.FieldOffset(0)]
+            public float FloatValue;
+
+            [System.Runtime.InteropServices.FieldOffset(0)]
+            public int IntValue;
+        }
+    }
+}
