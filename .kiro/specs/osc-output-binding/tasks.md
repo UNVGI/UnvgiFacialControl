@@ -371,7 +371,7 @@
   - _Requirements: 8.6, 8.7, 8.13_
   - _Boundary: Tests/PlayMode/Integration_
 
-- [ ] 9.4 (P) `OscLoopbackSuppressionTests` + `OscFailSafeRevertTests`
+- [x] 9.4 (P) `OscLoopbackSuppressionTests` + `OscFailSafeRevertTests`
   - 同一プロセス内のループバック抑制ポリシー（既定 ON 時は送信されず、明示 OFF 時は送信される）を検証する
   - staleness 超過時のフェイルセーフ復帰: 送信側を停止して staleness 秒数経過後に受信側がベース表情へ復帰すること、送信再開後に表情が復元することを検証する
   - 観察完了状態: PlayMode テストランナーで両ケース緑
