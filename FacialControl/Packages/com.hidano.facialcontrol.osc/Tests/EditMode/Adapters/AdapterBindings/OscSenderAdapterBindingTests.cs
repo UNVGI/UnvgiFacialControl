@@ -244,6 +244,43 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         }
 
         [Test]
+        public void OnStart_ARKitGazeExpressionIds_BuildsPerfectSyncEyeLookAddresses()
+        {
+            var bus = new RecordingFacialOutputBus();
+            var binding = new OscSenderAdapterBinding { Slug = "osc-sender" };
+            binding.ConfigureEndpoints(new[]
+            {
+                new OscSenderEndpointConfig("127.0.0.1", AllocatePort(), preset: AddressPresetKind.ARKit)
+            });
+            binding.GazeExpressionIds.Add("eyeLook");
+            var host = new GameObject("OscSenderAdapterBindingArKitGazeAddressTests");
+
+            try
+            {
+                binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
+
+                Assert.That(binding.IsStarted, Is.True);
+                string[] addresses = GetPrivateField<string[]>(
+                    binding.HelperHost.Sender,
+                    "_oscAddresses");
+
+                Assert.That(addresses.Length, Is.EqualTo(1 + PerfectSyncEyeLook.Count));
+                Assert.That(addresses[0], Is.EqualTo("/ARKit/smile"));
+                for (int i = 0; i < PerfectSyncEyeLook.Count; i++)
+                {
+                    Assert.That(
+                        addresses[i + 1],
+                        Is.EqualTo(PerfectSyncEyeLook.ArKitAddressPrefix + PerfectSyncEyeLook.Names[i]));
+                }
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
         public void OnFacialOutputPublished_VRChatGazeSnapshot_WritesXAndYToScratchFrame()
         {
             var bus = new RecordingFacialOutputBus();
@@ -280,6 +317,57 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 Assert.That(values[0], Is.EqualTo(0.25f).Within(0.0001f));
                 Assert.That(values[1], Is.EqualTo(-0.4f).Within(0.0001f));
                 Assert.That(values[2], Is.EqualTo(0.6f).Within(0.0001f));
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
+        public void OnFacialOutputPublished_ARKitGazeSnapshot_WritesPerfectSyncEyeLookToScratchFrame()
+        {
+            var bus = new RecordingFacialOutputBus();
+            var binding = new OscSenderAdapterBinding { Slug = "osc-sender" };
+            binding.ConfigureEndpoints(new[]
+            {
+                new OscSenderEndpointConfig("127.0.0.1", AllocatePort(), preset: AddressPresetKind.ARKit)
+            });
+            binding.GazeExpressionIds.Add("eyeLook");
+            var host = new GameObject("OscSenderAdapterBindingArKitGazeScratchTests");
+
+            try
+            {
+                binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
+
+                bus.Publish(
+                    new[] { 0.25f },
+                    new[]
+                    {
+                        new GazeSnapshot("eyeLook", -0.4f, 0.6f),
+                        new GazeSnapshot("ignored", 1f, 1f)
+                    });
+
+                IList slots = GetPrivateField<IList>(binding, "_sendSlots");
+                object slot = slots[0];
+                int count = GetPrivateField<int>(slot, "ScratchFloatCount");
+                byte[][] addresses = GetPrivateField<byte[][]>(slot, "ScratchAddressUtf8");
+                float[] values = GetPrivateField<float[]>(slot, "ScratchFloatValues");
+
+                Assert.That(count, Is.EqualTo(1 + PerfectSyncEyeLook.Count));
+                Assert.That(Encoding.UTF8.GetString(addresses[0]), Is.EqualTo("/ARKit/smile"));
+                Assert.That(values[0], Is.EqualTo(0.25f).Within(0.0001f));
+
+                var expected = new float[PerfectSyncEyeLook.Count];
+                PerfectSyncEyeLook.Compose(new Vector2(-0.4f, 0.6f), new Vector2(-0.4f, 0.6f), expected);
+                for (int i = 0; i < PerfectSyncEyeLook.Count; i++)
+                {
+                    Assert.That(
+                        Encoding.UTF8.GetString(addresses[i + 1]),
+                        Is.EqualTo(PerfectSyncEyeLook.ArKitAddressPrefix + PerfectSyncEyeLook.Names[i]));
+                    Assert.That(values[i + 1], Is.EqualTo(expected[i]).Within(0.0001f));
+                }
             }
             finally
             {

@@ -19,6 +19,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         public const float MinHeartbeatIntervalSeconds = 0.5f;
         public const float MaxHeartbeatIntervalSeconds = 60f;
 
+        private const int VrChatGazeMessageCount = 2;
+
         [SerializeField]
         private List<OscSenderEndpointConfig> _endpoints = new List<OscSenderEndpointConfig>
         {
@@ -231,6 +233,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                     host.Configure(endpoint.endpoint, endpoint.port, mappings, addressUtf8);
                     sendSlots.Add(new SendSlot(
                         host,
+                        endpoint.preset,
                         addressUtf8,
                         sourceBlendShapeIndices,
                         heartbeatBlendShapeNames,
@@ -543,8 +546,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
             int blendShapeCapacity = names != null ? names.Count : 0;
             int gazeCapacity = _gazeExpressionIds != null ? _gazeExpressionIds.Count : 0;
-            var mappingList = new List<OscMapping>(blendShapeCapacity + (gazeCapacity * 2));
-            var addressBytesList = new List<byte[]>(blendShapeCapacity + (gazeCapacity * 2));
+            int gazeMessageCount = GetGazeMessageCount(preset);
+            var mappingList = new List<OscMapping>(blendShapeCapacity + (gazeCapacity * gazeMessageCount));
+            var addressBytesList = new List<byte[]>(blendShapeCapacity + (gazeCapacity * gazeMessageCount));
             var indexList = new List<int>(blendShapeCapacity);
             var heartbeatNameList = new List<string>(blendShapeCapacity);
             var gazeExpressionIdList = new List<string>(gazeCapacity);
@@ -588,7 +592,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 }
             }
 
-            AppendVrChatGazeMappings(preset, mappingList, addressBytesList, gazeExpressionIdList);
+            AppendGazeMappings(preset, mappingList, addressBytesList, gazeExpressionIdList);
 
             mappings = mappingList.ToArray();
             addressUtf8 = addressBytesList.ToArray();
@@ -598,13 +602,13 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             return mappings.Length > 0;
         }
 
-        private void AppendVrChatGazeMappings(
+        private void AppendGazeMappings(
             AddressPresetKind preset,
             List<OscMapping> mappingList,
             List<byte[]> addressBytesList,
             List<string> gazeExpressionIdList)
         {
-            if (preset != AddressPresetKind.VRChat || _gazeExpressionIds == null)
+            if (_gazeExpressionIds == null)
             {
                 return;
             }
@@ -614,6 +618,13 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 string expressionId = _gazeExpressionIds[i];
                 if (string.IsNullOrEmpty(expressionId))
                 {
+                    continue;
+                }
+
+                if (preset == AddressPresetKind.ARKit)
+                {
+                    AppendArKitGazeMappings(mappingList, addressBytesList);
+                    gazeExpressionIdList.Add(expressionId);
                     continue;
                 }
 
@@ -644,6 +655,23 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
         }
 
+        private void AppendArKitGazeMappings(
+            List<OscMapping> mappingList,
+            List<byte[]> addressBytesList)
+        {
+            for (int i = 0; i < PerfectSyncEyeLook.Count; i++)
+            {
+                string name = PerfectSyncEyeLook.Names[i];
+                string address = OscAddressFormatter.FormatBlendShapeAddress(AddressPresetKind.ARKit, name);
+
+                mappingList.Add(new OscMapping(address, name, string.Empty));
+                addressBytesList.Add(OscAddressFormatter.GetOrAddBlendShapeAddressUtf8(
+                    _addressBytesPool,
+                    AddressPresetKind.ARKit,
+                    name));
+            }
+        }
+
         private void AppendGazeMessages(SendSlot slot, ref int writeIndex)
         {
             string[] gazeIds = slot.GazeExpressionIds;
@@ -657,16 +685,50 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             {
                 if (TryFindGazeSnapshot(gazeIds[i], out GazeSnapshot snapshot))
                 {
-                    slot.ScratchAddressUtf8[writeIndex] = slot.ConfiguredAddressUtf8[addressIndex];
-                    slot.ScratchFloatValues[writeIndex] = snapshot.X;
-                    writeIndex++;
-
-                    slot.ScratchAddressUtf8[writeIndex] = slot.ConfiguredAddressUtf8[addressIndex + 1];
-                    slot.ScratchFloatValues[writeIndex] = snapshot.Y;
-                    writeIndex++;
+                    if (slot.Preset == AddressPresetKind.ARKit)
+                    {
+                        AppendArKitGazeMessages(slot, addressIndex, snapshot, ref writeIndex);
+                    }
+                    else
+                    {
+                        AppendVrChatGazeMessages(slot, addressIndex, snapshot, ref writeIndex);
+                    }
                 }
 
-                addressIndex += 2;
+                addressIndex += slot.GazeMessageCount;
+            }
+        }
+
+        private static void AppendVrChatGazeMessages(
+            SendSlot slot,
+            int addressIndex,
+            GazeSnapshot snapshot,
+            ref int writeIndex)
+        {
+            slot.ScratchAddressUtf8[writeIndex] = slot.ConfiguredAddressUtf8[addressIndex];
+            slot.ScratchFloatValues[writeIndex] = snapshot.X;
+            writeIndex++;
+
+            slot.ScratchAddressUtf8[writeIndex] = slot.ConfiguredAddressUtf8[addressIndex + 1];
+            slot.ScratchFloatValues[writeIndex] = snapshot.Y;
+            writeIndex++;
+        }
+
+        private static void AppendArKitGazeMessages(
+            SendSlot slot,
+            int addressIndex,
+            GazeSnapshot snapshot,
+            ref int writeIndex)
+        {
+            Span<float> eyeLookValues = stackalloc float[PerfectSyncEyeLook.Count];
+            var gaze = new Vector2(snapshot.X, snapshot.Y);
+            PerfectSyncEyeLook.Compose(gaze, gaze, eyeLookValues);
+
+            for (int i = 0; i < PerfectSyncEyeLook.Count; i++)
+            {
+                slot.ScratchAddressUtf8[writeIndex] = slot.ConfiguredAddressUtf8[addressIndex + i];
+                slot.ScratchFloatValues[writeIndex] = eyeLookValues[i];
+                writeIndex++;
             }
         }
 
@@ -767,30 +829,42 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
         }
 
+        private static int GetGazeMessageCount(AddressPresetKind preset)
+        {
+            return preset == AddressPresetKind.ARKit
+                ? PerfectSyncEyeLook.Count
+                : VrChatGazeMessageCount;
+        }
+
         private sealed class SendSlot
         {
             public readonly OscSenderHost Host;
+            public readonly AddressPresetKind Preset;
             public readonly byte[][] ConfiguredAddressUtf8;
             public readonly int[] SourceBlendShapeIndices;
             public readonly string[] HeartbeatBlendShapeNames;
             public readonly string[] GazeExpressionIds;
+            public readonly int GazeMessageCount;
             public byte[][] ScratchAddressUtf8;
             public float[] ScratchFloatValues;
             public int ScratchFloatCount;
 
             public SendSlot(
                 OscSenderHost host,
+                AddressPresetKind preset,
                 byte[][] configuredAddressUtf8,
                 int[] sourceBlendShapeIndices,
                 string[] heartbeatBlendShapeNames,
                 string[] gazeExpressionIds)
             {
                 Host = host;
+                Preset = preset;
                 ConfiguredAddressUtf8 = configuredAddressUtf8 ?? Array.Empty<byte[]>();
                 SourceBlendShapeIndices = sourceBlendShapeIndices ?? Array.Empty<int>();
                 HeartbeatBlendShapeNames = heartbeatBlendShapeNames ?? Array.Empty<string>();
                 GazeExpressionIds = gazeExpressionIds ?? Array.Empty<string>();
-                int scratchCapacity = SourceBlendShapeIndices.Length + (GazeExpressionIds.Length * 2);
+                GazeMessageCount = GetGazeMessageCount(preset);
+                int scratchCapacity = SourceBlendShapeIndices.Length + (GazeExpressionIds.Length * GazeMessageCount);
                 ScratchAddressUtf8 = scratchCapacity == 0
                     ? Array.Empty<byte[]>()
                     : new byte[scratchCapacity][];
@@ -801,7 +875,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
             public void EnsureScratchCapacity()
             {
-                int required = SourceBlendShapeIndices.Length + (GazeExpressionIds.Length * 2);
+                int required = SourceBlendShapeIndices.Length + (GazeExpressionIds.Length * GazeMessageCount);
                 if (ScratchAddressUtf8 == null || ScratchAddressUtf8.Length < required)
                 {
                     ScratchAddressUtf8 = new byte[required][];
