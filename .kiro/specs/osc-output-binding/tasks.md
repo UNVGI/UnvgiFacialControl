@@ -155,7 +155,7 @@
   - _Requirements: 3.1, 3.2, 4.1, 4.8_
   - _Boundary: Adapters.OSC.OscSenderEndpointConfig, Adapters.OSC.OscAddressFormatter_
 
-- [ ] 4.2 (P) `SenderIdentity` / `SenderIdentityGenerator`（UUID + UTC ms）
+- [x] 4.2 (P) `SenderIdentity` / `SenderIdentityGenerator`（UUID + UTC ms）
   - `SenderIdentity` を `readonly struct`（`Guid Uuid` + `long StartedAtUnixMs`）として定義する
   - `SenderIdentityGenerator.Generate()` で `Guid.NewGuid()` + `DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()` を返す
   - OSC 表現として `/_facialcontrol/sender_id` に 2 引数（`Guid.ToByteArray()` の 16 byte blob, `long` の UTC ms）を送る規約を定数化する

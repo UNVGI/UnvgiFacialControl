@@ -31,7 +31,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
     [FacialAdapterBinding(displayName: "OSC")]
     public sealed class OscAdapterBinding : AdapterBindingBase
     {
-        public const string SenderIdentityAddress = "/_facialcontrol/sender_id";
+        public const string SenderIdentityAddress = SenderIdentity.OscAddress;
         public const string BlendShapeNamesAddress = "/_facialcontrol/blendshape_names";
 
         private const int MaxCachedBundleSenderDecisions = 32;
@@ -1000,7 +1000,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             Guid senderId;
-            if (values[0] is byte[] bytes && bytes.Length == 16)
+            if (values[0] is byte[] bytes && bytes.Length == SenderIdentity.UuidByteLength)
             {
                 senderId = new Guid(bytes);
             }

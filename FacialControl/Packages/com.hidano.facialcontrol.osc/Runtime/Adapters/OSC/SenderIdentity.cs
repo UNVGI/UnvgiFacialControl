@@ -2,19 +2,19 @@ using System;
 
 namespace Hidano.FacialControl.Adapters.OSC
 {
-    /// <summary>
-    /// OSC 送信元を識別する UUID と起動時刻の組。
-    /// </summary>
     public readonly struct SenderIdentity : IEquatable<SenderIdentity>
     {
-        public readonly Guid SenderId;
+        public const string OscAddress = "/_facialcontrol/sender_id";
+        public const int UuidByteLength = 16;
+
+        public readonly Guid Uuid;
         public readonly long StartedAtUnixMs;
 
-        public SenderIdentity(Guid senderId, long startedAtUnixMs)
+        public SenderIdentity(Guid uuid, long startedAtUnixMs)
         {
-            if (senderId == Guid.Empty)
+            if (uuid == Guid.Empty)
             {
-                throw new ArgumentException("Sender UUID must not be empty.", nameof(senderId));
+                throw new ArgumentException("Sender UUID must not be empty.", nameof(uuid));
             }
 
             if (startedAtUnixMs < 0L)
@@ -23,13 +23,15 @@ namespace Hidano.FacialControl.Adapters.OSC
                     "StartedAtUnixMs must be greater than or equal to zero.");
             }
 
-            SenderId = senderId;
+            Uuid = uuid;
             StartedAtUnixMs = startedAtUnixMs;
         }
 
+        public Guid SenderId => Uuid;
+
         public bool Equals(SenderIdentity other)
         {
-            return SenderId.Equals(other.SenderId)
+            return Uuid.Equals(other.Uuid)
                 && StartedAtUnixMs == other.StartedAtUnixMs;
         }
 
@@ -42,13 +44,13 @@ namespace Hidano.FacialControl.Adapters.OSC
         {
             unchecked
             {
-                return (SenderId.GetHashCode() * 397) ^ StartedAtUnixMs.GetHashCode();
+                return (Uuid.GetHashCode() * 397) ^ StartedAtUnixMs.GetHashCode();
             }
         }
 
         public override string ToString()
         {
-            return $"{SenderId:D}@{StartedAtUnixMs}";
+            return $"{Uuid:D}@{StartedAtUnixMs}";
         }
 
         public static bool operator ==(SenderIdentity left, SenderIdentity right)
