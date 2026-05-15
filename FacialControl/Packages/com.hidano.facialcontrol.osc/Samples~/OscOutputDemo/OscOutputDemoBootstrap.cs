@@ -33,7 +33,7 @@ namespace Hidano.FacialControl.Samples.OscOutputDemo
 
         private void Awake()
         {
-            Application.runInBackground = true;
+            UnityEngine.Application.runInBackground = true;
 
             if (_facialController == null)
             {

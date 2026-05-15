@@ -264,7 +264,14 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 {
                     if (host != null)
                     {
-                        UnityEngine.Object.Destroy(host);
+                        if (UnityEngine.Application.isPlaying)
+                        {
+                            UnityEngine.Object.Destroy(host);
+                        }
+                        else
+                        {
+                            UnityEngine.Object.DestroyImmediate(host);
+                        }
                     }
 
                     Debug.LogWarning(
@@ -365,7 +372,14 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                     OscSenderHost host = _sendSlots[i].Host;
                     if (host != null)
                     {
-                        UnityEngine.Object.Destroy(host);
+                        if (UnityEngine.Application.isPlaying)
+                        {
+                            UnityEngine.Object.Destroy(host);
+                        }
+                        else
+                        {
+                            UnityEngine.Object.DestroyImmediate(host);
+                        }
                     }
                 }
 

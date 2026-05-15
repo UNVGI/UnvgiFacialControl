@@ -239,9 +239,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             yield return new WaitForSecondsRealtime(0.2f);
 
-            UnityEngine.InputSystem.InputSystem.QueueStateEvent(
-                _gamepad,
-                new GamepadState { leftStick = inputValue });
+            UnityEngine.InputSystem.LowLevel.InputState.Change(_gamepad.leftStick, inputValue);
             UnityEngine.InputSystem.InputSystem.Update();
             inputBinding.OnLateTick(0.016f);
 

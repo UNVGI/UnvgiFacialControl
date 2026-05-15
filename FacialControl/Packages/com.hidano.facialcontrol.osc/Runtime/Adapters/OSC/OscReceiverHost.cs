@@ -129,13 +129,27 @@ namespace Hidano.FacialControl.Adapters.OSC
                 {
                     Debug.LogException(ex);
                 }
-                UnityEngine.Object.Destroy(_receiver);
+                if (UnityEngine.Application.isPlaying)
+                {
+                    UnityEngine.Object.Destroy(_receiver);
+                }
+                else
+                {
+                    UnityEngine.Object.DestroyImmediate(_receiver);
+                }
                 _receiver = null;
             }
 
             if (_server != null)
             {
-                UnityEngine.Object.Destroy(_server);
+                if (UnityEngine.Application.isPlaying)
+                {
+                    UnityEngine.Object.Destroy(_server);
+                }
+                else
+                {
+                    UnityEngine.Object.DestroyImmediate(_server);
+                }
                 _server = null;
             }
 

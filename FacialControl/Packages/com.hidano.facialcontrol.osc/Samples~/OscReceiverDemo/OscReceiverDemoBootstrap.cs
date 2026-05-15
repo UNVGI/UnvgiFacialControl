@@ -28,7 +28,7 @@ namespace Hidano.FacialControl.Samples.OscReceiverDemo
 
         private void Awake()
         {
-            Application.runInBackground = true;
+            UnityEngine.Application.runInBackground = true;
 
             if (_facialController == null)
             {

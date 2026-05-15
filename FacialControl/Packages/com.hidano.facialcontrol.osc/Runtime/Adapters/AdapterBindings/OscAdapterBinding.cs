@@ -370,7 +370,14 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                     _helperHost.Receiver.SetMessageFilter(null);
                 }
 
-                UnityEngine.Object.Destroy(_helperHost);
+                if (UnityEngine.Application.isPlaying)
+                {
+                    UnityEngine.Object.Destroy(_helperHost);
+                }
+                else
+                {
+                    UnityEngine.Object.DestroyImmediate(_helperHost);
+                }
                 _helperHost = null;
             }
 

@@ -121,6 +121,30 @@
 - **影響範囲**: `Runtime/Domain/Models/Expression.cs`, `Runtime/Domain/Models/ExpressionSnapshot.cs`, 新規 `IExpressionDriver` 等の interface, `Runtime/Adapters/Bone/GazeBonePoseProvider.cs` の Domain への昇格検討, `IFacialCharacterProfile` 経路, runtime 評価経路の再設計
 - **関連**: M-8（Burst / IAnimationJob への差替 — Domain 純化の延長線）、M-4（BonePose 多重 provider のブレンド合成）
 
+### M-16: uOSC vendor copy + zero-alloc fork（osc-output-binding spec Phase 10 / 11）
+- **出典**: [`.kiro/specs/osc-output-binding/tasks.md`](../.kiro/specs/osc-output-binding/tasks.md) "preview.3 milestone（Deferred）" / [`.kiro/specs/osc-output-binding/uosc-modification-plan.md`](../.kiro/specs/osc-output-binding/uosc-modification-plan.md)
+- **内容**: `osc-output-binding` spec の Phase 10 / 11 として記載済み。`com.hidano.uosc` を `Library/PackageCache` から `Packages/com.hidano.uosc/` へ vendor copy 化し、`Runtime/Core/Modern/` 配下に Span / ArrayPool / BinaryPrimitives ベースの新 API（`OscMessage` SoA struct, `OscMessagePool`, `OscWriter`, `OscBundleBuilder`, `OscClient`/`OscServer` (ring buffer + Socket.ReceiveFrom worker), `OscPacketParser` (ref struct), `OscMessageView`, `OscAddressHash` (UTF-8 → uint64)）を実装、送受信ホットパスを zero-alloc 化する。完了後に旧 `uOscClient` / `Bundle` / `Message` facade を撤去（Phase 11）。`osc-output-binding` 内の Req 10.1 「`OnLateTick` で毎フレーム 0 byte GC」を完全達成する。preview.2 では本 spec ロジック側のみ GC ゼロを確認し、uOSC 側 string / object[] alloc は baseline 計測に留めている（`OscSenderGCAllocationTests` / `OscReceiverGCAllocationTests` が `*` deferred マーク付き）。
+- **トリガ**: 1 sender × 10+ receiver × 1000 BlendShape の高負荷シナリオで GC スパイクが実測課題化したとき / 1.0 凍結前の最終性能検証フェーズ
+- **影響範囲**: `Packages/com.hidano.uosc/`（vendor 化）、`Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/OSC/`（新 API への接続切り替え）、対応 PlayMode 性能テスト
+- **関連**: `osc-output-binding` spec Req 8.12 / 10.1 / 10.6
+
+### M-17: OverlaySlotBinding 既存テスト失敗（suppress + snapshot 同時存在の検証で 7 件 fail）
+- **出典**: `osc-output-binding` spec 完了直後の `/kiro:validate-impl` セッション（2026-05-15）で実テスト実行時に検出
+- **内容**: `SystemTextJsonParser.cs` が `OverlaySlotBinding slot='X' has invalid state: suppress=true and snapshot is not null` という validation を持っているが、サンプル JSON / テスト fixture 側に `suppress=true` AND non-null `snapshot` の組合せが残存しているため、以下 7 件の EditMode テストが恒常 fail する。`osc-output-binding` の commit 範囲外で発生しており、別 spec（overlay-clip-redesign 系）の積み残し tech debt。
+  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserOverlaysTests.Parse_SampleProfileJson_RoundTripsEquivalentOverlaySchema`
+  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserOverlaysTests.RoundTrip_ThreeOverlayStates_PreservesEquivalentProfile`
+  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.ParseProfile_PopulatesLayerInputSourcesAlignedWithLayers`
+  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.SerializeParseSerialize_SampleJson_ProducesIdenticalString`
+  - `Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.FacialCharacterProfileConverterTests.ToProfileSnapshotDto_DomainOverlayStates_EmitsNewOverlayDtoSchema`
+  - `Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Serializable.OverlaySlotBindingSerializableTests.UnitySerialization_LegacyExpressionIdKey_IsIgnoredAndNewFieldsKeepDefaults`
+  - `Hidano.FacialControl.Tests.EditMode.Editor.AutoExport.FacialCharacterProfileExporter_OverlayClipTests.ExportProfileJson_OverlaySlotsAndBindings_WritesNewSchema`
+- 加えて PlayMode 側に同系の overlay 由来既存失敗が 2 件残存:
+  - `Hidano.FacialControl.Tests.PlayMode.Integration.LayerLifecycleZeroFadeTests.ActivateThenDeactivate_DrivenByMonoBehaviourTick_FadesToZero`
+  - `Hidano.FacialControl.Tests.PlayMode.Performance.OverlayInputSourcePerformanceTests.TryWriteValues_1000Frames_AllocatesZeroBytes`
+- **トリガ**: overlay-clip 機能を本格利用するとき / 1.0 凍結前のテスト緑化フェーズ
+- **影響範囲**: `Packages/com.hidano.facialcontrol/Runtime/Adapters/Json/SystemTextJsonParser.cs` の validation 緩和（`suppress=true` 時の snapshot 同時保持を許容し読み戻し時に snapshot を無視する等）、または サンプル JSON / SO fixture の修正、対応テスト fixture 更新
+- **関連**: overlay-clip-redesign / layer-input-source-blending spec の積み残し
+
 ---
 
 ## 横断フォローアップ（実装着手時に再確認するメモ）

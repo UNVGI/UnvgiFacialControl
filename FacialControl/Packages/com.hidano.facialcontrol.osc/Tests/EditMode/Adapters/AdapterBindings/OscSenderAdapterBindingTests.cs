@@ -615,7 +615,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
 
         private static T GetPrivateField<T>(object target, string fieldName)
         {
-            FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             Assert.That(field, Is.Not.Null);
             return (T)field.GetValue(target);
         }
