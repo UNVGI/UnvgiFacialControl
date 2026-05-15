@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
 using Hidano.FacialControl.Adapters.AdapterBindings;
 using Hidano.FacialControl.Adapters.InputSources;
@@ -142,6 +144,56 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         }
 
         [Test]
+        public void OnStart_MixedPresetEndpoints_BuildsPresetAddressesAndReusesUtf8Cache()
+        {
+            var bus = new RecordingFacialOutputBus();
+            var binding = new OscSenderAdapterBinding { Slug = "osc-sender" };
+            binding.ConfigureEndpoints(new[]
+            {
+                new OscSenderEndpointConfig("127.0.0.1", AllocatePort(), preset: AddressPresetKind.VRChat),
+                new OscSenderEndpointConfig("127.0.0.1", AllocatePort(), preset: AddressPresetKind.ARKit),
+                new OscSenderEndpointConfig("127.0.0.1", AllocatePort(), preset: AddressPresetKind.ARKit)
+            });
+            var host = new GameObject("OscSenderAdapterBindingPresetAddressTests");
+
+            try
+            {
+                binding.OnStart(CreateContext(bus, host, new[] { "eyeBlinkLeft" }));
+
+                Assert.That(binding.IsStarted, Is.True);
+                Assert.That(binding.HelperHostCount, Is.EqualTo(3));
+
+                string[] vrchatAddresses = GetPrivateField<string[]>(
+                    binding.GetHelperHost(0).Sender,
+                    "_oscAddresses");
+                string[] arkitAddresses = GetPrivateField<string[]>(
+                    binding.GetHelperHost(1).Sender,
+                    "_oscAddresses");
+                byte[][] vrchatBytes = GetPrivateField<byte[][]>(
+                    binding.GetHelperHost(0).Sender,
+                    "_oscAddressUtf8");
+                byte[][] firstArKitBytes = GetPrivateField<byte[][]>(
+                    binding.GetHelperHost(1).Sender,
+                    "_oscAddressUtf8");
+                byte[][] secondArKitBytes = GetPrivateField<byte[][]>(
+                    binding.GetHelperHost(2).Sender,
+                    "_oscAddressUtf8");
+
+                Assert.That(vrchatAddresses[0], Is.EqualTo("/avatar/parameters/eyeBlinkLeft"));
+                Assert.That(arkitAddresses[0], Is.EqualTo("/ARKit/eyeBlinkLeft"));
+                Assert.That(Encoding.UTF8.GetString(vrchatBytes[0]), Is.EqualTo(vrchatAddresses[0]));
+                Assert.That(Encoding.UTF8.GetString(firstArKitBytes[0]), Is.EqualTo(arkitAddresses[0]));
+                Assert.That(firstArKitBytes[0], Is.SameAs(secondArKitBytes[0]));
+                Assert.That(firstArKitBytes[0], Is.Not.SameAs(vrchatBytes[0]));
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
         public void OnStart_DuplicateEndpoint_NormalizesToOneHostAndWarnsOnce()
         {
             var bus = new RecordingFacialOutputBus();
@@ -271,6 +323,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         private static int AllocatePort()
         {
             return PortBase + System.Threading.Interlocked.Increment(ref s_portCounter);
+        }
+
+        private static T GetPrivateField<T>(object target, string fieldName)
+        {
+            FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            return (T)field.GetValue(target);
         }
 
         private sealed class RecordingFacialOutputBus : IFacialOutputBus

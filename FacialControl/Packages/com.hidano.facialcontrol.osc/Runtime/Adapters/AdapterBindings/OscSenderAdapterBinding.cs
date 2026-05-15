@@ -38,6 +38,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         private List<SendSlot> _sendSlots;
 
         [NonSerialized]
+        private Dictionary<(string name, AddressPresetKind preset), byte[]> _addressBytesPool;
+
+        [NonSerialized]
         private GazeSnapshot[] _scratchGazeSnapshots = Array.Empty<GazeSnapshot>();
 
         [NonSerialized]
@@ -191,6 +194,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return;
             }
 
+            _addressBytesPool = new Dictionary<(string name, AddressPresetKind preset), byte[]>();
             var sendSlots = new List<SendSlot>(endpoints.Count);
             for (int i = 0; i < endpoints.Count; i++)
             {
@@ -199,6 +203,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                         ctx.BlendShapeNames,
                         endpoint.preset,
                         out OscMapping[] mappings,
+                        out byte[][] addressUtf8,
                         out int[] sourceBlendShapeIndices,
                         out string[] heartbeatBlendShapeNames))
                 {
@@ -211,7 +216,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 try
                 {
                     host = ctx.HostGameObject.AddComponent<OscSenderHost>();
-                    host.Configure(endpoint.endpoint, endpoint.port, mappings);
+                    host.Configure(endpoint.endpoint, endpoint.port, mappings, addressUtf8);
                     sendSlots.Add(new SendSlot(host, sourceBlendShapeIndices, heartbeatBlendShapeNames));
                 }
                 catch (Exception ex)
@@ -228,6 +233,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
             if (sendSlots.Count == 0)
             {
+                _addressBytesPool = null;
                 Debug.LogWarning("[OscSenderAdapterBinding] No endpoint could be started. OSC Sender will not start.");
                 return;
             }
@@ -330,6 +336,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _identity = default;
             _identityUuidBytes = null;
             _identityStartedAtUnixMs = null;
+            _addressBytesPool = null;
             _heartbeatBlendShapeNames = Array.Empty<string>();
             _heartbeatElapsedSeconds = 0f;
             _sendHeartbeatOnNextTick = false;
@@ -478,6 +485,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             IReadOnlyList<string> contextBlendShapeNames,
             AddressPresetKind preset,
             out OscMapping[] mappings,
+            out byte[][] addressUtf8,
             out int[] sourceIndices,
             out string[] heartbeatBlendShapeNames)
         {
@@ -488,12 +496,14 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             if (names == null || names.Count == 0)
             {
                 mappings = Array.Empty<OscMapping>();
+                addressUtf8 = Array.Empty<byte[]>();
                 sourceIndices = Array.Empty<int>();
                 heartbeatBlendShapeNames = Array.Empty<string>();
                 return false;
             }
 
             var mappingList = new List<OscMapping>(names.Count);
+            var addressBytesList = new List<byte[]>(names.Count);
             var indexList = new List<int>(names.Count);
             var heartbeatNameList = new List<string>(names.Count);
             for (int i = 0; i < names.Count; i++)
@@ -524,11 +534,16 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 }
 
                 mappingList.Add(new OscMapping(address, blendShapeName, string.Empty));
+                addressBytesList.Add(OscAddressFormatter.GetOrAddBlendShapeAddressUtf8(
+                    _addressBytesPool,
+                    preset,
+                    blendShapeName));
                 indexList.Add(sourceIndex);
                 heartbeatNameList.Add(blendShapeName);
             }
 
             mappings = mappingList.ToArray();
+            addressUtf8 = addressBytesList.ToArray();
             sourceIndices = indexList.ToArray();
             heartbeatBlendShapeNames = heartbeatNameList.ToArray();
             return mappings.Length > 0;

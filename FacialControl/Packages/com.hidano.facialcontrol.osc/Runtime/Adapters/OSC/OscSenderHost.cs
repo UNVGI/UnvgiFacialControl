@@ -42,6 +42,11 @@ namespace Hidano.FacialControl.Adapters.OSC
         /// <param name="mappings">OSC アドレスマッピング配列。</param>
         public void Configure(string endpoint, int port, OscMapping[] mappings)
         {
+            Configure(endpoint, port, mappings, addressUtf8: null);
+        }
+
+        public void Configure(string endpoint, int port, OscMapping[] mappings, byte[][] addressUtf8)
+        {
             if (mappings == null) throw new ArgumentNullException(nameof(mappings));
 
             _endpoint = endpoint;
@@ -54,7 +59,7 @@ namespace Hidano.FacialControl.Adapters.OSC
             }
             _sender.Address = endpoint;
             _sender.Port = port;
-            _sender.Initialize(mappings);
+            _sender.Initialize(mappings, addressUtf8);
             _sender.StartSending();
 
             _client = _sender.Client;

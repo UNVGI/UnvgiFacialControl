@@ -91,8 +91,16 @@ namespace Hidano.FacialControl.Adapters.OSC
         /// <param name="mappings">OSC アドレスマッピング配列。</param>
         public void Initialize(OscMapping[] mappings)
         {
+            Initialize(mappings, addressUtf8: null);
+        }
+
+        public void Initialize(OscMapping[] mappings, byte[][] addressUtf8)
+        {
             if (mappings == null)
                 throw new ArgumentNullException(nameof(mappings));
+
+            if (addressUtf8 != null && addressUtf8.Length != mappings.Length)
+                throw new ArgumentException("Address byte table length must match mapping length.", nameof(addressUtf8));
 
             _mappings = mappings;
             _oscAddresses = new string[mappings.Length];
@@ -100,7 +108,9 @@ namespace Hidano.FacialControl.Adapters.OSC
             for (int i = 0; i < mappings.Length; i++)
             {
                 _oscAddresses[i] = mappings[i].OscAddress;
-                _oscAddressUtf8[i] = Encoding.UTF8.GetBytes(_oscAddresses[i]);
+                _oscAddressUtf8[i] = addressUtf8 != null && addressUtf8[i] != null
+                    ? addressUtf8[i]
+                    : Encoding.UTF8.GetBytes(_oscAddresses[i]);
             }
 
             if (_bundleBuilder == null)

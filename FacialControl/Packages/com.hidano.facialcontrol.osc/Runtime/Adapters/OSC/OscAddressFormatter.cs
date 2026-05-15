@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
 
 namespace Hidano.FacialControl.Adapters.OSC
 {
     public static class OscAddressFormatter
     {
         public const string VRChatParameterPrefix = "/avatar/parameters/";
+        public const string ARKitParameterPrefix = "/ARKit/";
         public const char VRChatGazeXAxis = 'X';
         public const char VRChatGazeYAxis = 'Y';
 
@@ -36,13 +39,34 @@ namespace Hidano.FacialControl.Adapters.OSC
 
         public static string FormatBlendShapeAddress(AddressPresetKind preset, string blendShapeName)
         {
-            switch (preset)
+            return GetBlendShapePrefix(preset).ToString() + (blendShapeName ?? string.Empty);
+        }
+
+        public static byte[] FormatBlendShapeAddressUtf8(AddressPresetKind preset, string blendShapeName)
+        {
+            return Encoding.UTF8.GetBytes(FormatBlendShapeAddress(preset, blendShapeName));
+        }
+
+        public static byte[] GetOrAddBlendShapeAddressUtf8(
+            Dictionary<(string name, AddressPresetKind preset), byte[]> addressBytesPool,
+            AddressPresetKind preset,
+            string blendShapeName)
+        {
+            if (addressBytesPool == null)
             {
-                case AddressPresetKind.VRChat:
-                    return VRChatParameterPrefix + (blendShapeName ?? string.Empty);
-                default:
-                    throw new NotSupportedException($"{preset} address preset is not implemented for sender output yet.");
+                throw new ArgumentNullException(nameof(addressBytesPool));
             }
+
+            string name = blendShapeName ?? string.Empty;
+            var key = (name, preset);
+            if (addressBytesPool.TryGetValue(key, out byte[] addressBytes))
+            {
+                return addressBytes;
+            }
+
+            addressBytes = FormatBlendShapeAddressUtf8(preset, name);
+            addressBytesPool.Add(key, addressBytes);
+            return addressBytes;
         }
 
         public static int GetGazeAddressLength(
@@ -79,14 +103,7 @@ namespace Hidano.FacialControl.Adapters.OSC
         public static string FormatGazeAddress(AddressPresetKind preset, string expressionId, char axis)
         {
             ValidateGazeAxis(axis);
-
-            switch (preset)
-            {
-                case AddressPresetKind.VRChat:
-                    return VRChatParameterPrefix + (expressionId ?? string.Empty) + axis;
-                default:
-                    throw new NotSupportedException($"{preset} address preset is not implemented for gaze sender output yet.");
-            }
+            return GetGazePrefix(preset).ToString() + (expressionId ?? string.Empty) + axis;
         }
 
         private static ReadOnlySpan<char> GetBlendShapePrefix(AddressPresetKind preset)
@@ -95,6 +112,8 @@ namespace Hidano.FacialControl.Adapters.OSC
             {
                 case AddressPresetKind.VRChat:
                     return VRChatParameterPrefix.AsSpan();
+                case AddressPresetKind.ARKit:
+                    return ARKitParameterPrefix.AsSpan();
                 default:
                     throw new NotSupportedException($"{preset} address preset is not implemented for sender output yet.");
             }
