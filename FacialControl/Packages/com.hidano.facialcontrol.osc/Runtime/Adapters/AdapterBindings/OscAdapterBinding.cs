@@ -70,6 +70,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         private OscInputSource _inputSource;
 
         [NonSerialized]
+        private List<GazeVector2InputSource> _gazeSources;
+
+        [NonSerialized]
         private bool _started;
 
         /// <summary>
@@ -138,6 +141,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         public OscBundleAccumulator BundleAccumulator => _bundleAccumulator;
 
+        public IReadOnlyList<GazeVector2InputSource> GazeSources =>
+            _gazeSources ?? (IReadOnlyList<GazeVector2InputSource>)Array.Empty<GazeVector2InputSource>();
+
         /// <summary>OnStart で構築した <see cref="OscInputSource"/>（テスト/診断用、未開始は null）。</summary>
         public OscInputSource InputSource => _inputSource;
 
@@ -175,7 +181,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             OscMapping[] runtimeMappings = _runtimeMappings ?? CreateNormalBlendShapeMappings(_mappings);
-            if (runtimeMappings == null || runtimeMappings.Length == 0)
+            bool hasBlendShapeMappings = runtimeMappings != null && runtimeMappings.Length > 0;
+            bool hasGazeMappings = HasGazeMappings(_mappings);
+            if (!hasBlendShapeMappings && !hasGazeMappings)
             {
                 Debug.LogWarning(
                     $"[OscAdapterBinding] OSC mappings が未設定のため入力源を登録しません。slug='{Slug}'");
@@ -189,21 +197,29 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return;
             }
 
-            _buffer = new OscDoubleBuffer(runtimeMappings.Length);
-            _bundleAccumulator = new OscBundleAccumulator(_buffer, _bundleAccumulationTimeoutMs);
+            if (hasBlendShapeMappings)
+            {
+                _buffer = new OscDoubleBuffer(runtimeMappings.Length);
+                _bundleAccumulator = new OscBundleAccumulator(_buffer, _bundleAccumulationTimeoutMs);
 
-            _helperHost = ctx.HostGameObject.AddComponent<OscReceiverHost>();
-            _helperHost.Configure(
-                _endpoint,
-                _port,
-                _buffer,
-                runtimeMappings,
-                _bundleMode == BundleInterpretationMode.AtomicSwap ? _bundleAccumulator : null,
-                _bundleMode,
-                ctx.TimeProvider);
+                _helperHost = ctx.HostGameObject.AddComponent<OscReceiverHost>();
+                _helperHost.Configure(
+                    _endpoint,
+                    _port,
+                    _buffer,
+                    runtimeMappings,
+                    _bundleMode == BundleInterpretationMode.AtomicSwap ? _bundleAccumulator : null,
+                    _bundleMode,
+                    ctx.TimeProvider);
 
-            _inputSource = new OscInputSource(_buffer, _stalenessSeconds, ctx.TimeProvider);
-            ctx.InputSourceRegistry.Register(slug, _inputSource);
+                _inputSource = new OscInputSource(_buffer, _stalenessSeconds, ctx.TimeProvider);
+                ctx.InputSourceRegistry.Register(slug, _inputSource);
+            }
+
+            if (hasGazeMappings)
+            {
+                RegisterGazeSources(ctx.InputSourceRegistry, slug, _mappings);
+            }
 
             _started = true;
         }
@@ -234,6 +250,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             _inputSource = null;
+            _gazeSources = null;
 
             if (_buffer != null)
             {
@@ -271,6 +288,83 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             return result.ToArray();
+        }
+
+        private void RegisterGazeSources(
+            IInputSourceRegistry registry,
+            AdapterSlug slug,
+            List<OscMappingEntry> mappings)
+        {
+            if (_gazeSources == null)
+            {
+                _gazeSources = new List<GazeVector2InputSource>();
+            }
+            else
+            {
+                _gazeSources.Clear();
+            }
+
+            for (int i = 0; i < mappings.Count; i++)
+            {
+                OscMappingEntry entry = mappings[i];
+                if (entry == null || !IsGazeMode(entry.mode) || string.IsNullOrEmpty(entry.expressionId))
+                {
+                    continue;
+                }
+
+                if (entry.mode == OscMappingMode.Gaze_ARKit_8BS || entry.leftRightIndependent)
+                {
+                    RegisterGazeSource(registry, slug, entry.expressionId + ".left");
+                    RegisterGazeSource(registry, slug, entry.expressionId + ".right");
+                }
+                else
+                {
+                    RegisterGazeSource(registry, slug, entry.expressionId);
+                }
+            }
+        }
+
+        private void RegisterGazeSource(
+            IInputSourceRegistry registry,
+            AdapterSlug slug,
+            string sub)
+        {
+            string id = slug.Value + ":" + sub;
+            if (!InputSourceId.TryParse(id, out InputSourceId sourceId))
+            {
+                Debug.LogWarning(
+                    $"[OscAdapterBinding] Gaze source id '{id}' is not a valid InputSourceId. Skipping.");
+                return;
+            }
+
+            var source = new GazeVector2InputSource(sourceId);
+            registry.Register(slug, sub, source);
+            _gazeSources.Add(source);
+        }
+
+        private static bool HasGazeMappings(List<OscMappingEntry> mappings)
+        {
+            if (mappings == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < mappings.Count; i++)
+            {
+                OscMappingEntry entry = mappings[i];
+                if (entry != null && IsGazeMode(entry.mode) && !string.IsNullOrEmpty(entry.expressionId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsGazeMode(OscMappingMode mode)
+        {
+            return mode == OscMappingMode.Gaze_VRChat_XY
+                || mode == OscMappingMode.Gaze_ARKit_8BS;
         }
     }
 }

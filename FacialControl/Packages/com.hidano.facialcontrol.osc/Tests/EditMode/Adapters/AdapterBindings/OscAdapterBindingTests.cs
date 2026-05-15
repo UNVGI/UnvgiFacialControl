@@ -1,9 +1,18 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Hidano.FacialControl.Adapters.AdapterBindings;
+using Hidano.FacialControl.Adapters.InputSources;
+using Hidano.FacialControl.Adapters.OSC;
+using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Domain.Adapters;
+using Hidano.FacialControl.Domain.Interfaces;
+using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
+using Hidano.FacialControl.Tests.Shared;
 using NUnit.Framework;
 using UnityEditor;
+using UnityEngine;
 
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
 {
@@ -100,6 +109,71 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
 
             Assert.That(attr, Is.Not.Null);
             Assert.That(attr.DisplayName, Is.EqualTo(ExpectedDisplayName));
+        }
+
+        [Test]
+        public void OnStart_GazeVrchatMapping_RegistersVector2InputSourceUnderExpressionId()
+        {
+            var registry = new InputSourceRegistry();
+            var binding = new OscAdapterBinding { Slug = "osc" };
+            binding.Mappings = new List<OscMappingEntry>
+            {
+                new OscMappingEntry
+                {
+                    mode = OscMappingMode.Gaze_VRChat_XY,
+                    expressionId = "eye",
+                    addressPattern = "/avatar/parameters/eye",
+                    leftRightIndependent = false,
+                }
+            };
+
+            var host = new GameObject("OscAdapterBindingTests");
+            try
+            {
+                AdapterBuildContext ctx = CreateContext(registry, host);
+
+                binding.OnStart(ctx);
+
+                Assert.That(binding.IsStarted, Is.True);
+                Assert.That(binding.GazeSources.Count, Is.EqualTo(1));
+                Assert.That(registry.TryResolve("osc:eye", out IInputSource inputSource), Is.True);
+                var gazeSource = inputSource as GazeVector2InputSource;
+                Assert.That(gazeSource, Is.Not.Null);
+
+                gazeSource.Publish(0.25f, -0.5f);
+                var config = new GazeBindingConfig { expressionId = "eye" };
+
+                bool resolved = GazeBindingConfigResolver.TryResolve(
+                    config,
+                    registry,
+                    out ResolvedGazeInputSources sources);
+
+                Assert.That(resolved, Is.True);
+                Assert.That(sources.LeftSource, Is.SameAs(gazeSource));
+                Assert.That(sources.RightSource, Is.SameAs(gazeSource));
+                Assert.That(sources.LeftSource.TryReadVector2(out float x, out float y), Is.True);
+                Assert.That(x, Is.EqualTo(0.25f).Within(1e-6f));
+                Assert.That(y, Is.EqualTo(-0.5f).Within(1e-6f));
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        private static AdapterBuildContext CreateContext(
+            InputSourceRegistry registry,
+            GameObject host)
+        {
+            return new AdapterBuildContext(
+                new FacialProfile("2.0.0"),
+                Array.Empty<string>(),
+                registry,
+                new FacialOutputBus(),
+                new ManualTimeProvider(),
+                host,
+                lipSyncProvider: null);
         }
     }
 }
