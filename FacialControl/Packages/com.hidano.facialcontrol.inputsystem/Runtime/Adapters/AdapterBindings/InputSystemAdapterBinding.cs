@@ -331,12 +331,30 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                 {
                     if (entry.useDistinctLeftRight)
                     {
-                        TryRegisterAnalogSource(ctx, slug, entry.actionNameLeft, registered);
-                        TryRegisterAnalogSource(ctx, slug, entry.actionNameRight, registered);
+                        InputActionAnalogSource leftSource =
+                            TryRegisterAnalogSource(ctx, slug, entry.actionNameLeft, registered);
+                        InputActionAnalogSource rightSource =
+                            TryRegisterAnalogSource(ctx, slug, entry.actionNameRight, registered);
+                        TryRegisterAnalogSourceAlias(
+                            ctx.InputSourceRegistry,
+                            slug,
+                            $"{entry.expressionId}.left",
+                            leftSource);
+                        TryRegisterAnalogSourceAlias(
+                            ctx.InputSourceRegistry,
+                            slug,
+                            $"{entry.expressionId}.right",
+                            rightSource);
                     }
                     else
                     {
-                        TryRegisterAnalogSource(ctx, slug, entry.actionName, registered);
+                        InputActionAnalogSource sharedSource =
+                            TryRegisterAnalogSource(ctx, slug, entry.actionName, registered);
+                        TryRegisterAnalogSourceAlias(
+                            ctx.InputSourceRegistry,
+                            slug,
+                            entry.expressionId,
+                            sharedSource);
                     }
                     continue;
                 }
@@ -349,21 +367,21 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             }
         }
 
-        private void TryRegisterAnalogSource(
+        private InputActionAnalogSource TryRegisterAnalogSource(
             in AdapterBuildContext ctx,
             AdapterSlug slug,
             string actionName,
             HashSet<string> registered)
         {
-            if (string.IsNullOrWhiteSpace(actionName)) return;
-            if (registered.Contains(actionName)) return;
+            if (string.IsNullOrWhiteSpace(actionName)) return null;
+            if (registered.Contains(actionName)) return FindAnalogSourceById(actionName);
 
             var action = _runtimeActionMap.FindAction(actionName);
             if (action == null)
             {
                 Debug.LogWarning(
                     $"[InputSystemAdapterBinding] Analog 経路の Action '{actionName}' が ActionMap '{_runtimeActionMap.name}' に見つかりません。skip します。");
-                return;
+                return null;
             }
 
             AnalogInputShape shape = DetermineShape(action);
@@ -372,13 +390,53 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             {
                 Debug.LogWarning(
                     $"[InputSystemAdapterBinding] Action 名 '{actionName}' が InputSourceId 規約に合致しません。analog source の登録を skip します。");
-                return;
+                return null;
             }
 
             var src = new InputActionAnalogSource(srcId, action, shape);
             _analogSources.Add(src);
             ctx.InputSourceRegistry.Register(slug, actionName, new AnalogInputSourceWrapper(src));
             registered.Add(actionName);
+            return src;
+        }
+
+        private InputActionAnalogSource FindAnalogSourceById(string id)
+        {
+            if (_analogSources == null || string.IsNullOrEmpty(id))
+            {
+                return null;
+            }
+
+            for (int i = 0; i < _analogSources.Count; i++)
+            {
+                InputActionAnalogSource source = _analogSources[i];
+                if (source != null && string.Equals(source.Id, id, StringComparison.Ordinal))
+                {
+                    return source;
+                }
+            }
+
+            return null;
+        }
+
+        private static void TryRegisterAnalogSourceAlias(
+            IInputSourceRegistry registry,
+            AdapterSlug slug,
+            string sub,
+            InputActionAnalogSource source)
+        {
+            if (registry == null || source == null || string.IsNullOrWhiteSpace(sub))
+            {
+                return;
+            }
+
+            string compositeId = slug.Value + ":" + sub;
+            if (registry.TryResolve(compositeId, out _))
+            {
+                return;
+            }
+
+            registry.Register(slug, sub, new AnalogInputSourceWrapper(source));
         }
 
         // bindingMode == Analog のエントリで AnalogExpressionInputSource を構築する。
@@ -776,7 +834,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
         /// 解決対象の analog source を <see cref="IAnalogInputSource"/> 利用者（GazeBonePoseProvider 等）に
         /// 引き渡すための識別チャネルとしてのみ機能する。
         /// </summary>
-        private sealed class AnalogInputSourceWrapper : IInputSource
+        private sealed class AnalogInputSourceWrapper : IInputSource, IAnalogInputSource
         {
             private readonly InputActionAnalogSource _inner;
 
@@ -787,6 +845,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             }
 
             public string Id => _inner.Id;
+
+            public bool IsValid => _inner.IsValid;
+
+            public int AxisCount => _inner.AxisCount;
 
             public InputSourceType Type => InputSourceType.ValueProvider;
 
@@ -800,6 +862,21 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
             }
 
             public bool TryWriteValues(Span<float> output) => false;
+
+            public bool TryReadScalar(out float value)
+            {
+                return _inner.TryReadScalar(out value);
+            }
+
+            public bool TryReadVector2(out float x, out float y)
+            {
+                return _inner.TryReadVector2(out x, out y);
+            }
+
+            public bool TryReadAxes(Span<float> output)
+            {
+                return _inner.TryReadAxes(output);
+            }
         }
     }
 }

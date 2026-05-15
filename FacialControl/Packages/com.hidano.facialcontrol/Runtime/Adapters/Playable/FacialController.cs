@@ -7,6 +7,7 @@ using VContainer;
 using Hidano.FacialControl.Adapters.Bone;
 using Hidano.FacialControl.Adapters.DependencyInjection;
 using Hidano.FacialControl.Adapters.InputSources;
+using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Application.UseCases;
 using Hidano.FacialControl.Domain.Adapters;
@@ -538,84 +539,22 @@ namespace Hidano.FacialControl.Adapters.Playable
                 return false;
             }
 
-            if (!TryResolveGazeInputSource(config.expressionId, out IAnalogInputSource source))
+            if (!GazeBindingConfigResolver.TryResolve(
+                    config,
+                    _inputSourceRegistry,
+                    out ResolvedGazeInputSources sources))
             {
                 return false;
             }
 
-            if (!TryReadGazeInput(source, out float x, out float y))
+            if (!TryReadGazeInput(sources.LeftSource, out float x, out float y)
+                && !TryReadGazeInput(sources.RightSource, out x, out y))
             {
                 return false;
             }
 
             snapshot = new GazeSnapshot(config.expressionId, x, y);
             return true;
-        }
-
-        private bool TryResolveGazeInputSource(string expressionId, out IAnalogInputSource source)
-        {
-            if (TryResolveAnalogSource(expressionId, out source))
-            {
-                return true;
-            }
-
-            IReadOnlyList<string> registeredIds = _inputSourceRegistry.RegisteredIds;
-            if (registeredIds == null)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < registeredIds.Count; i++)
-            {
-                string registeredId = registeredIds[i];
-                if (IsGazeSourceIdMatch(registeredId, expressionId)
-                    && TryResolveAnalogSource(registeredId, out source))
-                {
-                    return true;
-                }
-            }
-
-            source = null;
-            return false;
-        }
-
-        private bool TryResolveAnalogSource(string sourceId, out IAnalogInputSource source)
-        {
-            source = null;
-            if (_inputSourceRegistry == null
-                || string.IsNullOrEmpty(sourceId)
-                || !_inputSourceRegistry.TryResolve(sourceId, out IInputSource inputSource)
-                || inputSource == null)
-            {
-                return false;
-            }
-
-            source = inputSource as IAnalogInputSource;
-            return source != null;
-        }
-
-        private static bool IsGazeSourceIdMatch(string registeredId, string expressionId)
-        {
-            if (string.IsNullOrEmpty(registeredId) || string.IsNullOrEmpty(expressionId))
-            {
-                return false;
-            }
-
-            if (string.Equals(registeredId, expressionId, StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            int separatorIndex = registeredId.IndexOf(':');
-            int subIdStart = separatorIndex + 1;
-            return separatorIndex >= 0
-                && registeredId.Length - subIdStart == expressionId.Length
-                && string.CompareOrdinal(
-                    registeredId,
-                    subIdStart,
-                    expressionId,
-                    0,
-                    expressionId.Length) == 0;
         }
 
         private static bool TryReadGazeInput(
