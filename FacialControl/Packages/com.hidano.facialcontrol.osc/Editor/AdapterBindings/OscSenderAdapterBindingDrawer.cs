@@ -54,8 +54,14 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
             AddSlugField(root, property);
             AddEndpointList(root, property);
             AddBoundField(root, property, SuppressLoopbackFieldName, "Suppress Loopback", SuppressLoopbackFieldElementName);
-            AddBoundField(root, property, BlendShapeNamesFieldName, "BlendShape Mapping Names", BlendShapeNamesFieldElementName);
-            AddBoundField(root, property, GazeExpressionIdsFieldName, "Gaze Expression Ids", GazeExpressionIdsFieldElementName);
+            AddBoundField(root, property, BlendShapeNamesFieldName, "BlendShape Names (Optional Filter)", BlendShapeNamesFieldElementName);
+            root.Add(new HelpBox(
+                "空のままにすると、対象キャラの全 BlendShape を自動送信します。subset 配信したい場合のみ名前を列挙してください。",
+                HelpBoxMessageType.Info));
+            AddBoundField(root, property, GazeExpressionIdsFieldName, "Gaze Expression Ids (Optional Filter)", GazeExpressionIdsFieldElementName);
+            root.Add(new HelpBox(
+                "空のままにすると、Profile の Gaze Configs から expressionId を自動取得します。subset 配信したい場合のみ明示してください。",
+                HelpBoxMessageType.Info));
             AddHeartbeatIntervalField(root, property);
             AddSenderIdentityReadout(root, property);
 
