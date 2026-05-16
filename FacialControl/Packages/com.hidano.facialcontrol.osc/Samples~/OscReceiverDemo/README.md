@@ -1,42 +1,39 @@
 # OscReceiverDemo
 
-`OscAdapterBinding` の受信専用サンプルです。`OscReceiverDemo.unity` を開いて Play すると、`127.0.0.1:9000` で `/avatar/parameters/{name}` 形式の OSC を受信し、最小構成の `FacialCharacterProfileSO` から生成した手続きメッシュへ BlendShape 値を反映します。
+`OscAdapterBinding` の受信専用サンプルです。`OscReceiverDemo.unity` を開き、お手持ちのキャラモデルを Scene に置いた状態で Play すると、`127.0.0.1:9000` で受信した `/avatar/parameters/{BlendShape 名}` 系 OSC メッセージをモデルの BlendShape に反映します。
 
-## 含まれるもの
+## 同梱されているもの
 
 | ファイル | 役割 |
 |---|---|
-| `OscReceiverDemo.unity` | 受信専用サンプル Scene |
-| `OscReceiverDemoProfile.asset` | `OscAdapterBinding` と 1 Layer の入力源だけを持つ最小 `FacialCharacterProfileSO` |
-| `OscReceiverDemoBootstrap.cs` | 実行時に最小 `SkinnedMeshRenderer` を作り、Scene と profile を結線するサンプルコード |
-| `OscReceiverOptions.json` | Scene 内の受信設定と同じ内容の `OscReceiverOptionsDto` サンプル |
+| `OscReceiverDemo.unity` | `FacialController` と `OscReceiverDemoProfile` を結線済みの最小 Scene |
+| `OscReceiverDemoProfile.asset` | `OscAdapterBinding`（OSC 受信）を結線済みの `FacialCharacterProfileSO`。Layer は 1 つだけ（OSC 入力を素通し） |
+| `OscReceiverDemoBootstrap.cs` | `Application.runInBackground = true` を有効化する最小 helper |
+| `OscReceiverOptions.json` | Scene 内設定と同等の `OscReceiverOptionsDto` サンプル（参考用） |
+
+> キャラモデル (FBX / VRM / prefab) は同梱していません。お手持ちのものを用意してください。
 
 ## 受信内容
 
 - listen endpoint: `127.0.0.1:9000`
-- BlendShape: `Joy`, `Blink`, `MouthOpen`, `BrowUp`
-- Gaze: `/avatar/parameters/eye_lookX` / `/avatar/parameters/eye_lookY`
-- staleness: 1 秒で base に戻す
+- BlendShape: `OscReceiverDemoProfile.asset` の `OSC` → `Mappings` で定義されたアドレス → BlendShape 名のマッピング（既定では `Joy / Blink / MouthOpen / BrowUp` の 4 種類のサンプル）
+- Gaze: VRChat 形式 X/Y 2 メッセージから Vector2 を復元する `Gaze_VRChat_XY` mode entry が必要（既定では `eye_look` が登録済み）
+- staleness: 1 秒受信が途絶えると base 表情へ復帰
 - bundle mode: atomic swap
 
-`OscReceiverOptions.json` は手動設定やドキュメント確認用のサンプルです。Play で使われる設定は `OscReceiverDemoProfile.asset` の `OscAdapterBinding` に同じ値として保存されています。
+## 手順
 
-## 確認手順
+1. **シーンを開く**: Project ウィンドウで `OscReceiverDemo.unity` をダブルクリック。Hierarchy に `Character / Main Camera / Directional Light` が並びます。
+2. **モデルを置く**: お手持ちのキャラモデルの prefab を Hierarchy の **`Character` の子**にドラッグして配置します。
+3. **`Mappings` をモデルに合わせる（重要）**: `OscReceiverDemoProfile.asset` を Inspector で開き、**`OSC` → `Mappings`** に並ぶエントリの `expressionId` をモデル実装の BlendShape 名に書き換えます。`Joy / Blink / MouthOpen / BrowUp` というサンプル名はあくまでプレースホルダで、ほとんどのモデルでは異なる名前（`笑い` / `怒り` 等の日本語名や `eyeBlink_L` のような英語名）になっています。
+4. **listen port を必要に応じて変更**: 別 port で受けたいとき、`OscReceiverDemoProfile.asset` の `OSC` → `_endpoint` / `_port` を変更します。
+5. **Play**: 送信側（`OscOutputDemo` 等）から `127.0.0.1:9000` に向けて OSC を送ると、モデルの BlendShape が更新されます。
 
-1. `OscReceiverDemo.unity` を開きます。
-2. 必要に応じて `OscReceiverDemoProfile.asset` の `OSC` listen port を送信側に合わせます。
-3. Play します。
-4. `OscOutputDemo` などの送信側から `127.0.0.1:9000` に送ると、受信側の手続きメッシュの BlendShape が更新されます。
+## 将来の改善
 
-## BlendShape 名を変更したいとき
+現状、受信側 `Mappings` の `expressionId` 列挙は手作業です。送信側 heartbeat (`/_facialcontrol/blendshape_names`) を活用した「受信側 `Mappings` 自動生成」は別 spec で計画されており、それが入ると `Mappings` を空のままで送信側に流れる全 BlendShape を自動的にローカル mesh に貼り付けられるようになります。
 
-`OscReceiverDemoProfile.asset` 内の **`OSC` → `Mappings`** が Single Source of Truth。Bootstrap はここから `mode = Normal_BlendShape` の entry を抽出して `expressionId` を BlendShape 名として手続きメッシュに登録する（`OscReceiverDemoBootstrap.ResolveBlendShapeNames`）。Bootstrap 側に名前リストを別途設定する必要はない。
+## トラブルシューティング
 
-新しい BlendShape を 1 つ追加するには `Mappings` に 1 行追加するだけで OK:
-- `mode = Normal_BlendShape`
-- `expressionId = 追加したい BlendShape 名`
-- `addressPattern = /avatar/parameters/{追加したい BlendShape 名}`（VRChat 互換）
-
-送信側（`OscOutputDemoProfile`）の `OSC Sender` の `BlendShape Mapping Names` も同名で揃える必要がある。揃わないと heartbeat consistency checker が警告を出して該当 BlendShape を skip する。
-
-`Samples~/OscReceiverDemo` を編集した場合は、同じ変更を `Assets/Samples/OscReceiverDemo` にも同期してください。
+- **何も動かない**: Hierarchy の `Character` 配下にモデルの `SkinnedMeshRenderer` が居るか確認。`Mappings` の `expressionId` がモデル実装の BlendShape 名と一致しているか確認（不一致のときは heartbeat 整合性検査が警告ログを出します）。
+- **送信側と同居して動かしたい**: `OscOutputDemo` 側の `OSC Sender` で `Suppress Loopback` を ✗ OFF にする必要があります。

@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Hidano.FacialControl.Adapters.OSC;
+using Hidano.FacialControl.Adapters.Playable;
+using Hidano.FacialControl.Adapters.ScriptableObject;
+using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Models;
 using UnityEngine;
@@ -228,6 +231,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return;
             }
 
+            IReadOnlyList<string> resolvedGazeExpressionIds = ResolveGazeExpressionIds(ctx);
+
             _addressBytesPool = new Dictionary<(string name, AddressPresetKind preset), byte[]>();
             var sendSlots = new List<SendSlot>(endpoints.Count);
             for (int i = 0; i < endpoints.Count; i++)
@@ -235,6 +240,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 OscSenderEndpointConfig endpoint = endpoints[i];
                 if (!TryBuildMappings(
                         ctx.BlendShapeNames,
+                        resolvedGazeExpressionIds,
                         endpoint.preset,
                         out OscMapping[] mappings,
                         out byte[][] addressUtf8,
@@ -592,6 +598,63 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
         }
 
+        // _gazeExpressionIds が明示指定されていればそれを優先、空ならホスト GameObject 上の
+        // FacialController.CharacterSO.GazeConfigs から expressionId を抽出してフォールバック使用する。
+        // これにより demo / 本番運用で「Gaze は Profile で 1 度設定すれば OSC 送信側に再設定不要」を実現。
+        private IReadOnlyList<string> ResolveGazeExpressionIds(in AdapterBuildContext ctx)
+        {
+            if (_gazeExpressionIds != null && _gazeExpressionIds.Count > 0)
+            {
+                return _gazeExpressionIds;
+            }
+
+            GameObject host = ctx.HostGameObject;
+            if (host == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            FacialController controller = host.GetComponent<FacialController>();
+            FacialCharacterProfileSO so = controller != null ? controller.CharacterSO : null;
+            if (so == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            IReadOnlyList<GazeBindingConfig> gazeConfigs = so.GazeConfigs;
+            if (gazeConfigs == null || gazeConfigs.Count == 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            var result = new List<string>(gazeConfigs.Count);
+            for (int i = 0; i < gazeConfigs.Count; i++)
+            {
+                GazeBindingConfig cfg = gazeConfigs[i];
+                if (cfg == null || string.IsNullOrEmpty(cfg.expressionId))
+                {
+                    continue;
+                }
+
+                bool duplicate = false;
+                for (int j = 0; j < result.Count; j++)
+                {
+                    if (string.Equals(result[j], cfg.expressionId, StringComparison.Ordinal))
+                    {
+                        duplicate = true;
+                        break;
+                    }
+                }
+
+                if (!duplicate)
+                {
+                    result.Add(cfg.expressionId);
+                }
+            }
+
+            return result;
+        }
+
         private void SetGazeExpressionIds(IReadOnlyList<string> gazeExpressionIds)
         {
             List<string> target = EnsureGazeExpressionIdList();
@@ -609,6 +672,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         private bool TryBuildMappings(
             IReadOnlyList<string> contextBlendShapeNames,
+            IReadOnlyList<string> resolvedGazeExpressionIds,
             AddressPresetKind preset,
             out OscMapping[] mappings,
             out byte[][] addressUtf8,
@@ -621,7 +685,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 : contextBlendShapeNames;
 
             int blendShapeCapacity = names != null ? names.Count : 0;
-            int gazeCapacity = _gazeExpressionIds != null ? _gazeExpressionIds.Count : 0;
+            int gazeCapacity = resolvedGazeExpressionIds != null ? resolvedGazeExpressionIds.Count : 0;
             int gazeMessageCount = GetGazeMessageCount(preset);
             var mappingList = new List<OscMapping>(blendShapeCapacity + (gazeCapacity * gazeMessageCount));
             var addressBytesList = new List<byte[]>(blendShapeCapacity + (gazeCapacity * gazeMessageCount));
@@ -668,7 +732,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 }
             }
 
-            AppendGazeMappings(preset, mappingList, addressBytesList, gazeExpressionIdList);
+            AppendGazeMappings(preset, resolvedGazeExpressionIds, mappingList, addressBytesList, gazeExpressionIdList);
 
             mappings = mappingList.ToArray();
             addressUtf8 = addressBytesList.ToArray();
@@ -680,18 +744,19 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         private void AppendGazeMappings(
             AddressPresetKind preset,
+            IReadOnlyList<string> resolvedGazeExpressionIds,
             List<OscMapping> mappingList,
             List<byte[]> addressBytesList,
             List<string> gazeExpressionIdList)
         {
-            if (_gazeExpressionIds == null)
+            if (resolvedGazeExpressionIds == null)
             {
                 return;
             }
 
-            for (int i = 0; i < _gazeExpressionIds.Count; i++)
+            for (int i = 0; i < resolvedGazeExpressionIds.Count; i++)
             {
-                string expressionId = _gazeExpressionIds[i];
+                string expressionId = resolvedGazeExpressionIds[i];
                 if (string.IsNullOrEmpty(expressionId))
                 {
                     continue;

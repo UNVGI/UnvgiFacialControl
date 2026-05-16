@@ -89,7 +89,6 @@ MonoBehaviour:
       type: {class: OscOutputDemoSignalBinding, ns: Hidano.FacialControl.Samples.OscOutputDemo, asm: Assembly-CSharp}
       data:
         Slug: demo
-        _blendShapeCount: 4
         _cycleSeconds: 4
     - rid: 8000000000000000002
       type: {class: OscSenderAdapterBinding, ns: Hidano.FacialControl.Adapters.AdapterBindings, asm: Hidano.FacialControl.Osc}
@@ -104,12 +103,7 @@ MonoBehaviour:
           port: 9001
           enabled: 1
           preset: 1
-        _blendShapeNames:
-        - Joy
-        - Blink
-        - MouthOpen
-        - BrowUp
-        _gazeExpressionIds:
-        - eye_look
+        _blendShapeNames: []
+        _gazeExpressionIds: []
         _heartbeatIntervalSeconds: 5
         _suppressLoopback: 1
