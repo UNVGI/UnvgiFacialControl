@@ -28,4 +28,15 @@
 3. Play します。
 4. `OscOutputDemo` などの送信側から `127.0.0.1:9000` に送ると、受信側の手続きメッシュの BlendShape が更新されます。
 
+## BlendShape 名を変更したいとき
+
+`OscReceiverDemoProfile.asset` 内の **`OSC` → `Mappings`** が Single Source of Truth。Bootstrap はここから `mode = Normal_BlendShape` の entry を抽出して `expressionId` を BlendShape 名として手続きメッシュに登録する（`OscReceiverDemoBootstrap.ResolveBlendShapeNames`）。Bootstrap 側に名前リストを別途設定する必要はない。
+
+新しい BlendShape を 1 つ追加するには `Mappings` に 1 行追加するだけで OK:
+- `mode = Normal_BlendShape`
+- `expressionId = 追加したい BlendShape 名`
+- `addressPattern = /avatar/parameters/{追加したい BlendShape 名}`（VRChat 互換）
+
+送信側（`OscOutputDemoProfile`）の `OSC Sender` の `BlendShape Mapping Names` も同名で揃える必要がある。揃わないと heartbeat consistency checker が警告を出して該当 BlendShape を skip する。
+
 `Samples~/OscReceiverDemo` を編集した場合は、同じ変更を `Assets/Samples/OscReceiverDemo` にも同期してください。

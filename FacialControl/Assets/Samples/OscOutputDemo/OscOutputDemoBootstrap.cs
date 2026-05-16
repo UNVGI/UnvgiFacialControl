@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using Hidano.FacialControl.Adapters.AdapterBindings;
 using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Adapters;
@@ -23,10 +25,9 @@ namespace Hidano.FacialControl.Samples.OscOutputDemo
         private string _meshObjectName = "ProceduralFace";
 
         [SerializeField]
-        private string[] _blendShapeNames = { "Joy", "Blink", "MouthOpen", "BrowUp" };
-
-        [SerializeField]
         private float _meshScale = 1f;
+
+        private static readonly string[] s_fallbackBlendShapeNames = { "Joy", "Blink", "MouthOpen", "BrowUp" };
 
         private Mesh _mesh;
         private Material _material;
@@ -118,9 +119,7 @@ namespace Hidano.FacialControl.Samples.OscOutputDemo
                 new Vector2(0.5f, 1f)
             };
 
-            string[] names = _blendShapeNames == null || _blendShapeNames.Length == 0
-                ? new[] { "Joy", "Blink", "MouthOpen", "BrowUp" }
-                : _blendShapeNames;
+            string[] names = ResolveBlendShapeNames();
 
             for (int i = 0; i < names.Length; i++)
             {
@@ -138,6 +137,34 @@ namespace Hidano.FacialControl.Samples.OscOutputDemo
 
             _mesh.RecalculateBounds();
             return _mesh;
+        }
+
+        // Profile の OscSenderAdapterBinding が持つ BlendShapeNames を Single Source of Truth として使う。
+        // Profile 未設定 / OscSenderAdapterBinding が無い / 空リストの場合はデモ用 fallback (Joy/Blink/MouthOpen/BrowUp) を返す。
+        private string[] ResolveBlendShapeNames()
+        {
+            if (_profile == null)
+            {
+                return s_fallbackBlendShapeNames;
+            }
+
+            IReadOnlyList<AdapterBindingBase> bindings = _profile.AdapterBindings;
+            if (bindings == null)
+            {
+                return s_fallbackBlendShapeNames;
+            }
+
+            for (int i = 0; i < bindings.Count; i++)
+            {
+                if (bindings[i] is OscSenderAdapterBinding sender
+                    && sender.BlendShapeNames != null
+                    && sender.BlendShapeNames.Count > 0)
+                {
+                    return sender.BlendShapeNames.ToArray();
+                }
+            }
+
+            return s_fallbackBlendShapeNames;
         }
 
         private Material CreateMaterial()

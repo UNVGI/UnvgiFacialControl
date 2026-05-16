@@ -184,11 +184,6 @@ MonoBehaviour:
   _facialController: {fileID: 1003}
   _profile: {fileID: 11400000, guid: d4accc7fb7b646c18437de1bd3bd286a, type: 2}
   _meshObjectName: ProceduralFace
-  _blendShapeNames:
-  - Joy
-  - Blink
-  - MouthOpen
-  - BrowUp
   _meshScale: 1
 --- !u!1 &2000
 GameObject:

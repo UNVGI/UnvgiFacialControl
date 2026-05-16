@@ -1,5 +1,9 @@
+using System.Collections.Generic;
+using Hidano.FacialControl.Adapters.AdapterBindings;
+using Hidano.FacialControl.Adapters.OSC;
 using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
+using Hidano.FacialControl.Domain.Adapters;
 using UnityEngine;
 
 namespace Hidano.FacialControl.Samples.OscReceiverDemo
@@ -18,10 +22,9 @@ namespace Hidano.FacialControl.Samples.OscReceiverDemo
         private string _meshObjectName = "ProceduralFace";
 
         [SerializeField]
-        private string[] _blendShapeNames = { "Joy", "Blink", "MouthOpen", "BrowUp" };
-
-        [SerializeField]
         private float _meshScale = 1f;
+
+        private static readonly string[] s_fallbackBlendShapeNames = { "Joy", "Blink", "MouthOpen", "BrowUp" };
 
         private Mesh _mesh;
         private Material _material;
@@ -113,9 +116,7 @@ namespace Hidano.FacialControl.Samples.OscReceiverDemo
                 new Vector2(0.5f, 1f)
             };
 
-            string[] names = _blendShapeNames == null || _blendShapeNames.Length == 0
-                ? new[] { "Joy", "Blink", "MouthOpen", "BrowUp" }
-                : _blendShapeNames;
+            string[] names = ResolveBlendShapeNames();
 
             for (int i = 0; i < names.Length; i++)
             {
@@ -133,6 +134,47 @@ namespace Hidano.FacialControl.Samples.OscReceiverDemo
 
             _mesh.RecalculateBounds();
             return _mesh;
+        }
+
+        // Profile の OscAdapterBinding が持つ Mappings から Normal_BlendShape 経路の expressionId を抽出して使う。
+        // Profile 未設定 / OscAdapterBinding が無い / Normal_BlendShape entry が無い場合はデモ用 fallback を返す。
+        private string[] ResolveBlendShapeNames()
+        {
+            if (_profile == null)
+            {
+                return s_fallbackBlendShapeNames;
+            }
+
+            IReadOnlyList<AdapterBindingBase> bindings = _profile.AdapterBindings;
+            if (bindings == null)
+            {
+                return s_fallbackBlendShapeNames;
+            }
+
+            for (int i = 0; i < bindings.Count; i++)
+            {
+                if (bindings[i] is OscAdapterBinding receiver && receiver.Mappings != null)
+                {
+                    var names = new List<string>();
+                    for (int j = 0; j < receiver.Mappings.Count; j++)
+                    {
+                        OscMappingEntry entry = receiver.Mappings[j];
+                        if (entry == null) continue;
+                        if (entry.mode == OscMappingMode.Normal_BlendShape
+                            && !string.IsNullOrWhiteSpace(entry.expressionId))
+                        {
+                            names.Add(entry.expressionId);
+                        }
+                    }
+
+                    if (names.Count > 0)
+                    {
+                        return names.ToArray();
+                    }
+                }
+            }
+
+            return s_fallbackBlendShapeNames;
         }
 
         private Material CreateMaterial()
