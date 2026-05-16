@@ -3,6 +3,7 @@ using Hidano.FacialControl.Adapters.AdapterBindings;
 using Hidano.FacialControl.Adapters.OSC;
 using Hidano.FacialControl.Adapters.Playable;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
+using Hidano.FacialControl.Domain.Adapters;
 using UnityEngine;
 
 namespace Hidano.FacialControl.Samples.OscReceiverDemo
