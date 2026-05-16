@@ -40,6 +40,16 @@ namespace Hidano.FacialControl.Domain.Adapters
         public readonly IInputSourceRegistry InputSourceRegistry;
 
         /// <summary>
+        /// Post-blend BlendShape and Gaze output bus exposed to adapter bindings.
+        /// </summary>
+        public readonly IFacialOutputBus FacialOutputBus;
+
+        /// <summary>
+        /// Adapter bindings registered in the same FacialController child scope.
+        /// </summary>
+        public readonly IReadOnlyList<AdapterBindingBase> AdapterBindings;
+
+        /// <summary>
         /// <c>Time.timeScale</c> の影響を受けない経過秒数を提供する時刻抽象。
         /// </summary>
         public readonly ITimeProvider TimeProvider;
@@ -79,10 +89,12 @@ namespace Hidano.FacialControl.Domain.Adapters
             FacialProfile profile,
             IReadOnlyList<string> blendShapeNames,
             IInputSourceRegistry inputSourceRegistry,
+            IFacialOutputBus facialOutputBus,
             ITimeProvider timeProvider,
             GameObject hostGameObject,
             ILipSyncProvider lipSyncProvider,
-            IActiveExpressionProvider activeExpressionProvider = null)
+            IActiveExpressionProvider activeExpressionProvider = null,
+            IReadOnlyList<AdapterBindingBase> adapterBindings = null)
         {
             if (blendShapeNames == null)
             {
@@ -91,6 +103,10 @@ namespace Hidano.FacialControl.Domain.Adapters
             if (inputSourceRegistry == null)
             {
                 throw new ArgumentNullException(nameof(inputSourceRegistry));
+            }
+            if (facialOutputBus == null)
+            {
+                throw new ArgumentNullException(nameof(facialOutputBus));
             }
             if (timeProvider == null)
             {
@@ -104,6 +120,8 @@ namespace Hidano.FacialControl.Domain.Adapters
             Profile = profile;
             BlendShapeNames = blendShapeNames;
             InputSourceRegistry = inputSourceRegistry;
+            FacialOutputBus = facialOutputBus;
+            AdapterBindings = adapterBindings ?? Array.Empty<AdapterBindingBase>();
             TimeProvider = timeProvider;
             HostGameObject = hostGameObject;
             LipSyncProvider = lipSyncProvider;

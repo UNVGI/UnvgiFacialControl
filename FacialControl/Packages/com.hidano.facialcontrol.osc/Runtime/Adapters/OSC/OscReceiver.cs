@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using UnityEngine;
 
@@ -29,6 +30,9 @@ namespace Hidano.FacialControl.Adapters.OSC
 
         private uOSC.uOscServer _server;
         private OscDoubleBuffer _buffer;
+        private OscBundleAccumulator _bundleAccumulator;
+        private BundleInterpretationMode _bundleMode;
+        private ITimeProvider _timeProvider;
         private bool _initialized;
 
         // OSC アドレス → バッファインデックスの高速逆引き辞書
@@ -39,6 +43,9 @@ namespace Hidano.FacialControl.Adapters.OSC
 
         // マッピング情報を保持（レイヤー分配のため）
         private OscMapping[] _mappings;
+
+        // binding 統合用: sender_id / heartbeat / Gaze など、float routing 前のメッセージ判定。
+        private Func<uOSC.Message, bool> _messageFilter;
 
         // analog-input-binding 用: 任意 OSC アドレスごとの float リスナー (加算的拡張)
         private readonly object _analogListenersLock = new object();
@@ -63,13 +70,25 @@ namespace Hidano.FacialControl.Adapters.OSC
         /// </summary>
         public OscDoubleBuffer Buffer => _buffer;
 
+        public OscBundleAccumulator BundleAccumulator => _bundleAccumulator;
+
+        public void SetMessageFilter(Func<uOSC.Message, bool> filter)
+        {
+            _messageFilter = filter;
+        }
+
         /// <summary>
         /// OscReceiver を初期化する。
         /// OscDoubleBuffer とマッピング情報を設定する。
         /// </summary>
         /// <param name="buffer">受信データ書き込み先のダブルバッファ。</param>
         /// <param name="mappings">OSC アドレスマッピング配列。</param>
-        public void Initialize(OscDoubleBuffer buffer, OscMapping[] mappings)
+        public void Initialize(
+            OscDoubleBuffer buffer,
+            OscMapping[] mappings,
+            OscBundleAccumulator bundleAccumulator = null,
+            BundleInterpretationMode bundleMode = BundleInterpretationMode.IndividualMessage,
+            ITimeProvider timeProvider = null)
         {
             if (buffer == null)
                 throw new ArgumentNullException(nameof(buffer));
@@ -77,6 +96,9 @@ namespace Hidano.FacialControl.Adapters.OSC
                 throw new ArgumentNullException(nameof(mappings));
 
             _buffer = buffer;
+            _bundleAccumulator = bundleAccumulator;
+            _bundleMode = bundleMode;
+            _timeProvider = timeProvider;
             _mappings = mappings;
             BuildLookupTables(mappings);
             _initialized = true;
@@ -141,6 +163,25 @@ namespace Hidano.FacialControl.Adapters.OSC
             if (string.IsNullOrEmpty(message.address))
                 return;
 
+            if (_messageFilter != null)
+            {
+                bool shouldContinue;
+                try
+                {
+                    shouldContinue = _messageFilter.Invoke(message);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogException(ex);
+                    return;
+                }
+
+                if (!shouldContinue)
+                {
+                    return;
+                }
+            }
+
             if (message.values == null || message.values.Length == 0)
                 return;
 
@@ -163,7 +204,7 @@ namespace Hidano.FacialControl.Adapters.OSC
             // アドレス完全一致による高速ルックアップ
             if (_addressToIndex.TryGetValue(message.address, out int index))
             {
-                _buffer.Write(index, value);
+                WriteValue(message, index, value);
             }
             else
             {
@@ -171,7 +212,7 @@ namespace Hidano.FacialControl.Adapters.OSC
                 string blendShapeName = ExtractBlendShapeName(message.address);
                 if (blendShapeName != null && _blendShapeNameToIndex.TryGetValue(blendShapeName, out index))
                 {
-                    _buffer.Write(index, value);
+                    WriteValue(message, index, value);
                 }
             }
 
@@ -266,6 +307,22 @@ namespace Hidano.FacialControl.Adapters.OSC
                 // 受信スレッドで例外が漏れて uOSC サーバが停止しないよう握り潰してログのみ
                 Debug.LogException(ex);
             }
+        }
+
+        private void WriteValue(uOSC.Message message, int index, float value)
+        {
+            if (_bundleMode == BundleInterpretationMode.AtomicSwap && _bundleAccumulator != null)
+            {
+                _bundleAccumulator.RecordMessage(message, index, value, GetCurrentTimeSeconds());
+                return;
+            }
+
+            _buffer.Write(index, value);
+        }
+
+        private double GetCurrentTimeSeconds()
+        {
+            return _timeProvider != null ? _timeProvider.UnscaledTimeSeconds : Time.unscaledTimeAsDouble;
         }
 
         /// <summary>

@@ -40,6 +40,9 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
         public const string ExpressionBindingsListName = "input-system-binding-expression-bindings-list";
         public const string BindingModeFieldName = "input-system-binding-mode-field";
         public const string ActionDropdownName = "input-system-binding-action-dropdown";
+        public const string GazeUseDistinctToggleName = "input-system-binding-gaze-use-distinct-toggle";
+        public const string GazeLeftActionDropdownName = "input-system-binding-gaze-left-action-dropdown";
+        public const string GazeRightActionDropdownName = "input-system-binding-gaze-right-action-dropdown";
         public const string ExpressionDropdownName = "input-system-binding-expression-dropdown";
         public const string TriggerModeFieldName = "input-system-binding-trigger-mode-field";
         public const string ModeMismatchHelpName = "input-system-binding-mode-mismatch-help";
@@ -47,7 +50,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
         public const string OverlaySlotHelpName = "input-system-binding-overlay-slot-help";
 
         // 1 行の高さ (Action + Expression + BindingMode + TriggerMode + ヒントボックス分の余裕)
-        private const float RowHeight = 156f;
+        private const float RowHeight = 228f;
         private const long OverlaySlotRefreshIntervalMs = 500;
 
         /// <inheritdoc />
@@ -206,6 +209,12 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                     if (modeProp != null) modeProp.enumValueIndex = (int)BindingMode.Normal;
                     var actionProp = entry.FindPropertyRelative("actionName");
                     if (actionProp != null) actionProp.stringValue = string.Empty;
+                    var useDistinctProp = entry.FindPropertyRelative("useDistinctLeftRight");
+                    if (useDistinctProp != null) useDistinctProp.boolValue = false;
+                    var actionLeftProp = entry.FindPropertyRelative("actionNameLeft");
+                    if (actionLeftProp != null) actionLeftProp.stringValue = string.Empty;
+                    var actionRightProp = entry.FindPropertyRelative("actionNameRight");
+                    if (actionRightProp != null) actionRightProp.stringValue = string.Empty;
                     var exprProp = entry.FindPropertyRelative("expressionId");
                     if (exprProp != null) exprProp.stringValue = string.Empty;
                     var triggerProp = entry.FindPropertyRelative("triggerMode");
@@ -286,6 +295,9 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             var entryProp = listProp.GetArrayElementAtIndex(index);
             var bindingModeProp = entryProp.FindPropertyRelative("bindingMode");
             var actionNameProp = entryProp.FindPropertyRelative("actionName");
+            var useDistinctLeftRightProp = entryProp.FindPropertyRelative("useDistinctLeftRight");
+            var actionNameLeftProp = entryProp.FindPropertyRelative("actionNameLeft");
+            var actionNameRightProp = entryProp.FindPropertyRelative("actionNameRight");
             var expressionIdProp = entryProp.FindPropertyRelative("expressionId");
             var triggerModeProp = entryProp.FindPropertyRelative("triggerMode");
             var overlaySlotProp = entryProp.FindPropertyRelative("overlaySlot");
@@ -301,6 +313,39 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             actionDropdown.choices = BuildSafeChoices(actionChoices, actionNameValue);
             actionDropdown.SetValueWithoutNotify(actionNameValue);
             element.Add(actionDropdown);
+
+            var useDistinctLeftRightToggle = new Toggle("Gaze 左右別 Action")
+            {
+                name = GazeUseDistinctToggleName,
+                tooltip = "Gaze モードのみ有効。OFF は Action 名を左右共通で使い、ON は左/右 Action 名を別々に使います。",
+            };
+            if (useDistinctLeftRightProp != null)
+            {
+                useDistinctLeftRightToggle.BindProperty(useDistinctLeftRightProp);
+            }
+            element.Add(useDistinctLeftRightToggle);
+
+            var actionLeftDropdown = new DropdownField("左 Action")
+            {
+                name = GazeLeftActionDropdownName,
+            };
+            string actionNameLeftValue = actionNameLeftProp != null
+                ? actionNameLeftProp.stringValue ?? string.Empty
+                : string.Empty;
+            actionLeftDropdown.choices = BuildSafeChoices(actionChoices, actionNameLeftValue);
+            actionLeftDropdown.SetValueWithoutNotify(actionNameLeftValue);
+            element.Add(actionLeftDropdown);
+
+            var actionRightDropdown = new DropdownField("右 Action")
+            {
+                name = GazeRightActionDropdownName,
+            };
+            string actionNameRightValue = actionNameRightProp != null
+                ? actionNameRightProp.stringValue ?? string.Empty
+                : string.Empty;
+            actionRightDropdown.choices = BuildSafeChoices(actionChoices, actionNameRightValue);
+            actionRightDropdown.SetValueWithoutNotify(actionNameRightValue);
+            element.Add(actionRightDropdown);
 
             // 2) Expression dropdown
             var expressionDropdown = new DropdownField("表情 ID")
@@ -376,6 +421,13 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             element.Add(overlayTargetLayerField);
 
             UpdateOverlayFieldVisibility(overlaySlotField, overlayTargetLayerField, currentMode);
+            UpdateGazeActionFieldVisibility(
+                actionDropdown,
+                useDistinctLeftRightToggle,
+                actionLeftDropdown,
+                actionRightDropdown,
+                currentMode,
+                useDistinctLeftRightProp != null && useDistinctLeftRightProp.boolValue);
 
             // 5) Mode と Action の expectedControlType の不一致を検知するヒントボックス。
             //    Normal モードで連続値 Action (Axis/Vector2) を選んでいる、
@@ -413,15 +465,91 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 }
                 RefreshModeMismatchHint();
             });
+            useDistinctLeftRightToggle.RegisterValueChangedCallback(evt =>
+            {
+                BindingMode m = bindingModeProp != null
+                    ? (BindingMode)bindingModeProp.enumValueIndex
+                    : BindingMode.Normal;
+                UpdateGazeActionFieldVisibility(
+                    actionDropdown,
+                    useDistinctLeftRightToggle,
+                    actionLeftDropdown,
+                    actionRightDropdown,
+                    m,
+                    evt.newValue);
+                RefreshModeMismatchHint();
+            });
+            actionLeftDropdown.RegisterValueChangedCallback(evt =>
+            {
+                var so = bindingProperty.serializedObject;
+                so.Update();
+                var list = bindingProperty.FindPropertyRelative(ExpressionBindingsFieldName);
+                if (list == null || index < 0 || index >= list.arraySize) return;
+                var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("actionNameLeft");
+                if (prop != null)
+                {
+                    prop.stringValue = evt.newValue ?? string.Empty;
+                    so.ApplyModifiedProperties();
+                }
+            });
+            actionRightDropdown.RegisterValueChangedCallback(evt =>
+            {
+                var so = bindingProperty.serializedObject;
+                so.Update();
+                var list = bindingProperty.FindPropertyRelative(ExpressionBindingsFieldName);
+                if (list == null || index < 0 || index >= list.arraySize) return;
+                var prop = list.GetArrayElementAtIndex(index).FindPropertyRelative("actionNameRight");
+                if (prop != null)
+                {
+                    prop.stringValue = evt.newValue ?? string.Empty;
+                    so.ApplyModifiedProperties();
+                }
+            });
             bindingModeField.RegisterValueChangedCallback(evt =>
             {
                 if (evt.newValue is BindingMode mode)
                 {
                     UpdateTriggerModeVisibility(triggerModeField, mode);
                     UpdateOverlayFieldVisibility(overlaySlotField, overlayTargetLayerField, mode);
+                    UpdateGazeActionFieldVisibility(
+                        actionDropdown,
+                        useDistinctLeftRightToggle,
+                        actionLeftDropdown,
+                        actionRightDropdown,
+                        mode,
+                        useDistinctLeftRightToggle.value);
                 }
                 RefreshModeMismatchHint();
             });
+        }
+
+        private static void UpdateGazeActionFieldVisibility(
+            VisualElement actionField,
+            VisualElement useDistinctLeftRightField,
+            VisualElement leftActionField,
+            VisualElement rightActionField,
+            BindingMode mode,
+            bool useDistinctLeftRight)
+        {
+            bool isGaze = mode == BindingMode.Gaze;
+            if (actionField != null)
+            {
+                actionField.style.display = !isGaze || !useDistinctLeftRight
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+            }
+            if (useDistinctLeftRightField != null)
+            {
+                useDistinctLeftRightField.style.display = isGaze
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+            }
+
+            DisplayStyle distinctDisplay = isGaze && useDistinctLeftRight
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+            if (leftActionField != null) leftActionField.style.display = distinctDisplay;
+            if (rightActionField != null) rightActionField.style.display = distinctDisplay;
         }
 
         private static void UpdateOverlayFieldVisibility(

@@ -49,7 +49,6 @@
   - Timeline 統合
   - テクスチャ切替 / UV アニメーションの JSON 対応
   - ホットリロード自動検知
-  - OSC マッピング Editor UI
 - **方針**: 各機能について preview.2 着手時に独立 spec を切る。本 backlog では存在のみ記録し、詳細は technical-spec.md 1.5 節と各 spec の Non-Goals を権威にする。
 
 ### M-2: Addressables / プロファイル JSON ロード経路抽象化
@@ -87,11 +86,6 @@
 - **内容**: preview.1 のアナログマッピング編集は「読取専用 Inspector + JSON Import/Export + Humanoid 自動割当ボタン」に留める。フル GUI（curve エディタ統合）は preview.2 以降。
 - **トリガ**: ユーザーから「JSON 直編集が辛い」というフィードバックが集まったとき
 
-### M-10: OSC アダプタの mapping 移植（schema v2.0 / mapping 撤去への追従）
-- **出典**: [`.kiro/specs/inspector-and-data-model-redesign/research.md`](../.kiro/specs/inspector-and-data-model-redesign/research.md) Topic / [`.kiro/specs/inspector-and-data-model-redesign/design.md`](../.kiro/specs/inspector-and-data-model-redesign/design.md) §「OSC 別 spec」
-- **内容**: 直近の Domain 改修で `AnalogBindingEntry.Mapping` field と `AnalogMappingFunction` / `AnalogMappingEvaluator` を物理削除した。OSC アダプタ（`com.hidano.facialcontrol.osc`）は本仕様の影響を受けないが、OSC 側で別途 mapping 相当の処理を再実装する将来作業が発生する。
-- **トリガ**: OSC 経由の VRChat 連携でアナログ表現が必要になったとき / `InputSourceCategory` enum を OSC 用に再導入する判断が出たとき
-
 ### M-11: スキーマ migration パス（preview の破壊変更を 1.0 で吸収）
 - **出典**: [`.kiro/specs/analog-input-binding/design.md`](../.kiro/specs/analog-input-binding/design.md) `version` field の扱い
 - **内容**: preview 中は JSON スキーマの破壊的変更を許容している（CLAUDE.md / 要件方針）。1.0 リリースに向けて `schemaVersion` ベースの migration パスを設計する。analog binding profile の `version` field は preview 中は文字列保持のみで分岐なしの状態。
@@ -109,12 +103,47 @@
 - **影響範囲**: `Runtime/Adapters/Bone/GazeBoneBinding.cs`, `Runtime/Adapters/Bone/GazeBonePoseProvider.cs`, `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/AdapterBindings/InputSystemAdapterBinding.cs`, 新規合成戦略型, テスト
 - **関連**: M-4（BonePose 多重 provider のブレンド合成 — 異なる bone への複数 provider の話で別概念だが、合成戦略の設計はここと共通化できる可能性あり）
 
+### M-15: ARKit 検出機能の責務分離 / 命名規約データセット抽象化
+- **出典**: 2026-05-14 セッション「`com.hidano.facialcontrol` 内に ARKit 依存があるか」のアーキ確認
+- **内容**: `Runtime/Domain/Services/ARKitDetector.cs` / `Runtime/Application/UseCases/ARKitUseCase.cs` / `Editor/Windows/ARKitDetectorWindow.cs` / `Editor/Tools/ARKitEditorService.cs` は **Apple ARKit SDK / ARFoundation / `UnityEngine.XR` には一切依存していない**（grep ヒット 0、manifest.json に XR 系パッケージなし）。実体は ARKit 52 + PerfectSync 13 個の **BlendShape 名文字列定数** と、name → layerGroup (eye/mouth/brow/cheek/nose) の Dictionary、および完全一致検出ロジックのみ。バイナリ依存ゼロなので preview.1 リリースのブロッカーではない。
+  - ただし以下 2 点が中期的な整理候補:
+    - (1) **クラス名・API 名に "ARKit" が固定**されている。将来 VRoid / iFacialMocap 独自命名 / VRM Standard Expressions などの別命名規約データセットが追加された場合、`PerfectSyncDetector` を別途作るか `ARKitDetector` に詰め込み続けるかが曖昧。データセットとロジックを分離して `BlendShapeNamingDetector` + `IBlendShapeNamingScheme`（ARKit / PerfectSync / VRM 等の datasource を差し替え可能）にする方が拡張に強い。
+    - (2) `ARKitUseCase.GenerateOscMapping(string[])` が **OSC 互換マッピング (`/avatar/parameters/{name}`)** を生成しているが、OSC binding 本体は `com.hidano.facialcontrol.osc` に分離済み。マッピング生成だけ core 側にあるのは命名上の責務漏れ気味。ただし `OscMapping` / `OscConfiguration` 型自体は Domain にいて profile JSON の `osc` セクションを担うため、Domain 配置の理屈は通る。整理するなら `OscMappingAutoGenerator` のような中立名 + 生成器の所属再考。
+  - 候補対応: (a) `ARKitDetector` → `BlendShapeNamingDetector` リネーム + 命名規約データセットを `IBlendShapeNamingScheme` 抽象化、(b) `ARKitUseCase.GenerateOscMapping` を OSC パッケージへ移管、(c) Editor ツール (`ARKitDetectorWindow`) を `BlendShapeNamingDetectorWindow` 化、(d) 将来別 UPM (`com.hidano.facialcontrol.arkit-detection`) への切り出しは現状の規模ではオーバーキルなので不採用。
+- **トリガ**: ARKit 以外の命名規約サポート要望が出たとき（VRoid / VRM Standard Expressions / iFacialMocap 独自命名等） / 1.0 リリース前の Public API 凍結タイミング（preview 中なら破壊的リネーム可）
+- **影響範囲**: `Runtime/Domain/Services/ARKitDetector.cs`, `Runtime/Application/UseCases/ARKitUseCase.cs`, `Editor/Windows/ARKitDetectorWindow.cs`, `Editor/Tools/ARKitEditorService.cs`, 対応 EditMode テスト（`Tests/EditMode/Domain/ARKitDetectorTests.cs`, `Tests/EditMode/Application/ARKitUseCaseTests.cs`）、Public API 名変更による下流影響
+- **関連**: `osc-output-binding` spec（OSC 側の mode 別 mapping / Drawer / Samples は同 spec で回収済み。`GenerateOscMapping` の core 残置を将来リネームする場合のみ再検討）
+
 ### M-14: Domain への「動的 Expression driver」概念導入
 - **出典**: `.kiro/specs/gaze-config-promotion/` セッションでの user 指摘（2026-05-06）
 - **内容**: 現状 `Domain/Models/ExpressionSnapshot` は **AnimationClip サンプリング由来の静的 snapshot**（`BlendShapeSnapshot[]` + `BoneSnapshot[]` を不変保持）として設計されており、bone も BlendShape も first-class concept として表現可能。しかし「Vector2 入力で連続的に bone Euler を算出する gaze」のような **動的駆動 driver** は Domain の語彙に存在せず、`IBonePoseSource` / `GazeBonePoseProvider` という形で Adapters 層に閉じている。「目線操作も Expression の 1 種」という抽象化を Domain で表現するには、Expression を「静的 snapshot を持つもの」と「動的 driver を持つもの」の上位抽象に揃える Domain refactor が必要。具体的には (a) Expression interface を導入し `StaticExpressionSnapshot` と `DynamicExpressionDriver` を sibling として実装する / (b) `IExpressionEvaluator` を Domain に置き、入力に応じた evaluation strategy を expressing する / (c) 現状維持で動的 driver は Adapters のみ、のいずれか。preview.1 では (c) で固定。Domain refactor は preview.2 以降の大型 spec として独立化する。なお現状でも **Domain は BlendShape 前提ではなく `BoneSnapshot` も first-class** であるため、表情ボーンを使うキャラ（口元・眉毛・瞼を bone で動かす）の対応は本 spec の範囲外で既に成立している。
 - **トリガ**: gaze 以外の動的 driver（手書き lip sync curve、procedural な微表情ジッタ、analog 駆動の口開き等）が Adapters 層に増えて統一抽象が欲しくなったとき / 1.0 リリースに向けて Domain の安定 API を凍結するタイミング
 - **影響範囲**: `Runtime/Domain/Models/Expression.cs`, `Runtime/Domain/Models/ExpressionSnapshot.cs`, 新規 `IExpressionDriver` 等の interface, `Runtime/Adapters/Bone/GazeBonePoseProvider.cs` の Domain への昇格検討, `IFacialCharacterProfile` 経路, runtime 評価経路の再設計
 - **関連**: M-8（Burst / IAnimationJob への差替 — Domain 純化の延長線）、M-4（BonePose 多重 provider のブレンド合成）
+
+### M-16: uOSC vendor copy + zero-alloc fork（osc-output-binding spec Phase 10 / 11）
+- **出典**: [`.kiro/specs/osc-output-binding/tasks.md`](../.kiro/specs/osc-output-binding/tasks.md) "preview.3 milestone（Deferred）" / [`.kiro/specs/osc-output-binding/uosc-modification-plan.md`](../.kiro/specs/osc-output-binding/uosc-modification-plan.md)
+- **内容**: `osc-output-binding` spec の Phase 10 / 11 として記載済み。`com.hidano.uosc` を `Library/PackageCache` から `Packages/com.hidano.uosc/` へ vendor copy 化し、`Runtime/Core/Modern/` 配下に Span / ArrayPool / BinaryPrimitives ベースの新 API（`OscMessage` SoA struct, `OscMessagePool`, `OscWriter`, `OscBundleBuilder`, `OscClient`/`OscServer` (ring buffer + Socket.ReceiveFrom worker), `OscPacketParser` (ref struct), `OscMessageView`, `OscAddressHash` (UTF-8 → uint64)）を実装、送受信ホットパスを zero-alloc 化する。完了後に旧 `uOscClient` / `Bundle` / `Message` facade を撤去（Phase 11）。`osc-output-binding` 内の Req 10.1 「`OnLateTick` で毎フレーム 0 byte GC」を完全達成する。preview.2 では本 spec ロジック側のみ GC ゼロを確認し、uOSC 側 string / object[] alloc は baseline 計測に留めている（`OscSenderGCAllocationTests` / `OscReceiverGCAllocationTests` が `*` deferred マーク付き）。
+- **トリガ**: 1 sender × 10+ receiver × 1000 BlendShape の高負荷シナリオで GC スパイクが実測課題化したとき / 1.0 凍結前の最終性能検証フェーズ
+- **影響範囲**: `Packages/com.hidano.uosc/`（vendor 化）、`Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/OSC/`（新 API への接続切り替え）、対応 PlayMode 性能テスト
+- **関連**: `osc-output-binding` spec Req 8.12 / 10.1 / 10.6
+
+### M-17: OverlaySlotBinding 既存テスト失敗（suppress + snapshot 同時存在の検証で 7 件 fail）
+- **出典**: `osc-output-binding` spec 完了直後の `/kiro:validate-impl` セッション（2026-05-15）で実テスト実行時に検出
+- **内容**: `SystemTextJsonParser.cs` が `OverlaySlotBinding slot='X' has invalid state: suppress=true and snapshot is not null` という validation を持っているが、サンプル JSON / テスト fixture 側に `suppress=true` AND non-null `snapshot` の組合せが残存しているため、以下 7 件の EditMode テストが恒常 fail する。`osc-output-binding` の commit 範囲外で発生しており、別 spec（overlay-clip-redesign 系）の積み残し tech debt。
+  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserOverlaysTests.Parse_SampleProfileJson_RoundTripsEquivalentOverlaySchema`
+  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserOverlaysTests.RoundTrip_ThreeOverlayStates_PreservesEquivalentProfile`
+  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.ParseProfile_PopulatesLayerInputSourcesAlignedWithLayers`
+  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.SerializeParseSerialize_SampleJson_ProducesIdenticalString`
+  - `Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.FacialCharacterProfileConverterTests.ToProfileSnapshotDto_DomainOverlayStates_EmitsNewOverlayDtoSchema`
+  - `Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Serializable.OverlaySlotBindingSerializableTests.UnitySerialization_LegacyExpressionIdKey_IsIgnoredAndNewFieldsKeepDefaults`
+  - `Hidano.FacialControl.Tests.EditMode.Editor.AutoExport.FacialCharacterProfileExporter_OverlayClipTests.ExportProfileJson_OverlaySlotsAndBindings_WritesNewSchema`
+- 加えて PlayMode 側に同系の overlay 由来既存失敗が 2 件残存:
+  - `Hidano.FacialControl.Tests.PlayMode.Integration.LayerLifecycleZeroFadeTests.ActivateThenDeactivate_DrivenByMonoBehaviourTick_FadesToZero`
+  - `Hidano.FacialControl.Tests.PlayMode.Performance.OverlayInputSourcePerformanceTests.TryWriteValues_1000Frames_AllocatesZeroBytes`
+- **トリガ**: overlay-clip 機能を本格利用するとき / 1.0 凍結前のテスト緑化フェーズ
+- **影響範囲**: `Packages/com.hidano.facialcontrol/Runtime/Adapters/Json/SystemTextJsonParser.cs` の validation 緩和（`suppress=true` 時の snapshot 同時保持を許容し読み戻し時に snapshot を無視する等）、または サンプル JSON / SO fixture の修正、対応テスト fixture 更新
+- **関連**: overlay-clip-redesign / layer-input-source-blending spec の積み残し
 
 ---
 
@@ -125,7 +154,7 @@
 | spec | follow-up が記載されている節 |
 |------|-----------------------------|
 | `layer-input-source-blending` | research.md Topic 1 / 3 / 4 / 6 / 7（asmdef CI 確認、深度超過テスト、診断 UI、要件文書注記、`using BulkScope` パターン）|
-| `inspector-and-data-model-redesign` | research.md Topic で AnimationEvent 経由メタデータ書き戻し / schema v1.0 拒否 / Custom keyframe / OSC adaptor 経路（M-10 と重複）|
+| `inspector-and-data-model-redesign` | research.md Topic で AnimationEvent 経由メタデータ書き戻し / schema v1.0 拒否 / Custom keyframe / OSC adaptor 経路（OSC 側 mapping は `osc-output-binding` spec で回収済み）|
 | `analog-input-binding` | research.md Topic 4 / 9 / 10 / 14（curve エディタ → M-9、bone-control internal API、OscRouter 抽出、ARKit native → M-3、Binder 分割 → M-12 等）|
 | `bone-control` | research.md §「LateUpdate 競合」「Quaternion.Euler 一致誤差」「BonePoseSO 独立化 → M-6」「Burst → M-8」「BoneWriter 必須化」|
 
@@ -147,4 +176,6 @@
 - 2026-05-06: spec `adapter-binding-architecture` クローズに伴い follow-up 2 件追加（S-5: Sample SO guid 再生成、S-6: VContainer dependency 宣言）。
 - 2026-05-06: spec `gaze-config-promotion` 設計セッションで preview.1 スコープ外と確定した 2 件を追加（M-13: 複数 Vector2 入力源での gaze 同時駆動、M-14: Domain への動的 Expression driver 概念導入）。
 - 2026-05-10: ユーザー指示で「LipSync の AnimationClip 形式が動かない件の根本対応」を S-9 として追加（凌ぎの診断ログ / HelpBox は既に main に入っている）。
+- 2026-05-14: アーキ確認セッションで M-15（ARKit 検出機能の責務分離 / 命名規約データセット抽象化）を追加。SDK 依存はゼロだが、クラス名 ARKit 固定 / `GenerateOscMapping` の core 残置という整理候補が確認されたもの。
+- 2026-05-15: `osc-output-binding` spec へ OSC 送信 / 受信 mode mapping / Drawer / Samples を引き上げたため、M-1 の「OSC マッピング Editor UI」と M-10（OSC アダプタの mapping 移植）を backlog から削除。
 - 2026-05-10: 本セッションで以下を消化して削除: S-1（ボーン参照を相対 path / 単純名併用に拡張）、S-2（旧 schema field 残置なしを確認）、S-3（PlayMode 統合テスト追加）、S-4（Fork 先で確認済みのため不要と判断）、S-6（README に VContainer 依存と OpenUPM 設定例を追記）、S-8（slug 編集 UI を candidate ドロップダウン + 手動 override テキストの 2 段に変更）、M-7（同名ボーン衝突時の警告を追加。S-1 と同 PR で実装）。

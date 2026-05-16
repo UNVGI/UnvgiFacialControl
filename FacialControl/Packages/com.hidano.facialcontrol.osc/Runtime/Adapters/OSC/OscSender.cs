@@ -1,6 +1,11 @@
 using System;
+using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using Hidano.FacialControl.Domain.Models;
 using UnityEngine;
+using uOSC;
 
 namespace Hidano.FacialControl.Adapters.OSC
 {
@@ -10,6 +15,14 @@ namespace Hidano.FacialControl.Adapters.OSC
     /// </summary>
     public class OscSender : MonoBehaviour
     {
+        private const string BlendShapeNamesAddress = "/_facialcontrol/blendshape_names";
+
+        private static readonly byte[] SenderIdentityAddressUtf8 =
+            Encoding.UTF8.GetBytes(SenderIdentity.OscAddress);
+
+        private static readonly byte[] BlendShapeNamesAddressUtf8 =
+            Encoding.UTF8.GetBytes(BlendShapeNamesAddress);
+
         [SerializeField]
         private string _address = "127.0.0.1";
 
@@ -20,11 +33,17 @@ namespace Hidano.FacialControl.Adapters.OSC
         private bool _autoStart = true;
 
         private uOSC.uOscClient _client;
+        private UdpClient _bundleClient;
+        private IPEndPoint _bundleEndpoint;
+        private string _bundleEndpointAddress;
+        private int _bundleEndpointPort;
+        private OscBundleBuilder _bundleBuilder;
         private bool _initialized;
         private bool _sending;
 
         // マッピング情報: インデックス → OSC アドレス
         private string[] _oscAddresses;
+        private byte[][] _oscAddressUtf8;
 
         // マッピング情報を保持
         private OscMapping[] _mappings;
@@ -52,6 +71,9 @@ namespace Hidano.FacialControl.Adapters.OSC
         /// </summary>
         public bool IsRunning => _client != null && _client.isRunning;
 
+        /// <summary>uOSC client owned by this sender after StartSending.</summary>
+        public uOSC.uOscClient Client => _client;
+
         /// <summary>
         /// 初期化済みかどうか。
         /// </summary>
@@ -69,15 +91,33 @@ namespace Hidano.FacialControl.Adapters.OSC
         /// <param name="mappings">OSC アドレスマッピング配列。</param>
         public void Initialize(OscMapping[] mappings)
         {
+            Initialize(mappings, addressUtf8: null);
+        }
+
+        public void Initialize(OscMapping[] mappings, byte[][] addressUtf8)
+        {
             if (mappings == null)
                 throw new ArgumentNullException(nameof(mappings));
 
+            if (addressUtf8 != null && addressUtf8.Length != mappings.Length)
+                throw new ArgumentException("Address byte table length must match mapping length.", nameof(addressUtf8));
+
             _mappings = mappings;
             _oscAddresses = new string[mappings.Length];
+            _oscAddressUtf8 = new byte[mappings.Length][];
             for (int i = 0; i < mappings.Length; i++)
             {
                 _oscAddresses[i] = mappings[i].OscAddress;
+                _oscAddressUtf8[i] = addressUtf8 != null && addressUtf8[i] != null
+                    ? addressUtf8[i]
+                    : Encoding.UTF8.GetBytes(_oscAddresses[i]);
             }
+
+            if (_bundleBuilder == null)
+            {
+                _bundleBuilder = new OscBundleBuilder();
+            }
+
             _initialized = true;
         }
 
@@ -112,6 +152,7 @@ namespace Hidano.FacialControl.Adapters.OSC
                 return;
 
             EnsureClient();
+            EnsureBundleClient();
             _client.address = _address;
             _client.port = _port;
 
@@ -133,6 +174,8 @@ namespace Hidano.FacialControl.Adapters.OSC
             {
                 _client.StopClient();
             }
+
+            CloseBundleClient();
             _sending = false;
         }
 
@@ -154,6 +197,137 @@ namespace Hidano.FacialControl.Adapters.OSC
             for (int i = 0; i < count; i++)
             {
                 _client.Send(_oscAddresses[i], values[i]);
+            }
+        }
+
+        /// <summary>
+        /// 送信元識別ヘッダと BlendShape 値群を 1 つの OSC bundle として送信する。
+        /// </summary>
+        public void SendBundle(SenderIdentity identity, float[] values, int count)
+        {
+            SendBundle(
+                identity.Uuid.ToByteArray(),
+                identity.StartedAtUnixMs.ToString(CultureInfo.InvariantCulture),
+                values,
+                count);
+        }
+
+        /// <summary>
+        /// 事前構築済みの送信元識別 payload と BlendShape 値群を 1 つの OSC bundle として送信する。
+        /// </summary>
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            float[] values,
+            int count)
+        {
+            SendBundle(
+                senderUuidBytes,
+                startedAtUnixMs,
+                values,
+                count,
+                heartbeatNames: null,
+                heartbeatNameCount: 0);
+        }
+
+        /// <summary>
+        /// 事前構築済みの送信元識別 payload、BlendShape 値群、必要なら heartbeat を 1 つの OSC bundle として送信する。
+        /// </summary>
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            float[] values,
+            int count,
+            string[] heartbeatNames,
+            int heartbeatNameCount)
+        {
+            SendBundle(
+                senderUuidBytes,
+                startedAtUnixMs,
+                _oscAddressUtf8,
+                values,
+                count,
+                heartbeatNames,
+                heartbeatNameCount);
+        }
+
+        /// <summary>
+        /// Sends a frame bundle using a caller-provided address table. This is used when the
+        /// current frame contains a compact subset of the configured sender mappings.
+        /// </summary>
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            byte[][] addressUtf8,
+            float[] values,
+            int count)
+        {
+            SendBundle(
+                senderUuidBytes,
+                startedAtUnixMs,
+                addressUtf8,
+                values,
+                count,
+                heartbeatNames: null,
+                heartbeatNameCount: 0);
+        }
+
+        /// <summary>
+        /// Sends a frame bundle using a caller-provided address table plus an optional heartbeat.
+        /// </summary>
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            byte[][] addressUtf8,
+            float[] values,
+            int count,
+            string[] heartbeatNames,
+            int heartbeatNameCount)
+        {
+            if (!_initialized || _client == null || !_client.isRunning)
+                return;
+
+            if (senderUuidBytes == null || senderUuidBytes.Length != SenderIdentity.UuidByteLength)
+                return;
+
+            if (string.IsNullOrEmpty(startedAtUnixMs) || addressUtf8 == null || values == null)
+                return;
+
+            bool includeHeartbeat = heartbeatNames != null;
+            if (includeHeartbeat &&
+                (heartbeatNameCount < 0 || heartbeatNameCount > heartbeatNames.Length))
+            {
+                return;
+            }
+
+            int messageCount = Math.Min(Math.Min(Math.Max(count, 0), values.Length), addressUtf8.Length);
+            ulong timestamp = Timestamp.Now.value;
+            int packetCount = includeHeartbeat
+                ? _bundleBuilder.BuildFrameBundle(
+                    timestamp,
+                    SenderIdentityAddressUtf8,
+                    senderUuidBytes,
+                    startedAtUnixMs,
+                    addressUtf8,
+                    values,
+                    messageCount,
+                    BlendShapeNamesAddressUtf8,
+                    heartbeatNames,
+                    heartbeatNameCount)
+                : _bundleBuilder.BuildFrameBundle(
+                    timestamp,
+                    SenderIdentityAddressUtf8,
+                    senderUuidBytes,
+                    startedAtUnixMs,
+                    addressUtf8,
+                    values,
+                    messageCount);
+
+            EnsureBundleClient();
+            for (int i = 0; i < packetCount; i++)
+            {
+                OscBundlePacket packet = _bundleBuilder.GetPacket(i);
+                _bundleClient.Send(packet.Buffer, packet.Length, _bundleEndpoint);
             }
         }
 
@@ -191,19 +365,81 @@ namespace Hidano.FacialControl.Adapters.OSC
             if (_client != null)
                 return;
 
-            _client = GetComponent<uOSC.uOscClient>();
-            if (_client == null)
+            // Each OscSender owns a client so multiple sender hosts on one GameObject stay independent.
+            _client = gameObject.AddComponent<uOSC.uOscClient>();
+            _client.StopClient();
+        }
+
+        private void EnsureBundleClient()
+        {
+            if (_bundleEndpoint == null ||
+                _bundleEndpointPort != _port ||
+                !string.Equals(_bundleEndpointAddress, _address, StringComparison.Ordinal))
             {
-                // uOscClient は OnEnable で自動的に StartClient() を呼ぶ。
-                // 追加直後に即停止して、手動制御に切り替える。
-                _client = gameObject.AddComponent<uOSC.uOscClient>();
-                _client.StopClient();
+                IPAddress ipAddress = ResolveIpAddress(_address);
+                IPEndPoint endpoint = new IPEndPoint(ipAddress, _port);
+
+                if (_bundleClient != null && _bundleClient.Client.AddressFamily != ipAddress.AddressFamily)
+                {
+                    CloseBundleClient();
+                }
+
+                _bundleEndpoint = endpoint;
+                _bundleEndpointAddress = _address;
+                _bundleEndpointPort = _port;
             }
+
+            if (_bundleClient == null)
+            {
+                _bundleClient = new UdpClient(_bundleEndpoint.AddressFamily);
+            }
+        }
+
+        private static IPAddress ResolveIpAddress(string address)
+        {
+            if (IPAddress.TryParse(address, out IPAddress parsed))
+            {
+                return parsed;
+            }
+
+            IPAddress[] addresses = Dns.GetHostAddresses(address);
+            for (int i = 0; i < addresses.Length; i++)
+            {
+                if (addresses[i].AddressFamily == AddressFamily.InterNetwork)
+                {
+                    return addresses[i];
+                }
+            }
+
+            if (addresses.Length > 0)
+            {
+                return addresses[0];
+            }
+
+            throw new ArgumentException($"OSC endpoint address '{address}' could not be resolved.", nameof(address));
+        }
+
+        private void CloseBundleClient()
+        {
+            if (_bundleClient != null)
+            {
+                _bundleClient.Close();
+                _bundleClient = null;
+            }
+
+            _bundleEndpoint = null;
+            _bundleEndpointAddress = null;
+            _bundleEndpointPort = 0;
         }
 
         private void OnDestroy()
         {
             StopSending();
+            if (_bundleBuilder != null)
+            {
+                _bundleBuilder.Dispose();
+                _bundleBuilder = null;
+            }
         }
     }
 }

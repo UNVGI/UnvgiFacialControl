@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
 using Hidano.FacialControl.LipSync.Adapters;
 using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
 using NUnit.Framework;
@@ -287,6 +288,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
                 new FacialProfile("1.0"),
                 new List<string>(blendShapeNames),
                 new InputSourceRegistry(),
+                new FacialOutputBus(),
                 new UnityTimeProvider(),
                 host,
                 null);

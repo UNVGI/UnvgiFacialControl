@@ -1,0 +1,251 @@
+using System;
+using System.Collections.Generic;
+using Hidano.FacialControl.Adapters.AdapterBindings;
+using Hidano.FacialControl.Adapters.InputSources;
+using Hidano.FacialControl.Adapters.OSC;
+using Hidano.FacialControl.Domain.Adapters;
+using Hidano.FacialControl.Domain.Interfaces;
+using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
+using Hidano.FacialControl.Tests.Shared;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.Profiling;
+
+namespace Hidano.FacialControl.Tests.PlayMode.Performance
+{
+    [TestFixture]
+    public sealed class OscReceiverGCAllocationTests
+    {
+        private const int FrameCount = 100;
+        private const int PortBase = 19700;
+        private const string Endpoint = "127.0.0.1";
+        private const string Slug = "osc-receiver-gc";
+
+        private static int s_portCounter;
+
+        private GameObject _host;
+        private OscAdapterBinding _binding;
+
+        [TearDown]
+        public void TearDown()
+        {
+            if (_binding != null)
+            {
+                _binding.Dispose();
+                _binding = null;
+            }
+
+            if (_host != null)
+            {
+                _host.SetActive(false);
+                UnityEngine.Object.DestroyImmediate(_host);
+                _host = null;
+            }
+        }
+
+        [Test]
+        public void OnFixedTick_IndividualBlendShapeMessages100Frames_RecordsBaseline()
+        {
+            var registry = new InputSourceRegistry();
+            var timeProvider = new ManualTimeProvider();
+            StartReceiver(registry, timeProvider, BundleInterpretationMode.IndividualMessage, includeGaze: false);
+
+            uOSC.Message[] messages =
+            {
+                new uOSC.Message("/avatar/parameters/smile", 0.25f),
+                new uOSC.Message("/avatar/parameters/frown", 0.75f),
+            };
+
+            WarmUp(messages, timeProvider);
+
+            BaselineResult baseline = MeasureFrames(() =>
+            {
+                HandleMessages(messages);
+                _binding.OnFixedTick(1f / 60f);
+            });
+
+            Assert.That(registry.TryResolve(Slug, out IInputSource source), Is.True);
+            var output = new float[2];
+            Assert.That(source.TryWriteValues(output), Is.True);
+            Assert.That(output[0], Is.EqualTo(0.25f).Within(1e-6f));
+            Assert.That(output[1], Is.EqualTo(0.75f).Within(1e-6f));
+            LogBaseline(nameof(OscReceiverGCAllocationTests), "individualBlendShapeMessages", baseline);
+        }
+
+        [Test]
+        public void OnFixedTick_AtomicBundleGazeMessages100Frames_RecordsBaseline()
+        {
+            var registry = new InputSourceRegistry();
+            var timeProvider = new ManualTimeProvider();
+            StartReceiver(registry, timeProvider, BundleInterpretationMode.AtomicSwap, includeGaze: true);
+
+            uOSC.Message[] messages =
+            {
+                FloatMessage("/avatar/parameters/smile", 0.25f, timestamp: 100UL),
+                FloatMessage("/avatar/parameters/eyeX", -0.4f, timestamp: 100UL),
+                FloatMessage("/avatar/parameters/eyeY", 0.6f, timestamp: 100UL),
+            };
+
+            WarmUp(messages, timeProvider);
+
+            BaselineResult baseline = MeasureFrames(() =>
+            {
+                HandleMessages(messages);
+                timeProvider.UnscaledTimeSeconds += 0.001d;
+                _binding.OnFixedTick(1f / 60f);
+            });
+
+            GazeVector2InputSource gaze = ResolveGaze(registry, Slug + ":eye");
+            Assert.That(gaze.TryReadVector2(out float x, out float y), Is.True);
+            Assert.That(x, Is.EqualTo(-0.4f).Within(1e-6f));
+            Assert.That(y, Is.EqualTo(0.6f).Within(1e-6f));
+            LogBaseline(nameof(OscReceiverGCAllocationTests), "atomicBundleGazeMessages", baseline);
+        }
+
+        private void StartReceiver(
+            InputSourceRegistry registry,
+            ManualTimeProvider timeProvider,
+            BundleInterpretationMode bundleMode,
+            bool includeGaze)
+        {
+            _host = new GameObject("OscReceiverGCAllocationTests");
+            _binding = new OscAdapterBinding
+            {
+                Slug = Slug,
+                Endpoint = Endpoint,
+                Port = AllocatePort(),
+                StalenessSeconds = 0f,
+                BundleMode = bundleMode,
+                BundleAccumulationTimeoutMs = 0f,
+            };
+
+            if (includeGaze)
+            {
+                _binding.Mappings = new List<OscMappingEntry>
+                {
+                    new OscMappingEntry
+                    {
+                        mode = OscMappingMode.Gaze_VRChat_XY,
+                        expressionId = "eye",
+                        addressPattern = "/avatar/parameters/eye",
+                    },
+                };
+            }
+
+            _binding.Configure(Endpoint, _binding.Port, new[]
+            {
+                new OscMapping("/avatar/parameters/smile", "smile", "emotion"),
+                new OscMapping("/avatar/parameters/frown", "frown", "emotion"),
+            });
+            _binding.OnStart(CreateContext(registry, timeProvider));
+
+            Assert.That(_binding.IsStarted, Is.True);
+            Assert.That(_binding.HelperHost, Is.Not.Null);
+        }
+
+        private AdapterBuildContext CreateContext(
+            InputSourceRegistry registry,
+            ManualTimeProvider timeProvider)
+        {
+            return new AdapterBuildContext(
+                new FacialProfile("2.0.0"),
+                Array.Empty<string>(),
+                registry,
+                new FacialOutputBus(),
+                timeProvider,
+                _host,
+                lipSyncProvider: null);
+        }
+
+        private void WarmUp(uOSC.Message[] messages, ManualTimeProvider timeProvider)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                HandleMessages(messages);
+                timeProvider.UnscaledTimeSeconds += 0.001d;
+                _binding.OnFixedTick(1f / 60f);
+            }
+        }
+
+        private void HandleMessages(uOSC.Message[] messages)
+        {
+            for (int i = 0; i < messages.Length; i++)
+            {
+                _binding.HelperHost.Receiver.HandleOscMessage(messages[i]);
+            }
+        }
+
+        private static uOSC.Message FloatMessage(string address, float value, ulong timestamp)
+        {
+            var message = new uOSC.Message(address, value);
+            message.timestamp = new uOSC.Timestamp(timestamp);
+            return message;
+        }
+
+        private static GazeVector2InputSource ResolveGaze(InputSourceRegistry registry, string id)
+        {
+            Assert.That(registry.TryResolve(id, out IInputSource source), Is.True);
+            Assert.That(source, Is.InstanceOf<GazeVector2InputSource>());
+            return (GazeVector2InputSource)source;
+        }
+
+        private static BaselineResult MeasureFrames(Action measureFrame)
+        {
+            StabilizeManagedHeap();
+
+            long managedBefore = GC.GetTotalMemory(forceFullCollection: false);
+            long profilerBefore = Profiler.GetTotalAllocatedMemoryLong();
+            for (int frame = 0; frame < FrameCount; frame++)
+            {
+                measureFrame();
+            }
+
+            long profilerAfter = Profiler.GetTotalAllocatedMemoryLong();
+            long managedAfter = GC.GetTotalMemory(forceFullCollection: false);
+            return new BaselineResult(
+                FrameCount,
+                profilerAfter - profilerBefore,
+                managedAfter - managedBefore);
+        }
+
+        private static void LogBaseline(string fixture, string scenario, BaselineResult baseline)
+        {
+            string message =
+                $"[{fixture}] preview.2 GC baseline scenario={scenario}, frames={baseline.FrameCount}, " +
+                $"profilerAllocatedDeltaBytes={baseline.ProfilerAllocatedDeltaBytes}, " +
+                $"managedHeapDeltaBytes={baseline.ManagedHeapDeltaBytes}";
+            TestContext.Out.WriteLine(message);
+            Debug.Log(message);
+        }
+
+        private static void StabilizeManagedHeap()
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }
+
+        private static int AllocatePort()
+        {
+            return PortBase + System.Threading.Interlocked.Increment(ref s_portCounter);
+        }
+
+        private readonly struct BaselineResult
+        {
+            public readonly int FrameCount;
+            public readonly long ProfilerAllocatedDeltaBytes;
+            public readonly long ManagedHeapDeltaBytes;
+
+            public BaselineResult(
+                int frameCount,
+                long profilerAllocatedDeltaBytes,
+                long managedHeapDeltaBytes)
+            {
+                FrameCount = frameCount;
+                ProfilerAllocatedDeltaBytes = profilerAllocatedDeltaBytes;
+                ManagedHeapDeltaBytes = managedHeapDeltaBytes;
+            }
+        }
+    }
+}

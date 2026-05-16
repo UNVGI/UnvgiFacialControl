@@ -42,6 +42,12 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject
         [Tooltip("対応する Expression の ID。Expressions リスト内に id 一致するエントリが存在する必要がある。")]
         public string expressionId;
 
+        public bool useDistinctLeftRight;
+
+        public string sourceIdLeft = string.Empty;
+
+        public string sourceIdRight = string.Empty;
+
         // ----------------- ボーン制御 (主) -----------------
 
         [Tooltip("左目ボーンの Transform 名または参照モデル相対 path。"

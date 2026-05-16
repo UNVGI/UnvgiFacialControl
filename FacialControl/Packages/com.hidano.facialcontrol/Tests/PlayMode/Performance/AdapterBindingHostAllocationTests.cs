@@ -5,6 +5,7 @@ using Hidano.FacialControl.Adapters.DependencyInjection;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
 using Hidano.FacialControl.Tests.Shared;
 using NUnit.Framework;
 using UnityEngine;
@@ -137,6 +138,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
                     profile,
                     blendShapeNames,
                     new InputSourceRegistry(),
+                    new FacialOutputBus(),
                     new ManualTimeProvider(),
                     hostGameObject,
                     lipSyncProvider: null);

@@ -33,6 +33,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.AutoExport
                 so.WritableGazeConfigs.Add(new GazeBindingConfig
                 {
                     expressionId = "eye_look",
+                    useDistinctLeftRight = true,
+                    sourceIdLeft = "input:eye_look.left",
+                    sourceIdRight = "osc:eye_look.right",
                     leftEyeBonePath = "Armature/Hips/Head/LeftEye",
                     leftEyeInitialRotation = new Vector3(1f, 2f, 3f),
                     leftEyeYawAxisLocal = new Vector3(0f, 1f, 0f),
@@ -62,6 +65,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.AutoExport
 
                 string json = File.ReadAllText(profilePath);
                 StringAssert.Contains("\"gaze_configs\"", json);
+                StringAssert.Contains("\"useDistinctLeftRight\"", json);
+                StringAssert.Contains("\"sourceIdLeft\"", json);
+                StringAssert.Contains("\"sourceIdRight\"", json);
                 StringAssert.DoesNotContain("\"_gazeConfigs\"", json);
                 StringAssert.DoesNotContain("\"lookLeftClip\"", json);
                 StringAssert.DoesNotContain("\"lookRightClip\"", json);
@@ -76,6 +82,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.AutoExport
                 Assert.That(dto.gazeConfigs, Has.Count.EqualTo(1));
                 var config = dto.gazeConfigs[0];
                 Assert.That(config.expressionId, Is.EqualTo("eye_look"));
+                Assert.That(config.useDistinctLeftRight, Is.True);
+                Assert.That(config.sourceIdLeft, Is.EqualTo("input:eye_look.left"));
+                Assert.That(config.sourceIdRight, Is.EqualTo("osc:eye_look.right"));
                 Assert.That(config.leftEyeBonePath, Is.EqualTo("Armature/Hips/Head/LeftEye"));
                 Assert.That(config.leftEyeInitialRotation, Is.EqualTo(new Vector3(1f, 2f, 3f)));
                 Assert.That(config.leftEyeYawAxisLocal, Is.EqualTo(new Vector3(0f, 1f, 0f)));

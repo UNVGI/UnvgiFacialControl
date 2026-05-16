@@ -116,6 +116,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
 
             Assert.AreEqual(src.gazeConfigs.Count, dst.gazeConfigs.Count, "gazeConfigs count mismatch");
             Assert.AreEqual(src.gazeConfigs[0].expressionId, dst.gazeConfigs[0].expressionId);
+            Assert.AreEqual(src.gazeConfigs[0].useDistinctLeftRight, dst.gazeConfigs[0].useDistinctLeftRight);
+            Assert.AreEqual(src.gazeConfigs[0].sourceIdLeft, dst.gazeConfigs[0].sourceIdLeft);
+            Assert.AreEqual(src.gazeConfigs[0].sourceIdRight, dst.gazeConfigs[0].sourceIdRight);
             Assert.AreEqual(src.gazeConfigs[0].leftEyeBonePath, dst.gazeConfigs[0].leftEyeBonePath);
             Assert.AreEqual(src.gazeConfigs[0].rightEyeBonePath, dst.gazeConfigs[0].rightEyeBonePath);
             Assert.AreEqual(src.gazeConfigs[0].leftEyeYawAxisLocal, dst.gazeConfigs[0].leftEyeYawAxisLocal);
@@ -350,6 +353,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                     new GazeBindingConfigDto
                     {
                         expressionId = "550e8400-e29b-41d4-a716-446655440000",
+                        useDistinctLeftRight = true,
+                        sourceIdLeft = "input:550e8400-e29b-41d4-a716-446655440000.left",
+                        sourceIdRight = "osc:550e8400-e29b-41d4-a716-446655440000.right",
                         leftEyeBonePath = "Armature/Head/LeftEye",
                         leftEyeInitialRotation = Vector3.zero,
                         leftEyeYawAxisLocal = Vector3.up,

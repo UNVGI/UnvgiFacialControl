@@ -18,11 +18,23 @@ namespace Hidano.FacialControl.Adapters.Bone
     {
         public GazeBindingConfig Config { get; }
         public IAnalogInputSource Source { get; }
+        public IAnalogInputSource LeftSource { get; }
+        public IAnalogInputSource RightSource { get; }
 
         public GazeBoneBinding(GazeBindingConfig config, IAnalogInputSource source)
+            : this(config, source, source)
+        {
+        }
+
+        public GazeBoneBinding(
+            GazeBindingConfig config,
+            IAnalogInputSource leftSource,
+            IAnalogInputSource rightSource)
         {
             Config = config;
-            Source = source;
+            Source = leftSource ?? rightSource;
+            LeftSource = leftSource;
+            RightSource = rightSource;
         }
     }
 }

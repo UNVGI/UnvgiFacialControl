@@ -7,6 +7,7 @@ using Hidano.FacialControl.Adapters.OSC;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -283,6 +284,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
                 profile: new FacialProfile("1.0"),
                 blendShapeNames: blendShapeNames ?? new List<string> { "smile", "frown" },
                 inputSourceRegistry: _registry,
+                facialOutputBus: new FacialOutputBus(),
                 timeProvider: new UnityTimeProvider(),
                 hostGameObject: _hostGameObject,
                 lipSyncProvider: null);

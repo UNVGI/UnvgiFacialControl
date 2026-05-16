@@ -200,7 +200,14 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.ARKit
 
             if (_helperHost != null)
             {
-                UnityEngine.Object.Destroy(_helperHost);
+                if (UnityEngine.Application.isPlaying)
+                {
+                    UnityEngine.Object.Destroy(_helperHost);
+                }
+                else
+                {
+                    UnityEngine.Object.DestroyImmediate(_helperHost);
+                }
                 _helperHost = null;
             }
 

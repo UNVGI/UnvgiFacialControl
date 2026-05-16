@@ -7,6 +7,7 @@ using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
 using Hidano.FacialControl.Tests.Shared;
 using NUnit.Framework;
 using UnityEngine;
@@ -118,6 +119,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Adapters
                 new FacialProfile("2.0"),
                 new[] { "Blink", "Smile" },
                 new InputSourceRegistry(),
+                new FacialOutputBus(),
                 new ManualTimeProvider(),
                 _hostGameObject,
                 lipSyncProvider: null);

@@ -148,6 +148,9 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
                 result.Add(new GazeBindingConfig
                 {
                     expressionId = src.expressionId,
+                    useDistinctLeftRight = src.useDistinctLeftRight,
+                    sourceIdLeft = src.sourceIdLeft ?? string.Empty,
+                    sourceIdRight = src.sourceIdRight ?? string.Empty,
                     leftEyeBonePath = src.leftEyeBonePath,
                     leftEyeInitialRotation = src.leftEyeInitialRotation,
                     leftEyeYawAxisLocal = src.leftEyeYawAxisLocal,
@@ -163,6 +166,48 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
                 });
             }
             return result;
+        }
+
+        public static List<GazeBindingConfigDto> ToGazeConfigDtos(IReadOnlyList<GazeBindingConfig> configs)
+        {
+            if (configs == null || configs.Count == 0)
+                return new List<GazeBindingConfigDto>();
+
+            var result = new List<GazeBindingConfigDto>(configs.Count);
+            for (int i = 0; i < configs.Count; i++)
+            {
+                var src = configs[i];
+                if (src == null) continue;
+
+                result.Add(ToGazeConfigDto(src));
+            }
+            return result;
+        }
+
+        public static GazeBindingConfigDto ToGazeConfigDto(GazeBindingConfig src)
+        {
+            if (src == null)
+                return null;
+
+            return new GazeBindingConfigDto
+            {
+                expressionId = src.expressionId,
+                useDistinctLeftRight = src.useDistinctLeftRight,
+                sourceIdLeft = src.sourceIdLeft ?? string.Empty,
+                sourceIdRight = src.sourceIdRight ?? string.Empty,
+                leftEyeBonePath = src.leftEyeBonePath,
+                leftEyeInitialRotation = src.leftEyeInitialRotation,
+                leftEyeYawAxisLocal = src.leftEyeYawAxisLocal,
+                leftEyePitchAxisLocal = src.leftEyePitchAxisLocal,
+                rightEyeBonePath = src.rightEyeBonePath,
+                rightEyeInitialRotation = src.rightEyeInitialRotation,
+                rightEyeYawAxisLocal = src.rightEyeYawAxisLocal,
+                rightEyePitchAxisLocal = src.rightEyePitchAxisLocal,
+                lookUpAngle = src.lookUpAngle,
+                lookDownAngle = src.lookDownAngle,
+                outerYawAngle = src.outerYawAngle,
+                innerYawAngle = src.innerYawAngle,
+            };
         }
 
         /// <summary>

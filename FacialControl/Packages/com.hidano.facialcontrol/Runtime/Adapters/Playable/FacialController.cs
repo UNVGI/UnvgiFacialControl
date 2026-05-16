@@ -7,6 +7,7 @@ using VContainer;
 using Hidano.FacialControl.Adapters.Bone;
 using Hidano.FacialControl.Adapters.DependencyInjection;
 using Hidano.FacialControl.Adapters.InputSources;
+using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Application.UseCases;
 using Hidano.FacialControl.Domain.Adapters;
@@ -54,6 +55,10 @@ namespace Hidano.FacialControl.Adapters.Playable
         private bool _isInitialized;
         private BoneWriter _boneWriter;
         private FacialControllerLifetimeScope _childLifetimeScope;
+        private IFacialOutputBus _facialOutputBus;
+        private IInputSourceRegistry _inputSourceRegistry;
+        private IReadOnlyList<GazeBindingConfig> _gazeConfigs = Array.Empty<GazeBindingConfig>();
+        private GazeSnapshot[] _gazeSnapshotBuffer = Array.Empty<GazeSnapshot>();
 
         // BlendShape 出力インデックス → (Renderer, Renderer 上の BS index) のマッピング
         private BlendShapeTarget[][] _blendShapeTargets;
@@ -149,6 +154,8 @@ namespace Hidano.FacialControl.Adapters.Playable
             }
 
             // BoneWriter は LateUpdate 末尾で適用する（Animator → BlendShape → BoneWriter の順）。
+            PublishFacialOutput(output);
+
             _boneWriter?.Apply();
         }
 
@@ -258,6 +265,11 @@ namespace Hidano.FacialControl.Adapters.Playable
                     ? _characterSO.GazeConfigs
                     : Array.Empty<GazeBindingConfig>();
 
+            _facialOutputBus = null;
+            _inputSourceRegistry = null;
+            _gazeConfigs = gazeConfigs ?? Array.Empty<GazeBindingConfig>();
+            EnsureGazeSnapshotBufferCapacity(_gazeConfigs.Count);
+
             ConfigureAdapterBindingsWithGazeConfigs(bindings, gazeConfigs);
 
             var appScope = FacialControlAppLifetimeScope.GetOrCreate();
@@ -281,6 +293,7 @@ namespace Hidano.FacialControl.Adapters.Playable
                     gameObject,
                     childScopeName: name,
                     activeExpressionProvider: _expressionUseCase);
+                CacheChildScopeServices();
             }
             catch (Exception ex)
             {
@@ -462,6 +475,114 @@ namespace Hidano.FacialControl.Adapters.Playable
             }
 
             return char.ToUpperInvariant(name[0]) + name.Substring(1);
+        }
+
+        private void CacheChildScopeServices()
+        {
+            if (_childLifetimeScope == null || _childLifetimeScope.Container == null)
+            {
+                return;
+            }
+
+            _childLifetimeScope.Container.TryResolve<IFacialOutputBus>(out _facialOutputBus);
+            _childLifetimeScope.Container.TryResolve<IInputSourceRegistry>(out _inputSourceRegistry);
+        }
+
+        private void PublishFacialOutput(ReadOnlySpan<float> postBlendValues)
+        {
+            if (_facialOutputBus == null || !_facialOutputBus.HasObservers)
+            {
+                return;
+            }
+
+            ReadOnlySpan<GazeSnapshot> gazeSnapshots = BuildGazeSnapshotSpan();
+            _facialOutputBus.Publish(postBlendValues, gazeSnapshots);
+        }
+
+        private ReadOnlySpan<GazeSnapshot> BuildGazeSnapshotSpan()
+        {
+            if (_gazeConfigs == null || _gazeConfigs.Count == 0 || _inputSourceRegistry == null)
+            {
+                return Array.Empty<GazeSnapshot>();
+            }
+
+            EnsureGazeSnapshotBufferCapacity(_gazeConfigs.Count);
+
+            int count = 0;
+            for (int i = 0; i < _gazeConfigs.Count; i++)
+            {
+                if (TryBuildGazeSnapshot(_gazeConfigs[i], out GazeSnapshot snapshot))
+                {
+                    _gazeSnapshotBuffer[count] = snapshot;
+                    count++;
+                }
+            }
+
+            return new ReadOnlySpan<GazeSnapshot>(_gazeSnapshotBuffer, 0, count);
+        }
+
+        private void EnsureGazeSnapshotBufferCapacity(int count)
+        {
+            if (_gazeSnapshotBuffer == null || _gazeSnapshotBuffer.Length != count)
+            {
+                _gazeSnapshotBuffer = count == 0
+                    ? Array.Empty<GazeSnapshot>()
+                    : new GazeSnapshot[count];
+            }
+        }
+
+        private bool TryBuildGazeSnapshot(GazeBindingConfig config, out GazeSnapshot snapshot)
+        {
+            snapshot = default;
+            if (config == null || string.IsNullOrEmpty(config.expressionId))
+            {
+                return false;
+            }
+
+            if (!GazeBindingConfigResolver.TryResolve(
+                    config,
+                    _inputSourceRegistry,
+                    out ResolvedGazeInputSources sources))
+            {
+                return false;
+            }
+
+            if (!TryReadGazeInput(sources.LeftSource, out float x, out float y)
+                && !TryReadGazeInput(sources.RightSource, out x, out y))
+            {
+                return false;
+            }
+
+            snapshot = new GazeSnapshot(config.expressionId, x, y);
+            return true;
+        }
+
+        private static bool TryReadGazeInput(
+            IAnalogInputSource source,
+            out float x,
+            out float y)
+        {
+            x = default;
+            y = default;
+            if (source == null || !source.IsValid)
+            {
+                return false;
+            }
+
+            bool hasValue = source.AxisCount >= 2
+                ? source.TryReadVector2(out x, out y)
+                : source.TryReadScalar(out x);
+
+            if (!hasValue)
+            {
+                x = default;
+                y = default;
+                return false;
+            }
+
+            x = Mathf.Clamp(x, -1f, 1f);
+            y = Mathf.Clamp(y, -1f, 1f);
+            return true;
         }
 
         private List<(int layerIdx, IInputSource source, float weight)> ResolveLayerInputSourcesFromRegistry(
@@ -927,6 +1048,11 @@ namespace Hidano.FacialControl.Adapters.Playable
                 _childLifetimeScope.Dispose();
                 _childLifetimeScope = null;
             }
+
+            _facialOutputBus = null;
+            _inputSourceRegistry = null;
+            _gazeConfigs = Array.Empty<GazeBindingConfig>();
+            _gazeSnapshotBuffer = Array.Empty<GazeSnapshot>();
 
             if (_graphBuildResult != null)
             {

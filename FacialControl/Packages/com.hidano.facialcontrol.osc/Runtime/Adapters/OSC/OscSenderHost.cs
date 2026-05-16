@@ -42,6 +42,11 @@ namespace Hidano.FacialControl.Adapters.OSC
         /// <param name="mappings">OSC アドレスマッピング配列。</param>
         public void Configure(string endpoint, int port, OscMapping[] mappings)
         {
+            Configure(endpoint, port, mappings, addressUtf8: null);
+        }
+
+        public void Configure(string endpoint, int port, OscMapping[] mappings, byte[][] addressUtf8)
+        {
             if (mappings == null) throw new ArgumentNullException(nameof(mappings));
 
             _endpoint = endpoint;
@@ -54,10 +59,10 @@ namespace Hidano.FacialControl.Adapters.OSC
             }
             _sender.Address = endpoint;
             _sender.Port = port;
-            _sender.Initialize(mappings);
+            _sender.Initialize(mappings, addressUtf8);
             _sender.StartSending();
 
-            _client = _sender.GetComponent<uOSC.uOscClient>();
+            _client = _sender.Client;
             _configured = true;
         }
 
@@ -83,6 +88,86 @@ namespace Hidano.FacialControl.Adapters.OSC
             }
         }
 
+        /// <summary>
+        /// 送信元識別ヘッダと BlendShape 値群を 1 つの OSC bundle として送信する。
+        /// </summary>
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            float[] values,
+            int count)
+        {
+            SendBundle(
+                senderUuidBytes,
+                startedAtUnixMs,
+                values,
+                count,
+                heartbeatNames: null,
+                heartbeatNameCount: 0);
+        }
+
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            byte[][] addressUtf8,
+            float[] values,
+            int count)
+        {
+            SendBundle(
+                senderUuidBytes,
+                startedAtUnixMs,
+                addressUtf8,
+                values,
+                count,
+                heartbeatNames: null,
+                heartbeatNameCount: 0);
+        }
+
+        /// <summary>
+        /// 送信元識別ヘッダ、BlendShape 値群、必要なら heartbeat を 1 つの OSC bundle として送信する。
+        /// </summary>
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            float[] values,
+            int count,
+            string[] heartbeatNames,
+            int heartbeatNameCount)
+        {
+            if (_sender != null)
+            {
+                _sender.SendBundle(
+                    senderUuidBytes,
+                    startedAtUnixMs,
+                    values,
+                    count,
+                    heartbeatNames,
+                    heartbeatNameCount);
+            }
+        }
+
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            byte[][] addressUtf8,
+            float[] values,
+            int count,
+            string[] heartbeatNames,
+            int heartbeatNameCount)
+        {
+            if (_sender != null)
+            {
+                _sender.SendBundle(
+                    senderUuidBytes,
+                    startedAtUnixMs,
+                    addressUtf8,
+                    values,
+                    count,
+                    heartbeatNames,
+                    heartbeatNameCount);
+            }
+        }
+
         private void OnDestroy()
         {
             if (_sender != null)
@@ -95,13 +180,27 @@ namespace Hidano.FacialControl.Adapters.OSC
                 {
                     Debug.LogException(ex);
                 }
-                UnityEngine.Object.Destroy(_sender);
+                if (UnityEngine.Application.isPlaying)
+                {
+                    UnityEngine.Object.Destroy(_sender);
+                }
+                else
+                {
+                    UnityEngine.Object.DestroyImmediate(_sender);
+                }
                 _sender = null;
             }
 
             if (_client != null)
             {
-                UnityEngine.Object.Destroy(_client);
+                if (UnityEngine.Application.isPlaying)
+                {
+                    UnityEngine.Object.Destroy(_client);
+                }
+                else
+                {
+                    UnityEngine.Object.DestroyImmediate(_client);
+                }
                 _client = null;
             }
 

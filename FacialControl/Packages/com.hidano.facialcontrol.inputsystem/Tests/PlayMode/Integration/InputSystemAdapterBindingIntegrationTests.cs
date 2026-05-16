@@ -6,6 +6,7 @@ using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
 using Hidano.FacialControl.InputSystem.Adapters.ScriptableObject;
 using NUnit.Framework;
 using UnityEngine;
@@ -247,6 +248,48 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
             Assert.IsTrue(resolved,
                 $"Analog 経路の InputSource は \"{slug}:GazeLook\" で解決できるべき。");
             Assert.IsNotNull(source);
+
+            bool expressionAliasResolved = _registry.TryResolve(slug + ":expr-gaze", out IInputSource expressionAlias);
+            Assert.IsTrue(expressionAliasResolved,
+                "Gaze binding は Cross-binding Slug Convention 用に expressionId でも登録されるべき。");
+            Assert.IsInstanceOf<IAnalogInputSource>(expressionAlias);
+        }
+
+        [Test]
+        public void OnStart_GazePath_DistinctMode_RegistersLeftRightExpressionAliases()
+        {
+            const string slug = "input-system-gaze-distinct-alias";
+            _sourceAsset = ScriptableObject.CreateInstance<InputActionAsset>();
+            var map = _sourceAsset.AddActionMap("Expression");
+            map.AddAction("LeftLook", InputActionType.Value, expectedControlLayout: "Vector2")
+                .AddBinding("<Gamepad>/leftStick");
+            map.AddAction("RightLook", InputActionType.Value, expectedControlLayout: "Vector2")
+                .AddBinding("<Gamepad>/rightStick");
+
+            var gazeBinding = new ExpressionBindingEntry
+            {
+                bindingMode = BindingMode.Gaze,
+                expressionId = "expr-gaze",
+                useDistinctLeftRight = true,
+                actionNameLeft = "LeftLook",
+                actionNameRight = "RightLook",
+            };
+
+            _binding = CreateBinding(
+                slug: slug,
+                asset: _sourceAsset,
+                actionMapName: "Expression",
+                expressionBindings: new List<ExpressionBindingEntry> { gazeBinding });
+
+            AdapterBuildContext ctx = CreateContext();
+
+            _binding.OnStart(in ctx);
+            _bindingStarted = true;
+
+            Assert.IsTrue(_registry.TryResolve(slug + ":expr-gaze.left", out IInputSource leftAlias));
+            Assert.IsTrue(_registry.TryResolve(slug + ":expr-gaze.right", out IInputSource rightAlias));
+            Assert.IsInstanceOf<IAnalogInputSource>(leftAlias);
+            Assert.IsInstanceOf<IAnalogInputSource>(rightAlias);
         }
 
         [Test]
@@ -573,6 +616,7 @@ namespace Hidano.FacialControl.InputSystem.Tests.PlayMode.Integration
                 profile: new FacialProfile("1.0", slots: slots),
                 blendShapeNames: blendShapeNames ?? new List<string> { "smile", "frown" },
                 inputSourceRegistry: _registry,
+                facialOutputBus: new FacialOutputBus(),
                 timeProvider: new UnityTimeProvider(),
                 hostGameObject: _hostGameObject,
                 lipSyncProvider: null);

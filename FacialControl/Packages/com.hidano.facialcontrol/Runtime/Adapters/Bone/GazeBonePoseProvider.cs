@@ -58,13 +58,14 @@ namespace Hidano.FacialControl.Adapters.Bone
             for (int i = 0; i < bindings.Count; i++)
             {
                 var cfg = bindings[i].Config;
-                var source = bindings[i].Source;
-                if (cfg == null || source == null) continue;
+                var leftSource = bindings[i].LeftSource ?? bindings[i].Source;
+                var rightSource = bindings[i].RightSource ?? bindings[i].Source;
+                if (cfg == null || (leftSource == null && rightSource == null)) continue;
 
-                if (!string.IsNullOrWhiteSpace(cfg.leftEyeBonePath))
+                if (!string.IsNullOrWhiteSpace(cfg.leftEyeBonePath) && leftSource != null)
                 {
                     list.Add(new EyeBinding(
-                        source,
+                        leftSource,
                         cfg.leftEyeBonePath,
                         Quaternion.Euler(cfg.leftEyeInitialRotation),
                         SafeNormalize(cfg.leftEyeYawAxisLocal, Vector3.up),
@@ -75,10 +76,10 @@ namespace Hidano.FacialControl.Adapters.Bone
                         cfg.lookUpAngle,
                         cfg.lookDownAngle));
                 }
-                if (!string.IsNullOrWhiteSpace(cfg.rightEyeBonePath))
+                if (!string.IsNullOrWhiteSpace(cfg.rightEyeBonePath) && rightSource != null)
                 {
                     list.Add(new EyeBinding(
-                        source,
+                        rightSource,
                         cfg.rightEyeBonePath,
                         Quaternion.Euler(cfg.rightEyeInitialRotation),
                         SafeNormalize(cfg.rightEyeYawAxisLocal, Vector3.up),
