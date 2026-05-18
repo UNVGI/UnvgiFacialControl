@@ -1,9 +1,12 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.OSC;
+using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Domain.Services;
 using Hidano.FacialControl.Tests.Shared;
 using NUnit.Framework;
 
@@ -82,6 +85,51 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
             Assert.That(output[1], Is.EqualTo(0.1f).Within(1e-6f));
             Assert.That(output[2], Is.EqualTo(-1f).Within(1e-6f));
             Assert.That(output[3], Is.EqualTo(0.9f).Within(1e-6f));
+        }
+
+        [Test]
+        public void Aggregate_OscReceiverAndOutputDemoShapeMismatch_DoesNotThrow()
+        {
+            const int meshBlendShapeCount = 4;
+            using var buffer = new OscDoubleBuffer(2);
+            var source = CreateMeshMappedSource(
+                buffer,
+                skipMask: new BitArray(meshBlendShapeCount, false),
+                contributeMask: new BitArray(new[] { true, false, false, true }),
+                mappingIndexToMeshIndex: new[] { 3, 0 });
+
+            buffer.Write(0, 0.75f);
+            buffer.Write(1, 0.25f);
+            buffer.Swap();
+
+            var profile = new FacialProfile(
+                "1.0",
+                layers: new[] { new LayerDefinition("osc", priority: 0, ExclusionMode.LastWins) });
+
+            using var registry = new LayerInputSourceRegistry(
+                profile,
+                meshBlendShapeCount,
+                new List<(int layerIdx, int sourceIdx, IInputSource source)>
+                {
+                    (0, 0, source)
+                });
+            using var weightBuffer = new LayerInputSourceWeightBuffer(
+                registry.LayerCount,
+                registry.MaxSourcesPerLayer);
+            weightBuffer.SetWeight(0, 0, 1f);
+
+            var aggregator = new LayerInputSourceAggregator(registry, weightBuffer, meshBlendShapeCount);
+            var outputPerLayer = new LayerBlender.LayerInput[registry.LayerCount];
+
+            Assert.DoesNotThrow(() => aggregator.Aggregate(0f, outputPerLayer));
+
+            var values = outputPerLayer[0].BlendShapeValues.Span;
+            Assert.That(values.Length, Is.EqualTo(meshBlendShapeCount));
+            Assert.That(values[0], Is.EqualTo(0.25f).Within(1e-6f));
+            Assert.That(values[1], Is.EqualTo(0f).Within(1e-6f));
+            Assert.That(values[2], Is.EqualTo(0f).Within(1e-6f));
+            Assert.That(values[3], Is.EqualTo(0.75f).Within(1e-6f));
+            Assert.That(outputPerLayer[0].ContributeMask.Length, Is.EqualTo(meshBlendShapeCount));
         }
 
         private static OscInputSource CreateMeshMappedSource(
