@@ -155,6 +155,56 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         }
 
         [Test]
+        public void BulkRegenerateGazeConfigs_AddsMissingConfigsForGazeExpressions()
+        {
+            _so = CreateProfile();
+            _so.Expressions.Add(CreateExpression("analog-existing", "Analog Existing", true));
+            _so.Expressions.Add(CreateExpression("analog-missing", "Analog Missing", true));
+            _so.Expressions.Add(CreateExpression("digital-one", "Digital One", false));
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig { expressionId = "analog-existing" });
+            BuildInspectorRoot();
+
+            InvokeBulkRegenerateGazeConfigs();
+
+            Assert.That(_so.GazeConfigs, Has.Count.EqualTo(2));
+            Assert.That(FindGazeConfig("analog-existing"), Is.Not.Null);
+            Assert.That(FindGazeConfig("analog-missing"), Is.Not.Null);
+            Assert.That(FindGazeConfig("digital-one"), Is.Null);
+        }
+
+        [Test]
+        public void BulkRegenerateGazeConfigs_DoesNotOverwriteExistingConfigs()
+        {
+            _so = CreateProfile();
+            _so.Expressions.Add(CreateExpression("analog-existing", "Analog Existing", true));
+            _so.Expressions.Add(CreateExpression("analog-missing", "Analog Missing", true));
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig
+            {
+                expressionId = "analog-existing",
+                leftEyeBonePath = "ManualLeft",
+                rightEyeBonePath = "ManualRight",
+                lookUpAngle = 42f,
+                lookDownAngle = 43f,
+                outerYawAngle = 44f,
+                innerYawAngle = 45f,
+            });
+            BuildInspectorRoot();
+
+            InvokeBulkRegenerateGazeConfigs();
+
+            Assert.That(_so.GazeConfigs, Has.Count.EqualTo(2));
+            var existing = FindGazeConfig("analog-existing");
+            Assert.That(existing, Is.Not.Null);
+            Assert.That(existing.leftEyeBonePath, Is.EqualTo("ManualLeft"));
+            Assert.That(existing.rightEyeBonePath, Is.EqualTo("ManualRight"));
+            Assert.That(existing.lookUpAngle, Is.EqualTo(42f));
+            Assert.That(existing.lookDownAngle, Is.EqualTo(43f));
+            Assert.That(existing.outerYawAngle, Is.EqualTo(44f));
+            Assert.That(existing.innerYawAngle, Is.EqualTo(45f));
+            Assert.That(FindGazeConfig("analog-missing"), Is.Not.Null);
+        }
+
+        [Test]
         public void ResolveGazeConfigFromReferenceModel_OverwritesExistingBoneValues()
         {
             _so = CreateProfile();
@@ -453,6 +503,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             method.Invoke(_editor, new object[] { index });
         }
 
+        private void InvokeBulkRegenerateGazeConfigs()
+        {
+            var method = typeof(FacialCharacterProfileSOInspector).GetMethod(
+                "BulkRegenerateGazeConfigs",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(_editor, null);
+        }
+
         private void InvokeRemoveExpression(int index)
         {
             var method = typeof(FacialCharacterProfileSOInspector).GetMethod(
@@ -555,6 +614,20 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
                 layer = layer,
                 isGaze = isGaze,
             };
+        }
+
+        private GazeBindingConfig FindGazeConfig(string expressionId)
+        {
+            for (int i = 0; i < _so.GazeConfigs.Count; i++)
+            {
+                var config = _so.GazeConfigs[i];
+                if (config != null && config.expressionId == expressionId)
+                {
+                    return config;
+                }
+            }
+
+            return null;
         }
 
         private static List<string> CollectLabelTexts(VisualElement root, string name)
