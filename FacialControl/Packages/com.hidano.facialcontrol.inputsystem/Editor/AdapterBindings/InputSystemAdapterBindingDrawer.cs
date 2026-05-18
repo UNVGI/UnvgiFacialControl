@@ -312,7 +312,6 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             var actionChoices = CollectActionNames(bindingProperty);
             actionDropdown.choices = BuildSafeChoices(actionChoices, actionNameValue);
             actionDropdown.SetValueWithoutNotify(actionNameValue);
-            element.Add(actionDropdown);
 
             var useDistinctLeftRightToggle = new Toggle("Gaze 左右別 Action")
             {
@@ -323,7 +322,6 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             {
                 useDistinctLeftRightToggle.BindProperty(useDistinctLeftRightProp);
             }
-            element.Add(useDistinctLeftRightToggle);
 
             var actionLeftDropdown = new DropdownField("左 Action")
             {
@@ -334,7 +332,6 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 : string.Empty;
             actionLeftDropdown.choices = BuildSafeChoices(actionChoices, actionNameLeftValue);
             actionLeftDropdown.SetValueWithoutNotify(actionNameLeftValue);
-            element.Add(actionLeftDropdown);
 
             var actionRightDropdown = new DropdownField("右 Action")
             {
@@ -345,7 +342,6 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 : string.Empty;
             actionRightDropdown.choices = BuildSafeChoices(actionChoices, actionNameRightValue);
             actionRightDropdown.SetValueWithoutNotify(actionNameRightValue);
-            element.Add(actionRightDropdown);
 
             // 2) Expression dropdown
             var expressionDropdown = new DropdownField("表情 ID")
@@ -374,7 +370,6 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                     so.ApplyModifiedProperties();
                 }
             });
-            element.Add(expressionDropdown);
 
             // 3) BindingMode field
             var bindingModeField = new EnumField("動作モード", BindingMode.Normal)
@@ -388,7 +383,6 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             {
                 bindingModeField.BindProperty(bindingModeProp);
             }
-            element.Add(bindingModeField);
 
             // 4) TriggerMode field
             var triggerModeField = new EnumField("トリガモード", TriggerMode.Hold)
@@ -405,29 +399,36 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 ? (BindingMode)bindingModeProp.enumValueIndex
                 : BindingMode.Normal;
             UpdateTriggerModeVisibility(triggerModeField, currentMode);
-            element.Add(triggerModeField);
 
             // 4b) Overlay モード時のみ表示する overlaySlot / overlayTargetLayer。
             var overlaySlotField = CreateOverlaySlotDropdown(
                 bindingProperty,
                 index,
                 overlaySlotProp);
-            element.Add(overlaySlotField);
 
             var overlayTargetLayerField = new PropertyField(overlayTargetLayerProp, "Overlay 対象レイヤー")
             {
                 tooltip = "Overlay モード時のみ有効。Action 押し量で weight を更新する対象レイヤー名（typically \"overlay\"）。",
             };
-            element.Add(overlayTargetLayerField);
 
             UpdateOverlayFieldVisibility(overlaySlotField, overlayTargetLayerField, currentMode);
-            UpdateGazeActionFieldVisibility(
+            UpdateGazeActionFieldState(
                 actionDropdown,
                 useDistinctLeftRightToggle,
                 actionLeftDropdown,
                 actionRightDropdown,
                 currentMode,
                 useDistinctLeftRightProp != null && useDistinctLeftRightProp.boolValue);
+
+            element.Add(expressionDropdown);
+            element.Add(bindingModeField);
+            element.Add(useDistinctLeftRightToggle);
+            element.Add(actionLeftDropdown);
+            element.Add(actionRightDropdown);
+            element.Add(actionDropdown);
+            element.Add(triggerModeField);
+            element.Add(overlaySlotField);
+            element.Add(overlayTargetLayerField);
 
             // 5) Mode と Action の expectedControlType の不一致を検知するヒントボックス。
             //    Normal モードで連続値 Action (Axis/Vector2) を選んでいる、
@@ -470,7 +471,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 BindingMode m = bindingModeProp != null
                     ? (BindingMode)bindingModeProp.enumValueIndex
                     : BindingMode.Normal;
-                UpdateGazeActionFieldVisibility(
+                UpdateGazeActionFieldState(
                     actionDropdown,
                     useDistinctLeftRightToggle,
                     actionLeftDropdown,
@@ -511,7 +512,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
                 {
                     UpdateTriggerModeVisibility(triggerModeField, mode);
                     UpdateOverlayFieldVisibility(overlaySlotField, overlayTargetLayerField, mode);
-                    UpdateGazeActionFieldVisibility(
+                    UpdateGazeActionFieldState(
                         actionDropdown,
                         useDistinctLeftRightToggle,
                         actionLeftDropdown,
@@ -523,7 +524,7 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             });
         }
 
-        private static void UpdateGazeActionFieldVisibility(
+        private static void UpdateGazeActionFieldState(
             VisualElement actionField,
             VisualElement useDistinctLeftRightField,
             VisualElement leftActionField,
@@ -534,9 +535,8 @@ namespace Hidano.FacialControl.InputSystem.Editor.AdapterBindings
             bool isGaze = mode == BindingMode.Gaze;
             if (actionField != null)
             {
-                actionField.style.display = !isGaze || !useDistinctLeftRight
-                    ? DisplayStyle.Flex
-                    : DisplayStyle.None;
+                actionField.style.display = DisplayStyle.Flex;
+                actionField.SetEnabled(!isGaze || !useDistinctLeftRight);
             }
             if (useDistinctLeftRightField != null)
             {
