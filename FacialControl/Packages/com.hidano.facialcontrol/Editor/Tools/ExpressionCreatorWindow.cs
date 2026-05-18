@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -24,6 +25,7 @@ namespace Hidano.FacialControl.Editor.Tools
         private const float MinWindowHeight = 500f;
         private const int PreviewSize = 256;
         private const float BakeButtonMinWidth = 140f;
+        private const string SavePreviewButtonName = "expression-creator-save-preview-png-button";
 
         // モデル参照
         private GameObject _targetObject;
@@ -51,6 +53,9 @@ namespace Hidano.FacialControl.Editor.Tools
 
         // 依存
         private IExpressionAnimationClipSampler _sampler;
+        private Func<string> _savePreviewPathProvider;
+        private Func<int, int, Texture2D> _previewTextureCapture;
+        private Action<string, byte[]> _pngFileWriter;
 
         [MenuItem("FacialControl/Expression 作成", false, 20)]
         public static void ShowWindow()
@@ -64,6 +69,7 @@ namespace Hidano.FacialControl.Editor.Tools
         {
             _sampler = new AnimationClipExpressionSampler();
             _previewWrapper = new PreviewRenderWrapper();
+            ConfigureSavePreviewDependencies();
         }
 
         private void OnDisable()
@@ -89,6 +95,7 @@ namespace Hidano.FacialControl.Editor.Tools
             // 左パネル: プレビュー + モデル選択
             // ========================================
             var leftPanel = new VisualElement();
+            leftPanel.name = "expression-creator-left-panel";
             leftPanel.style.width = PreviewSize + 16;
             leftPanel.style.minWidth = PreviewSize + 16;
             leftPanel.style.paddingLeft = 4;
@@ -122,6 +129,12 @@ namespace Hidano.FacialControl.Editor.Tools
             cameraResetButton.AddToClassList(FacialControlStyles.ActionButton);
             cameraResetButton.style.marginTop = 4;
             leftPanel.Add(cameraResetButton);
+
+            var savePreviewButton = new Button(OnSavePreviewClicked) { text = "プレビューを PNG として保存" };
+            savePreviewButton.name = SavePreviewButtonName;
+            savePreviewButton.AddToClassList(FacialControlStyles.ActionButton);
+            savePreviewButton.style.marginTop = 4;
+            leftPanel.Add(savePreviewButton);
 
             var resetButton = new Button(OnResetBlendShapes) { text = "全スライダーリセット" };
             resetButton.AddToClassList(FacialControlStyles.ActionButton);
@@ -393,6 +406,40 @@ namespace Hidano.FacialControl.Editor.Tools
             _previewContainer.MarkDirtyRepaint();
         }
 
+        private void OnSavePreviewClicked()
+        {
+            ConfigureSavePreviewDependencies();
+
+            var path = _savePreviewPathProvider();
+            if (string.IsNullOrEmpty(path))
+                return;
+
+            Texture2D texture = null;
+            try
+            {
+                texture = _previewTextureCapture(PreviewSize, PreviewSize);
+                if (texture == null)
+                {
+                    ShowStatus("PNG 保存用のプレビュー画像を取得できませんでした。", isError: true);
+                    return;
+                }
+
+                var pngBytes = texture.EncodeToPNG();
+                _pngFileWriter(path, pngBytes);
+                ShowStatus($"プレビュー PNG を保存しました: {path}", isError: false);
+            }
+            catch (Exception ex)
+            {
+                ShowStatus($"プレビュー PNG 保存エラー: {ex.Message}", isError: true);
+                Debug.LogError($"[ExpressionCreatorWindow] プレビュー PNG 保存エラー: {ex}");
+            }
+            finally
+            {
+                if (texture != null)
+                    UnityEngine.Object.DestroyImmediate(texture);
+            }
+        }
+
         // ========================================
         // プレビュー
         // ========================================
@@ -580,6 +627,17 @@ namespace Hidano.FacialControl.Editor.Tools
                 : FacialControlStyles.StatusSuccess);
 
             _statusLabel.style.display = DisplayStyle.Flex;
+        }
+
+        private void ConfigureSavePreviewDependencies()
+        {
+            _savePreviewPathProvider ??= () => EditorUtility.SaveFilePanel(
+                "プレビューを PNG として保存",
+                "",
+                "expression-preview.png",
+                "png");
+            _previewTextureCapture ??= (width, height) => _previewWrapper?.CapturePreviewTexture(width, height);
+            _pngFileWriter ??= File.WriteAllBytes;
         }
 
         private class BlendShapeEntry
