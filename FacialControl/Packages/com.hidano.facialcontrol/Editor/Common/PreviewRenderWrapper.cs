@@ -100,6 +100,42 @@ namespace Hidano.FacialControl.Editor.Common
             GUI.DrawTexture(rect, texture, ScaleMode.StretchToFill, false);
         }
 
+        public Texture2D CapturePreviewTexture(int width, int height)
+        {
+            if (_previewRenderUtility == null || _previewInstance == null)
+                return null;
+
+            if (width <= 0)
+                throw new ArgumentOutOfRangeException(nameof(width), width, "Width must be greater than zero.");
+            if (height <= 0)
+                throw new ArgumentOutOfRangeException(nameof(height), height, "Height must be greater than zero.");
+
+            _previewRenderUtility.camera.transform.position = _state.position;
+            _previewRenderUtility.camera.transform.rotation = _state.rotation;
+
+            var rect = new Rect(0f, 0f, width, height);
+            var previousActive = RenderTexture.active;
+
+            _previewRenderUtility.BeginPreview(rect, GUIStyle.none);
+            try
+            {
+                _previewRenderUtility.Render(true, true);
+                var renderTexture = _previewRenderUtility.EndPreview() as RenderTexture;
+                if (renderTexture == null)
+                    return null;
+
+                RenderTexture.active = renderTexture;
+                var texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                texture.ReadPixels(rect, 0, 0);
+                texture.Apply();
+                return texture;
+            }
+            finally
+            {
+                RenderTexture.active = previousActive;
+            }
+        }
+
         public bool HandleInput(Rect rect)
         {
             var evt = Event.current;
