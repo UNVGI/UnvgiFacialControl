@@ -7,6 +7,7 @@ using Hidano.FacialControl.Editor.Sampling;
 using Hidano.FacialControl.Editor.Tools;
 using NUnit.Framework;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -21,6 +22,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Tools
     {
         private readonly List<UnityEngine.Object> _trackedObjects = new List<UnityEngine.Object>();
         private readonly List<string> _trackedFiles = new List<string>();
+        private readonly List<string> _trackedAssetPaths = new List<string>();
 
         [TearDown]
         public void TearDown()
@@ -40,6 +42,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Tools
                     File.Delete(_trackedFiles[i]);
             }
             _trackedFiles.Clear();
+
+            for (int i = 0; i < _trackedAssetPaths.Count; i++)
+            {
+                AssetDatabase.DeleteAsset(_trackedAssetPaths[i]);
+            }
+            _trackedAssetPaths.Clear();
         }
 
         private AnimationClip CreateTrackedClip()
@@ -103,6 +111,26 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Tools
         }
 
         [Test]
+        public void CreateGUI_AddsCreateNewClipButtonNextToClipField()
+        {
+            var window = ScriptableObject.CreateInstance<ExpressionCreatorWindow>();
+            _trackedObjects.Add(window);
+
+            InvokeCreateGUI(window);
+
+            var clipField = (ObjectField)GetPrivateField(window, "_clipField");
+            Assert.IsNotNull(clipField);
+
+            var parent = clipField.parent;
+            Assert.IsNotNull(parent);
+
+            var createButton = parent.Q<Button>("expression-creator-create-new-clip-button");
+            Assert.IsNotNull(createButton);
+            Assert.AreEqual("新規作成", createButton.text);
+            Assert.IsNotNull(createButton.clickable);
+        }
+
+        [Test]
         public void SavePreviewPngHandler_WithSpecifiedPath_WritesPngFile()
         {
             var window = ScriptableObject.CreateInstance<ExpressionCreatorWindow>();
@@ -143,6 +171,50 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Tools
             Assert.AreEqual((byte)'P', bytes[1]);
             Assert.AreEqual((byte)'N', bytes[2]);
             Assert.AreEqual((byte)'G', bytes[3]);
+        }
+
+        [Test]
+        public void CreateNewClipHandler_WithSpecifiedPath_CreatesAndAssignsClip()
+        {
+            var window = ScriptableObject.CreateInstance<ExpressionCreatorWindow>();
+            _trackedObjects.Add(window);
+            InvokeCreateGUI(window);
+
+            var assetPath = $"Assets/expression-creator-created-{Guid.NewGuid():N}.anim";
+            _trackedAssetPaths.Add(assetPath);
+            SetPrivateField(window, "_createClipPathProvider", (Func<string>)(() => assetPath));
+
+            InvokePrivateMethod(window, "OnCreateNewClipClicked");
+
+            var createdClip = AssetDatabase.LoadAssetAtPath<AnimationClip>(assetPath);
+            Assert.IsNotNull(createdClip);
+
+            var clipField = (ObjectField)GetPrivateField(window, "_clipField");
+            Assert.AreSame(createdClip, clipField.value);
+            Assert.AreSame(createdClip, GetPrivateField(window, "_targetClip"));
+        }
+
+        [Test]
+        public void CreateNewClipHandler_DialogCancelled_DoesNotCreateOrChangeClip()
+        {
+            var window = ScriptableObject.CreateInstance<ExpressionCreatorWindow>();
+            _trackedObjects.Add(window);
+            InvokeCreateGUI(window);
+
+            var existingClip = CreateTrackedClip();
+            var clipField = (ObjectField)GetPrivateField(window, "_clipField");
+            clipField.value = existingClip;
+            SetPrivateField(window, "_targetClip", existingClip);
+
+            var createAssetCalled = false;
+            SetPrivateField(window, "_createClipPathProvider", (Func<string>)(() => string.Empty));
+            SetPrivateField(window, "_clipAssetCreator", (Action<AnimationClip, string>)((_, _) => createAssetCalled = true));
+
+            InvokePrivateMethod(window, "OnCreateNewClipClicked");
+
+            Assert.IsFalse(createAssetCalled);
+            Assert.AreSame(existingClip, clipField.value);
+            Assert.AreSame(existingClip, GetPrivateField(window, "_targetClip"));
         }
 
         [Test]
@@ -273,6 +345,26 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Tools
             Assert.IsNotNull(field);
 
             field.SetValue(window, value);
+        }
+
+        private static object GetPrivateField(ExpressionCreatorWindow window, string fieldName)
+        {
+            var field = typeof(ExpressionCreatorWindow).GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(field);
+
+            return field.GetValue(window);
+        }
+
+        private static void InvokePrivateMethod(ExpressionCreatorWindow window, string methodName)
+        {
+            var method = typeof(ExpressionCreatorWindow).GetMethod(
+                methodName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(method);
+
+            method.Invoke(window, null);
         }
     }
 }

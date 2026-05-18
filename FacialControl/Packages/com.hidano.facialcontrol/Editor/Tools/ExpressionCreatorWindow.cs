@@ -26,6 +26,7 @@ namespace Hidano.FacialControl.Editor.Tools
         private const int PreviewSize = 256;
         private const float BakeButtonMinWidth = 140f;
         private const string SavePreviewButtonName = "expression-creator-save-preview-png-button";
+        private const string CreateNewClipButtonName = "expression-creator-create-new-clip-button";
 
         // モデル参照
         private GameObject _targetObject;
@@ -56,6 +57,10 @@ namespace Hidano.FacialControl.Editor.Tools
         private Func<string> _savePreviewPathProvider;
         private Func<int, int, Texture2D> _previewTextureCapture;
         private Action<string, byte[]> _pngFileWriter;
+        private Func<string> _createClipPathProvider;
+        private Action<AnimationClip, string> _clipAssetCreator;
+        private Func<string, AnimationClip> _clipAssetLoader;
+        private Action _assetDatabaseSaveAssets;
 
         [MenuItem("FacialControl/Expression 作成", false, 20)]
         public static void ShowWindow()
@@ -70,6 +75,7 @@ namespace Hidano.FacialControl.Editor.Tools
             _sampler = new AnimationClipExpressionSampler();
             _previewWrapper = new PreviewRenderWrapper();
             ConfigureSavePreviewDependencies();
+            ConfigureCreateClipDependencies();
         }
 
         private void OnDisable()
@@ -158,7 +164,21 @@ namespace Hidano.FacialControl.Editor.Tools
                 tooltip = "ベイク対象の AnimationClip。割り当てると現在の値がスライダーに復元される。"
             };
             _clipField.RegisterValueChangedCallback(OnClipFieldChanged);
-            rightPanel.Add(_clipField);
+
+            var clipRow = new VisualElement();
+            clipRow.style.flexDirection = FlexDirection.Row;
+            clipRow.style.alignItems = Align.Center;
+            rightPanel.Add(clipRow);
+
+            _clipField.style.flexGrow = 1;
+            clipRow.Add(_clipField);
+
+            var createNewClipButton = new Button(OnCreateNewClipClicked) { text = "新規作成" };
+            createNewClipButton.name = CreateNewClipButtonName;
+            createNewClipButton.AddToClassList(FacialControlStyles.ActionButton);
+            createNewClipButton.style.marginLeft = 4;
+            createNewClipButton.style.flexShrink = 0f;
+            clipRow.Add(createNewClipButton);
 
             // BlendShape 検索
             _blendShapeSearchField = new TextField("BlendShape 検索");
@@ -532,6 +552,37 @@ namespace Hidano.FacialControl.Editor.Tools
             RestoreSliderValuesFromTargetClip();
         }
 
+        private void OnCreateNewClipClicked()
+        {
+            ConfigureCreateClipDependencies();
+
+            var path = _createClipPathProvider();
+            if (string.IsNullOrEmpty(path))
+                return;
+
+            try
+            {
+                var clip = new AnimationClip();
+                _clipAssetCreator(clip, path);
+                _assetDatabaseSaveAssets();
+
+                var loadedClip = _clipAssetLoader(path) ?? clip;
+                _clipField.value = loadedClip;
+                if (_targetClip != loadedClip)
+                {
+                    _targetClip = loadedClip;
+                    RestoreSliderValuesFromTargetClip();
+                }
+
+                ShowStatus($"AnimationClip を作成しました: {path}", isError: false);
+            }
+            catch (Exception ex)
+            {
+                ShowStatus($"AnimationClip 作成エラー: {ex.Message}", isError: true);
+                Debug.LogError($"[ExpressionCreatorWindow] AnimationClip 作成エラー: {ex}");
+            }
+        }
+
         /// <summary>
         /// 現在の <see cref="_targetClip"/> から <see cref="IExpressionAnimationClipSampler"/> 経由で
         /// BlendShape 値を取得し、スライダーへ復元する。clip 未設定時は何もしない。
@@ -638,6 +689,18 @@ namespace Hidano.FacialControl.Editor.Tools
                 "png");
             _previewTextureCapture ??= (width, height) => _previewWrapper?.CapturePreviewTexture(width, height);
             _pngFileWriter ??= File.WriteAllBytes;
+        }
+
+        private void ConfigureCreateClipDependencies()
+        {
+            _createClipPathProvider ??= () => EditorUtility.SaveFilePanelInProject(
+                "新規 AnimationClip を作成",
+                "NewExpression",
+                "anim",
+                "");
+            _clipAssetCreator ??= AssetDatabase.CreateAsset;
+            _clipAssetLoader ??= AssetDatabase.LoadAssetAtPath<AnimationClip>;
+            _assetDatabaseSaveAssets ??= AssetDatabase.SaveAssets;
         }
 
         private class BlendShapeEntry
