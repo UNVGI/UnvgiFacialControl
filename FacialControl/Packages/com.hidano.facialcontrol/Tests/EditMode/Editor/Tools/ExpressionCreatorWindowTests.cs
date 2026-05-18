@@ -72,7 +72,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Tools
         }
 
         [Test]
-        public void Bake_TransitionMetadata_WritesAnimationEvents()
+        public void Bake_DoesNotWriteAnimationEvents()
         {
             var clip = CreateTrackedClip();
             var entries = new List<ExpressionClipBakery.BlendShapeBakeEntry>
@@ -84,32 +84,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Tools
 
             var events = AnimationUtility.GetAnimationEvents(clip);
             Assert.IsNotNull(events);
-
-            var seen = new Dictionary<string, float>();
-            for (int i = 0; i < events.Length; i++)
-            {
-                var ev = events[i];
-                if (!string.Equals(ev.functionName, AnimationClipExpressionSampler.MetaSetFunctionName, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-                seen[ev.stringParameter] = ev.floatParameter;
-            }
-
-            Assert.IsTrue(seen.ContainsKey(ExpressionClipBakery.MetaKeyTransitionDuration),
-                "transitionDuration AnimationEvent が書き込まれていない");
-            Assert.IsTrue(seen.ContainsKey(ExpressionClipBakery.MetaKeyTransitionCurvePreset),
-                "transitionCurvePreset AnimationEvent が書き込まれていない");
-
-            Assert.AreEqual(0.7f, seen[ExpressionClipBakery.MetaKeyTransitionDuration], 1e-5f);
-            Assert.AreEqual((int)TransitionCurvePreset.EaseInOut,
-                Mathf.RoundToInt(seen[ExpressionClipBakery.MetaKeyTransitionCurvePreset]));
-
-            // Sampler 経由の往復検証
-            var sampler = new AnimationClipExpressionSampler();
-            var snapshot = sampler.SampleSnapshot("expr-bake-meta", clip);
-            Assert.AreEqual(0.7f, snapshot.TransitionDuration, 1e-5f);
-            Assert.AreEqual(TransitionCurvePreset.EaseInOut, snapshot.TransitionCurvePreset);
+            Assert.AreEqual(0, events.Length);
         }
 
         [Test]

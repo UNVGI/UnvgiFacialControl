@@ -92,24 +92,6 @@ namespace Hidano.FacialControl.Editor.Tools
                 AnimationUtility.SetEditorCurve(clip, binding, curve);
             }
 
-            var events = new[]
-            {
-                new AnimationEvent
-                {
-                    time = 0f,
-                    functionName = AnimationClipExpressionSampler.MetaSetFunctionName,
-                    stringParameter = MetaKeyTransitionDuration,
-                    floatParameter = transitionDuration,
-                },
-                new AnimationEvent
-                {
-                    time = 0f,
-                    functionName = AnimationClipExpressionSampler.MetaSetFunctionName,
-                    stringParameter = MetaKeyTransitionCurvePreset,
-                    floatParameter = (int)transitionCurvePreset,
-                },
-            };
-            AnimationUtility.SetAnimationEvents(clip, events);
         }
 
         /// <summary>
