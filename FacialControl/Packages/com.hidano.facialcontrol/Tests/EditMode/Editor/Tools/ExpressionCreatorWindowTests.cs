@@ -58,6 +58,25 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Tools
         }
 
         [Test]
+        public void BakeButton_HasFlexShrinkZeroAndMinWidth()
+        {
+            var window = ScriptableObject.CreateInstance<ExpressionCreatorWindow>();
+            _trackedObjects.Add(window);
+
+            var createGui = typeof(ExpressionCreatorWindow).GetMethod(
+                "CreateGUI",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(createGui);
+
+            createGui.Invoke(window, null);
+
+            var bakeButton = window.rootVisualElement.Q<Button>("expression-creator-bake-button");
+            Assert.IsNotNull(bakeButton);
+            Assert.AreEqual(0f, bakeButton.style.flexShrink.value, 1e-5f);
+            Assert.AreEqual(140f, bakeButton.style.minWidth.value.value, 1e-5f);
+        }
+
+        [Test]
         public void Bake_BlendShapeSliders_WritesEditorCurves()
         {
             var clip = CreateTrackedClip();

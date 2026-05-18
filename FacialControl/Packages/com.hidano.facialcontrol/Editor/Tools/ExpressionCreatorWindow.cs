@@ -23,6 +23,7 @@ namespace Hidano.FacialControl.Editor.Tools
         private const float MinWindowWidth = 700f;
         private const float MinWindowHeight = 500f;
         private const int PreviewSize = 256;
+        private const float BakeButtonMinWidth = 140f;
 
         // モデル参照
         private GameObject _targetObject;
@@ -170,7 +171,10 @@ namespace Hidano.FacialControl.Editor.Tools
             bottomSection.style.justifyContent = Justify.FlexEnd;
 
             var bakeButton = new Button(OnBakeClicked) { text = "AnimationClip にベイク" };
+            bakeButton.name = "expression-creator-bake-button";
             bakeButton.AddToClassList(FacialControlStyles.ActionButton);
+            bakeButton.style.flexShrink = 0f;
+            bakeButton.style.minWidth = BakeButtonMinWidth;
             bottomSection.Add(bakeButton);
 
             root.Add(bottomSection);
