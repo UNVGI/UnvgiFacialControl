@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
 using Hidano.FacialControl.LipSync.Editor.Inspector;
 using NUnit.Framework;
@@ -18,6 +19,8 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
         [SetUp]
         public void SetUp()
         {
+            Undo.ClearAll();
+
             _asset = ScriptableObject.CreateInstance<PhonemeEntryListViewTestAsset>();
             _serializedObject = new SerializedObject(_asset);
             _entriesProperty =
@@ -29,6 +32,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
         {
             _serializedObject.Dispose();
             Object.DestroyImmediate(_asset);
+            Undo.ClearAll();
         }
 
         [Test]
@@ -163,12 +167,95 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
             Assert.That(row.Q<HelpBox>(PhonemeEntryListView.BlendShapeWarningName), Is.Null);
         }
 
+        [Test]
+        public void UndoAfterSetEntryKind_DisplaysSerializedPropertyCurrentValue()
+        {
+            _asset.Entries.Add(new BlendShapePhonemeEntry
+            {
+                PhonemeId = "A",
+                BlendShapeName = "Mouth_A",
+                MaxWeight = 100f,
+            });
+            _serializedObject.Update();
+            var view = CreateView();
+
+            Undo.RecordObject(_asset, "Change Phoneme Entry Kind");
+            view.SetEntryKind(0, PhonemeEntryListView.EntryKind.AnimationClip);
+            Undo.FlushUndoRecordObjects();
+
+            Assert.That(GetBoundEntryTypeSelectorValue(view), Is.EqualTo(PhonemeEntryListView.AnimationClipLabel));
+
+            Undo.PerformUndo();
+            InvokeUndoRedoPerformed(view);
+
+            _serializedObject.Update();
+            SerializedProperty entry = _entriesProperty.GetArrayElementAtIndex(0);
+            Assert.That(entry.managedReferenceValue, Is.InstanceOf<BlendShapePhonemeEntry>());
+            Assert.That(
+                GetBoundEntryTypeSelectorValue(view),
+                Is.EqualTo(PhonemeEntryListView.BlendShapeLabel));
+        }
+
+        [Test]
+        public void UndoRedoPerformed_WhenFiredRepeatedly_RebuildsWithoutStaleDisplay()
+        {
+            _asset.Entries.Add(new BlendShapePhonemeEntry
+            {
+                PhonemeId = "I",
+                BlendShapeName = "Mouth_I",
+                MaxWeight = 90f,
+            });
+            _serializedObject.Update();
+            var view = CreateView();
+
+            Undo.RecordObject(_asset, "Change Phoneme Entry Kind To AnimationClip");
+            view.SetEntryKind(0, PhonemeEntryListView.EntryKind.AnimationClip);
+            Undo.FlushUndoRecordObjects();
+
+            Undo.RecordObject(_asset, "Change Phoneme Entry Kind To BlendShape");
+            view.SetEntryKind(0, PhonemeEntryListView.EntryKind.BlendShape);
+            Undo.FlushUndoRecordObjects();
+
+            Undo.PerformUndo();
+            Assert.DoesNotThrow(() => InvokeUndoRedoPerformed(view));
+            Assert.That(
+                GetBoundEntryTypeSelectorValue(view),
+                Is.EqualTo(PhonemeEntryListView.AnimationClipLabel));
+
+            Undo.PerformUndo();
+            Assert.DoesNotThrow(() =>
+            {
+                InvokeUndoRedoPerformed(view);
+                InvokeUndoRedoPerformed(view);
+            });
+            Assert.That(
+                GetBoundEntryTypeSelectorValue(view),
+                Is.EqualTo(PhonemeEntryListView.BlendShapeLabel));
+        }
+
         private PhonemeEntryListView CreateView()
         {
             _serializedObject.Update();
             _entriesProperty =
                 _serializedObject.FindProperty(nameof(PhonemeEntryListViewTestAsset.Entries));
             return new PhonemeEntryListView(_entriesProperty);
+        }
+
+        private static void InvokeUndoRedoPerformed(PhonemeEntryListView view)
+        {
+            MethodInfo method = typeof(PhonemeEntryListView).GetMethod(
+                "OnUndoRedoPerformed",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(view, null);
+        }
+
+        private static string GetBoundEntryTypeSelectorValue(PhonemeEntryListView view)
+        {
+            VisualElement row = view.CreateBoundRowForIndex(0);
+            var selector = row.Q<DropdownField>(PhonemeEntryListView.EntryTypeSelectorName);
+            Assert.That(selector, Is.Not.Null);
+            return selector.value;
         }
 
         private void SetPhonemeId(int index, string phonemeId)
