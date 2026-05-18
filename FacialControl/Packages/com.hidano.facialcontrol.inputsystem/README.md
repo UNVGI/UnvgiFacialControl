@@ -1,5 +1,10 @@
 # FacialControl InputSystem
 
+## preview.1 破壊的変更
+
+- `InputSystemAdapterBindingDrawer` の表示順を InputActionAsset / Trigger bindings / Analog bindings / Gaze settings の設定フローに合わせて変更しました。preview.1 polish 以降は旧 preview の Inspector 並び順と一致しません。
+- これは見た目互換を維持しない破壊的変更です。既存データの自動マイグレーションはありません。既存の `FacialCharacterProfileSO` / `InputSystemAdapterBinding` は Inspector で内容を確認し、手順書やスクリーンショットは新しい並び順に合わせて更新してください。
+
 `com.hidano.facialcontrol` の Unity InputSystem 連携アダプタ。
 
 ## 概要

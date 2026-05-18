@@ -1,5 +1,10 @@
 # com.hidano.facialcontrol
 
+## preview.1 破壊的変更
+
+- Expression の遷移時間と遷移カーブは `FacialCharacterProfileSO` Inspector の Expression 行で管理します。AnimationClip 上の `AnimationEvent` 由来メタデータ (`FacialControlMeta_Set` など) は preview.1 polish 以降の編集経路から撤去され、遷移メタの入力元として扱いません。
+- 過去 preview の AnimationClip に残っている遷移メタデータは自動マイグレーションされません。必要な値は `FacialCharacterProfileSO` または profile JSON の `transitionDuration` / `transitionCurvePreset` に手動で写してください。
+
 3D キャラクターの表情をリアルタイムに制御する Unity 向けコアパッケージ。
 
 本パッケージは表情制御本体のみを提供する。OSC 送受信や InputSystem 経由の入力は別パッケージ (`com.hidano.facialcontrol.osc` / `com.hidano.facialcontrol.inputsystem`) として分離されており、本コア単体で導入する場合は `com.unity.inputsystem` / `com.hidano.uosc` への依存は発生しない。

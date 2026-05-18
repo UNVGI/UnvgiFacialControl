@@ -1,5 +1,13 @@
 # Changelog
 
+## preview.1 リリースノート追補
+
+### Breaking Changes
+
+- **`AnimationEvent` 由来の遷移メタデータを撤去**: Expression の `transitionDuration` / `transitionCurvePreset` は `FacialCharacterProfileSO` Inspector の Expression 行だけで編集する方針に統一しました。AnimationClip 上の `AnimationEvent` (`FacialControlMeta_Set` など) は preview.1 以降の遷移メタデータとして扱いません。
+- **自動マイグレーション無し**: 過去 preview の AnimationClip に保存されていた遷移時間・遷移カーブは自動マイグレーションされません。必要な値はユーザーが `FacialCharacterProfileSO` / profile JSON 側へ手動で設定し直してください。
+- 根拠: spec `preview1-polish-pack` Req 2.6 / task 8.2。
+
 すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
 
 ## [0.1.0-preview.2] - Unreleased
