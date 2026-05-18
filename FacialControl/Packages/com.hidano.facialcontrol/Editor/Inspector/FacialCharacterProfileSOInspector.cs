@@ -96,6 +96,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string ExpressionRowGazeAutoAssignButtonName = "expression-row-gaze-auto-assign-button";
         public const string GazeConfigAddDropdownName = "gaze-config-add-dropdown";
         public const string GazeConfigBulkResolveButtonName = "gaze-config-bulk-resolve-button";
+        public const string GazeConfigBulkRegenerateButtonName = "gaze-config-bulk-regenerate-button";
         public const string GazeConfigNoCandidatesLabel = "追加できる目線操作の表情はありません";
         public const string GazeConfigRowName = "gaze-config-row";
         public const string GazeConfigExpressionNameLabelName = "gaze-config-expression-name";
@@ -915,6 +916,14 @@ namespace Hidano.FacialControl.Editor.Inspector
             addDropdown.style.display = DisplayStyle.None;
             _gazeConfigsContainer.Add(addDropdown);
 
+            var bulkRegenerateButton = new Button(BulkRegenerateGazeConfigs)
+            {
+                name = GazeConfigBulkRegenerateButtonName,
+                text = "GazeConfig を一括再生成",
+            };
+            bulkRegenerateButton.style.marginBottom = 6;
+            _gazeConfigsContainer.Add(bulkRegenerateButton);
+
             for (int i = 0; i < _rootGazeConfigsProperty.arraySize; i++)
             {
                 int configIndex = i;
@@ -1125,6 +1134,62 @@ namespace Hidano.FacialControl.Editor.Inspector
             }
 
             return candidates;
+        }
+
+        private void BulkRegenerateGazeConfigs()
+        {
+            if (_expressionsProperty == null || _rootGazeConfigsProperty == null) return;
+
+            serializedObject.Update();
+
+            var configuredIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < _rootGazeConfigsProperty.arraySize; i++)
+            {
+                var cfg = _rootGazeConfigsProperty.GetArrayElementAtIndex(i);
+                var idProp = cfg.FindPropertyRelative("expressionId");
+                if (idProp != null && !string.IsNullOrEmpty(idProp.stringValue))
+                {
+                    configuredIds.Add(idProp.stringValue);
+                }
+            }
+
+            var missingExpressionIds = new List<string>();
+            for (int i = 0; i < _expressionsProperty.arraySize; i++)
+            {
+                var expr = _expressionsProperty.GetArrayElementAtIndex(i);
+                var isGazeProp = expr.FindPropertyRelative("isGaze");
+                if (isGazeProp == null || !isGazeProp.boolValue) continue;
+
+                var idProp = expr.FindPropertyRelative("id");
+                string expressionId = idProp != null ? idProp.stringValue : string.Empty;
+                if (string.IsNullOrEmpty(expressionId) || configuredIds.Contains(expressionId)) continue;
+
+                configuredIds.Add(expressionId);
+                missingExpressionIds.Add(expressionId);
+            }
+
+            if (missingExpressionIds.Count == 0)
+            {
+                RebuildGazeConfigsUI();
+                return;
+            }
+
+            int undoGroup = BeginUndoGroup("Bulk Regenerate GazeConfigs");
+            Undo.RecordObject(target, "Bulk Regenerate GazeConfigs");
+            for (int i = 0; i < missingExpressionIds.Count; i++)
+            {
+                int newIndex = _rootGazeConfigsProperty.arraySize;
+                _rootGazeConfigsProperty.InsertArrayElementAtIndex(newIndex);
+                var cfg = _rootGazeConfigsProperty.GetArrayElementAtIndex(newIndex);
+                ResetGazeConfigToDefaults(cfg);
+
+                var idProp = cfg.FindPropertyRelative("expressionId");
+                if (idProp != null) idProp.stringValue = missingExpressionIds[i];
+            }
+
+            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
+            RebuildGazeConfigsUI();
+            UpdateValidation();
         }
 
         private void AddGazeConfigFromCandidate(string expressionId)

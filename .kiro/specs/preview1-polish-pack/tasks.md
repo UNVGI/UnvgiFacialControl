@@ -137,7 +137,7 @@
   - 観測可能な完了条件: 追加ケースが Red（未実装のため失敗）でテストランナーから報告される
   - _Requirements: 5.2, 5.3, 5.6_
   - _Boundary: FacialCharacterProfileSOInspectorGazeConfigsTests_
-- [ ] 5.4 「GazeConfig を一括再生成」ボタンと補完ロジックを実装する（Green）
+- [x] 5.4 「GazeConfig を一括再生成」ボタンと補完ロジックを実装する（Green）
   - `RebuildGazeConfigsUI` 周辺に「GazeConfig を一括再生成」ボタンを `GazeConfigBulkResolveButton` 近傍に配置する
   - `BulkRegenerateGazeConfigs()` を実装し、Expression を走査して `isGaze=true` かつ GazeConfig 未生成の Expression にだけ新規 GazeConfig を `_rootGazeConfigsProperty` に追加し、`ResetGazeConfigToDefaults` で初期化する（既存値は触らない）
   - 観測可能な完了条件: 5.3 のテストが Green で通り、UI 上に「GazeConfig を一括再生成」ボタンが表示される

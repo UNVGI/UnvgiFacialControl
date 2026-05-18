@@ -126,6 +126,19 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         }
 
         [Test]
+        public void RebuildGazeConfigsUI_Contains_BulkRegenerateButton()
+        {
+            _so = CreateProfile();
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
+
+            var root = BuildInspectorRoot();
+
+            var button = root.Q<Button>(FacialCharacterProfileSOInspector.GazeConfigBulkRegenerateButtonName);
+            Assert.That(button, Is.Not.Null);
+            Assert.That(button.text, Is.EqualTo("GazeConfig を一括再生成"));
+        }
+
+        [Test]
         public void GazeConfigResolveButtons_WhenReferenceModelMissing_AreDisabled()
         {
             _so = CreateProfile();
