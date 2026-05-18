@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -451,6 +452,56 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         }
 
         [Test]
+        public void OnStart_MappingOrderDiffersFromMeshOrder_InitializesCheckerAndSourceInMeshIndexSpace()
+        {
+            var registry = new InputSourceRegistry();
+            var binding = new OscAdapterBinding
+            {
+                Slug = "osc",
+                Port = AllocatePort(),
+                StalenessSeconds = 0f,
+                BundleMode = BundleInterpretationMode.IndividualMessage,
+            };
+            binding.Configure("127.0.0.1", binding.Port, new[]
+            {
+                new OscMapping("/avatar/parameters/frown", "frown", "emotion"),
+                new OscMapping("/avatar/parameters/smile", "smile", "emotion"),
+            });
+
+            var host = new GameObject("OscAdapterBindingMeshIndexTests");
+            try
+            {
+                binding.OnStart(CreateContext(
+                    registry,
+                    host,
+                    blendShapeNames: new[] { "smile", "blink", "frown" }));
+
+                Assert.That(binding.HeartbeatChecker.BlendShapeCount, Is.EqualTo(3));
+                AssertMask(binding.HeartbeatChecker.SkipMask, false, false, false);
+                AssertMask(binding.HeartbeatChecker.ContributeMask, true, false, true);
+
+                binding.HelperHost.Receiver.HandleOscMessage(
+                    new uOSC.Message("/avatar/parameters/frown", 0.75f));
+                binding.HelperHost.Receiver.HandleOscMessage(
+                    new uOSC.Message("/avatar/parameters/smile", 0.25f));
+                binding.OnFixedTick(0.02f);
+
+                Assert.That(registry.TryResolve("osc", out IInputSource source), Is.True);
+                var output = new float[] { -1f, -1f, -1f };
+                Assert.That(source.TryWriteValues(output), Is.True);
+                Assert.That(output[0], Is.EqualTo(0.25f).Within(1e-6f));
+                Assert.That(output[1], Is.EqualTo(-1f).Within(1e-6f));
+                Assert.That(output[2], Is.EqualTo(0.75f).Within(1e-6f));
+                AssertMask(source.ContributeMask, true, false, true);
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
         public void SenderIdentity_NewerStartupWinsAcrossBundleFrames()
         {
             var registry = new InputSourceRegistry();
@@ -500,11 +551,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         private static AdapterBuildContext CreateContext(
             InputSourceRegistry registry,
             GameObject host,
-            ManualTimeProvider timeProvider = null)
+            ManualTimeProvider timeProvider = null,
+            IReadOnlyList<string> blendShapeNames = null)
         {
             return new AdapterBuildContext(
                 new FacialProfile("2.0.0"),
-                Array.Empty<string>(),
+                blendShapeNames ?? Array.Empty<string>(),
                 registry,
                 new FacialOutputBus(),
                 timeProvider ?? new ManualTimeProvider(),
@@ -545,6 +597,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
             var message = new uOSC.Message(address, value);
             message.timestamp = new uOSC.Timestamp(timestamp);
             return message;
+        }
+
+        private static void AssertMask(BitArray mask, params bool[] expected)
+        {
+            Assert.That(mask.Length, Is.EqualTo(expected.Length));
+            for (int i = 0; i < expected.Length; i++)
+            {
+                Assert.That(mask[i], Is.EqualTo(expected[i]), $"mask[{i}]");
+            }
         }
     }
 }
