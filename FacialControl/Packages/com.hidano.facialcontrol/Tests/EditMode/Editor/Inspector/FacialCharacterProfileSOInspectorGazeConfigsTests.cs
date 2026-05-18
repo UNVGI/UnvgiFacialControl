@@ -287,6 +287,40 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         }
 
         [Test]
+        public void RemoveGazeConfigAt_ExplicitUserRemoval_UndoRestoresDeletedConfigContents()
+        {
+            Undo.ClearAll();
+            _so = CreateProfile();
+            _so.Expressions.Add(CreateExpression("analog-one", "Analog One", true));
+            _so.WritableGazeConfigs.Add(new GazeBindingConfig
+            {
+                expressionId = "analog-one",
+                leftEyeBonePath = "Armature/Head/LeftEye",
+                rightEyeBonePath = "Armature/Head/RightEye",
+                lookUpAngle = 21f,
+                lookDownAngle = 11f,
+                outerYawAngle = 31f,
+                innerYawAngle = 13f,
+            });
+            BuildInspectorRoot();
+
+            InvokeRemoveGazeConfigAt(0);
+
+            Assert.That(_so.GazeConfigs, Is.Empty);
+
+            Undo.PerformUndo();
+
+            Assert.That(_so.GazeConfigs, Has.Count.EqualTo(1));
+            Assert.That(_so.GazeConfigs[0].expressionId, Is.EqualTo("analog-one"));
+            Assert.That(_so.GazeConfigs[0].leftEyeBonePath, Is.EqualTo("Armature/Head/LeftEye"));
+            Assert.That(_so.GazeConfigs[0].rightEyeBonePath, Is.EqualTo("Armature/Head/RightEye"));
+            Assert.That(_so.GazeConfigs[0].lookUpAngle, Is.EqualTo(21f));
+            Assert.That(_so.GazeConfigs[0].lookDownAngle, Is.EqualTo(11f));
+            Assert.That(_so.GazeConfigs[0].outerYawAngle, Is.EqualTo(31f));
+            Assert.That(_so.GazeConfigs[0].innerYawAngle, Is.EqualTo(13f));
+        }
+
+        [Test]
         public void ExpressionRows_DoNotRenderIdTextOrGazeConfigControls()
         {
             _so = CreateProfile();
