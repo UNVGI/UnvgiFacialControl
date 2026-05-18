@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Hidano.FacialControl.Adapters.AdapterBindings.InputSystem;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
@@ -96,6 +97,65 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Adapters.AdapterBindin
             StringAssert.Contains("Slots", help.text);
         }
 
+        [Test]
+        public void BindExpressionBindingRow_PreservesNewFieldOrder()
+        {
+            _profileSo = ScriptableObject.CreateInstance<TestProfileSO>();
+            _profileSo.WritableAdapterBindings.Add(CreateBinding(InputBindingMode.Gaze, useDistinctLeftRight: true));
+            SerializedProperty bindingProperty = CreateProfileBindingProperty(_profileSo);
+
+            var row = new VisualElement();
+            InvokeBindExpressionBindingRow(row, 0, bindingProperty);
+
+            string[] orderedFieldNames = row.Children()
+                .Select(child => child.name)
+                .Where(IsExpressionBindingPrimaryFieldName)
+                .ToArray();
+
+            Assert.That(orderedFieldNames, Is.EqualTo(new[]
+            {
+                InputSystemAdapterBindingDrawer.ExpressionDropdownName,
+                InputSystemAdapterBindingDrawer.BindingModeFieldName,
+                InputSystemAdapterBindingDrawer.GazeUseDistinctToggleName,
+                InputSystemAdapterBindingDrawer.GazeLeftActionDropdownName,
+                InputSystemAdapterBindingDrawer.GazeRightActionDropdownName,
+                InputSystemAdapterBindingDrawer.ActionDropdownName,
+                InputSystemAdapterBindingDrawer.TriggerModeFieldName,
+            }));
+        }
+
+        [Test]
+        public void UpdateGazeActionFieldState_GazeAndUseDistinct_DisablesActionFieldWithoutHiding()
+        {
+            _profileSo = ScriptableObject.CreateInstance<TestProfileSO>();
+            _profileSo.WritableAdapterBindings.Add(CreateBinding(InputBindingMode.Gaze, useDistinctLeftRight: true));
+            SerializedProperty bindingProperty = CreateProfileBindingProperty(_profileSo);
+
+            var row = new VisualElement();
+            InvokeBindExpressionBindingRow(row, 0, bindingProperty);
+
+            var actionField = row.Q<DropdownField>(InputSystemAdapterBindingDrawer.ActionDropdownName);
+            Assert.That(actionField, Is.Not.Null);
+            Assert.That(actionField.enabledSelf, Is.False);
+            Assert.That(actionField.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+        }
+
+        [Test]
+        public void UpdateGazeActionFieldState_GazeWithoutUseDistinct_EnablesActionField()
+        {
+            _profileSo = ScriptableObject.CreateInstance<TestProfileSO>();
+            _profileSo.WritableAdapterBindings.Add(CreateBinding(InputBindingMode.Gaze, useDistinctLeftRight: false));
+            SerializedProperty bindingProperty = CreateProfileBindingProperty(_profileSo);
+
+            var row = new VisualElement();
+            InvokeBindExpressionBindingRow(row, 0, bindingProperty);
+
+            var actionField = row.Q<DropdownField>(InputSystemAdapterBindingDrawer.ActionDropdownName);
+            Assert.That(actionField, Is.Not.Null);
+            Assert.That(actionField.enabledSelf, Is.True);
+            Assert.That(actionField.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+        }
+
         private SerializedProperty CreateProfileBindingProperty(TestProfileSO so)
         {
             _serializedObject?.Dispose();
@@ -134,6 +194,40 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Adapters.AdapterBindin
                     },
                 });
             return binding;
+        }
+
+        private static InputSystemAdapterBinding CreateBinding(
+            InputBindingMode bindingMode,
+            bool useDistinctLeftRight)
+        {
+            var binding = new InputSystemAdapterBinding();
+            binding.Configure(
+                asset: null,
+                actionMapName: "Expression",
+                expressionBindings: new[]
+                {
+                    new ExpressionBindingEntry
+                    {
+                        bindingMode = bindingMode,
+                        actionName = "Gaze",
+                        useDistinctLeftRight = useDistinctLeftRight,
+                        actionNameLeft = "GazeLeft",
+                        actionNameRight = "GazeRight",
+                        expressionId = "look",
+                    },
+                });
+            return binding;
+        }
+
+        private static bool IsExpressionBindingPrimaryFieldName(string name)
+        {
+            return name == InputSystemAdapterBindingDrawer.ExpressionDropdownName
+                || name == InputSystemAdapterBindingDrawer.BindingModeFieldName
+                || name == InputSystemAdapterBindingDrawer.GazeUseDistinctToggleName
+                || name == InputSystemAdapterBindingDrawer.GazeLeftActionDropdownName
+                || name == InputSystemAdapterBindingDrawer.GazeRightActionDropdownName
+                || name == InputSystemAdapterBindingDrawer.ActionDropdownName
+                || name == InputSystemAdapterBindingDrawer.TriggerModeFieldName;
         }
 
         private static void InvokeBindExpressionBindingRow(
