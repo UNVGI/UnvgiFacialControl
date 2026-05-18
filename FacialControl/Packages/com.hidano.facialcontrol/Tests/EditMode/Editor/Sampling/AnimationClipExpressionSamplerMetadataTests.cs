@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.Sampling;
 using NUnit.Framework;
@@ -11,11 +10,9 @@ using UnityEngine.TestTools;
 namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
 {
     /// <summary>
-    /// <see cref="AnimationClipExpressionSampler"/> の AnimationEvent 経由
-    /// メタデータ抽出（TransitionDuration / TransitionCurvePreset）を検証する。
-    /// 予約 functionName: <c>FacialControlMeta_Set</c>、
-    /// stringParameter で key 識別（transitionDuration / transitionCurvePreset）、
-    /// floatParameter で値運搬（preset enum 整数も float として）。
+    /// <see cref="AnimationClipExpressionSampler"/> returns transition metadata defaults.
+    /// AnimationEvent metadata may remain on clips baked by earlier previews, but the sampler
+    /// no longer treats those events as the transition source of truth.
     /// </summary>
     [TestFixture]
     public class AnimationClipExpressionSamplerMetadataTests
@@ -39,16 +36,14 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
         {
             var clip = new AnimationClip();
             _trackedObjects.Add(clip);
-            // BlendShape カーブを 1 本入れて clip が空にならないようにする（warning 回避目的ではないがテストの意図を明確にする）
             SetFloatCurve(clip, "Body/Face", typeof(SkinnedMeshRenderer), "blendShape.Smile", 0.5f);
             return clip;
         }
 
         [Test]
-        public void SampleSnapshot_NoMetadata_FallsBackToDefaults()
+        public void SampleSnapshot_NoMetadata_ReturnsDefaultTransitionMetadata()
         {
             var clip = CreateTrackedClip();
-            // AnimationEvent を一切設定しない
             var sampler = new AnimationClipExpressionSampler();
 
             var snapshot = sampler.SampleSnapshot("expr-meta-default", clip);
@@ -58,7 +53,29 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
         }
 
         [Test]
-        public void SampleSnapshot_DurationEvent_AppliesDuration()
+        public void SampleSummary_NoMetadata_ReturnsDefaultTransitionDuration()
+        {
+            var clip = CreateTrackedClip();
+            var sampler = new AnimationClipExpressionSampler();
+
+            var summary = sampler.SampleSummary(clip);
+
+            Assert.AreEqual(Expression.DefaultTransitionDuration, summary.TransitionDuration);
+        }
+
+        [Test]
+        public void SampleSummary_NoMetadata_ReturnsLinearCurvePreset()
+        {
+            var clip = CreateTrackedClip();
+            var sampler = new AnimationClipExpressionSampler();
+
+            var summary = sampler.SampleSummary(clip);
+
+            Assert.AreEqual(TransitionCurvePreset.Linear, summary.TransitionCurve);
+        }
+
+        [Test]
+        public void SampleSnapshot_LegacyDurationEvent_ReturnsDefaultTransitionDuration()
         {
             var clip = CreateTrackedClip();
             SetMetaEvents(clip, new[]
@@ -67,15 +84,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
             });
 
             var sampler = new AnimationClipExpressionSampler();
+
             var snapshot = sampler.SampleSnapshot("expr-meta-duration", clip);
 
-            Assert.AreEqual(0.5f, snapshot.TransitionDuration, 1e-5f);
-            // CurvePreset は不在なので Linear のまま
+            Assert.AreEqual(Expression.DefaultTransitionDuration, snapshot.TransitionDuration);
             Assert.AreEqual(TransitionCurvePreset.Linear, snapshot.TransitionCurvePreset);
         }
 
         [Test]
-        public void SampleSnapshot_CurvePresetEvent_AppliesPreset()
+        public void SampleSnapshot_LegacyCurvePresetEvent_ReturnsLinearCurvePreset()
         {
             var clip = CreateTrackedClip();
             SetMetaEvents(clip, new[]
@@ -84,15 +101,33 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
             });
 
             var sampler = new AnimationClipExpressionSampler();
+
             var snapshot = sampler.SampleSnapshot("expr-meta-curve", clip);
 
-            Assert.AreEqual(TransitionCurvePreset.EaseInOut, snapshot.TransitionCurvePreset);
-            // Duration は不在なので Expression.DefaultTransitionDuration のまま
             Assert.AreEqual(Expression.DefaultTransitionDuration, snapshot.TransitionDuration);
+            Assert.AreEqual(TransitionCurvePreset.Linear, snapshot.TransitionCurvePreset);
         }
 
         [Test]
-        public void SampleSnapshot_DuplicateKey_LogsWarningAndUsesFirst()
+        public void SampleSummary_LegacyAnimationEventMeta_ReturnsDefaultsWithoutError()
+        {
+            var clip = CreateTrackedClip();
+            SetMetaEvents(clip, new[]
+            {
+                CreateMetaEvent("transitionDuration", 0.4f),
+                CreateMetaEvent("transitionCurvePreset", (float)(int)TransitionCurvePreset.EaseInOut),
+            });
+
+            var sampler = new AnimationClipExpressionSampler();
+
+            var summary = sampler.SampleSummary(clip);
+
+            Assert.AreEqual(Expression.DefaultTransitionDuration, summary.TransitionDuration);
+            Assert.AreEqual(TransitionCurvePreset.Linear, summary.TransitionCurve);
+        }
+
+        [Test]
+        public void SampleSnapshot_LegacyDuplicateMetaEvents_ReturnsDefaultsWithoutWarning()
         {
             var clip = CreateTrackedClip();
             SetMetaEvents(clip, new[]
@@ -103,17 +138,16 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
 
             var sampler = new AnimationClipExpressionSampler();
 
-            LogAssert.Expect(LogType.Warning, new Regex("Duplicate"));
             var snapshot = sampler.SampleSnapshot("expr-meta-dup", clip);
 
-            // 最初の値のみ採用
-            Assert.AreEqual(0.4f, snapshot.TransitionDuration, 1e-5f);
+            Assert.AreEqual(Expression.DefaultTransitionDuration, snapshot.TransitionDuration);
+            Assert.AreEqual(TransitionCurvePreset.Linear, snapshot.TransitionCurvePreset);
+            LogAssert.NoUnexpectedReceived();
         }
 
         [Test]
         public void MetaSetFunctionName_IsExposedAsConstant()
         {
-            // 予約 functionName を public 定数として外部から参照可能にする（Refactor 完了基準）
             Assert.AreEqual("FacialControlMeta_Set", AnimationClipExpressionSampler.MetaSetFunctionName);
         }
 
