@@ -2228,6 +2228,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
             var clipProp = entryProp.FindPropertyRelative("animationClip");
             var isGazeProp = entryProp.FindPropertyRelative("isGaze");
+            bool currentIsGazeForClip = isGazeProp != null && isGazeProp.boolValue;
 
             var clipField = new ExpressionClipObjectField
             {
@@ -2249,6 +2250,7 @@ namespace Hidano.FacialControl.Editor.Inspector
                 };
                 clipField.RefreshDisplayLabel();
             }
+            clipField.style.display = currentIsGazeForClip ? DisplayStyle.None : DisplayStyle.Flex;
             row.Add(clipField);
 
             // AnimationClip スロットの直下に「目線操作」Toggle を配置する。
@@ -2263,6 +2265,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             isGazeToggle.style.marginTop = 2;
             isGazeToggle.RegisterValueChangedCallback(evt =>
             {
+                clipField.style.display = evt.newValue ? DisplayStyle.None : DisplayStyle.Flex;
                 ChangeExpressionIsGaze(exprIndex, evt.newValue);
             });
             row.Add(isGazeToggle);
