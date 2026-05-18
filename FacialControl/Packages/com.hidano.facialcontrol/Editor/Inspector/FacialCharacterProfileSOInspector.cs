@@ -1161,6 +1161,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             int undoGroup = BeginUndoGroup("Remove GazeConfig");
             ValidateGazeConfigDeletionTrigger(GazeConfigDeletionTrigger.ExplicitUserRemoval);
+            Undo.RecordObject(target, "Remove GazeConfig");
             _rootGazeConfigsProperty.DeleteArrayElementAtIndex(configIndex);
             ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
             RebuildGazeConfigsUI();
