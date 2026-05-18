@@ -22,6 +22,68 @@
 
 ## 短期（別 PR / preview.1 内に拾う候補）
 
+### S-11: Expression 遷移メタデータの AnimationClip ベイク撤去
+- **出典**: ユーザー報告（2026-05-19）「Expression の遷移メタデータは不要ではないのか」
+- **内容**: 現状 `ExpressionClipBakery.Bake` は AnimationClip に (a) 0F 目の BlendShape 値、(b) 遷移時間 / カーブの `AnimationEvent` メタの 2 種を書き込み、`ExpressionCreatorWindow` 右ペインにも「遷移メタデータ」Foldout が出ている。一方で `ExpressionSerializable.transitionDuration` / `transitionCurve` は既に Profile Inspector の Expression Row でも編集可能（`FacialCharacterProfileSOInspector.cs:1796` の Slider）。同じ値を 2 か所で編集できるのは混乱の元。
+  - 方針: **AnimationClip 内は 0F 目の BlendShape / Bone キーのみ**を記録し、遷移時間 / カーブの AnimationEvent は書かない。source of truth は Profile Inspector の Expression Row 一本化。
+  - 影響: `ExpressionClipBakery.Bake` から `AnimationEvent` 書き込みを除去、`AnimationClipExpressionSampler.SampleSummary` を「メタが無ければ既定値を返す」挙動に揃える、`ExpressionCreatorWindow` から「遷移メタデータ」Foldout (`_transitionDurationField` / `_curveTypeDropdown`) を削除、AutoExporter / SampleSummary を参照している経路の動作確認、Domain の `Expression` bridge ctor (TransitionDuration / TransitionCurve を受ける方) の撤去可否を別 PR で判断。
+- **トリガ**: 本セッションで集約した UI/UX 改善群と同じ PR / 連続 PR
+- **影響範囲**: `Packages/com.hidano.facialcontrol/Editor/Tools/ExpressionClipBakery.cs`, `Editor/Tools/ExpressionCreatorWindow.cs`, `Editor/Sampling/AnimationClipExpressionSampler.cs`, `Editor/AutoExport/FacialCharacterProfileExporter.cs`, 対応 EditMode テスト
+
+### S-12: ExpressionCreatorWindow UI 改善（ボタンつぶれ / 画像書き出し / Clip 無し新規作成）
+- **出典**: ユーザー報告（2026-05-19）「Expression 作成ボタンがつぶれている」「画像書き出し機能を追加したい」「AnimationClip が無い状態から新規作成する機能を追加」
+- **内容**:
+  - (1) **ボタンつぶれ**: `ExpressionCreatorWindow.cs:192-204` の bottomSection に flex-end 配置された「AnimationClip にベイク」ボタンが幅を確保できず潰れて表示される。`FacialControlStyles.ActionButton` の幅指定 / `flexShrink` の組合せが原因と推定。`style.flexShrink = 0` + `style.minWidth` 追加で修正。
+  - (2) **画像書き出し**: 現在のプレビュー出力（256×256 の RenderTexture）を PNG で保存するボタンを leftPanel に追加。`PreviewRenderWrapper` から `Texture2D.ReadPixels` で取得 → `EditorUtility.SaveFilePanel` で保存先指定。
+  - (3) **Clip 無し新規作成**: ObjectField 隣に「新規作成」ボタンを追加。`EditorUtility.SaveFilePanelInProject` で保存先指定 → 空 AnimationClip を生成 → `_clipField.value` に代入して `OnClipFieldChanged` を発火させる。
+- **トリガ**: S-11 と同 PR / preview.1 リリース前の Editor UX 整備
+- **影響範囲**: `Editor/Tools/ExpressionCreatorWindow.cs`, `Editor/Common/PreviewRenderWrapper.cs`（PNG 出力 API 追加）, `Tests/EditMode/Editor/Tools/ExpressionCreatorWindowTests.cs`
+
+### S-13: Expression Row の Gaze 用 AnimationClip スロット非表示（isGaze=true 時）
+- **出典**: ユーザー報告（2026-05-19）「目線を BlendShape で実装する場合に、表情ライブラリ内に表示される AnimationClip のスロットは混乱を招く」
+- **内容**: Profile Inspector の Expression Row では `isGaze=true` のときに「遷移時間」スライダーは非表示にしている（`FacialCharacterProfileSOInspector.cs:1805`）が、AnimationClip ObjectField は同行内で表示され続けている。`ExpressionSerializable.animationClip` のコメントによれば isGaze=true では AnimationClip による補間は適用されないため、UI 上もスロット自体を `DisplayStyle.None` にして混乱を避ける。
+- **トリガ**: Gaze 用 Expression の UI 整備（S-14 と同時着手が自然）
+- **影響範囲**: `Editor/Inspector/FacialCharacterProfileSOInspector.cs` の Expression Row 構築箇所、対応 EditMode テスト（`Tests/EditMode/Editor/Inspector/FacialCharacterProfileSOInspector*Tests.cs`）
+
+### S-14: GazeConfigs の一括再生成ボタン + Undo 経路復元
+- **出典**: ユーザー報告（2026-05-19）「GazeConfigs の項目を消すと再生成する方法がない」
+- **内容**: 現状 GazeConfig 手動追加 dropdown は `RebuildGazeConfigsUI` で `DisplayStyle.None` に隠されている（`FacialCharacterProfileSOInspector.cs:915`）。アナログ表情追加時の自動生成のみが正規ルートだが、誤って GazeConfig 行を削除した場合に再生成する手段が UI 上に無く、Undo でも復元されないケースが報告されている。
+  - 方針: (a) `GazeConfigBulkResolveButton` の隣 or 同等位置に「GazeConfig を一括再生成」ボタンを明示配置し、未生成の Gaze 用 Expression を一括スキャンして補完する。(b) GazeConfig 削除経路に `Undo.RecordObject` を正しく挿し、Ctrl+Z で復元できることを EditMode テストで保証する。
+- **トリガ**: S-13 と同 PR が自然
+- **影響範囲**: `Editor/Inspector/FacialCharacterProfileSOInspector.cs`, 対応 EditMode テスト
+
+### S-15: Gaze 左右別 Action UI の配置見直し（動作モード直下 + 元 Action はグレーアウト）
+- **出典**: ユーザー報告（2026-05-19）「Gaze 左右別 Action の UI 配置が悪い」
+- **内容**: 現状 `InputSystemAdapterBindingDrawer.BindExpressionBindingRow` の並び順は `Action 名 → useDistinct チェック → 左 Action → 右 Action → 表情 ID → 動作モード → トリガモード`。Gaze モードのとき `useDistinct=true` で元の「Action 名」を `DisplayStyle.None` で非表示にしている（`UpdateGazeActionFieldVisibility` `InputSystemAdapterBindingDrawer.cs:526-553`）。
+  - 方針: 並び順を `表情 ID → 動作モード → useDistinct チェック → 左 Action → 右 Action → Action 名 → トリガモード` に変更し、Gaze + useDistinct=true のときの「Action 名」は **非表示ではなくグレーアウト**（`SetEnabled(false)`）にして「左右別を ON にしたから単一 Action が無効化されている」ことを視覚的に伝える。
+- **トリガ**: 本セッション集約 PR / preview.1 リリース前の Editor UX 整備
+- **影響範囲**: `Packages/com.hidano.facialcontrol.inputsystem/Editor/AdapterBindings/InputSystemAdapterBindingDrawer.cs`、対応 EditMode テスト
+
+### S-16: uLipSync PhonemeEntry Undo 後の値表示不整合
+- **出典**: ユーザー報告（2026-05-19）「uLipSync の BlendShape と AnimationClip 設定を Undo した時に、モードを切り替えると表示が古いままになる？」
+- **内容**: ユーザー回答により、現象は「BlendShape 名 ↔ AnimationClip 参照の値自体が古い状態のまま表示される」。`PhonemeEntryListView.SetEntryKind` で managedReferenceValue を差し替えると `ApplyModifiedPropertiesAndRefresh` → `_listView.Rebuild()` を呼んでいるが、Undo 経路では `Undo.undoRedoPerformed` を購読していないため、ListView の `bindItem` が直近の SerializedProperty 値で再描画されないと推定。
+  - 方針: `PhonemeEntryListView` のコンストラクタで `Undo.undoRedoPerformed += OnUndoRedoPerformed` を購読し、Detach 時 (`UnregisterCallback<DetachFromPanelEvent>`) に解除。`OnUndoRedoPerformed` で `serializedObject.Update()` + `_listView.Rebuild()` を呼ぶ。EditMode テストで Undo → モード切替 → 表示値が SerializedProperty と一致することを保証。
+- **トリガ**: Lipsync 周りの不具合 PR と同梱
+- **影響範囲**: `Packages/com.hidano.facialcontrol.lipsync/Editor/Inspector/PhonemeEntryListView.cs`, 対応 EditMode テスト
+
+### S-17: Expression の Phoneme Overlay スロット拡張（A/I/U/E/O の口形上書き）
+- **出典**: ユーザー報告（2026-05-19）「Lipsync のあいうえおの Overlay も設定できるようにする」
+- **内容**: ユーザー要望は「既存の Expression (Smile, Angry 等) に A/I/U/E/O 5 種の Overlay スロットを持たせる。何も設定されていなければ Lipsync 側で設定した AnimationClip/BlendShape がそのまま出る。Overlay が設定されている場合はそちらを使用する」。既存の blink overlay と同じ枠組みを a/i/u/e/o 5 phoneme へ広げる。
+  - 方針: (a) `FacialCharacterProfileSO.Slots` に `a` / `i` / `u` / `e` / `o` を予約 slot 名として導入。(b) Expression 毎の `OverlaySlotBinding` で各 phoneme slot に snapshot を上書き宣言可能にする（既存 `Expression.Overlays` の枠組みをそのまま使う）。(c) `ULipSyncAdapterBinding` の出力経路を「Overlay レイヤー経由で発火」させ、`OverlayInputSource` 解決で Expression の slot 宣言が優先、未宣言時は `ULipSyncAdapterBinding` の `BlendShape/AnimationClipPhonemeEntry` がデフォルトとして残るようにする。
+  - 要設計判断: Overlay snapshot を Inspector の Expression Row で編集する UI（slot×5 だと縦に伸びる → Foldout / Tab で畳む）、Profile 既定 Slots 配列に a/i/u/e/o を初期登録するか / オプトインか、`ULipSyncAdapterBinding` の出力先 Layer 切替（既存の mouth layer 直書きから Overlay 経由へ）の互換戦略
+- **トリガ**: preview.1 のリップシンク表現拡張、または preview.2 着手時
+- **影響範囲**: `Runtime/Domain/Models/Expression.cs`（既存 Overlays フィールド活用）, `Runtime/Adapters/ScriptableObject/Serializable/ExpressionSerializable.cs`, `Runtime/Adapters/ScriptableObject/FacialCharacterProfileSO.cs`（Slots 規約）, `Packages/com.hidano.facialcontrol.lipsync/Runtime/Adapters/ULipSyncAdapterBinding.cs`, `Editor/Inspector/FacialCharacterProfileSOInspector.cs`（Expression Row の phoneme overlay 編集 UI）, 対応 EditMode / PlayMode テスト
+
+### S-10: OSC 受信側 ContributeMask / TryWriteValues の index 空間ずれ
+- **出典**: ユーザー報告（2026-05-19）「OscReceiverDemo と OscOutputDemo を同時起動して同プロセス内テストすると `ArgumentException: Array lengths must be the same.` が `BitArray.Or` 経由で毎フレーム発生」/ stack: `LayerInputSourceAggregator.AggregateInternal:323` → `LayerUseCase.UpdateWeights:148` → `FacialController.LateUpdate:136`
+- **内容**: `HeartbeatConsistencyChecker._contributeMask` / `_skipMask` は **OSC マッピング数** 長で `new BitArray(_receiverBlendShapeNames.Length, …)` 構築される（`HeartbeatConsistencyChecker.cs:56-57`）が、`LayerInputSourceAggregator._perLayerMask[l]` は **mesh の BlendShape 数** 長で構築される（`LayerInputSourceAggregator.cs:161`）。両者を `BitArray.Or` するため長さ不一致で例外。`OscReceiverDemoProfile.asset` は Normal_BlendShape マッピングが 4 件しかなく、ユーザー持ち込みモデル（典型的に BlendShape 多数）と一致しないので必ず再現する。
+  - 同時起動でだけ顕在化したのは、OscOutputDemo 起動で OSC パケットが安定着信→`OscInputSource.TryWriteValues=true` が毎フレーム成立→`Or` 呼び出しが毎フレーム発生するため。単独起動でも `_stalenessSeconds=1` 経過後 `_failSafeMode=RevertToBase` で `TryWriteValues=true` を返すので本来は同じ例外が出ているはず。
+  - 加えて潜在バグ: `OscInputSource.TryWriteValues` (`OscInputSource.cs:126-134`) が `readBuffer[i] → output[i]` の同一インデックスでコピーしている。`readBuffer` は **mapping index 空間**、`output` は **mesh BlendShape index 空間** なので、マッピング順と mesh の BlendShape 順が一致しない場合に値が誤った BlendShape に乗る。クラッシュは出ないが結果が壊れる。
+  - 候補根本対応: (a) `OscAdapterBinding.OnStart` で `ctx.BlendShapeNames` を `HeartbeatConsistencyChecker` に渡し、`_contributeMask` / `_skipMask` を mesh BlendShape 数長で構築（マッピングの BlendShape 名 → mesh index 逆引きを噛ませる）、(b) `OscInputSource` 内部に `mappingIndex → meshIndex` の逆引きを保持させ、`TryWriteValues` を mesh-index 空間で書込むよう書き換え、(c) `IInputSource.ContributeMask` の interface コメント（「`BlendShapeCount` と一致」）と Aggregator 側の前提（「layer の `blendShapeCount` と一致」）のずれを契約として明文化し直す。`AnalogBlendShapeInputSource.cs:73-120` が同パターンの参考実装（`nameToIndex` で逆引きを構築し、mesh-index 空間で `_contributeMask` を立てる）。
+  - 一時回避（採用非推奨）: `LayerInputSourceAggregator.cs:323` で `Or` 前に長さガード。例外は止まるが値ずれ問題は残る。
+- **トリガ**: 他の OSC 周り不具合 / FB と同一 PR でまとめて対応する想定（本セッションで集約予定） / preview.1 リリース前のサンプル動作確認
+- **影響範囲**: `Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/OSC/HeartbeatConsistencyChecker.cs`, `Adapters/AdapterBindings/OscAdapterBinding.cs`, `Adapters/InputSources/OscInputSource.cs`, 既存 `Tests/EditMode/Adapters/OSC/HeartbeatConsistencyCheckerTests.cs` の mesh-index 空間追従、新規 `Tests/EditMode/Adapters/InputSources/OscInputSourceMaskTests.cs`（mapping 数 ≠ mesh 数のケース）
+
 ### S-9: LipSync の AnimationClip 形式が動かない件の根本対応
 - **出典**: ユーザー報告（2026-05-10）「LipsyncをAnimationClipで設定できない」/ HANDOVER.md タスク 8 の積み残し
 - **内容**: `ULipSyncAdapterBinding.TryFillAnimationClipSnapshot` は `entry.Clip.SampleAnimation(ctx.HostGameObject, sampleTime)` 経由で口形状クリップを採取するが、ユーザー作成 AnimationClip の rendererPath とキャラ階層が一致しない / クリップが BlendShape カーブを持たない等で snapshot が空になり結果として ContributeMask が空になる → BlendShape 直指定形式（`BlendShapePhonemeEntry`）では動くが AnimationClip 形式（`AnimationClipPhonemeEntry`）では動かない、という挙動になる。
@@ -128,6 +190,25 @@
 - **影響範囲**: `Packages/com.hidano.uosc/`（vendor 化）、`Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/OSC/`（新 API への接続切り替え）、対応 PlayMode 性能テスト
 - **関連**: `osc-output-binding` spec Req 8.12 / 10.1 / 10.6
 
+### M-18: ベース表情に Layer / OverrideMask を持たせる
+- **出典**: ユーザー報告（2026-05-19）「ベース表情もレイヤー設定を編集できた方がよいかも」
+- **内容**: 現状ベース表情は「どの Layer にも属さない default」として全 Layer のフォールバック値に使われている。ユーザー回答は **「ベース表情に所属レイヤー / OverrideMask を持たせる」** 方針で、他の Expression と同様に first-class Expression として扱いたい。これにより「特定 Layer ではベース値を別物に差し替える」「ベース表情自体が override で他レイヤーを抑え込む」ような構成が表現可能になる。
+  - 設計判断項目: (a) `FacialProfile.BaseExpression` を `Expression` (Layer + OverrideMask 必須) に格上げするか、それとも引き続き「Layer / OverrideMask 任意の特殊枠」として持つか、(b) ベース表情が `Layer` を持つようになると「Layer 内排他」のロジック (`LayerInputSourceAggregator`) でベース表情を例外扱いするか / 通常 Expression として後勝ち / ブレンドの対象にするか、(c) Inspector UI で「ベース表情編集ペイン」を専用タブにするか、通常の Expression 一覧の特別 row にするか。
+  - 既存 backlog M-14（Domain への動的 Expression driver 概念導入）と並走する形になりやすい。
+- **トリガ**: ユーザーが「ベース表情の差し替え / 上書き」需要を本格的に出したとき / Domain refactor 着手時
+- **影響範囲**: `Runtime/Domain/Models/FacialProfile.cs`, `Runtime/Domain/Models/Expression.cs`, `Runtime/Adapters/ScriptableObject/Serializable/ExpressionSerializable.cs`, `Runtime/Adapters/ScriptableObject/FacialCharacterProfileSO.cs`, `Runtime/Application/UseCases/LayerUseCase.cs`, `Editor/Inspector/FacialCharacterProfileSOInspector.cs`, 対応 EditMode / PlayMode テスト一式
+- **関連**: M-14（Domain への動的 Expression driver 概念導入）
+
+### M-19: Layer / InputSource / Adapter の関係視認性改善（UI + ドキュメント）
+- **出典**: ユーザー報告（2026-05-19）「Layer の入力源の仕様を分かりやすくする」「Layer の入力源と Adapter の関係性を分かりやすくする」
+- **内容**: ユーザー回答から具体的な痛点は以下:
+  - (1) **どの Layer にどの InputSource が接続されているのか Inspector 上で見えない**。Layer 一覧と InputSources 一覧が別セクション or 別タブに分かれているため、関連付けが追えない。
+  - (2) **Adapter → InputSource → Layer の 3 層構造がドキュメント / UI どちらでも明示されていない**。Adapter を 1 つ追加したときに、その設定が Layer のどの InputSource slot とつながるのか Inspector だけでは辿れない。
+  - (3) **単一 Adapter から N Layer へ分岐するケース (Lipsync→mouth, Overlay→blink) の振り分け箇所が見えない**。「どこで分岐設定するか」が判別できない。
+  - 方針案: (a) Profile Inspector に「Layer 単位ビュー」を追加し、各 Layer の row 内に「貢献している InputSource 名 + 由来 Adapter」を inline 表示。(b) AdapterBinding Drawer に「この Adapter の出力先 Layer / InputSource」のサマリー Box を追加。(c) Layer 削除時に InputSource 側の参照を孤児にしないよう警告。(d) `Documentation~/` 配下に 3 層構造の図示（Mermaid or Markdown 表）を追加し、`README.md` からリンク。
+- **トリガ**: preview.1 リリース前の UX 整備、または preview.2 着手時の「設定ミスを減らす」フェーズ
+- **影響範囲**: `Editor/Inspector/FacialCharacterProfileSOInspector.cs`, 各 AdapterBinding Drawer（InputSystem / OSC / Lipsync）, `Documentation~/architecture.md` 新設、README.md リンク追加
+
 ### M-17: OverlaySlotBinding 既存テスト失敗（suppress + snapshot 同時存在の検証で 7 件 fail）
 - **出典**: `osc-output-binding` spec 完了直後の `/kiro:validate-impl` セッション（2026-05-15）で実テスト実行時に検出
 - **内容**: `SystemTextJsonParser.cs` が `OverlaySlotBinding slot='X' has invalid state: suppress=true and snapshot is not null` という validation を持っているが、サンプル JSON / テスト fixture 側に `suppress=true` AND non-null `snapshot` の組合せが残存しているため、以下 7 件の EditMode テストが恒常 fail する。`osc-output-binding` の commit 範囲外で発生しており、別 spec（overlay-clip-redesign 系）の積み残し tech debt。
@@ -179,3 +260,5 @@
 - 2026-05-14: アーキ確認セッションで M-15（ARKit 検出機能の責務分離 / 命名規約データセット抽象化）を追加。SDK 依存はゼロだが、クラス名 ARKit 固定 / `GenerateOscMapping` の core 残置という整理候補が確認されたもの。
 - 2026-05-15: `osc-output-binding` spec へ OSC 送信 / 受信 mode mapping / Drawer / Samples を引き上げたため、M-1 の「OSC マッピング Editor UI」と M-10（OSC アダプタの mapping 移植）を backlog から削除。
 - 2026-05-10: 本セッションで以下を消化して削除: S-1（ボーン参照を相対 path / 単純名併用に拡張）、S-2（旧 schema field 残置なしを確認）、S-3（PlayMode 統合テスト追加）、S-4（Fork 先で確認済みのため不要と判断）、S-6（README に VContainer 依存と OpenUPM 設定例を追記）、S-8（slug 編集 UI を candidate ドロップダウン + 手動 override テキストの 2 段に変更）、M-7（同名ボーン衝突時の警告を追加。S-1 と同 PR で実装）。
+- 2026-05-19: ユーザー報告で S-10（OSC 受信側 ContributeMask / TryWriteValues の index 空間ずれ）を追加。他の OSC 周り不具合 / FB と同一 PR で根本対応する想定で集約。
+- 2026-05-19: ユーザー集中 FB セッションで 8 件追加。短期: S-11（Expression 遷移メタの AnimationClip ベイク撤去）, S-12（ExpressionCreatorWindow UI 改善: ボタンつぶれ / 画像書き出し / Clip 無し新規作成）, S-13（Expression Row の Gaze 用 AnimationClip スロット非表示）, S-14（GazeConfigs 一括再生成 + Undo 復元）, S-15（Gaze 左右別 Action UI 配置）, S-16（uLipSync PhonemeEntry Undo 表示不整合）, S-17（A/I/U/E/O Overlay スロット拡張）。中期: M-18（ベース表情の Layer / OverrideMask 保持）, M-19（Layer / InputSource / Adapter 関係視認性改善）。
