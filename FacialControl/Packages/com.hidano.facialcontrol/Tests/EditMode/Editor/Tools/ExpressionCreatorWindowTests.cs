@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.Sampling;
 using Hidano.FacialControl.Editor.Tools;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace Hidano.FacialControl.Tests.EditMode.Editor.Tools
 {
@@ -36,6 +38,23 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Tools
             var clip = new AnimationClip();
             _trackedObjects.Add(clip);
             return clip;
+        }
+
+        [Test]
+        public void CreateGUI_DoesNotShowTransitionMetadataFoldout()
+        {
+            var window = ScriptableObject.CreateInstance<ExpressionCreatorWindow>();
+            _trackedObjects.Add(window);
+
+            var createGui = typeof(ExpressionCreatorWindow).GetMethod(
+                "CreateGUI",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(createGui);
+
+            createGui.Invoke(window, null);
+
+            var foldouts = window.rootVisualElement.Query<Foldout>().ToList();
+            Assert.AreEqual(0, foldouts.Count);
         }
 
         [Test]

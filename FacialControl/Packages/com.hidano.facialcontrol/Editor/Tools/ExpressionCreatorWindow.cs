@@ -41,18 +41,9 @@ namespace Hidano.FacialControl.Editor.Tools
         private TextField _blendShapeSearchField;
         private string _blendShapeSearchText = "";
 
-        // ベイク先 AnimationClip + 遷移メタデータ
+        // ベイク先 AnimationClip
         private ObjectField _clipField;
         private AnimationClip _targetClip;
-        private FloatField _transitionDurationField;
-        private DropdownField _curveTypeDropdown;
-        private static readonly List<string> CurvePresetChoices = new List<string>
-        {
-            nameof(TransitionCurvePreset.Linear),
-            nameof(TransitionCurvePreset.EaseIn),
-            nameof(TransitionCurvePreset.EaseOut),
-            nameof(TransitionCurvePreset.EaseInOut),
-        };
 
         // ステータス
         private Label _statusLabel;
@@ -154,25 +145,6 @@ namespace Hidano.FacialControl.Editor.Tools
             };
             _clipField.RegisterValueChangedCallback(OnClipFieldChanged);
             rightPanel.Add(_clipField);
-
-            // 遷移メタデータ foldout（OQ4: スライダーペイン下部の foldout 配置）
-            var transitionFoldout = new Foldout
-            {
-                text = "遷移メタデータ",
-                value = true,
-            };
-            transitionFoldout.style.marginTop = 4;
-            rightPanel.Add(transitionFoldout);
-
-            _transitionDurationField = new FloatField("遷移時間 (秒)")
-            {
-                value = 0.25f,
-                tooltip = "0〜1 秒（範囲外は AnimationEvent 経由で運搬される）",
-            };
-            transitionFoldout.Add(_transitionDurationField);
-
-            _curveTypeDropdown = new DropdownField("遷移カーブ", CurvePresetChoices, 0);
-            transitionFoldout.Add(_curveTypeDropdown);
 
             // BlendShape 検索
             _blendShapeSearchField = new TextField("BlendShape 検索");
@@ -511,8 +483,7 @@ namespace Hidano.FacialControl.Editor.Tools
 
         /// <summary>
         /// 現在の <see cref="_targetClip"/> から <see cref="IExpressionAnimationClipSampler"/> 経由で
-        /// BlendShape 値および TransitionDuration / TransitionCurvePreset メタデータを取得し、
-        /// スライダーと遷移メタ UI を復元する。clip 未設定時は何もしない。
+        /// BlendShape 値を取得し、スライダーへ復元する。clip 未設定時は何もしない。
         /// </summary>
         private void RestoreSliderValuesFromTargetClip()
         {
@@ -527,18 +498,6 @@ namespace Hidano.FacialControl.Editor.Tools
                     var entry = _blendShapeEntries[i];
                     var key = (entry.RendererPath ?? string.Empty, entry.BlendShapeName ?? string.Empty);
                     entry.Value = values.TryGetValue(key, out var value) ? Mathf.Clamp01(value) : 0f;
-                }
-
-                var summary = _sampler.SampleSummary(_targetClip);
-                if (_transitionDurationField != null)
-                {
-                    _transitionDurationField.value = summary.TransitionDuration;
-                }
-                if (_curveTypeDropdown != null)
-                {
-                    var curveName = summary.TransitionCurve.ToString();
-                    var idx = CurvePresetChoices.IndexOf(curveName);
-                    _curveTypeDropdown.index = idx >= 0 ? idx : 0;
                 }
 
                 RebuildBlendShapeList();
@@ -581,8 +540,8 @@ namespace Hidano.FacialControl.Editor.Tools
                 }
             }
 
-            var transitionDuration = _transitionDurationField?.value ?? 0.25f;
-            var transitionCurvePreset = ParseCurvePreset(_curveTypeDropdown?.value);
+            var transitionDuration = Expression.DefaultTransitionDuration;
+            var transitionCurvePreset = TransitionCurvePreset.Linear;
 
             try
             {
@@ -617,17 +576,6 @@ namespace Hidano.FacialControl.Editor.Tools
                 : FacialControlStyles.StatusSuccess);
 
             _statusLabel.style.display = DisplayStyle.Flex;
-        }
-
-        private static TransitionCurvePreset ParseCurvePreset(string value)
-        {
-            return value switch
-            {
-                nameof(TransitionCurvePreset.EaseIn) => TransitionCurvePreset.EaseIn,
-                nameof(TransitionCurvePreset.EaseOut) => TransitionCurvePreset.EaseOut,
-                nameof(TransitionCurvePreset.EaseInOut) => TransitionCurvePreset.EaseInOut,
-                _ => TransitionCurvePreset.Linear,
-            };
         }
 
         private class BlendShapeEntry
