@@ -40,6 +40,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
         private readonly FailSafeMode _failSafeMode;
         private readonly BitArray _skipMask;
         private readonly BitArray _contributeMask;
+        private readonly int[] _mappingIndexToMeshIndex;
 
         private int _lastObservedTick;
         private double _lastDataTime;
@@ -62,7 +63,38 @@ namespace Hidano.FacialControl.Adapters.InputSources
             FailSafeMode failSafeMode = FailSafeMode.HoldLastValue,
             BitArray skipMask = null,
             BitArray contributeMask = null)
-            : base(InputSourceId.Parse(ReservedId), buffer != null ? buffer.Size : 0)
+            : this(
+                buffer,
+                stalenessSeconds,
+                timeProvider,
+                failSafeMode,
+                skipMask,
+                contributeMask,
+                mappingIndexToMeshIndex: null)
+        {
+        }
+
+        /// <summary>
+        /// mapping index 遨ｺ髢薙・ OSC 蜿嶺ｿ｡蛟､繧・mesh BlendShape index 遨ｺ髢薙↓譖ｸ霎ｼ繧
+        /// <see cref="OscInputSource"/> 繧呈ｧ狗ｯ峨☆繧九・
+        /// </summary>
+        /// <param name="mappingIndexToMeshIndex">
+        /// mapping index 竊・mesh BlendShape index 縺ｮ騾・ｼ輔″縲・c>-1</c> 縺ｯ譛ｪ蟇ｾ蠢・mapping 縺ｨ縺励※譖ｸ縺崎ｾｼ縺ｾ縺ｪ縺・・
+        /// </param>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="buffer"/> 縺ｾ縺溘・ <paramref name="timeProvider"/> 縺・null縲・
+        /// </exception>
+        public OscInputSource(
+            OscDoubleBuffer buffer,
+            float stalenessSeconds,
+            ITimeProvider timeProvider,
+            FailSafeMode failSafeMode,
+            BitArray skipMask,
+            BitArray contributeMask,
+            int[] mappingIndexToMeshIndex)
+            : base(
+                InputSourceId.Parse(ReservedId),
+                GetBlendShapeCount(buffer, skipMask, contributeMask, mappingIndexToMeshIndex))
         {
             if (buffer == null)
             {
@@ -83,7 +115,8 @@ namespace Hidano.FacialControl.Adapters.InputSources
             _stalenessSeconds = stalenessSeconds;
             _failSafeMode = failSafeMode;
             _skipMask = skipMask;
-            _contributeMask = contributeMask;
+            _mappingIndexToMeshIndex = CreateMappingIndexToMeshIndex(buffer.Size, mappingIndexToMeshIndex);
+            _contributeMask = contributeMask ?? CreateContributeMask(BlendShapeCount, _mappingIndexToMeshIndex);
             _lastObservedTick = 0;
             _lastDataTime = timeProvider.UnscaledTimeSeconds;
         }
@@ -124,15 +157,89 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
             _isStale = false;
             NativeArray<float>.ReadOnly readBuffer = _buffer.GetReadBuffer();
-            int copyLength = output.Length < readBuffer.Length ? output.Length : readBuffer.Length;
-            for (int i = 0; i < copyLength; i++)
+            int copyLength = readBuffer.Length < _mappingIndexToMeshIndex.Length
+                ? readBuffer.Length
+                : _mappingIndexToMeshIndex.Length;
+            for (int mappingIndex = 0; mappingIndex < copyLength; mappingIndex++)
             {
-                output[i] = _skipMask != null && i < _skipMask.Length && _skipMask[i]
+                int meshIndex = _mappingIndexToMeshIndex[mappingIndex];
+                if (meshIndex < 0 || meshIndex >= output.Length)
+                {
+                    continue;
+                }
+
+                output[meshIndex] = _skipMask != null && meshIndex < _skipMask.Length && _skipMask[meshIndex]
                     ? 0f
-                    : readBuffer[i];
+                    : readBuffer[mappingIndex];
             }
 
             return true;
+        }
+
+        private static int GetBlendShapeCount(
+            OscDoubleBuffer buffer,
+            BitArray skipMask,
+            BitArray contributeMask,
+            int[] mappingIndexToMeshIndex)
+        {
+            if (contributeMask != null)
+            {
+                return contributeMask.Length;
+            }
+
+            if (skipMask != null)
+            {
+                return skipMask.Length;
+            }
+
+            int maxMeshIndex = -1;
+            if (mappingIndexToMeshIndex != null)
+            {
+                for (int i = 0; i < mappingIndexToMeshIndex.Length; i++)
+                {
+                    if (mappingIndexToMeshIndex[i] > maxMeshIndex)
+                    {
+                        maxMeshIndex = mappingIndexToMeshIndex[i];
+                    }
+                }
+            }
+
+            return maxMeshIndex >= 0
+                ? maxMeshIndex + 1
+                : buffer != null
+                    ? buffer.Size
+                    : 0;
+        }
+
+        private static int[] CreateMappingIndexToMeshIndex(int mappingCount, int[] mappingIndexToMeshIndex)
+        {
+            if (mappingIndexToMeshIndex != null)
+            {
+                return mappingIndexToMeshIndex;
+            }
+
+            var identity = new int[mappingCount];
+            for (int i = 0; i < identity.Length; i++)
+            {
+                identity[i] = i;
+            }
+
+            return identity;
+        }
+
+        private static BitArray CreateContributeMask(int blendShapeCount, int[] mappingIndexToMeshIndex)
+        {
+            var mask = new BitArray(blendShapeCount, false);
+            for (int i = 0; i < mappingIndexToMeshIndex.Length; i++)
+            {
+                int meshIndex = mappingIndexToMeshIndex[i];
+                if (meshIndex >= 0 && meshIndex < mask.Length)
+                {
+                    mask[meshIndex] = true;
+                }
+            }
+
+            return mask;
         }
     }
 }
