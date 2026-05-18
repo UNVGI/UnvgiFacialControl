@@ -57,6 +57,7 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
         private readonly SerializedProperty _listProperty;
         private readonly List<int> _indexProxy = new List<int>();
         private readonly ListView _listView;
+        private bool _undoRedoSubscribed;
 
         public PhonemeEntryListView(SerializedProperty listProperty)
         {
@@ -102,6 +103,9 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             _listView.itemsRemoved += OnItemsRemoved;
             _listView.itemIndexChanged += OnItemIndexChanged;
             Add(_listView);
+
+            RegisterCallback<AttachToPanelEvent>(OnAttachToPanel);
+            RegisterCallback<DetachFromPanelEvent>(OnDetachFromPanel);
         }
 
         public void AddEntry(EntryKind kind)
@@ -177,6 +181,7 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
 
             entryProperty.managedReferenceValue = replacement;
             ApplyModifiedPropertiesAndRefresh(serializedObject);
+            Undo.IncrementCurrentGroup();
         }
 
         public VisualElement CreateBoundRowForIndex(int index)
@@ -457,6 +462,42 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
         private void OnItemIndexChanged(int fromIndex, int toIndex)
         {
             MoveEntry(fromIndex, toIndex);
+        }
+
+        private void OnAttachToPanel(AttachToPanelEvent evt)
+        {
+            if (_undoRedoSubscribed)
+            {
+                return;
+            }
+
+            Undo.undoRedoPerformed += OnUndoRedoPerformed;
+            _undoRedoSubscribed = true;
+        }
+
+        private void OnDetachFromPanel(DetachFromPanelEvent evt)
+        {
+            if (!_undoRedoSubscribed)
+            {
+                return;
+            }
+
+            Undo.undoRedoPerformed -= OnUndoRedoPerformed;
+            _undoRedoSubscribed = false;
+        }
+
+        private void OnUndoRedoPerformed()
+        {
+            SerializedObject serializedObject = _listProperty?.serializedObject;
+            if (serializedObject == null || serializedObject.targetObject == null)
+            {
+                return;
+            }
+
+            serializedObject.Update();
+            RebuildIndexProxy(_indexProxy, GetListProperty());
+            ClampSelection();
+            _listView?.Rebuild();
         }
 
         private void ApplyModifiedPropertiesAndRefresh(SerializedObject serializedObject)
