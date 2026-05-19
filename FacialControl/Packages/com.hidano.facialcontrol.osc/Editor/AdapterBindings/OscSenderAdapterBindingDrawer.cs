@@ -20,6 +20,7 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
 
         public const string RootClassName = "facial-control-osc-sender-adapter-binding";
         public const string SettingsFieldElementName = "osc-sender-adapter-binding-settings";
+        public const string SettingsMissingHelpBoxName = "osc-sender-adapter-binding-settings-missing";
         public const string BlendShapeNamesFieldElementName = "osc-sender-blend-shape-names";
         public const string GazeExpressionIdsFieldElementName = "osc-sender-gaze-expression-ids";
         public const string IdentityContainerName = "osc-sender-identity";
@@ -55,10 +56,34 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
                 return;
             }
 
-            root.Add(new PropertyField(settingsProp, "OSC Runtime Settings")
+            var settingsField = new PropertyField(settingsProp, "OSC Runtime Settings")
             {
                 name = SettingsFieldElementName,
-            });
+            };
+            root.Add(settingsField);
+
+            var missingHelpBox = new HelpBox(
+                "OSC Runtime Settings が未設定のため、この OSC Sender Adapter Binding は起動しません。"
+                + "Collection (AdapterRuntimeSettingsCollection) 内の sub-asset を削除すると、この参照も null になる可能性があります。",
+                HelpBoxMessageType.Warning)
+            {
+                name = SettingsMissingHelpBoxName,
+            };
+            root.Add(missingHelpBox);
+
+            RefreshSettingsMissingHelpBox(missingHelpBox, settingsProp);
+            missingHelpBox.TrackPropertyValue(settingsProp, prop => RefreshSettingsMissingHelpBox(missingHelpBox, prop));
+        }
+
+        private static void RefreshSettingsMissingHelpBox(HelpBox helpBox, SerializedProperty settingsProp)
+        {
+            if (helpBox == null)
+            {
+                return;
+            }
+
+            bool isMissing = settingsProp == null || settingsProp.objectReferenceValue == null;
+            helpBox.style.display = isMissing ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         private static void AddSlugField(VisualElement root, SerializedProperty property)

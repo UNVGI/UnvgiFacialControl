@@ -69,10 +69,34 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
                 return;
             }
 
-            root.Add(new PropertyField(settingsProp, "OSC Runtime Settings")
+            var settingsField = new PropertyField(settingsProp, "OSC Runtime Settings")
             {
                 name = SettingsFieldElementName,
-            });
+            };
+            root.Add(settingsField);
+
+            var missingHelpBox = new HelpBox(
+                "OSC Runtime Settings が未設定のため、この OSC Adapter Binding は起動しません。"
+                + "Collection (AdapterRuntimeSettingsCollection) 内の sub-asset を削除すると、この参照も null になる可能性があります。",
+                HelpBoxMessageType.Warning)
+            {
+                name = SettingsMissingHelpBoxName,
+            };
+            root.Add(missingHelpBox);
+
+            RefreshSettingsMissingHelpBox(missingHelpBox, settingsProp);
+            missingHelpBox.TrackPropertyValue(settingsProp, prop => RefreshSettingsMissingHelpBox(missingHelpBox, prop));
+        }
+
+        private static void RefreshSettingsMissingHelpBox(HelpBox helpBox, SerializedProperty settingsProp)
+        {
+            if (helpBox == null)
+            {
+                return;
+            }
+
+            bool isMissing = settingsProp == null || settingsProp.objectReferenceValue == null;
+            helpBox.style.display = isMissing ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         private static void AddMappingsList(VisualElement root, SerializedProperty property)
