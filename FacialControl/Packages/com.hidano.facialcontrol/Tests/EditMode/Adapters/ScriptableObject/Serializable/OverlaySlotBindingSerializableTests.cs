@@ -24,7 +24,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ser
             try
             {
                 EditorJsonUtility.FromJsonOverwrite(
-                    "{\"binding\":{\"slot\":\"blink\",\"expressionId\":\"legacy_overlay\"}}",
+                    "{\"MonoBehaviour\":{\"binding\":{\"slot\":\"blink\",\"expressionId\":\"legacy_overlay\"}}}",
                     host);
 
                 Assert.That(host.binding, Is.Not.Null);
