@@ -162,6 +162,34 @@
 - **トリガ**: adapter-runtime-settings 実装後に sub-asset 削除 UI を実運用で使い始めるタイミング / preview.1 リリース前の UX リスクレビュー
 - **影響範囲**: `AdapterRuntimeSettingsCollectionEditor`、`OscAdapterBindingDrawer`、`OscSenderAdapterBindingDrawer`、Profile/Prefab/Scene の serialized reference 走査 helper、対応 EditMode (Editor) テスト
 
+### M-21: Adapter 種別の C# 型削除/リネーム時の自動マイグレーション（対応レベル c）
+- **出典**: [`.kiro/specs/adapter-runtime-settings/requirements.md`](../.kiro/specs/adapter-runtime-settings/requirements.md) 要件 3.5 / 8.1（スコープ外明示）
+- **内容**: `adapter-runtime-settings` spec では「対応レベル b」（Inspector でのエントリ追加/削除 + 新規 C# 型追加）のみをパラメータ消失防止の保証範囲とし、**対応レベル c（C# 型削除/リネーム時の自動マイグレーション）はスコープ外**としている。preview 段階では破壊的変更を許容する前提で進めるが、1.0 リリースに向けては型削除/リネームを検知して既存 sub-asset を新型に救済する仕組みが必要になる。
+  - 設計判断項目: (a) Unity の `[MovedFrom]` 属性 / `FormerlySerializedAs` を Base から派生 SO まで一貫して扱えるか検証、(b) 削除型に対しては「孤児 sub-asset」を保持してダンプ JSON に退避する救済パスを設けるか、その場で `AssetDatabase.RemoveObjectFromAsset` で破棄するかの方針決定、(c) `_schemaVersion` をキーに既存 `ToJson`/`FromJson` ラウンドトリップ経路を再利用してマイグレーションを実装、(d) Editor 起動時に Collection を走査して `MissingScript` 化した sub-asset を Inspector に列挙する診断 UI。
+- **トリガ**: 1.0 リリース前に Public API（AdapterRuntimeSettings 型階層）を凍結するタイミング / 既存 RuntimeSettings 型のリネーム要望が顕在化したとき
+- **影響範囲**: `AdapterRuntimeSettingsBase`, `AdapterRuntimeSettingsCollectionSO.MigrateOnLoad`, 新規 `AdapterRuntimeSettingsTypeMigrator`（Editor）、Collection Inspector の診断ペイン、対応 EditMode (Editor) テスト
+- **関連**: M-11（analog binding 側の schema migration パス — 共通の migration 基盤として整合させる余地あり）、M-22（MigrateOnLoad 本実装と `_schemaVersion` 増分規約）
+
+### M-22: AdapterRuntimeSettingsCollectionSO.MigrateOnLoad の本実装と `_schemaVersion` 増分規約策定
+- **出典**: [`.kiro/specs/adapter-runtime-settings/requirements.md`](../.kiro/specs/adapter-runtime-settings/requirements.md) 要件 5.4 / 5.5 / 5.6 / [`.kiro/specs/adapter-runtime-settings/tasks.md`](../.kiro/specs/adapter-runtime-settings/tasks.md) 2.2 / 9.2
+- **内容**: 本 spec では `AdapterRuntimeSettingsBase._schemaVersion` フィールドと `ToJson` / `FromJson` 仮想 API、および `AdapterRuntimeSettingsCollectionSO.OnEnable` 内の **空 `MigrateOnLoad()` フック** までを v0 として仕込むに留め、マイグレーション処理本体は実装しない（要件 5.5）。後続では以下を確定させる:
+  - (a) `_schemaVersion` の **増分規約**: どの粒度（フィールド追加 / フィールド削除 / 既定値変更 / enum 値追加 etc.）でバージョンを上げるかのルール文書化。Sub-asset 単位で持つ `_schemaVersion` と Collection 側で持つ「アグリゲートバージョン」の関係整理。
+  - (b) `MigrateOnLoad` の本実装: Sub-asset ごとの `_schemaVersion` を読んで `FromJson` 経路で defaults を埋め直す or 旧フィールド名 → 新フィールド名のマッピングを適用する。マイグレーション失敗時のロールバックと Warning ログ方針を確定。
+  - (c) マイグレーションテスト基盤: 過去バージョンの JSON fixture を `Tests/Shared/Fixtures/` に置き、`FromJson` ラウンドトリップで全フィールドが救済されることを検証する EditMode テストの雛形。
+- **トリガ**: 本 spec マージ後に最初の破壊的フィールド変更（追加/削除/リネーム）が発生したタイミング / 1.0 凍結フェーズで `_schemaVersion` 規約を確定する必要が出たとき
+- **影響範囲**: `AdapterRuntimeSettingsBase`, `AdapterRuntimeSettingsCollectionSO.MigrateOnLoad`, 各派生 SettingsSO の `FromJson` 実装、`Documentation~/adapter-runtime-settings/migration-guide.md`（新設）、`Tests/Shared/Fixtures/` 配下の JSON fixture、EditMode マイグレーションテスト
+- **関連**: M-21（型削除/リネーム時の自動マイグレーション — `MigrateOnLoad` は両者の共通基盤）、M-11（analog binding 側の schema migration パス）
+
+### M-23: OscAdapterBinding と OscSenderAdapterBinding の統合解消（Receiver/Sender Binding 一本化）の再検討
+- **出典**: [`.kiro/specs/adapter-runtime-settings/requirements.md`](../.kiro/specs/adapter-runtime-settings/requirements.md) 要件 8.2（スコープ外明示） / `.kiro/specs/adapter-runtime-settings/design.md` Boundary Context
+- **内容**: 本 spec では Receiver/Sender セクションを **1 つの `OscRuntimeSettingsSO`** に統合しつつ、`OscAdapterBinding` (Receiver) と `OscSenderAdapterBinding` (Sender) の 2 MonoBehaviour 構造は維持する（要件 8.2）。両 Binding が同一 SettingsSO の異なるセクションを参照する形のため、運用上は「片方だけ起動したい」「片方だけ別 SettingsSO を参照したい」というケースで `_receiverEnabled` / `_senderEnabled` トグル + 同一 SO 参照の組み合わせで対応している。preview.2 以降で以下のいずれかを検討する:
+  - (a) **統合**: `OscAdapterBinding` と `OscSenderAdapterBinding` を 1 MonoBehaviour に統合し、Receiver/Sender セクションを単一 binding が両方扱う。MonoBehaviour ライフサイクル管理が単純化される一方、片方だけ disable する operational UX を別途用意する必要あり。
+  - (b) **SettingsSO 分割**: `OscRuntimeSettingsSO` を `OscReceiverRuntimeSettingsSO` / `OscSenderRuntimeSettingsSO` の 2 SO に分割し、現行 2 Binding 構造はそのまま維持。SettingsSO 側の責務が明確化される一方、Receiver/Sender 設定の一貫性を担保していた要件 2.7 を別途満たす仕組み（命名規則 / Inspector ヘルパー）が必要。
+  - (c) **現状維持**: 2 Binding + 統合 SO + `_receiverEnabled` / `_senderEnabled` トグルの組み合わせで運用を続け、混乱が出たら (a) または (b) に切り替える。
+- **トリガ**: Receiver/Sender 別個運用の UX 不満が顕在化したとき / 1.0 リリース前の AdapterBinding API 凍結タイミング / `_receiverEnabled` / `_senderEnabled` トグルの運用負荷が想定以上に高まったとき
+- **影響範囲**: `OscAdapterBinding`, `OscSenderAdapterBinding`, `OscRuntimeSettingsSO`, 各 Drawer、Profile 内 AdapterBindings リスト、対応 EditMode/PlayMode テスト、`Documentation~/adapter-runtime-settings/`
+- **関連**: M-20（Sub-asset 削除時の逆引き確認ダイアログ — 統合/分割いずれを採るかで参照関係の管理粒度が変わる）
+
 ---
 
 ## 横断フォローアップ（実装着手時に再確認するメモ）
@@ -199,3 +227,4 @@
 - 2026-05-19: ユーザー集中 FB セッションで S-17（A/I/U/E/O Overlay スロット拡張）を追加。中期: M-18（ベース表情の Layer / OverrideMask 保持）, M-19（Layer / InputSource / Adapter 関係視認性改善）。
 - 2026-05-19: preview1-polish-pack 完了後の `/kiro:validate-impl` で EditMode 7 件 fail を再検出。同件である M-17 を本ファイルから削除し、`.kiro/specs/overlay-clip-redesign/tasks.md` の Phase 10（10.1〜10.3）として吸収・移動。
 - 2026-05-19: adapter-runtime-settings spec の validate-design Critical Issue #2 を受け、M-20（Sub-asset 削除時の AdapterBinding 逆引き確認ダイアログ）を追加。本 spec 内では Drawer HelpBox 警告で暫定対応する方針に整理。
+- 2026-05-20: adapter-runtime-settings spec の Phase 9.2（スコープ外項目・将来マイグレーションの集約）を消化し、以下 3 件を追加。M-21（対応レベル c: 型削除/リネーム時の自動マイグレーション）、M-22（`MigrateOnLoad` 本実装と `_schemaVersion` 増分規約策定）、M-23（OscAdapterBinding / OscSenderAdapterBinding 統合解消の再検討）。
