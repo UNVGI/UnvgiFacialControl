@@ -219,7 +219,8 @@ sequenceDiagram
 
 **Key Decisions**:
 - `RemoveObjectFromAsset` は対象 sub-asset のみを切り離す API。他の sub-asset の serialize 済み値は影響を受けない (要件 3.3 を満たす唯一の標準 API)
-- 削除時に外部 `AdapterBindings` から参照されている可能性があるため、削除前に Project 内の `AdapterBindingBase` 派生から検索する操作は本 spec ではスコープ外とし、参照欠落は `MissingReferenceException` でなく Unity 標準の serialized field 欠落 (null) として現れる。利用者は `OscAdapterBinding._settings` を再アサインする運用
+- 削除時に外部 `AdapterBindings` から参照されている可能性があるため、削除前に Project 内の `AdapterBindingBase` 派生から検索する逆引き確認ダイアログは本 spec ではスコープ外とし、後続 spec/backlog で扱う。参照欠落は `MissingReferenceException` でなく Unity 標準の serialized field 欠落 (null) として現れる
+- 本 spec 内の暫定対応は Drawer 側の `_settings == null` HelpBox 警告に限定する。HelpBox では「未設定時は OSC Adapter が起動しない」ことに加え、sub-asset 削除で参照が欠落した可能性と再アサインが必要であることを通知する
 
 ### AdapterBinding 起動時の Settings 読込 (要件 2.5-2.7)
 
@@ -474,7 +475,7 @@ public sealed class OscRuntimeSettingsSO : AdapterRuntimeSettingsBase
 **Implementation Notes**
 - Integration: PropertyDrawer は `_settings` への ObjectField を追加し、削除フィールドの UI を完全に取り除く
 - Validation: `_settings.ListenPort` が 0 などの不正値の場合は `OscRuntimeSettingsSO` 側の `OnAfterDeserialize` で既定値に正規化される
-- Risks: `_settings` 未代入のキャラ SO が dev で量産される懸念。Drawer に「未設定時は OSC Adapter は起動しない」HelpBox を出す
+- Risks: `_settings` 未代入のキャラ SO が dev で量産される懸念。Drawer に「未設定時は OSC Adapter は起動しない」HelpBox を出し、sub-asset 削除で参照欠落が起きた場合も同じ HelpBox で再アサインを促す。Project 内 binding 逆引き確認ダイアログは本 spec では実装せず、`docs/backlog.md` の後続項目へ回す
 
 #### OscSenderAdapterBinding (改修)
 

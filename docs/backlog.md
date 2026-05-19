@@ -155,6 +155,13 @@
 - **トリガ**: preview.1 リリース前の UX 整備、または preview.2 着手時の「設定ミスを減らす」フェーズ
 - **影響範囲**: `Editor/Inspector/FacialCharacterProfileSOInspector.cs`, 各 AdapterBinding Drawer（InputSystem / OSC / Lipsync）, `Documentation~/architecture.md` 新設、README.md リンク追加
 
+### M-20: Sub-asset 削除時の AdapterBinding 逆引き確認ダイアログ
+- **出典**: `.kiro/specs/adapter-runtime-settings/tasks.md` 0.2 / validate-design Critical Issue #2（Sub-asset 削除時の binding 参照欠落）
+- **内容**: `AdapterRuntimeSettingsCollectionSO` の sub-asset を削除すると、`OscAdapterBinding._settings` / `OscSenderAdapterBinding._settings` など外部の serialized field 参照が null になる可能性がある。本 spec では Project 内の `AdapterBindingBase` 派生を削除前に逆引き検索して一覧表示する確認ダイアログは実装せず、暫定対応として各 Drawer の `_settings == null` HelpBox に「sub-asset 削除で参照欠落した可能性」「再アサインが必要」「未設定時は OSC Adapter が起動しない」ことを表示する。
+  - 後続対応案: (a) `AssetDatabase.FindAssets` / `SerializedObject` 走査で削除対象 sub-asset を参照する Profile/Prefab/Scene を列挙、(b) 削除確認ダイアログに参照元一覧と影響範囲を表示、(c) 可能なら対象 binding への ping / selection を提供、(d) 大規模 Project で重くならないよう検索範囲とキャッシュ戦略を設計する。
+- **トリガ**: adapter-runtime-settings 実装後に sub-asset 削除 UI を実運用で使い始めるタイミング / preview.1 リリース前の UX リスクレビュー
+- **影響範囲**: `AdapterRuntimeSettingsCollectionEditor`、`OscAdapterBindingDrawer`、`OscSenderAdapterBindingDrawer`、Profile/Prefab/Scene の serialized reference 走査 helper、対応 EditMode (Editor) テスト
+
 ---
 
 ## 横断フォローアップ（実装着手時に再確認するメモ）
@@ -191,3 +198,4 @@
 - 2026-05-10: 本セッションで以下を消化して削除: S-1（ボーン参照を相対 path / 単純名併用に拡張）、S-2（旧 schema field 残置なしを確認）、S-3（PlayMode 統合テスト追加）、S-4（Fork 先で確認済みのため不要と判断）、S-6（README に VContainer 依存と OpenUPM 設定例を追記）、S-8（slug 編集 UI を candidate ドロップダウン + 手動 override テキストの 2 段に変更）、M-7（同名ボーン衝突時の警告を追加。S-1 と同 PR で実装）。
 - 2026-05-19: ユーザー集中 FB セッションで S-17（A/I/U/E/O Overlay スロット拡張）を追加。中期: M-18（ベース表情の Layer / OverrideMask 保持）, M-19（Layer / InputSource / Adapter 関係視認性改善）。
 - 2026-05-19: preview1-polish-pack 完了後の `/kiro:validate-impl` で EditMode 7 件 fail を再検出。同件である M-17 を本ファイルから削除し、`.kiro/specs/overlay-clip-redesign/tasks.md` の Phase 10（10.1〜10.3）として吸収・移動。
+- 2026-05-19: adapter-runtime-settings spec の validate-design Critical Issue #2 を受け、M-20（Sub-asset 削除時の AdapterBinding 逆引き確認ダイアログ）を追加。本 spec 内では Drawer HelpBox 警告で暫定対応する方針に整理。
