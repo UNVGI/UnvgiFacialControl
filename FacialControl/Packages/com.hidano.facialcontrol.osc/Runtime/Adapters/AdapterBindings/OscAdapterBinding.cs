@@ -298,9 +298,14 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _bundleSenderDecisions = new Dictionary<ulong, bool>();
             _bundleSenderDecisionOrder = new Queue<ulong>();
             _heartbeatScratch = new List<string>();
+            IReadOnlyList<string> meshBlendShapeNames = ResolveMeshBlendShapeNames(ctx.BlendShapeNames, runtimeMappings);
+            int[] mappingIndexToMeshIndex = hasBlendShapeMappings
+                ? BuildMappingIndexToMeshIndex(meshBlendShapeNames, runtimeMappings)
+                : Array.Empty<int>();
+
             BuildNormalLookup(runtimeMappings);
             _heartbeatChecker = hasBlendShapeMappings
-                ? new HeartbeatConsistencyChecker(runtimeMappings, _consistencyCheckWarnLog)
+                ? new HeartbeatConsistencyChecker(meshBlendShapeNames, runtimeMappings, _consistencyCheckWarnLog)
                 : null;
 
             if (hasGazeMappings)
@@ -335,7 +340,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                     ctx.TimeProvider,
                     _failSafeMode,
                     _heartbeatChecker?.SkipMask,
-                    _heartbeatChecker?.ContributeMask);
+                    _heartbeatChecker?.ContributeMask,
+                    mappingIndexToMeshIndex);
                 ctx.InputSourceRegistry.Register(slug, _inputSource);
             }
 
@@ -940,6 +946,57 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             return blendShapeName != null &&
                 _normalBlendShapeNames != null &&
                 _normalBlendShapeNames.Contains(blendShapeName);
+        }
+
+        private static IReadOnlyList<string> ResolveMeshBlendShapeNames(
+            IReadOnlyList<string> contextBlendShapeNames,
+            OscMapping[] runtimeMappings)
+        {
+            if (contextBlendShapeNames != null && contextBlendShapeNames.Count > 0)
+            {
+                return contextBlendShapeNames;
+            }
+
+            string[] fallbackNames = new string[runtimeMappings.Length];
+            for (int i = 0; i < runtimeMappings.Length; i++)
+            {
+                fallbackNames[i] = runtimeMappings[i].BlendShapeName ?? string.Empty;
+            }
+
+            return fallbackNames;
+        }
+
+        private static int[] BuildMappingIndexToMeshIndex(
+            IReadOnlyList<string> meshBlendShapeNames,
+            OscMapping[] runtimeMappings)
+        {
+            var nameToMeshIndex = new Dictionary<string, int>(meshBlendShapeNames.Count, StringComparer.Ordinal);
+            for (int i = 0; i < meshBlendShapeNames.Count; i++)
+            {
+                string blendShapeName = meshBlendShapeNames[i];
+                if (!string.IsNullOrEmpty(blendShapeName) && !nameToMeshIndex.ContainsKey(blendShapeName))
+                {
+                    nameToMeshIndex.Add(blendShapeName, i);
+                }
+            }
+
+            int[] mappingIndexToMeshIndex = new int[runtimeMappings.Length];
+            for (int i = 0; i < runtimeMappings.Length; i++)
+            {
+                string blendShapeName = runtimeMappings[i].BlendShapeName;
+                if (!string.IsNullOrEmpty(blendShapeName) &&
+                    nameToMeshIndex.TryGetValue(blendShapeName, out int meshIndex))
+                {
+                    mappingIndexToMeshIndex[i] = meshIndex;
+                    continue;
+                }
+
+                mappingIndexToMeshIndex[i] = -1;
+                Debug.LogWarning(
+                    $"[OscAdapterBinding] OSC mapping '{blendShapeName}' was not found in ctx.BlendShapeNames and will be skipped.");
+            }
+
+            return mappingIndexToMeshIndex;
         }
 
         private void MarkAcceptedPacket()

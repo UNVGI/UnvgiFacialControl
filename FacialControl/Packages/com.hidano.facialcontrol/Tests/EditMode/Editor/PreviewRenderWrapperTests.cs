@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using SceneViewStyleCameraController;
 using UnityEngine;
+using UnityEngine.Rendering;
 using Hidano.FacialControl.Editor.Common;
 
 namespace Hidano.FacialControl.Tests.EditMode.Editor
@@ -157,6 +158,119 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
             freshWrapper.Dispose();
 
             Assert.AreEqual(resultFresh, resultAfterReset);
+        }
+
+        [Test]
+        public void CapturePreviewTexture_SetupObject_ReturnsRequestedReadableTextureWithRenderedPixels()
+        {
+            IgnoreWhenGraphicsDeviceUnavailable();
+
+            var source = CreatePreviewSource();
+            Texture2D texture = null;
+
+            try
+            {
+                _wrapper.Setup(source);
+
+                texture = _wrapper.CapturePreviewTexture(64, 32);
+
+                Assert.IsNotNull(texture);
+                Assert.AreEqual(64, texture.width);
+                Assert.AreEqual(32, texture.height);
+                Assert.IsTrue(ContainsNonBackgroundPixel(texture));
+            }
+            finally
+            {
+                if (texture != null)
+                    Object.DestroyImmediate(texture);
+                DestroyPreviewSourceMaterial(source);
+                Object.DestroyImmediate(source);
+            }
+        }
+
+        [Test]
+        public void CapturePreviewTexture_WhenRenderTextureActiveExists_RestoresPreviousActiveTexture()
+        {
+            IgnoreWhenGraphicsDeviceUnavailable();
+
+            var source = CreatePreviewSource();
+            var previousActive = RenderTexture.active;
+            var activeTexture = new RenderTexture(8, 8, 24, RenderTextureFormat.ARGB32);
+            Texture2D texture = null;
+
+            try
+            {
+                activeTexture.Create();
+                RenderTexture.active = activeTexture;
+                _wrapper.Setup(source);
+
+                texture = _wrapper.CapturePreviewTexture(32, 32);
+
+                Assert.IsNotNull(texture);
+                Assert.AreSame(activeTexture, RenderTexture.active);
+            }
+            finally
+            {
+                if (texture != null)
+                    Object.DestroyImmediate(texture);
+                RenderTexture.active = previousActive;
+                activeTexture.Release();
+                Object.DestroyImmediate(activeTexture);
+                DestroyPreviewSourceMaterial(source);
+                Object.DestroyImmediate(source);
+            }
+        }
+
+        [Test]
+        public void CapturePreviewTexture_WithoutSetup_ReturnsNull()
+        {
+            var texture = _wrapper.CapturePreviewTexture(16, 16);
+
+            Assert.IsNull(texture);
+        }
+
+        private static GameObject CreatePreviewSource()
+        {
+            var source = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            source.hideFlags = HideFlags.HideAndDontSave;
+            var shader = Shader.Find("Universal Render Pipeline/Lit")
+                ?? Shader.Find("Standard")
+                ?? Shader.Find("Unlit/Color");
+            var material = new Material(shader)
+            {
+                color = Color.red,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            source.GetComponent<Renderer>().sharedMaterial = material;
+            return source;
+        }
+
+        private static void IgnoreWhenGraphicsDeviceUnavailable()
+        {
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
+                Assert.Ignore("Preview rendering requires an active graphics device.");
+        }
+
+        private static void DestroyPreviewSourceMaterial(GameObject source)
+        {
+            var renderer = source.GetComponent<Renderer>();
+            if (renderer != null && renderer.sharedMaterial != null)
+                Object.DestroyImmediate(renderer.sharedMaterial);
+        }
+
+        private static bool ContainsNonBackgroundPixel(Texture2D texture)
+        {
+            var background = PreviewRenderWrapper.DefaultBackgroundColor;
+            var pixels = texture.GetPixels();
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                if (Mathf.Abs(pixels[i].r - background.r) > 0.02f
+                    || Mathf.Abs(pixels[i].g - background.g) > 0.02f
+                    || Mathf.Abs(pixels[i].b - background.b) > 0.02f)
+                    return true;
+            }
+
+            return false;
         }
     }
 }

@@ -64,7 +64,13 @@ namespace Hidano.FacialControl.Domain.Interfaces
         /// </summary>
         /// <remarks>
         /// 返される <see cref="BitArray"/> は事前確保済み参照であり、<see cref="BitArray.Length"/> は
-        /// <see cref="BlendShapeCount"/> と一致する。UnityEngine 型を含めず、実行中に新規確保しない。
+        /// <see cref="BlendShapeCount"/> と一致する。
+        /// index 軸は mesh BlendShape index 空間であり、Aggregator 側の blendShapeCount と同一の軸である。
+        /// mapping index や source 固有 index など入力源固有の index 空間を持つ実装は、構築時などに
+        /// mesh index へ変換し、この mask を mesh-index 空間で立てる責務を持つ。
+        /// 既存実装（AnalogBlendShapeInputSource, OscInputSource, ValueProviderInputSourceBase,
+        /// ExpressionTriggerInputSourceBase など）はこの契約に従う。
+        /// UnityEngine 型を含めず、実行中に新規確保しない。
         /// <see cref="TryWriteValues"/> が false を返す場合でも、構造上の contribute 集合として返す。
         /// </remarks>
         BitArray ContributeMask { get; }

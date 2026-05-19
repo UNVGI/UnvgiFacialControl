@@ -115,6 +115,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 dto.gazeConfigs = new List<GazeBindingConfigDto>();
             if (dto.defaultOverlays == null)
                 dto.defaultOverlays = new List<OverlaySlotBindingDto>();
+            NormalizeOverlaySlotBindingDtos(dto.defaultOverlays);
             dto.baseExpression = NormalizeExpressionSnapshotDto(dto.baseExpression);
 
             for (int i = 0; i < dto.expressions.Count; i++)
@@ -127,6 +128,28 @@ namespace Hidano.FacialControl.Adapters.Json
                     expr.layerOverrideMask = new List<string>();
 
                 expr.snapshot = NormalizeExpressionSnapshotDto(expr.snapshot);
+                NormalizeOverlaySlotBindingDtos(expr.snapshot.overlays);
+            }
+        }
+
+        private static void NormalizeOverlaySlotBindingDtos(List<OverlaySlotBindingDto> overlays)
+        {
+            if (overlays == null)
+                return;
+
+            for (int i = 0; i < overlays.Count; i++)
+            {
+                var overlay = overlays[i];
+                if (overlay == null)
+                    continue;
+
+                if (IsEffectivelyEmptyOverlaySnapshot(overlay.snapshot))
+                {
+                    overlay.snapshot = null;
+                    continue;
+                }
+
+                overlay.snapshot = NormalizeExpressionSnapshotDto(overlay.snapshot);
             }
         }
 
@@ -649,7 +672,8 @@ namespace Hidano.FacialControl.Adapters.Json
                 if (d == null || string.IsNullOrWhiteSpace(d.slot))
                     continue;
 
-                if (d.suppress && d.snapshot != null)
+                var snapshotDto = IsEffectivelyEmptyOverlaySnapshot(d.snapshot) ? null : d.snapshot;
+                if (d.suppress && snapshotDto != null)
                 {
                     throw new FormatException(
                         $"OverlaySlotBinding slot='{d.slot}' has invalid state: suppress=true and snapshot is not null.");
@@ -657,8 +681,8 @@ namespace Hidano.FacialControl.Adapters.Json
 
                 try
                 {
-                    var snapshot = d.snapshot != null
-                        ? ConvertExpressionSnapshot(d.snapshot, d.slot)
+                    var snapshot = snapshotDto != null
+                        ? ConvertExpressionSnapshot(snapshotDto, d.slot)
                         : (ExpressionSnapshot?)null;
                     list.Add(new OverlaySlotBinding(d.slot, d.suppress, snapshot));
                 }
@@ -670,6 +694,84 @@ namespace Hidano.FacialControl.Adapters.Json
                 }
             }
             return list.Count == 0 ? null : list.ToArray();
+        }
+
+        private static bool IsEffectivelyEmptyOverlaySnapshot(ExpressionSnapshotDto snapshot)
+        {
+            if (snapshot == null)
+                return true;
+
+            return IsEmptyTransitionDuration(snapshot.transitionDuration)
+                && (string.IsNullOrEmpty(snapshot.transitionCurvePreset) || snapshot.transitionCurvePreset == "Linear")
+                && IsNullOrEffectivelyEmpty(snapshot.blendShapes)
+                && IsNullOrEffectivelyEmpty(snapshot.bones)
+                && IsNullOrEffectivelyEmpty(snapshot.rendererPaths)
+                && IsNullOrEffectivelyEmpty(snapshot.overlays);
+        }
+
+        private static bool IsEmptyTransitionDuration(float value)
+        {
+            return Math.Abs(value) <= 0.0001f
+                || Math.Abs(value - Expression.DefaultTransitionDuration) <= 0.0001f;
+        }
+
+        private static bool IsNullOrEffectivelyEmpty(List<BlendShapeSnapshotDto> list)
+        {
+            if (list == null || list.Count == 0)
+                return true;
+
+            for (int i = 0; i < list.Count; i++)
+            {
+                var item = list[i];
+                if (item != null && !string.IsNullOrEmpty(item.name))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsNullOrEffectivelyEmpty(List<BoneSnapshotDto> list)
+        {
+            if (list == null || list.Count == 0)
+                return true;
+
+            for (int i = 0; i < list.Count; i++)
+            {
+                var item = list[i];
+                if (item != null && !string.IsNullOrEmpty(item.bonePath))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsNullOrEffectivelyEmpty(List<string> list)
+        {
+            if (list == null || list.Count == 0)
+                return true;
+
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (!string.IsNullOrEmpty(list[i]))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsNullOrEffectivelyEmpty(List<OverlaySlotBindingDto> list)
+        {
+            if (list == null || list.Count == 0)
+                return true;
+
+            for (int i = 0; i < list.Count; i++)
+            {
+                var item = list[i];
+                if (item != null && (!string.IsNullOrWhiteSpace(item.slot) || item.suppress || !IsEffectivelyEmptyOverlaySnapshot(item.snapshot)))
+                    return false;
+            }
+
+            return true;
         }
 
         private static ExpressionSnapshot ConvertExpressionSnapshot(ExpressionSnapshotDto dto, string fallbackId)
@@ -697,6 +799,8 @@ namespace Hidano.FacialControl.Adapters.Json
                 var d = dtos[i];
                 if (d == null)
                     continue;
+                if (string.IsNullOrEmpty(d.name))
+                    continue;
 
                 snapshots.Add(new BlendShapeSnapshot(d.rendererPath, d.name, d.value));
             }
@@ -714,6 +818,8 @@ namespace Hidano.FacialControl.Adapters.Json
             {
                 var d = dtos[i];
                 if (d == null)
+                    continue;
+                if (string.IsNullOrEmpty(d.bonePath))
                     continue;
 
                 snapshots.Add(new BoneSnapshot(

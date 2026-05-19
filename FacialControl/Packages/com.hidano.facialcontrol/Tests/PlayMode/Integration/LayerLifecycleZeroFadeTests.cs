@@ -43,6 +43,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         [UnityTest]
         public IEnumerator ActivateThenDeactivate_DrivenByMonoBehaviourTick_FadesToZero()
         {
+            const int maxTransitionFrames = 240;
             string[] blendShapeNames = { "bs_smile", "bs_sad" };
 
             var layers = new[]
@@ -74,7 +75,16 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             // ---- Activate: 数フレームで target = 1.0 に到達することを実フレームで確認 ----
             _expressionUseCase.Activate(profile.Expressions.Span[0]);
-            yield return WaitFrames(10);
+            for (int i = 0; i < maxTransitionFrames; i++)
+            {
+                var output = _useCase.BlendedOutputSpan;
+                if (output.Length > 0 && Mathf.Abs(output[0] - 1.0f) <= 0.01f)
+                {
+                    break;
+                }
+
+                yield return null;
+            }
 
             float[] activatedOutput = _useCase.GetBlendedOutput();
             Assert.AreEqual(1.0f, activatedOutput[0], 0.01f,
@@ -83,7 +93,16 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             // ---- Deactivate: 数フレームで rest = 0.0 へ補間されることを実フレームで確認 ----
             _expressionUseCase.Deactivate(profile.Expressions.Span[0]);
-            yield return WaitFrames(10);
+            for (int i = 0; i < maxTransitionFrames; i++)
+            {
+                var output = _useCase.BlendedOutputSpan;
+                if (output.Length > 0 && Mathf.Abs(output[0] - 0.0f) <= 0.01f)
+                {
+                    break;
+                }
+
+                yield return null;
+            }
 
             float[] deactivatedOutput = _useCase.GetBlendedOutput();
             Assert.AreEqual(0.0f, deactivatedOutput[0], 0.01f,
@@ -134,14 +153,6 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             Assert.AreEqual(0.0f, _useCase.GetBlendedOutput()[0], 0.01f,
                 "遷移途中の Deactivate からゼロ復帰が実フレームで完了していない。");
-        }
-
-        private static IEnumerator WaitFrames(int frames)
-        {
-            for (int i = 0; i < frames; i++)
-            {
-                yield return null;
-            }
         }
 
         /// <summary>

@@ -1,5 +1,10 @@
 # FacialControl
 
+## preview.1 破壊的変更
+
+- `com.hidano.facialcontrol`: AnimationClip 上の `AnimationEvent` 由来遷移メタデータ (`FacialControlMeta_Set` など) は撤去され、Expression の `transitionDuration` / `transitionCurvePreset` は `FacialCharacterProfileSO` Inspector の Expression 行で管理します。過去 preview の AnimationClip からの自動マイグレーションはありません。
+- `com.hidano.facialcontrol.inputsystem`: `InputSystemAdapterBindingDrawer` の表示順を InputActionAsset / Trigger bindings / Analog bindings / Gaze settings の設定フローに合わせて変更しました。旧 preview の Inspector 並び順との見た目互換は維持せず、自動マイグレーションもありません。
+
 3D キャラクターの表情をリアルタイムに制御する Unity 向けライブラリ（開発者向けアセット）のモノレポ。VTuber 配信用フェイシャルキャプチャ連動や GUI エディタでの Expression 作成支援をユースケースとし、コアに加えて OSC 送受信・InputSystem 入力の機能別サブパッケージを別途提供する。
 
 ## パッケージ構成

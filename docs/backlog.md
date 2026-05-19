@@ -22,6 +22,14 @@
 
 ## 短期（別 PR / preview.1 内に拾う候補）
 
+### S-17: Expression の Phoneme Overlay スロット拡張（A/I/U/E/O の口形上書き）
+- **出典**: ユーザー報告（2026-05-19）「Lipsync のあいうえおの Overlay も設定できるようにする」
+- **内容**: ユーザー要望は「既存の Expression (Smile, Angry 等) に A/I/U/E/O 5 種の Overlay スロットを持たせる。何も設定されていなければ Lipsync 側で設定した AnimationClip/BlendShape がそのまま出る。Overlay が設定されている場合はそちらを使用する」。既存の blink overlay と同じ枠組みを a/i/u/e/o 5 phoneme へ広げる。
+  - 方針: (a) `FacialCharacterProfileSO.Slots` に `a` / `i` / `u` / `e` / `o` を予約 slot 名として導入。(b) Expression 毎の `OverlaySlotBinding` で各 phoneme slot に snapshot を上書き宣言可能にする（既存 `Expression.Overlays` の枠組みをそのまま使う）。(c) `ULipSyncAdapterBinding` の出力経路を「Overlay レイヤー経由で発火」させ、`OverlayInputSource` 解決で Expression の slot 宣言が優先、未宣言時は `ULipSyncAdapterBinding` の `BlendShape/AnimationClipPhonemeEntry` がデフォルトとして残るようにする。
+  - 要設計判断: Overlay snapshot を Inspector の Expression Row で編集する UI（slot×5 だと縦に伸びる → Foldout / Tab で畳む）、Profile 既定 Slots 配列に a/i/u/e/o を初期登録するか / オプトインか、`ULipSyncAdapterBinding` の出力先 Layer 切替（既存の mouth layer 直書きから Overlay 経由へ）の互換戦略
+- **トリガ**: preview.1 のリップシンク表現拡張、または preview.2 着手時
+- **影響範囲**: `Runtime/Domain/Models/Expression.cs`（既存 Overlays フィールド活用）, `Runtime/Adapters/ScriptableObject/Serializable/ExpressionSerializable.cs`, `Runtime/Adapters/ScriptableObject/FacialCharacterProfileSO.cs`（Slots 規約）, `Packages/com.hidano.facialcontrol.lipsync/Runtime/Adapters/ULipSyncAdapterBinding.cs`, `Editor/Inspector/FacialCharacterProfileSOInspector.cs`（Expression Row の phoneme overlay 編集 UI）, 対応 EditMode / PlayMode テスト
+
 ### S-9: LipSync の AnimationClip 形式が動かない件の根本対応
 - **出典**: ユーザー報告（2026-05-10）「LipsyncをAnimationClipで設定できない」/ HANDOVER.md タスク 8 の積み残し
 - **内容**: `ULipSyncAdapterBinding.TryFillAnimationClipSnapshot` は `entry.Clip.SampleAnimation(ctx.HostGameObject, sampleTime)` 経由で口形状クリップを採取するが、ユーザー作成 AnimationClip の rendererPath とキャラ階層が一致しない / クリップが BlendShape カーブを持たない等で snapshot が空になり結果として ContributeMask が空になる → BlendShape 直指定形式（`BlendShapePhonemeEntry`）では動くが AnimationClip 形式（`AnimationClipPhonemeEntry`）では動かない、という挙動になる。
@@ -128,22 +136,24 @@
 - **影響範囲**: `Packages/com.hidano.uosc/`（vendor 化）、`Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/OSC/`（新 API への接続切り替え）、対応 PlayMode 性能テスト
 - **関連**: `osc-output-binding` spec Req 8.12 / 10.1 / 10.6
 
-### M-17: OverlaySlotBinding 既存テスト失敗（suppress + snapshot 同時存在の検証で 7 件 fail）
-- **出典**: `osc-output-binding` spec 完了直後の `/kiro:validate-impl` セッション（2026-05-15）で実テスト実行時に検出
-- **内容**: `SystemTextJsonParser.cs` が `OverlaySlotBinding slot='X' has invalid state: suppress=true and snapshot is not null` という validation を持っているが、サンプル JSON / テスト fixture 側に `suppress=true` AND non-null `snapshot` の組合せが残存しているため、以下 7 件の EditMode テストが恒常 fail する。`osc-output-binding` の commit 範囲外で発生しており、別 spec（overlay-clip-redesign 系）の積み残し tech debt。
-  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserOverlaysTests.Parse_SampleProfileJson_RoundTripsEquivalentOverlaySchema`
-  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserOverlaysTests.RoundTrip_ThreeOverlayStates_PreservesEquivalentProfile`
-  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.ParseProfile_PopulatesLayerInputSourcesAlignedWithLayers`
-  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.SerializeParseSerialize_SampleJson_ProducesIdenticalString`
-  - `Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.FacialCharacterProfileConverterTests.ToProfileSnapshotDto_DomainOverlayStates_EmitsNewOverlayDtoSchema`
-  - `Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Serializable.OverlaySlotBindingSerializableTests.UnitySerialization_LegacyExpressionIdKey_IsIgnoredAndNewFieldsKeepDefaults`
-  - `Hidano.FacialControl.Tests.EditMode.Editor.AutoExport.FacialCharacterProfileExporter_OverlayClipTests.ExportProfileJson_OverlaySlotsAndBindings_WritesNewSchema`
-- 加えて PlayMode 側に同系の overlay 由来既存失敗が 2 件残存:
-  - `Hidano.FacialControl.Tests.PlayMode.Integration.LayerLifecycleZeroFadeTests.ActivateThenDeactivate_DrivenByMonoBehaviourTick_FadesToZero`
-  - `Hidano.FacialControl.Tests.PlayMode.Performance.OverlayInputSourcePerformanceTests.TryWriteValues_1000Frames_AllocatesZeroBytes`
-- **トリガ**: overlay-clip 機能を本格利用するとき / 1.0 凍結前のテスト緑化フェーズ
-- **影響範囲**: `Packages/com.hidano.facialcontrol/Runtime/Adapters/Json/SystemTextJsonParser.cs` の validation 緩和（`suppress=true` 時の snapshot 同時保持を許容し読み戻し時に snapshot を無視する等）、または サンプル JSON / SO fixture の修正、対応テスト fixture 更新
-- **関連**: overlay-clip-redesign / layer-input-source-blending spec の積み残し
+### M-18: ベース表情に Layer / OverrideMask を持たせる
+- **出典**: ユーザー報告（2026-05-19）「ベース表情もレイヤー設定を編集できた方がよいかも」
+- **内容**: 現状ベース表情は「どの Layer にも属さない default」として全 Layer のフォールバック値に使われている。ユーザー回答は **「ベース表情に所属レイヤー / OverrideMask を持たせる」** 方針で、他の Expression と同様に first-class Expression として扱いたい。これにより「特定 Layer ではベース値を別物に差し替える」「ベース表情自体が override で他レイヤーを抑え込む」ような構成が表現可能になる。
+  - 設計判断項目: (a) `FacialProfile.BaseExpression` を `Expression` (Layer + OverrideMask 必須) に格上げするか、それとも引き続き「Layer / OverrideMask 任意の特殊枠」として持つか、(b) ベース表情が `Layer` を持つようになると「Layer 内排他」のロジック (`LayerInputSourceAggregator`) でベース表情を例外扱いするか / 通常 Expression として後勝ち / ブレンドの対象にするか、(c) Inspector UI で「ベース表情編集ペイン」を専用タブにするか、通常の Expression 一覧の特別 row にするか。
+  - 既存 backlog M-14（Domain への動的 Expression driver 概念導入）と並走する形になりやすい。
+- **トリガ**: ユーザーが「ベース表情の差し替え / 上書き」需要を本格的に出したとき / Domain refactor 着手時
+- **影響範囲**: `Runtime/Domain/Models/FacialProfile.cs`, `Runtime/Domain/Models/Expression.cs`, `Runtime/Adapters/ScriptableObject/Serializable/ExpressionSerializable.cs`, `Runtime/Adapters/ScriptableObject/FacialCharacterProfileSO.cs`, `Runtime/Application/UseCases/LayerUseCase.cs`, `Editor/Inspector/FacialCharacterProfileSOInspector.cs`, 対応 EditMode / PlayMode テスト一式
+- **関連**: M-14（Domain への動的 Expression driver 概念導入）
+
+### M-19: Layer / InputSource / Adapter の関係視認性改善（UI + ドキュメント）
+- **出典**: ユーザー報告（2026-05-19）「Layer の入力源の仕様を分かりやすくする」「Layer の入力源と Adapter の関係性を分かりやすくする」
+- **内容**: ユーザー回答から具体的な痛点は以下:
+  - (1) **どの Layer にどの InputSource が接続されているのか Inspector 上で見えない**。Layer 一覧と InputSources 一覧が別セクション or 別タブに分かれているため、関連付けが追えない。
+  - (2) **Adapter → InputSource → Layer の 3 層構造がドキュメント / UI どちらでも明示されていない**。Adapter を 1 つ追加したときに、その設定が Layer のどの InputSource slot とつながるのか Inspector だけでは辿れない。
+  - (3) **単一 Adapter から N Layer へ分岐するケース (Lipsync→mouth, Overlay→blink) の振り分け箇所が見えない**。「どこで分岐設定するか」が判別できない。
+  - 方針案: (a) Profile Inspector に「Layer 単位ビュー」を追加し、各 Layer の row 内に「貢献している InputSource 名 + 由来 Adapter」を inline 表示。(b) AdapterBinding Drawer に「この Adapter の出力先 Layer / InputSource」のサマリー Box を追加。(c) Layer 削除時に InputSource 側の参照を孤児にしないよう警告。(d) `Documentation~/` 配下に 3 層構造の図示（Mermaid or Markdown 表）を追加し、`README.md` からリンク。
+- **トリガ**: preview.1 リリース前の UX 整備、または preview.2 着手時の「設定ミスを減らす」フェーズ
+- **影響範囲**: `Editor/Inspector/FacialCharacterProfileSOInspector.cs`, 各 AdapterBinding Drawer（InputSystem / OSC / Lipsync）, `Documentation~/architecture.md` 新設、README.md リンク追加
 
 ---
 
@@ -179,3 +189,5 @@
 - 2026-05-14: アーキ確認セッションで M-15（ARKit 検出機能の責務分離 / 命名規約データセット抽象化）を追加。SDK 依存はゼロだが、クラス名 ARKit 固定 / `GenerateOscMapping` の core 残置という整理候補が確認されたもの。
 - 2026-05-15: `osc-output-binding` spec へ OSC 送信 / 受信 mode mapping / Drawer / Samples を引き上げたため、M-1 の「OSC マッピング Editor UI」と M-10（OSC アダプタの mapping 移植）を backlog から削除。
 - 2026-05-10: 本セッションで以下を消化して削除: S-1（ボーン参照を相対 path / 単純名併用に拡張）、S-2（旧 schema field 残置なしを確認）、S-3（PlayMode 統合テスト追加）、S-4（Fork 先で確認済みのため不要と判断）、S-6（README に VContainer 依存と OpenUPM 設定例を追記）、S-8（slug 編集 UI を candidate ドロップダウン + 手動 override テキストの 2 段に変更）、M-7（同名ボーン衝突時の警告を追加。S-1 と同 PR で実装）。
+- 2026-05-19: ユーザー集中 FB セッションで S-17（A/I/U/E/O Overlay スロット拡張）を追加。中期: M-18（ベース表情の Layer / OverrideMask 保持）, M-19（Layer / InputSource / Adapter 関係視認性改善）。
+- 2026-05-19: preview1-polish-pack 完了後の `/kiro:validate-impl` で EditMode 7 件 fail を再検出。同件である M-17 を本ファイルから削除し、`.kiro/specs/overlay-clip-redesign/tasks.md` の Phase 10（10.1〜10.3）として吸収・移動。

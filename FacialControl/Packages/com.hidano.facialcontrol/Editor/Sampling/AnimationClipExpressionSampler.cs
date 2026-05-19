@@ -31,10 +31,11 @@ namespace Hidano.FacialControl.Editor.Sampling
         /// AnimationClip メタデータ運搬用の予約 AnimationEvent functionName。
         /// stringParameter で key 識別、floatParameter で値運搬する。
         /// </summary>
+        /// <remarks>
+        /// preview.1 以降の sampler はこの AnimationEvent メタを読み取らない。
+        /// 既存 Clip や外部参照との互換のため定数の公開だけを維持する。
+        /// </remarks>
         public const string MetaSetFunctionName = "FacialControlMeta_Set";
-
-        private const string MetaKeyTransitionDuration = "transitionDuration";
-        private const string MetaKeyTransitionCurvePreset = "transitionCurvePreset";
 
         private const float DefaultTransitionDuration = Expression.DefaultTransitionDuration;
         private const TransitionCurvePreset DefaultTransitionCurve = TransitionCurvePreset.Linear;
@@ -224,52 +225,6 @@ namespace Hidano.FacialControl.Editor.Sampling
         {
             transitionDuration = DefaultTransitionDuration;
             transitionCurve = DefaultTransitionCurve;
-
-            var events = AnimationUtility.GetAnimationEvents(clip);
-            if (events == null || events.Length == 0)
-            {
-                return;
-            }
-
-            bool durationSeen = false;
-            bool curveSeen = false;
-
-            for (int i = 0; i < events.Length; i++)
-            {
-                var ev = events[i];
-                if (ev == null || !string.Equals(ev.functionName, MetaSetFunctionName, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                var key = ev.stringParameter;
-                if (string.Equals(key, MetaKeyTransitionDuration, StringComparison.Ordinal))
-                {
-                    if (!durationSeen)
-                    {
-                        transitionDuration = ev.floatParameter;
-                        durationSeen = true;
-                    }
-                    else
-                    {
-                        Debug.LogWarning(
-                            $"[AnimationClipExpressionSampler] Duplicate AnimationEvent meta key '{MetaKeyTransitionDuration}' detected; first value retained.");
-                    }
-                }
-                else if (string.Equals(key, MetaKeyTransitionCurvePreset, StringComparison.Ordinal))
-                {
-                    if (!curveSeen)
-                    {
-                        transitionCurve = (TransitionCurvePreset)Mathf.RoundToInt(ev.floatParameter);
-                        curveSeen = true;
-                    }
-                    else
-                    {
-                        Debug.LogWarning(
-                            $"[AnimationClipExpressionSampler] Duplicate AnimationEvent meta key '{MetaKeyTransitionCurvePreset}' detected; first value retained.");
-                    }
-                }
-            }
         }
 
         private static bool TryParseBlendShape(EditorCurveBinding binding, out string blendShapeName)

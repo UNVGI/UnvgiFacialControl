@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using Hidano.FacialControl.Adapters.Json;
 using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Models;
@@ -111,6 +113,65 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.AutoExport
             finally
             {
                 Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(so);
+            }
+        }
+
+        [Test]
+        public void ExportProfileJson_ExpressionCachedSnapshotTransitionDuration_UsesInspectorSliderValue()
+        {
+            var so = UnityEngine.ScriptableObject.CreateInstance<FacialCharacterProfileSO>();
+            string assetName = "ExporterTransitionDuration_" + Guid.NewGuid().ToString("N");
+            string profilePath = FacialCharacterProfileSO.GetStreamingAssetsProfilePath(assetName);
+            string profileDirectory = Path.GetDirectoryName(profilePath);
+
+            try
+            {
+                so.name = assetName;
+                so.Expressions.Add(new ExpressionSerializable
+                {
+                    id = "smile",
+                    name = "Smile",
+                    layer = "emotion",
+                    transitionDuration = 0.6f,
+                    cachedSnapshot = new ExpressionSnapshotDto
+                    {
+                        transitionDuration = 0.25f,
+                        transitionCurvePreset = TransitionCurvePreset.Linear.ToString(),
+                        blendShapes = new List<BlendShapeSnapshotDto>
+                        {
+                            new BlendShapeSnapshotDto
+                            {
+                                rendererPath = "Body/Face",
+                                name = "Smile",
+                                value = 72f,
+                            },
+                        },
+                        bones = new List<BoneSnapshotDto>(),
+                        rendererPaths = new List<string> { "Body/Face" },
+                    },
+                });
+
+                bool exported = FacialCharacterProfileExporter.ExportProfileJson(so);
+
+                Assert.That(exported, Is.True);
+                Assert.That(File.Exists(profilePath), Is.True);
+
+                string json = File.ReadAllText(profilePath);
+                var dto = new SystemTextJsonParser().ParseProfileSnapshotV2(json);
+                Assert.That(dto.expressions, Has.Count.EqualTo(1));
+                Assert.That(dto.expressions[0].snapshot.transitionDuration, Is.EqualTo(0.6f).Within(1e-6f),
+                    "Inspector スライダー値 (ExpressionSerializable.transitionDuration) が JSON 出力 DTO の真値であるべき。");
+                Assert.That(dto.expressions[0].snapshot.blendShapes, Has.Count.EqualTo(1));
+                Assert.That(dto.expressions[0].snapshot.blendShapes[0].name, Is.EqualTo("Smile"));
+            }
+            finally
+            {
+                if (Directory.Exists(profileDirectory))
+                {
+                    Directory.Delete(profileDirectory, true);
+                }
+
                 Object.DestroyImmediate(so);
             }
         }

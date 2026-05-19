@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -23,6 +24,9 @@ namespace Hidano.FacialControl.Editor.Tools
         private const float MinWindowWidth = 700f;
         private const float MinWindowHeight = 500f;
         private const int PreviewSize = 256;
+        private const float BakeButtonMinWidth = 140f;
+        private const string SavePreviewButtonName = "expression-creator-save-preview-png-button";
+        private const string CreateNewClipButtonName = "expression-creator-create-new-clip-button";
 
         // モデル参照
         private GameObject _targetObject;
@@ -41,24 +45,22 @@ namespace Hidano.FacialControl.Editor.Tools
         private TextField _blendShapeSearchField;
         private string _blendShapeSearchText = "";
 
-        // ベイク先 AnimationClip + 遷移メタデータ
+        // ベイク先 AnimationClip
         private ObjectField _clipField;
         private AnimationClip _targetClip;
-        private FloatField _transitionDurationField;
-        private DropdownField _curveTypeDropdown;
-        private static readonly List<string> CurvePresetChoices = new List<string>
-        {
-            nameof(TransitionCurvePreset.Linear),
-            nameof(TransitionCurvePreset.EaseIn),
-            nameof(TransitionCurvePreset.EaseOut),
-            nameof(TransitionCurvePreset.EaseInOut),
-        };
 
         // ステータス
         private Label _statusLabel;
 
         // 依存
         private IExpressionAnimationClipSampler _sampler;
+        private Func<string> _savePreviewPathProvider;
+        private Func<int, int, Texture2D> _previewTextureCapture;
+        private Action<string, byte[]> _pngFileWriter;
+        private Func<string> _createClipPathProvider;
+        private Action<AnimationClip, string> _clipAssetCreator;
+        private Func<string, AnimationClip> _clipAssetLoader;
+        private Action _assetDatabaseSaveAssets;
 
         [MenuItem("FacialControl/Expression 作成", false, 20)]
         public static void ShowWindow()
@@ -72,6 +74,8 @@ namespace Hidano.FacialControl.Editor.Tools
         {
             _sampler = new AnimationClipExpressionSampler();
             _previewWrapper = new PreviewRenderWrapper();
+            ConfigureSavePreviewDependencies();
+            ConfigureCreateClipDependencies();
         }
 
         private void OnDisable()
@@ -97,6 +101,7 @@ namespace Hidano.FacialControl.Editor.Tools
             // 左パネル: プレビュー + モデル選択
             // ========================================
             var leftPanel = new VisualElement();
+            leftPanel.name = "expression-creator-left-panel";
             leftPanel.style.width = PreviewSize + 16;
             leftPanel.style.minWidth = PreviewSize + 16;
             leftPanel.style.paddingLeft = 4;
@@ -131,6 +136,12 @@ namespace Hidano.FacialControl.Editor.Tools
             cameraResetButton.style.marginTop = 4;
             leftPanel.Add(cameraResetButton);
 
+            var savePreviewButton = new Button(OnSavePreviewClicked) { text = "プレビューを PNG として保存" };
+            savePreviewButton.name = SavePreviewButtonName;
+            savePreviewButton.AddToClassList(FacialControlStyles.ActionButton);
+            savePreviewButton.style.marginTop = 4;
+            leftPanel.Add(savePreviewButton);
+
             var resetButton = new Button(OnResetBlendShapes) { text = "全スライダーリセット" };
             resetButton.AddToClassList(FacialControlStyles.ActionButton);
             resetButton.style.marginTop = 4;
@@ -153,26 +164,21 @@ namespace Hidano.FacialControl.Editor.Tools
                 tooltip = "ベイク対象の AnimationClip。割り当てると現在の値がスライダーに復元される。"
             };
             _clipField.RegisterValueChangedCallback(OnClipFieldChanged);
-            rightPanel.Add(_clipField);
 
-            // 遷移メタデータ foldout（OQ4: スライダーペイン下部の foldout 配置）
-            var transitionFoldout = new Foldout
-            {
-                text = "遷移メタデータ",
-                value = true,
-            };
-            transitionFoldout.style.marginTop = 4;
-            rightPanel.Add(transitionFoldout);
+            var clipRow = new VisualElement();
+            clipRow.style.flexDirection = FlexDirection.Row;
+            clipRow.style.alignItems = Align.Center;
+            rightPanel.Add(clipRow);
 
-            _transitionDurationField = new FloatField("遷移時間 (秒)")
-            {
-                value = 0.25f,
-                tooltip = "0〜1 秒（範囲外は AnimationEvent 経由で運搬される）",
-            };
-            transitionFoldout.Add(_transitionDurationField);
+            _clipField.style.flexGrow = 1;
+            clipRow.Add(_clipField);
 
-            _curveTypeDropdown = new DropdownField("遷移カーブ", CurvePresetChoices, 0);
-            transitionFoldout.Add(_curveTypeDropdown);
+            var createNewClipButton = new Button(OnCreateNewClipClicked) { text = "新規作成" };
+            createNewClipButton.name = CreateNewClipButtonName;
+            createNewClipButton.AddToClassList(FacialControlStyles.ActionButton);
+            createNewClipButton.style.marginLeft = 4;
+            createNewClipButton.style.flexShrink = 0f;
+            clipRow.Add(createNewClipButton);
 
             // BlendShape 検索
             _blendShapeSearchField = new TextField("BlendShape 検索");
@@ -198,7 +204,10 @@ namespace Hidano.FacialControl.Editor.Tools
             bottomSection.style.justifyContent = Justify.FlexEnd;
 
             var bakeButton = new Button(OnBakeClicked) { text = "AnimationClip にベイク" };
+            bakeButton.name = "expression-creator-bake-button";
             bakeButton.AddToClassList(FacialControlStyles.ActionButton);
+            bakeButton.style.flexShrink = 0f;
+            bakeButton.style.minWidth = BakeButtonMinWidth;
             bottomSection.Add(bakeButton);
 
             root.Add(bottomSection);
@@ -417,6 +426,40 @@ namespace Hidano.FacialControl.Editor.Tools
             _previewContainer.MarkDirtyRepaint();
         }
 
+        private void OnSavePreviewClicked()
+        {
+            ConfigureSavePreviewDependencies();
+
+            var path = _savePreviewPathProvider();
+            if (string.IsNullOrEmpty(path))
+                return;
+
+            Texture2D texture = null;
+            try
+            {
+                texture = _previewTextureCapture(PreviewSize, PreviewSize);
+                if (texture == null)
+                {
+                    ShowStatus("PNG 保存用のプレビュー画像を取得できませんでした。", isError: true);
+                    return;
+                }
+
+                var pngBytes = texture.EncodeToPNG();
+                _pngFileWriter(path, pngBytes);
+                ShowStatus($"プレビュー PNG を保存しました: {path}", isError: false);
+            }
+            catch (Exception ex)
+            {
+                ShowStatus($"プレビュー PNG 保存エラー: {ex.Message}", isError: true);
+                Debug.LogError($"[ExpressionCreatorWindow] プレビュー PNG 保存エラー: {ex}");
+            }
+            finally
+            {
+                if (texture != null)
+                    UnityEngine.Object.DestroyImmediate(texture);
+            }
+        }
+
         // ========================================
         // プレビュー
         // ========================================
@@ -509,10 +552,40 @@ namespace Hidano.FacialControl.Editor.Tools
             RestoreSliderValuesFromTargetClip();
         }
 
+        private void OnCreateNewClipClicked()
+        {
+            ConfigureCreateClipDependencies();
+
+            var path = _createClipPathProvider();
+            if (string.IsNullOrEmpty(path))
+                return;
+
+            try
+            {
+                var clip = new AnimationClip();
+                _clipAssetCreator(clip, path);
+                _assetDatabaseSaveAssets();
+
+                var loadedClip = _clipAssetLoader(path) ?? clip;
+                _clipField.value = loadedClip;
+                if (_targetClip != loadedClip)
+                {
+                    _targetClip = loadedClip;
+                    RestoreSliderValuesFromTargetClip();
+                }
+
+                ShowStatus($"AnimationClip を作成しました: {path}", isError: false);
+            }
+            catch (Exception ex)
+            {
+                ShowStatus($"AnimationClip 作成エラー: {ex.Message}", isError: true);
+                Debug.LogError($"[ExpressionCreatorWindow] AnimationClip 作成エラー: {ex}");
+            }
+        }
+
         /// <summary>
         /// 現在の <see cref="_targetClip"/> から <see cref="IExpressionAnimationClipSampler"/> 経由で
-        /// BlendShape 値および TransitionDuration / TransitionCurvePreset メタデータを取得し、
-        /// スライダーと遷移メタ UI を復元する。clip 未設定時は何もしない。
+        /// BlendShape 値を取得し、スライダーへ復元する。clip 未設定時は何もしない。
         /// </summary>
         private void RestoreSliderValuesFromTargetClip()
         {
@@ -527,18 +600,6 @@ namespace Hidano.FacialControl.Editor.Tools
                     var entry = _blendShapeEntries[i];
                     var key = (entry.RendererPath ?? string.Empty, entry.BlendShapeName ?? string.Empty);
                     entry.Value = values.TryGetValue(key, out var value) ? Mathf.Clamp01(value) : 0f;
-                }
-
-                var summary = _sampler.SampleSummary(_targetClip);
-                if (_transitionDurationField != null)
-                {
-                    _transitionDurationField.value = summary.TransitionDuration;
-                }
-                if (_curveTypeDropdown != null)
-                {
-                    var curveName = summary.TransitionCurve.ToString();
-                    var idx = CurvePresetChoices.IndexOf(curveName);
-                    _curveTypeDropdown.index = idx >= 0 ? idx : 0;
                 }
 
                 RebuildBlendShapeList();
@@ -581,8 +642,8 @@ namespace Hidano.FacialControl.Editor.Tools
                 }
             }
 
-            var transitionDuration = _transitionDurationField?.value ?? 0.25f;
-            var transitionCurvePreset = ParseCurvePreset(_curveTypeDropdown?.value);
+            var transitionDuration = Expression.DefaultTransitionDuration;
+            var transitionCurvePreset = TransitionCurvePreset.Linear;
 
             try
             {
@@ -619,15 +680,27 @@ namespace Hidano.FacialControl.Editor.Tools
             _statusLabel.style.display = DisplayStyle.Flex;
         }
 
-        private static TransitionCurvePreset ParseCurvePreset(string value)
+        private void ConfigureSavePreviewDependencies()
         {
-            return value switch
-            {
-                nameof(TransitionCurvePreset.EaseIn) => TransitionCurvePreset.EaseIn,
-                nameof(TransitionCurvePreset.EaseOut) => TransitionCurvePreset.EaseOut,
-                nameof(TransitionCurvePreset.EaseInOut) => TransitionCurvePreset.EaseInOut,
-                _ => TransitionCurvePreset.Linear,
-            };
+            _savePreviewPathProvider ??= () => EditorUtility.SaveFilePanel(
+                "プレビューを PNG として保存",
+                "",
+                "expression-preview.png",
+                "png");
+            _previewTextureCapture ??= (width, height) => _previewWrapper?.CapturePreviewTexture(width, height);
+            _pngFileWriter ??= File.WriteAllBytes;
+        }
+
+        private void ConfigureCreateClipDependencies()
+        {
+            _createClipPathProvider ??= () => EditorUtility.SaveFilePanelInProject(
+                "新規 AnimationClip を作成",
+                "NewExpression",
+                "anim",
+                "");
+            _clipAssetCreator ??= AssetDatabase.CreateAsset;
+            _clipAssetLoader ??= AssetDatabase.LoadAssetAtPath<AnimationClip>;
+            _assetDatabaseSaveAssets ??= AssetDatabase.SaveAssets;
         }
 
         private class BlendShapeEntry

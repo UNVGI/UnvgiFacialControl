@@ -393,3 +393,41 @@
   - 観測可能な完了条件: Sample 再生時の overlay 挙動が Phase 7 完了時点と同等で、`SampleAssetsAreInSyncTests` が Green、Inspector の表示が Req 6.2 / 6.3 / 6.5 に適合していること (Req 7.5, 7.6)
   - _Requirements: 7.5, 7.6_
   - _Boundary: Sample.Validation_
+
+- [x] 10. テスト残債: JsonUtility / EditorJsonUtility 経路の overlay round-trip 失敗 7 件を緑化する
+> **発見経緯 (2026-05-19)**: preview1-polish-pack 完了後の `/kiro:validate-impl` で uloop run-tests を実行し、EditMode で以下 7 件が恒常 fail することを再検出。`docs/backlog.md` M-17（2026-05-15 osc-output-binding 完了直後に検出済み）と同件で、当該 spec のスコープ外残債として本 Phase に吸収する。preview1-polish-pack の commit 群 (ad5b7b7〜7a77c1e) は本件箇所のファイルを一切変更していないため、preview1-polish-pack 起因ではない。
+> - **共通根本原因 (系統 A: 6 件)**: `SystemTextJsonParser.ParseProfileSnapshotV2Internal` が `JsonUtility.FromJson<ProfileSnapshotDto>` を使っており、Unity の `JsonUtility` はクラスフィールドの `"snapshot": null` を保持できず空 `ExpressionSnapshotDto` インスタンスを生成する。一方 `ConvertOverlaySlotBindings`（line 652 付近）は `suppress=true && snapshot != null` を `FormatException` 扱いするため、JsonUtility の挙動と衝突して `OverlaySlotBinding slot='X' has invalid state: suppress=true and snapshot is not null.` で fail する。
+> - **共通根本原因 (系統 B: 1 件)**: `EditorJsonUtility.FromJsonOverwrite` で legacy `expressionId` キーを含む JSON を SO 上書きすると、`OverlaySlotBindingSerializable.slot` が null になる挙動（`Expected: "blink" But was: null`）。
+> - **対象テスト (系統 A)**:
+>   - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserOverlaysTests.Parse_SampleProfileJson_RoundTripsEquivalentOverlaySchema`
+>   - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserOverlaysTests.RoundTrip_ThreeOverlayStates_PreservesEquivalentProfile`
+>   - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.ParseProfile_PopulatesLayerInputSourcesAlignedWithLayers`
+>   - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.SerializeParseSerialize_SampleJson_ProducesIdenticalString`
+>   - `Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.FacialCharacterProfileConverterTests.ToProfileSnapshotDto_DomainOverlayStates_EmitsNewOverlayDtoSchema`
+>   - `Hidano.FacialControl.Tests.EditMode.Editor.AutoExport.FacialCharacterProfileExporter_OverlayClipTests.ExportProfileJson_OverlaySlotsAndBindings_WritesNewSchema`
+> - **対象テスト (系統 B)**:
+>   - `Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Serializable.OverlaySlotBindingSerializableTests.UnitySerialization_LegacyExpressionIdKey_IsIgnoredAndNewFieldsKeepDefaults`
+> - **PlayMode 同系残債**: M-17 にあわせて以下 2 件も同 Phase で扱う（実機 PlayMode 実行で再確認要）。
+>   - `Hidano.FacialControl.Tests.PlayMode.Integration.LayerLifecycleZeroFadeTests.ActivateThenDeactivate_DrivenByMonoBehaviourTick_FadesToZero`
+>   - `Hidano.FacialControl.Tests.PlayMode.Performance.OverlayInputSourcePerformanceTests.TryWriteValues_1000Frames_AllocatesZeroBytes`
+
+- [x] 10.1 `ConvertOverlaySlotBindings` で JsonUtility 由来の "実質的に空" な `ExpressionSnapshotDto` を null として扱う（系統 A: 6 件 Green）
+  - `Packages/com.hidano.facialcontrol/Runtime/Adapters/Json/SystemTextJsonParser.cs:640-672` の `ConvertOverlaySlotBindings` 内で、`d.snapshot` の判定を「実質的に空（`transitionDuration == 0f && transitionCurvePreset∈{null,"","Linear"} && blendShapes/bones/rendererPaths/overlays すべて null か Count==0`）なら null として扱う」ロジックに変更する
+  - 既存の `Parse_SuppressWithSnapshot_ThrowsFormatException`（`SystemTextJsonParserOverlaysTests`）が依然 Green であること（非空 snapshot が来た場合は従来通り `FormatException` を投げる挙動を維持）を確認する
+  - 観測可能な完了条件: 上記 6 件の EditMode テストが Green、`Parse_SuppressWithSnapshot_ThrowsFormatException` が Green、`uloop run-tests --test-mode EditMode` 全件 Pass
+  - _Requirements: 2.6, 3.1, 3.3_
+  - _Boundary: SystemTextJsonParser_
+
+- [x] 10.2 `OverlaySlotBindingSerializable` の Unity Serialization 経路で legacy `expressionId` キー混在時に新フィールド `slot` を保持する（系統 B: 1 件 Green）
+  - `Packages/com.hidano.facialcontrol/Tests/EditMode/Adapters/ScriptableObject/Serializable/OverlaySlotBindingSerializableTests.cs:21-40` を起点に、`EditorJsonUtility.FromJsonOverwrite` の挙動を再現する小さな再現テストを書き直してから（必要なら Red にして）、`OverlaySlotBindingSerializable` 側のフィールド配置 / `[FormerlySerializedAs]` 付与 / `ISerializationCallbackReceiver` 採用などで `"slot":"blink","expressionId":"legacy_overlay"` 混在 JSON でも `slot = "blink"` が保持される実装に修正する
+  - `TypeDefinition_DoesNotExposeLegacyExpressionIdField`（同ファイル）は引き続き Green を維持すること（`expressionId` フィールド自体は型に存在しないことを保証）
+  - 観測可能な完了条件: `UnitySerialization_LegacyExpressionIdKey_IsIgnoredAndNewFieldsKeepDefaults` を含む `OverlaySlotBindingSerializableTests` 全 5 件が Green
+  - _Requirements: 4.1, 4.4_
+  - _Boundary: OverlaySlotBindingSerializable_
+
+- [x] 10.3 PlayMode 同系の overlay 由来 2 件を緑化する
+  - `Hidano.FacialControl.Tests.PlayMode.Integration.LayerLifecycleZeroFadeTests.ActivateThenDeactivate_DrivenByMonoBehaviourTick_FadesToZero` と `Hidano.FacialControl.Tests.PlayMode.Performance.OverlayInputSourcePerformanceTests.TryWriteValues_1000Frames_AllocatesZeroBytes` を `uloop run-tests --test-mode PlayMode` で再走し、10.1 / 10.2 完了後に failure が残るかを確認する
+  - 残る場合は別系統の overlay 動的駆動経路の問題として原因切り分けし、修正 or Skip 判断を残す
+  - 観測可能な完了条件: PlayMode 上で当該 2 件が Green、もしくは現実的に直せない場合は理由を本タスクのコメントに残して `[Ignore]` 化（preview 段階のため許容）
+  - _Requirements: 2.6, 5.3_
+  - _Boundary: PlayMode.Integration / PlayMode.Performance_

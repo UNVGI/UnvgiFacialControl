@@ -1,5 +1,13 @@
 # Changelog
 
+## preview.1 リリースノート追補
+
+### Breaking Changes
+
+- **`InputSystemAdapterBindingDrawer` の表示順を変更**: Input Drawer は InputActionAsset / Trigger bindings / Analog bindings / Gaze settings の順で、実際の設定フローに合わせて並び替えました。既存 preview の Inspector 表示順との見た目互換は維持しません。
+- **自動マイグレーション無し**: 過去 preview のスクリーンショット、手順書、Inspector 操作順を前提にした説明は更新が必要です。既存データの自動変換は行いません。必要に応じて `InputSystemAdapterBinding` の内容を Inspector 上で確認し直してください。
+- 根拠: spec `preview1-polish-pack` Req 6.5 / task 8.2。
+
 すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
 
 ## [Unreleased]

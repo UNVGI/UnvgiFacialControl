@@ -27,6 +27,60 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         }
 
         [Test]
+        public void Constructor_WithMeshBlendShapeNames_LengthEqualsMeshBlendShapeCount()
+        {
+            var checker = new HeartbeatConsistencyChecker(
+                new[] { "Blink", "Happy", "Extra", "Angry" },
+                new[]
+                {
+                    new OscMapping("/avatar/parameters/Happy", "Happy", "emotion"),
+                    new OscMapping("/avatar/parameters/Angry", "Angry", "emotion")
+                },
+                false);
+
+            Assert.AreEqual(4, checker.BlendShapeCount);
+            AssertMask(checker.SkipMask, false, false, false, false);
+            AssertMask(checker.ContributeMask, false, true, false, true);
+        }
+
+        [Test]
+        public void UpdateFromHeartbeat_MappingPresentInSender_ContributeBitSetAtMeshIndex()
+        {
+            var checker = new HeartbeatConsistencyChecker(
+                new[] { "Blink", "Happy", "Angry" },
+                new[]
+                {
+                    new OscMapping("/avatar/parameters/Angry", "Angry", "emotion")
+                },
+                false);
+
+            checker.UpdateFromHeartbeat(new[] { "Angry" });
+
+            Assert.IsFalse(checker.HasMismatch);
+            AssertMask(checker.SkipMask, false, false, false);
+            AssertMask(checker.ContributeMask, false, false, true);
+        }
+
+        [Test]
+        public void UpdateFromHeartbeat_MappingMissingInSender_SkipBitSetAtMeshIndex()
+        {
+            var checker = new HeartbeatConsistencyChecker(
+                new[] { "Blink", "Happy", "Angry" },
+                new[]
+                {
+                    new OscMapping("/avatar/parameters/Happy", "Happy", "emotion"),
+                    new OscMapping("/avatar/parameters/Angry", "Angry", "emotion")
+                },
+                false);
+
+            checker.UpdateFromHeartbeat(new[] { "Happy" });
+
+            Assert.IsTrue(checker.HasMismatch);
+            AssertMask(checker.SkipMask, false, false, true);
+            AssertMask(checker.ContributeMask, false, true, false);
+        }
+
+        [Test]
         public void UpdateFromHeartbeat_PartialMismatch_SkipsOnlyReceiverMissingNames()
         {
             var checker = new HeartbeatConsistencyChecker(new[] { "Happy", "Angry", "Sad" });
