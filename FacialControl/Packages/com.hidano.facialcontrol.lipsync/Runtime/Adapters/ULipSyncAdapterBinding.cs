@@ -164,6 +164,20 @@ namespace Hidano.FacialControl.LipSync.Adapters
             _microphoneEnumerator = microphoneEnumerator;
         }
 
+        public void Configure(
+            uLipSync.Profile analyzerProfile,
+            IReadOnlyList<PhonemeEntryBase> phonemeEntries,
+            IAsioDriverEnumerator asioEnumerator = null,
+            IMicrophoneDeviceEnumerator microphoneEnumerator = null)
+        {
+            _analyzerProfile = analyzerProfile;
+            _phonemeEntries = phonemeEntries == null
+                ? new List<PhonemeEntryBase>()
+                : new List<PhonemeEntryBase>(phonemeEntries);
+            _asioEnumerator = asioEnumerator;
+            _microphoneEnumerator = microphoneEnumerator;
+        }
+
         public override void OnStart(in AdapterBuildContext ctx)
         {
             if (_started)
