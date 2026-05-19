@@ -155,23 +155,6 @@
 - **トリガ**: preview.1 リリース前の UX 整備、または preview.2 着手時の「設定ミスを減らす」フェーズ
 - **影響範囲**: `Editor/Inspector/FacialCharacterProfileSOInspector.cs`, 各 AdapterBinding Drawer（InputSystem / OSC / Lipsync）, `Documentation~/architecture.md` 新設、README.md リンク追加
 
-### M-17: OverlaySlotBinding 既存テスト失敗（suppress + snapshot 同時存在の検証で 7 件 fail）
-- **出典**: `osc-output-binding` spec 完了直後の `/kiro:validate-impl` セッション（2026-05-15）で実テスト実行時に検出
-- **内容**: `SystemTextJsonParser.cs` が `OverlaySlotBinding slot='X' has invalid state: suppress=true and snapshot is not null` という validation を持っているが、サンプル JSON / テスト fixture 側に `suppress=true` AND non-null `snapshot` の組合せが残存しているため、以下 7 件の EditMode テストが恒常 fail する。`osc-output-binding` の commit 範囲外で発生しており、別 spec（overlay-clip-redesign 系）の積み残し tech debt。
-  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserOverlaysTests.Parse_SampleProfileJson_RoundTripsEquivalentOverlaySchema`
-  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserOverlaysTests.RoundTrip_ThreeOverlayStates_PreservesEquivalentProfile`
-  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.ParseProfile_PopulatesLayerInputSourcesAlignedWithLayers`
-  - `Hidano.FacialControl.Tests.EditMode.Adapters.Json.SystemTextJsonParserRoundTripTests.SerializeParseSerialize_SampleJson_ProducesIdenticalString`
-  - `Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.FacialCharacterProfileConverterTests.ToProfileSnapshotDto_DomainOverlayStates_EmitsNewOverlayDtoSchema`
-  - `Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Serializable.OverlaySlotBindingSerializableTests.UnitySerialization_LegacyExpressionIdKey_IsIgnoredAndNewFieldsKeepDefaults`
-  - `Hidano.FacialControl.Tests.EditMode.Editor.AutoExport.FacialCharacterProfileExporter_OverlayClipTests.ExportProfileJson_OverlaySlotsAndBindings_WritesNewSchema`
-- 加えて PlayMode 側に同系の overlay 由来既存失敗が 2 件残存:
-  - `Hidano.FacialControl.Tests.PlayMode.Integration.LayerLifecycleZeroFadeTests.ActivateThenDeactivate_DrivenByMonoBehaviourTick_FadesToZero`
-  - `Hidano.FacialControl.Tests.PlayMode.Performance.OverlayInputSourcePerformanceTests.TryWriteValues_1000Frames_AllocatesZeroBytes`
-- **トリガ**: overlay-clip 機能を本格利用するとき / 1.0 凍結前のテスト緑化フェーズ
-- **影響範囲**: `Packages/com.hidano.facialcontrol/Runtime/Adapters/Json/SystemTextJsonParser.cs` の validation 緩和（`suppress=true` 時の snapshot 同時保持を許容し読み戻し時に snapshot を無視する等）、または サンプル JSON / SO fixture の修正、対応テスト fixture 更新
-- **関連**: overlay-clip-redesign / layer-input-source-blending spec の積み残し
-
 ---
 
 ## 横断フォローアップ（実装着手時に再確認するメモ）
@@ -207,3 +190,4 @@
 - 2026-05-15: `osc-output-binding` spec へ OSC 送信 / 受信 mode mapping / Drawer / Samples を引き上げたため、M-1 の「OSC マッピング Editor UI」と M-10（OSC アダプタの mapping 移植）を backlog から削除。
 - 2026-05-10: 本セッションで以下を消化して削除: S-1（ボーン参照を相対 path / 単純名併用に拡張）、S-2（旧 schema field 残置なしを確認）、S-3（PlayMode 統合テスト追加）、S-4（Fork 先で確認済みのため不要と判断）、S-6（README に VContainer 依存と OpenUPM 設定例を追記）、S-8（slug 編集 UI を candidate ドロップダウン + 手動 override テキストの 2 段に変更）、M-7（同名ボーン衝突時の警告を追加。S-1 と同 PR で実装）。
 - 2026-05-19: ユーザー集中 FB セッションで S-17（A/I/U/E/O Overlay スロット拡張）を追加。中期: M-18（ベース表情の Layer / OverrideMask 保持）, M-19（Layer / InputSource / Adapter 関係視認性改善）。
+- 2026-05-19: preview1-polish-pack 完了後の `/kiro:validate-impl` で EditMode 7 件 fail を再検出。同件である M-17 を本ファイルから削除し、`.kiro/specs/overlay-clip-redesign/tasks.md` の Phase 10（10.1〜10.3）として吸収・移動。
