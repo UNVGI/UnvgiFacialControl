@@ -1,6 +1,6 @@
 {
   "name": "jp.co.unvgi.facialcontrol.lipsync",
-  "version": "0.1.0-preview.8",
+  "version": "0.1.0-preview.9",
   "displayName": "FacialControl uLipSync Adapter",
   "description": "FacialControl の uLipSync 連携アダプタ。Windows 環境で jp.co.unvgi.facialcontrol と jp.co.unvgi.ulipsync-asio を橋渡しし、uLipSync 解析結果を FacialControl の lipsync 入力ソースへ変換します。",
   "unity": "6000.3",
@@ -10,7 +10,7 @@
     "name": "UNVGI Inc."
   },
   "dependencies": {
-    "jp.co.unvgi.facialcontrol": "0.1.0-preview.26",
+    "jp.co.unvgi.facialcontrol": "0.1.0-preview.28",
     "jp.co.unvgi.ulipsync-asio": "3.1.5-custom.2"
   },
   "keywords": [
