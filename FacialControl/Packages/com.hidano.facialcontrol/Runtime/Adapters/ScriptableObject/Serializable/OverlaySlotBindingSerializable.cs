@@ -22,7 +22,6 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
         public AnimationClip animationClip;
 
         [Tooltip("Exporter がベイクした overlay snapshot。空の場合は default fallback として扱います。")]
-        [SerializeReference]
         public ExpressionSnapshotDto cachedSnapshot;
     }
 

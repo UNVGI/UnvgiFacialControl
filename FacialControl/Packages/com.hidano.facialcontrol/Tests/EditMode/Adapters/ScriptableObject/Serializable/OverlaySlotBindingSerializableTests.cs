@@ -1,3 +1,4 @@
+using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using NUnit.Framework;
 using UnityEditor;
@@ -31,7 +32,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ser
                 Assert.That(host.binding.slot, Is.EqualTo("blink"));
                 Assert.That(host.binding.suppress, Is.False);
                 Assert.That(host.binding.animationClip, Is.Null);
-                Assert.That(host.binding.cachedSnapshot, Is.Null);
+                Assert.That(IsEffectivelyEmpty(host.binding.cachedSnapshot), Is.True,
+                    "cachedSnapshot is auto-instantiated by Unity serialization but must be effectively empty when not explicitly assigned.");
             }
             finally
             {
@@ -89,6 +91,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ser
             {
                 Object.DestroyImmediate(clip);
             }
+        }
+
+        private static bool IsEffectivelyEmpty(ExpressionSnapshotDto snapshot)
+        {
+            if (snapshot == null) return true;
+            return (snapshot.blendShapes == null || snapshot.blendShapes.Count == 0)
+                && (snapshot.bones == null || snapshot.bones.Count == 0)
+                && (snapshot.rendererPaths == null || snapshot.rendererPaths.Count == 0)
+                && (snapshot.overlays == null || snapshot.overlays.Count == 0);
         }
 
         private sealed class SerializationHost : ScriptableObject
