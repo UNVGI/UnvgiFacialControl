@@ -94,16 +94,6 @@ MonoBehaviour:
       type: {class: OscSenderAdapterBinding, ns: Hidano.FacialControl.Adapters.AdapterBindings, asm: Hidano.FacialControl.Osc}
       data:
         Slug: osc-output
-        _endpoints:
-        - endpoint: 127.0.0.1
-          port: 9000
-          enabled: 1
-          preset: 0
-        - endpoint: 127.0.0.1
-          port: 9001
-          enabled: 1
-          preset: 1
+        _settings: {fileID: 20005892592084400, guid: 4e1c25e3a051468393db2bb4034be605, type: 2}
         _blendShapeNames: []
         _gazeExpressionIds: []
-        _heartbeatIntervalSeconds: 5
-        _suppressLoopback: 1
