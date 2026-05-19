@@ -1,4 +1,4 @@
-using System;
+using UnityEngine;
 
 namespace Hidano.FacialControl.LipSync.Adapters.Devices
 {
@@ -6,27 +6,27 @@ namespace Hidano.FacialControl.LipSync.Adapters.Devices
     {
         public string GetString(string key, string defaultValue)
         {
-            throw new NotImplementedException();
+            return PlayerPrefs.GetString(key, defaultValue);
         }
 
         public int GetInt(string key, int defaultValue)
         {
-            throw new NotImplementedException();
+            return PlayerPrefs.GetInt(key, defaultValue);
         }
 
         public void SetString(string key, string value)
         {
-            throw new NotImplementedException();
+            PlayerPrefs.SetString(key, value);
         }
 
         public void SetInt(string key, int value)
         {
-            throw new NotImplementedException();
+            PlayerPrefs.SetInt(key, value);
         }
 
         public void Save()
         {
-            throw new NotImplementedException();
+            PlayerPrefs.Save();
         }
     }
 }
