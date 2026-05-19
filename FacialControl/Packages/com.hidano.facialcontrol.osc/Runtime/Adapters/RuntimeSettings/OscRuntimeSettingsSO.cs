@@ -106,6 +106,31 @@ namespace Hidano.FacialControl.Adapters.RuntimeSettings
         internal void SetConsistencyCheckWarnLog(bool value) => _consistencyCheckWarnLog = value;
         internal void SetBundleMode(BundleInterpretationMode value) => _bundleMode = value;
         internal void SetBundleAccumulationTimeoutMs(float value) => _bundleAccumulationTimeoutMs = value;
+        internal void SetSenderEnabled(bool value) => _senderEnabled = value;
+        internal void SetHeartbeatIntervalSeconds(float value) => _heartbeatIntervalSeconds = value;
+        internal void SetSuppressLoopback(bool value) => _suppressLoopback = value;
+
+        internal void SetEndpoints(IReadOnlyList<OscSenderEndpointConfig> value)
+        {
+            if (_endpoints == null)
+            {
+                _endpoints = new List<OscSenderEndpointConfig>();
+            }
+
+            _endpoints.Clear();
+            if (value == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < value.Count; i++)
+            {
+                OscSenderEndpointConfig src = value[i];
+                _endpoints.Add(src == null
+                    ? null
+                    : new OscSenderEndpointConfig(src.endpoint, src.port, src.enabled, src.preset));
+            }
+        }
 
         protected override void OnEnable()
         {

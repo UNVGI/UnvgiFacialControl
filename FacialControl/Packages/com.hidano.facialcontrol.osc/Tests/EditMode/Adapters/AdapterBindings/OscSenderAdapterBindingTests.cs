@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using Hidano.FacialControl.Adapters.AdapterBindings;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.OSC;
+using Hidano.FacialControl.Adapters.RuntimeSettings;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Tests.Shared;
@@ -75,15 +76,117 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         }
 
         [Test]
-        public void Type_SuppressLoopback_IsSerializableBoolField()
+        public void Type_Settings_IsSerializableSettingsField()
         {
             FieldInfo field = typeof(OscSenderAdapterBinding).GetField(
-                "_suppressLoopback",
+                "_settings",
                 BindingFlags.Instance | BindingFlags.NonPublic);
 
             Assert.That(field, Is.Not.Null);
-            Assert.That(field.FieldType, Is.EqualTo(typeof(bool)));
+            Assert.That(field.FieldType, Is.EqualTo(typeof(OscRuntimeSettingsSO)));
             Assert.That(field.GetCustomAttribute<SerializeField>(), Is.Not.Null);
+        }
+
+        [Test]
+        public void OnStart_SettingsNull_LogsWarningAndSkipsStart()
+        {
+            // task 5.2 観測可能完了条件: _settings 未代入時に warning が出て binding 起動がスキップされる。
+            var bus = new RecordingFacialOutputBus();
+            var binding = new OscSenderAdapterBinding { Slug = "osc-sender-no-settings" };
+            var host = new GameObject("OscSenderAdapterBindingSettingsNullTests");
+
+            LogAssert.Expect(LogType.Warning, new Regex("_settings が未代入"));
+
+            try
+            {
+                binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
+
+                Assert.That(binding.IsStarted, Is.False);
+                Assert.That(binding.HelperHostCount, Is.EqualTo(0));
+                Assert.That(bus.Observer, Is.Null);
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
+        public void OnStart_SettingsSenderDisabled_LogsWarningAndSkipsStart()
+        {
+            // task 5.2 観測可能完了条件補強: SenderEnabled=false の SO が割り当てられている場合も skip。
+            var bus = new RecordingFacialOutputBus();
+            var settings = ScriptableObject.CreateInstance<OscRuntimeSettingsSO>();
+            settings.hideFlags = HideFlags.HideAndDontSave;
+            settings.FromJson(
+                "{\"senderEnabled\":false,\"endpoints\":[{\"endpoint\":\"127.0.0.1\",\"port\":19999,\"enabled\":true,\"preset\":0}]}");
+
+            var binding = new OscSenderAdapterBinding
+            {
+                Slug = "osc-sender-disabled",
+                Settings = settings,
+            };
+
+            var host = new GameObject("OscSenderAdapterBindingSenderDisabledTests");
+
+            LogAssert.Expect(LogType.Warning, new Regex("SenderEnabled=false"));
+
+            try
+            {
+                binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
+
+                Assert.That(binding.IsStarted, Is.False);
+                Assert.That(binding.HelperHostCount, Is.EqualTo(0));
+                Assert.That(bus.Observer, Is.Null);
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
+        }
+
+        [Test]
+        public void OnStart_SettingsAssigned_ConfiguresHostsFromSettingsEndpoints()
+        {
+            // task 5.2 観測可能完了条件: _settings 経由で Sender Host が configure される (EditMode 範囲)。
+            // 実 UDP 検証は task 8.5 で追加する。
+            var bus = new RecordingFacialOutputBus();
+            int firstPort = AllocatePort();
+            int secondPort = AllocatePort();
+            var settings = ScriptableObject.CreateInstance<OscRuntimeSettingsSO>();
+            settings.hideFlags = HideFlags.HideAndDontSave;
+            settings.FromJson(
+                "{\"senderEnabled\":true,\"endpoints\":["
+                + "{\"endpoint\":\"127.0.0.1\",\"port\":" + firstPort + ",\"enabled\":true,\"preset\":0},"
+                + "{\"endpoint\":\"127.0.0.1\",\"port\":" + secondPort + ",\"enabled\":true,\"preset\":0}"
+                + "]}");
+
+            var binding = new OscSenderAdapterBinding
+            {
+                Slug = "osc-sender-settings",
+                Settings = settings,
+            };
+
+            var host = new GameObject("OscSenderAdapterBindingSettingsAppliedTests");
+            try
+            {
+                binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
+
+                Assert.That(binding.IsStarted, Is.True);
+                Assert.That(binding.HelperHostCount, Is.EqualTo(2));
+                Assert.That(binding.GetHelperHost(0).Port, Is.EqualTo(firstPort));
+                Assert.That(binding.GetHelperHost(1).Port, Is.EqualTo(secondPort));
+                Assert.That(bus.Observer, Is.SameAs(binding));
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
         }
 
         [Test]

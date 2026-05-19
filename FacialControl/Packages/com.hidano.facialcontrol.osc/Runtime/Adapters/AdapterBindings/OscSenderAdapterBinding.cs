@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Hidano.FacialControl.Adapters.OSC;
 using Hidano.FacialControl.Adapters.Playable;
+using Hidano.FacialControl.Adapters.RuntimeSettings;
 using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Adapters;
@@ -24,11 +25,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         private const int VrChatGazeMessageCount = 2;
 
+        /// <summary>
+        /// 環境/運用依存の Sender 設定を保持する SettingsSO (sub-asset)。
+        /// Inspector / CollectionSO 経由で割り当てられる本番経路。
+        /// </summary>
         [SerializeField]
-        private List<OscSenderEndpointConfig> _endpoints = new List<OscSenderEndpointConfig>
-        {
-            new OscSenderEndpointConfig()
-        };
+        private OscRuntimeSettingsSO _settings;
 
         [SerializeField]
         private List<string> _blendShapeNames = new List<string>();
@@ -36,11 +38,20 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         [SerializeField]
         private List<string> _gazeExpressionIds = new List<string>();
 
-        [SerializeField]
-        private float _heartbeatIntervalSeconds = DefaultHeartbeatIntervalSeconds;
+        /// <summary>
+        /// 診断/テスト経路。Inspector で <see cref="_settings"/> を割り当てない代わりに
+        /// プロパティ setter や <see cref="Configure(string, int)"/> から値を流し込むと on-demand で生成され、
+        /// <see cref="OnStart"/> で <see cref="_settings"/> のフォールバックとして採用される。
+        /// </summary>
+        [NonSerialized]
+        private OscRuntimeSettingsSO _runtimeSettings;
 
-        [SerializeField]
-        private bool _suppressLoopback = true;
+        /// <summary>
+        /// <see cref="OnStart"/> で確定した有効な Settings 参照。<see cref="OnLateTick"/> 等の
+        /// 読み出しは本フィールドを介して行い、起動後の SO 参照差し替えに左右されないようにする。
+        /// </summary>
+        [NonSerialized]
+        private OscRuntimeSettingsSO _effectiveSettings;
 
         [NonSerialized]
         private IFacialOutputBus _facialOutputBus;
@@ -91,35 +102,49 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         {
         }
 
+        /// <summary>
+        /// Inspector で割り当てられた <see cref="OscRuntimeSettingsSO"/>。診断 setter / Configure 経由で
+        /// 値を流し込む場合は <see cref="_runtimeSettings"/> が代わりに使われる。
+        /// </summary>
+        public OscRuntimeSettingsSO Settings
+        {
+            get => _settings;
+            set => _settings = value;
+        }
+
+        /// <summary>有効な Settings 参照を返す。<see cref="Settings"/> が未代入なら診断用 runtime SO にフォールバック。</summary>
+        public OscRuntimeSettingsSO EffectiveSettings =>
+            _settings != null ? _settings : _runtimeSettings;
+
         public OscSenderEndpointConfig Endpoint
         {
             get
             {
-                List<OscSenderEndpointConfig> endpoints = EnsureEndpointList();
-                if (endpoints.Count == 0)
+                OscRuntimeSettingsSO settings = EffectiveSettings;
+                if (settings == null || settings.Endpoints == null || settings.Endpoints.Count == 0)
                 {
-                    endpoints.Add(new OscSenderEndpointConfig());
+                    return new OscSenderEndpointConfig();
                 }
 
-                if (endpoints[0] == null)
-                {
-                    endpoints[0] = new OscSenderEndpointConfig();
-                }
-
-                return endpoints[0];
+                OscSenderEndpointConfig first = settings.Endpoints[0];
+                return first ?? new OscSenderEndpointConfig();
             }
             set
             {
-                List<OscSenderEndpointConfig> endpoints = EnsureEndpointList();
-                endpoints.Clear();
-                endpoints.Add(value ?? new OscSenderEndpointConfig());
+                EnsureRuntimeSettings().SetEndpoints(new[] { value ?? new OscSenderEndpointConfig() });
             }
         }
 
-        public List<OscSenderEndpointConfig> Endpoints
+        public IReadOnlyList<OscSenderEndpointConfig> Endpoints
         {
-            get => EnsureEndpointList();
-            set => _endpoints = value ?? new List<OscSenderEndpointConfig>();
+            get
+            {
+                OscRuntimeSettingsSO settings = EffectiveSettings;
+                return settings != null
+                    ? settings.Endpoints
+                    : (IReadOnlyList<OscSenderEndpointConfig>)Array.Empty<OscSenderEndpointConfig>();
+            }
+            set => EnsureRuntimeSettings().SetEndpoints(value);
         }
 
         public List<string> BlendShapeNames
@@ -136,14 +161,22 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         public float HeartbeatIntervalSeconds
         {
-            get => _heartbeatIntervalSeconds;
-            set => _heartbeatIntervalSeconds = value;
+            get
+            {
+                OscRuntimeSettingsSO settings = EffectiveSettings;
+                return settings != null ? settings.HeartbeatIntervalSeconds : DefaultHeartbeatIntervalSeconds;
+            }
+            set => EnsureRuntimeSettings().SetHeartbeatIntervalSeconds(value);
         }
 
         public bool SuppressLoopback
         {
-            get => _suppressLoopback;
-            set => _suppressLoopback = value;
+            get
+            {
+                OscRuntimeSettingsSO settings = EffectiveSettings;
+                return settings != null ? settings.SuppressLoopback : true;
+            }
+            set => EnsureRuntimeSettings().SetSuppressLoopback(value);
         }
 
         public OscSenderHost HelperHost => _sendSlots != null && _sendSlots.Count > 0
@@ -170,9 +203,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         public void Configure(string endpoint, int port)
         {
-            List<OscSenderEndpointConfig> endpoints = EnsureEndpointList();
-            endpoints.Clear();
-            endpoints.Add(new OscSenderEndpointConfig(endpoint, port));
+            EnsureRuntimeSettings().SetEndpoints(new[] { new OscSenderEndpointConfig(endpoint, port) });
         }
 
         public void Configure(string endpoint, int port, IReadOnlyList<string> blendShapeNames)
@@ -183,20 +214,33 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         public void ConfigureEndpoints(IReadOnlyList<OscSenderEndpointConfig> endpoints)
         {
-            SetEndpoints(endpoints);
+            EnsureRuntimeSettings().SetEndpoints(endpoints);
         }
 
         public void ConfigureEndpoints(
             IReadOnlyList<OscSenderEndpointConfig> endpoints,
             IReadOnlyList<string> blendShapeNames)
         {
-            SetEndpoints(endpoints);
+            EnsureRuntimeSettings().SetEndpoints(endpoints);
             SetBlendShapeNames(blendShapeNames);
         }
 
         public void ConfigureGazeExpressionIds(IReadOnlyList<string> gazeExpressionIds)
         {
             SetGazeExpressionIds(gazeExpressionIds);
+        }
+
+        private OscRuntimeSettingsSO EnsureRuntimeSettings()
+        {
+            if (_runtimeSettings == null)
+            {
+                // FQN で UnityEngine.ScriptableObject を指定する。Adapters 配下に同名の
+                // namespace (Hidano.FacialControl.Adapters.ScriptableObject) が存在するため
+                // 短縮形だと CS0234 で解決失敗するのを回避する。
+                _runtimeSettings = UnityEngine.ScriptableObject.CreateInstance<OscRuntimeSettingsSO>();
+                _runtimeSettings.hideFlags = HideFlags.HideAndDontSave;
+            }
+            return _runtimeSettings;
         }
 
         public override void OnStart(in AdapterBuildContext ctx)
@@ -219,11 +263,28 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return;
             }
 
-            _loopbackSuppressionPolicy = _suppressLoopback
+            OscRuntimeSettingsSO settings = EffectiveSettings;
+            if (settings == null)
+            {
+                Debug.LogWarning(
+                    $"[OscSenderAdapterBinding] _settings が未代入のため OSC Sender は起動しません。slug='{Slug}'");
+                return;
+            }
+            if (!settings.SenderEnabled)
+            {
+                Debug.LogWarning(
+                    $"[OscSenderAdapterBinding] _settings.SenderEnabled=false のため OSC Sender は起動しません。slug='{Slug}'");
+                return;
+            }
+
+            _effectiveSettings = settings;
+
+            _loopbackSuppressionPolicy = settings.SuppressLoopback
                 ? LoopbackSuppressionPolicy.FromBindings(ctx.AdapterBindings)
                 : null;
 
             if (!TryBuildEndpointPlan(
+                    settings,
                     _loopbackSuppressionPolicy,
                     out List<OscSenderEndpointConfig> endpoints,
                     out bool allEndpointsSuppressed))
@@ -402,6 +463,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _heartbeatElapsedSeconds = 0f;
             _sendHeartbeatOnNextTick = false;
             _hasPublishedFrame = false;
+            _effectiveSettings = null;
             _started = false;
         }
 
@@ -446,16 +508,6 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _hasPublishedFrame = true;
         }
 
-        private List<OscSenderEndpointConfig> EnsureEndpointList()
-        {
-            if (_endpoints == null)
-            {
-                _endpoints = new List<OscSenderEndpointConfig>();
-            }
-
-            return _endpoints;
-        }
-
         private List<string> EnsureGazeExpressionIdList()
         {
             if (_gazeExpressionIds == null)
@@ -466,32 +518,18 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             return _gazeExpressionIds;
         }
 
-        private void SetEndpoints(IReadOnlyList<OscSenderEndpointConfig> endpoints)
-        {
-            List<OscSenderEndpointConfig> target = EnsureEndpointList();
-            target.Clear();
-            if (endpoints == null)
-            {
-                return;
-            }
-
-            for (int i = 0; i < endpoints.Count; i++)
-            {
-                OscSenderEndpointConfig endpoint = endpoints[i];
-                target.Add(endpoint == null
-                    ? null
-                    : new OscSenderEndpointConfig(
-                        endpoint.endpoint,
-                        endpoint.port,
-                        endpoint.enabled,
-                        endpoint.preset));
-            }
-        }
-
         private void CompleteStart(in AdapterBuildContext ctx, List<SendSlot> sendSlots)
         {
             _sendSlots = sendSlots;
-            _heartbeatIntervalSeconds = ClampHeartbeatInterval(_heartbeatIntervalSeconds, logWarning: true);
+            float clampedHeartbeat = ClampHeartbeatInterval(
+                _effectiveSettings != null
+                    ? _effectiveSettings.HeartbeatIntervalSeconds
+                    : DefaultHeartbeatIntervalSeconds,
+                logWarning: true);
+            if (_effectiveSettings != null)
+            {
+                _effectiveSettings.SetHeartbeatIntervalSeconds(clampedHeartbeat);
+            }
             _heartbeatElapsedSeconds = 0f;
             _sendHeartbeatOnNextTick = true;
             _scratchGazeSnapshots = Array.Empty<GazeSnapshot>();
@@ -508,11 +546,15 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         }
 
         private bool TryBuildEndpointPlan(
+            OscRuntimeSettingsSO settings,
             LoopbackSuppressionPolicy loopbackPolicy,
             out List<OscSenderEndpointConfig> endpoints,
             out bool allEndpointsSuppressed)
         {
-            List<OscSenderEndpointConfig> configuredEndpoints = EnsureEndpointList();
+            IReadOnlyList<OscSenderEndpointConfig> configuredEndpoints =
+                settings != null && settings.Endpoints != null
+                    ? settings.Endpoints
+                    : (IReadOnlyList<OscSenderEndpointConfig>)Array.Empty<OscSenderEndpointConfig>();
             endpoints = new List<OscSenderEndpointConfig>(configuredEndpoints.Count);
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             bool loggedDuplicate = false;
@@ -901,7 +943,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 _heartbeatElapsedSeconds += deltaTime;
             }
 
-            return _heartbeatElapsedSeconds >= _heartbeatIntervalSeconds;
+            float interval = _effectiveSettings != null
+                ? _effectiveSettings.HeartbeatIntervalSeconds
+                : DefaultHeartbeatIntervalSeconds;
+            return _heartbeatElapsedSeconds >= interval;
         }
 
         private static float ClampHeartbeatInterval(float intervalSeconds, bool logWarning)
