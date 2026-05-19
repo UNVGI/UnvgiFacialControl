@@ -165,7 +165,9 @@ AdapterRuntimeSettingsCollection.asset (Project ビューでは 1 ファイル)
 3. When 利用者が追加対象型を確定する, the AdapterRuntimeSettingsCollectionSO Editor shall `ScriptableObject.CreateInstance` で sub-asset を生成し、`AssetDatabase.AddObjectToAsset` で親 Asset に追加し、`List<AdapterRuntimeSettingsBase>` に登録する
 4. When 利用者が Inspector の Remove ボタンを押す, the AdapterRuntimeSettingsCollectionSO Editor shall 対象 sub-asset を `AssetDatabase.RemoveObjectFromAsset` で除去し、`List<AdapterRuntimeSettingsBase>` から外し、`AssetDatabase.SaveAssets` を呼び出す
 5. The AdapterRuntimeSettingsCollectionSO Editor shall UI Toolkit で実装される (IMGUI を新規 UI に使わない)
-6. If 同一型の sub-asset が既に登録済みで重複を許可しない方針の場合, then the AdapterRuntimeSettingsCollectionSO Editor shall 重複追加を抑制し、Unity 標準ログでその旨を通知する
+6. The AdapterRuntimeSettingsCollectionSO Editor shall 同一型の sub-asset を 1 つの Collection に複数登録することを許可する (例: VRChat 用と ARKit 用の `OscRuntimeSettingsSO` を並べる、複数受信ポートのために `OscRuntimeSettingsSO` を 2 つ持つ等のユースケース)
+7. The AdapterRuntimeSettingsBase shall `_label` (string) フィールドを `[SerializeField]` として保持し、同型 sub-asset が複数登録された際の識別に用いる
+8. When 利用者が新規 sub-asset 追加時に既存と同一の `_label` を入力する, the AdapterRuntimeSettingsCollectionSO Editor shall Unity 標準ログで警告を出し、識別困難になる可能性を通知する (追加自体は許可する)
 
 ### Requirement 7: テストカバレッジ (EditMode / PlayMode)
 **Objective:** As a パッケージ保守担当, I want 新構造に対する EditMode/PlayMode テストが整備されていること, so that TDD (Red-Green-Refactor) サイクルで回帰を検出できる
@@ -174,7 +176,7 @@ AdapterRuntimeSettingsCollection.asset (Project ビューでは 1 ファイル)
 1. The Tests/EditMode shall `AdapterRuntimeSettingsCollectionSO` の sub-asset 追加/削除でパラメータ消失が発生しないことを検証するテストを含む
 2. The Tests/EditMode shall `OscRuntimeSettingsSO` の Receiver/Sender 両セクションが正しく serialize/deserialize されることを検証するテストを含む
 3. The Tests/EditMode shall `OscRuntimeSettingsSO.ToJson()` / `FromJson()` のラウンドトリップで全フィールドが保持されることを検証するテストを含む
-4. The Tests/EditMode shall `LipSyncDeviceStore` の PlayerPrefs 読み書き (既定値返却含む) を検証するテストを Fake/モック化された PlayerPrefs 抽象を使って実施する
+4. The Tests/EditMode shall `LipSyncDeviceStore` の Load/Save (既定値返却含む) を検証するテストを実 PlayerPrefs に書き込まない方式で実施する (interface 抽象 / internal backend 差し替え / static reset 等、具体的方式は設計フェーズで決定)
 5. The Tests/PlayMode shall `OscAdapterBinding` / `OscSenderAdapterBinding` が `OscRuntimeSettingsSO` を参照して実 UDP 経由で OSC 送受信できることを検証するテストを含む
 6. The Tests/PlayMode shall `ULipSyncAdapterBinding` が `LipSyncDeviceStore` 経由で取得した DeviceName を使用してマイク初期化フローを開始することを検証するテストを含む
 7. The FacialControl パッケージ shall 既存テストを新構造に合わせて全面修正し、旧フィールド (`_endpoint`, `_port` 等を キャラ SO 直下で参照していたテスト) への参照を全て除去する
