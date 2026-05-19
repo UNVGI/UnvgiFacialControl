@@ -18,14 +18,8 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
     public sealed class OscAdapterBindingDrawer : PropertyDrawer
     {
         private const string SlugFieldName = "Slug";
-        private const string EndpointFieldName = "_endpoint";
-        private const string PortFieldName = "_port";
-        private const string StalenessFieldName = "_stalenessSeconds";
+        private const string SettingsFieldName = "_settings";
         private const string MappingsFieldName = "_mappings";
-        private const string FailSafeModeFieldName = "_failSafeMode";
-        private const string ConsistencyCheckWarnLogFieldName = "_consistencyCheckWarnLog";
-        private const string BundleModeFieldName = "_bundleMode";
-        private const string BundleAccumulationTimeoutMsFieldName = "_bundleAccumulationTimeoutMs";
 
         private const string EntryModeFieldName = "mode";
         private const string EntryExpressionIdFieldName = "expressionId";
@@ -37,15 +31,8 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
         private const float MappingRowHeight = 236f;
 
         public const string RootClassName = "facial-control-osc-adapter-binding";
-        public const string EndpointFieldElementName = "osc-adapter-binding-endpoint";
-        public const string PortFieldElementName = "osc-adapter-binding-port";
-        public const string StalenessFieldElementName = "osc-adapter-binding-staleness";
-        public const string FailSafeModeFieldElementName = "osc-adapter-binding-fail-safe-mode";
-        public const string ConsistencyCheckWarnLogFieldElementName =
-            "osc-adapter-binding-consistency-check-warn-log";
-        public const string BundleModeFieldElementName = "osc-adapter-binding-bundle-mode";
-        public const string BundleAccumulationTimeoutMsFieldElementName =
-            "osc-adapter-binding-bundle-accumulation-timeout-ms";
+        public const string SettingsFieldElementName = "osc-adapter-binding-settings";
+        public const string SettingsMissingHelpBoxName = "osc-adapter-binding-settings-missing";
         public const string MappingListName = "osc-adapter-binding-mapping-list";
         public const string MappingRowClassName = "osc-adapter-binding-mapping-row";
         public const string MappingSkippedClassName = "osc-adapter-binding-mapping-skip-target";
@@ -67,26 +54,25 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
             root.AddToClassList(RootClassName);
 
             AddSlugField(root, property);
-            AddBoundField(root, property, EndpointFieldName, "Listen Endpoint", EndpointFieldElementName);
-            AddBoundField(root, property, PortFieldName, "Listen Port", PortFieldElementName);
-            AddBoundField(root, property, StalenessFieldName, "Staleness Seconds", StalenessFieldElementName);
+            AddSettingsField(root, property);
             AddMappingsList(root, property);
-            AddBoundField(root, property, FailSafeModeFieldName, "Fail Safe Mode", FailSafeModeFieldElementName);
-            AddBoundField(
-                root,
-                property,
-                ConsistencyCheckWarnLogFieldName,
-                "Consistency Check Warn Log",
-                ConsistencyCheckWarnLogFieldElementName);
-            AddBoundField(root, property, BundleModeFieldName, "Bundle Mode", BundleModeFieldElementName);
-            AddBoundField(
-                root,
-                property,
-                BundleAccumulationTimeoutMsFieldName,
-                "Bundle Accumulation Timeout Ms",
-                BundleAccumulationTimeoutMsFieldElementName);
 
             return root;
+        }
+
+        private static void AddSettingsField(VisualElement root, SerializedProperty property)
+        {
+            SerializedProperty settingsProp = property.FindPropertyRelative(SettingsFieldName);
+            if (settingsProp == null)
+            {
+                AddMissingFieldLabel(root, SettingsFieldName);
+                return;
+            }
+
+            root.Add(new PropertyField(settingsProp, "OSC Runtime Settings")
+            {
+                name = SettingsFieldElementName,
+            });
         }
 
         private static void AddMappingsList(VisualElement root, SerializedProperty property)

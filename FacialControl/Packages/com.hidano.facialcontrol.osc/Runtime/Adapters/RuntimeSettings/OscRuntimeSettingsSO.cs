@@ -95,6 +95,18 @@ namespace Hidano.FacialControl.Adapters.RuntimeSettings
 
         public bool SuppressLoopback => _suppressLoopback;
 
+        // Internal setters: 同一 asmdef 内の AdapterBinding 診断パス / テストフィクスチャから
+        // 個別フィールドを更新するための write hook。通常運用では Inspector / FromJson 経由で
+        // 値を反映するため、本 API は public にせず internal に閉じている。
+        internal void SetReceiverEnabled(bool value) => _receiverEnabled = value;
+        internal void SetListenEndpoint(string value) => _listenEndpoint = value;
+        internal void SetListenPort(int value) => _listenPort = value;
+        internal void SetStalenessSeconds(float value) => _stalenessSeconds = value;
+        internal void SetFailSafeMode(FailSafeMode value) => _failSafeMode = value;
+        internal void SetConsistencyCheckWarnLog(bool value) => _consistencyCheckWarnLog = value;
+        internal void SetBundleMode(BundleInterpretationMode value) => _bundleMode = value;
+        internal void SetBundleAccumulationTimeoutMs(float value) => _bundleAccumulationTimeoutMs = value;
+
         protected override void OnEnable()
         {
             base.OnEnable();
