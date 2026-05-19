@@ -425,7 +425,7 @@
   - _Requirements: 4.1, 4.4_
   - _Boundary: OverlaySlotBindingSerializable_
 
-- [ ] 10.3 PlayMode 同系の overlay 由来 2 件を緑化する
+- [x] 10.3 PlayMode 同系の overlay 由来 2 件を緑化する
   - `Hidano.FacialControl.Tests.PlayMode.Integration.LayerLifecycleZeroFadeTests.ActivateThenDeactivate_DrivenByMonoBehaviourTick_FadesToZero` と `Hidano.FacialControl.Tests.PlayMode.Performance.OverlayInputSourcePerformanceTests.TryWriteValues_1000Frames_AllocatesZeroBytes` を `uloop run-tests --test-mode PlayMode` で再走し、10.1 / 10.2 完了後に failure が残るかを確認する
   - 残る場合は別系統の overlay 動的駆動経路の問題として原因切り分けし、修正 or Skip 判断を残す
   - 観測可能な完了条件: PlayMode 上で当該 2 件が Green、もしくは現実的に直せない場合は理由を本タスクのコメントに残して `[Ignore]` 化（preview 段階のため許容）

@@ -68,9 +68,9 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
             for (int i = 0; i < MeasuredFrames; i++)
             {
                 allFramesWrote &= source.TryWriteValues(output);
-                yield return null;
             }
             long after = ReadAllocatedBytes();
+            yield return null;
 
             Assert.IsTrue(allFramesWrote);
             Assert.That(

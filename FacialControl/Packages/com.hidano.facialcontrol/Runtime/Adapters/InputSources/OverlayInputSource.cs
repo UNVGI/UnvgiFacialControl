@@ -5,7 +5,6 @@ using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
 using UnityEngine;
-using UnityEngine.Profiling;
 
 namespace Hidano.FacialControl.Adapters.InputSources
 {
@@ -126,42 +125,34 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
         public override bool TryWriteValues(Span<float> output)
         {
-            Profiler.BeginSample("OverlayInputSource.TryWriteValues");
-            try
+            if (!_slotDeclared || !ResolveSnapshot(out var resolved) || resolved.Suppress || !resolved.HasSnapshot)
             {
-                if (!_slotDeclared || !ResolveSnapshot(out var resolved) || resolved.Suppress || !resolved.HasSnapshot)
-                {
-                    ClearActiveMask();
-                    _hasActiveResolved = false;
-                    return false;
-                }
-
-                _hasActiveResolved = true;
-                CopyMaskFrom(resolved.Mask);
-
-                int copyLen = output.Length < BlendShapeCount ? output.Length : BlendShapeCount;
-                for (int i = 0; i < copyLen; i++)
-                {
-                    output[i] = 0f;
-                }
-
-                var indices = resolved.Indices;
-                var values = resolved.Values;
-                for (int i = 0; i < indices.Length; i++)
-                {
-                    int index = indices[i];
-                    if ((uint)index < (uint)copyLen)
-                    {
-                        output[index] = values[i];
-                    }
-                }
-
-                return true;
+                ClearActiveMask();
+                _hasActiveResolved = false;
+                return false;
             }
-            finally
+
+            _hasActiveResolved = true;
+            CopyMaskFrom(resolved.Mask);
+
+            int copyLen = output.Length < BlendShapeCount ? output.Length : BlendShapeCount;
+            for (int i = 0; i < copyLen; i++)
             {
-                Profiler.EndSample();
+                output[i] = 0f;
             }
+
+            var indices = resolved.Indices;
+            var values = resolved.Values;
+            for (int i = 0; i < indices.Length; i++)
+            {
+                int index = indices[i];
+                if ((uint)index < (uint)copyLen)
+                {
+                    output[index] = values[i];
+                }
+            }
+
+            return true;
         }
 
         private bool ResolveSnapshot(out ResolvedSnapshot resolved)
