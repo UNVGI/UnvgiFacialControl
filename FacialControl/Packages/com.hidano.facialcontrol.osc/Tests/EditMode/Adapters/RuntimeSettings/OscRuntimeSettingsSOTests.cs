@@ -92,6 +92,57 @@ namespace Hidano.FacialControl.Osc.Tests.EditMode.Adapters.RuntimeSettings
         }
 
         [Test]
+        public void JsonUtility_ToJsonAndFromJsonOverwrite_PreservesReceiverAndSenderFields()
+        {
+            AssignReceiverFields(
+                listenEndpoint: "192.168.1.10",
+                listenPort: 9100,
+                stalenessSeconds: 1.5f,
+                failSafeMode: FailSafeMode.HoldLastValue,
+                consistencyCheckWarnLog: false,
+                bundleMode: BundleInterpretationMode.IndividualMessage,
+                bundleAccumulationTimeoutMs: 12.5f);
+            AssignSenderFields(
+                endpoints: new List<OscSenderEndpointConfig>
+                {
+                    new OscSenderEndpointConfig("10.0.0.1", 9200, true, AddressPresetKind.VRChat),
+                    new OscSenderEndpointConfig("10.0.0.2", 9300, false, AddressPresetKind.ARKit),
+                },
+                heartbeatIntervalSeconds: 7.5f,
+                suppressLoopback: false);
+
+            var json = JsonUtility.ToJson(_instance);
+            var restored = ScriptableObject.CreateInstance<OscRuntimeSettingsSO>();
+            try
+            {
+                JsonUtility.FromJsonOverwrite(json, restored);
+
+                Assert.AreEqual(_instance.ListenEndpoint, restored.ListenEndpoint);
+                Assert.AreEqual(_instance.ListenPort, restored.ListenPort);
+                Assert.AreEqual(_instance.StalenessSeconds, restored.StalenessSeconds);
+                Assert.AreEqual(_instance.FailSafeMode, restored.FailSafeMode);
+                Assert.AreEqual(_instance.ConsistencyCheckWarnLog, restored.ConsistencyCheckWarnLog);
+                Assert.AreEqual(_instance.BundleMode, restored.BundleMode);
+                Assert.AreEqual(_instance.BundleAccumulationTimeoutMs, restored.BundleAccumulationTimeoutMs);
+
+                Assert.AreEqual(_instance.Endpoints.Count, restored.Endpoints.Count);
+                for (int i = 0; i < _instance.Endpoints.Count; i++)
+                {
+                    Assert.AreEqual(_instance.Endpoints[i].endpoint, restored.Endpoints[i].endpoint);
+                    Assert.AreEqual(_instance.Endpoints[i].port, restored.Endpoints[i].port);
+                    Assert.AreEqual(_instance.Endpoints[i].enabled, restored.Endpoints[i].enabled);
+                    Assert.AreEqual(_instance.Endpoints[i].preset, restored.Endpoints[i].preset);
+                }
+                Assert.AreEqual(_instance.HeartbeatIntervalSeconds, restored.HeartbeatIntervalSeconds);
+                Assert.AreEqual(_instance.SuppressLoopback, restored.SuppressLoopback);
+            }
+            finally
+            {
+                Object.DestroyImmediate(restored);
+            }
+        }
+
+        [Test]
         public void JsonUtility_ToJson_ContainsReceiverAndSenderFieldValues()
         {
             AssignReceiverFields(
