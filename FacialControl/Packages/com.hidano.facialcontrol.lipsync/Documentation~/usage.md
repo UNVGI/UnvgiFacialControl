@@ -2,6 +2,15 @@
 
 `com.hidano.facialcontrol.lipsync` は、uLipSync の解析結果を FacialControl の `lipsync` 入力ソースへ接続するための Windows 向け UPM パッケージです。設定は `FacialCharacterProfileSO` の `ULipSyncAdapterBinding` に inline serialized で保存され、再生時に `AudioSource`、`uLipSync.uLipSync`、入力コンポーネントを Host GameObject へ動的に追加します。
 
+> **マイクデバイス指定の保存先**: マシン依存値である Device 名 / Disambiguator Index は、spec
+> [`adapter-runtime-settings`](../../../../.kiro/specs/adapter-runtime-settings/) で導入された
+> `LipSyncDeviceStore` 経由で PlayerPrefs (キー
+> `Hidano.FacialControl.LipSync.MicDevice.Name` /
+> `Hidano.FacialControl.LipSync.MicDevice.Disambiguator`) に保存され、git 管理外になります。
+> Inspector の DeviceDescriptorPopup は内部で `LipSyncDeviceStore.Load()` / `Save()` を呼びます。
+> 詳細は [`com.hidano.facialcontrol/Documentation~/adapter-runtime-settings.md`](../../com.hidano.facialcontrol/Documentation~/adapter-runtime-settings.md)
+> の「5. PlayerPrefs キー名一覧」節を参照してください。
+
 ## AnimationClip 形式 entry の time-0 サンプリング
 
 AnimationClip 形式 entry は、初期化時に `AnimationClip.SampleAnimation(host, 0f)` 相当の処理で **time 0 の BlendShape weight だけ**を読み取ります。読み取った値は音素ごとの固定スナップショットとして保持され、再生中は `phonemeRatio * volume * snapshotWeight` として合算されます。
