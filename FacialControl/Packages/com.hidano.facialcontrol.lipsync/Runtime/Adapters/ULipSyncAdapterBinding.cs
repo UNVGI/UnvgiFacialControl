@@ -39,9 +39,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
             "FacialControl/LipSync/Default uLipSync Profile";
 
         [SerializeField]
-        private DeviceDescriptor _deviceDescriptor;
-
-        [SerializeField]
         private uLipSync.Profile _analyzerProfile;
 
         [SerializeReference]
@@ -52,6 +49,12 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
         [SerializeField]
         private float _maxWeightScale = 1f;
+
+        [NonSerialized]
+        private DeviceDescriptor _runtimeDescriptor;
+
+        [NonSerialized]
+        private bool _hasConfiguredDescriptor;
 
         [NonSerialized]
         private IAsioDriverEnumerator _asioEnumerator;
@@ -151,7 +154,8 @@ namespace Hidano.FacialControl.LipSync.Adapters
             IAsioDriverEnumerator asioEnumerator = null,
             IMicrophoneDeviceEnumerator microphoneEnumerator = null)
         {
-            _deviceDescriptor = deviceDescriptor;
+            _runtimeDescriptor = deviceDescriptor;
+            _hasConfiguredDescriptor = true;
             _analyzerProfile = analyzerProfile;
             _phonemeEntries = phonemeEntries == null
                 ? new List<PhonemeEntryBase>()
@@ -171,6 +175,11 @@ namespace Hidano.FacialControl.LipSync.Adapters
             {
                 Debug.LogError("[ULipSyncAdapterBinding] HostGameObject is null.");
                 return;
+            }
+
+            if (!_hasConfiguredDescriptor)
+            {
+                _runtimeDescriptor = LipSyncDeviceStore.Load();
             }
 
             if (_phonemeEntries == null || _phonemeEntries.Count == 0)
@@ -195,10 +204,10 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 return;
             }
 
-            DeviceResolution resolution = ResolveDevice(_deviceDescriptor);
+            DeviceResolution resolution = ResolveDevice(_runtimeDescriptor);
             if (resolution.Kind == DeviceKind.Unresolved)
             {
-                LogUnresolvedDevice(_deviceDescriptor, resolution);
+                LogUnresolvedDevice(_runtimeDescriptor, resolution);
                 return;
             }
 
