@@ -49,8 +49,28 @@ namespace Hidano.FacialControl.Adapters.RuntimeSettings
             return null;
         }
 
+        public int IndexOf(AdapterRuntimeSettingsBase item)
+        {
+            if (_items == null || item == null)
+            {
+                return -1;
+            }
+
+            for (var i = 0; i < _items.Count; i++)
+            {
+                if (ReferenceEquals(_items[i], item))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
         private void OnEnable()
         {
+            WarnOnNullItems();
+
             // Migration seam (要件 5.4-5.5):
             // 本 spec 時点では実装本体を持たない。将来 spec で対応レベル c (型削除/リネーム) を実装する際、
             // ここで `_schemaVersion` 別の互換変換を実行する。実装例:
@@ -59,6 +79,23 @@ namespace Hidano.FacialControl.Adapters.RuntimeSettings
             //       if (item != null) { /* item ごとのマイグレーション */ }
             //   }
             MigrateOnLoad();
+        }
+
+        private void WarnOnNullItems()
+        {
+            if (_items == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < _items.Count; i++)
+            {
+                if (_items[i] == null)
+                {
+                    Debug.LogWarning(
+                        $"[AdapterRuntimeSettingsCollectionSO] '{name}' の _items[{i}] が null です。sub-asset 参照が欠落している可能性があります (要件 3.1-3.4)。");
+                }
+            }
         }
 
         // 本 spec 時点では未実装の拡張点。対応レベル c (型削除/リネーム時のマイグレーション) で
