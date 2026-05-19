@@ -5,7 +5,7 @@ namespace Hidano.FacialControl.Adapters.RuntimeSettings
     public abstract class AdapterRuntimeSettingsBase : UnityEngine.ScriptableObject
     {
         [SerializeField]
-        private string _label = string.Empty;
+        protected string _label = string.Empty;
 
         [SerializeField]
         protected int _schemaVersion = 1;

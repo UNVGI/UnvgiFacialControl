@@ -12,10 +12,12 @@ namespace Hidano.FacialControl.Adapters.RuntimeSettings
     /// <see cref="AdapterRuntimeSettingsBase"/> 派生 SO。
     /// </summary>
     /// <remarks>
-    /// task 3.2 では <c>_receiverEnabled</c> / <c>_senderEnabled</c> トグルと
+    /// task 3.2 で <c>_receiverEnabled</c> / <c>_senderEnabled</c> トグルと
     /// <see cref="ISerializationCallbackReceiver.OnAfterDeserialize"/> による
-    /// 不正値の既定値補正・enum 正規化までを実装する。
-    /// <c>ToJson</c> / <c>FromJson</c> の override は task 3.3 で実装する。
+    /// 不正値の既定値補正・enum 正規化を実装した。
+    /// task 3.3 で <c>ToJson</c> / <c>FromJson</c> override により JSON ラウンドトリップを実装。
+    /// JSON では enum を文字列フィールドとして書き出し、フィールド名はアンダースコア無しの
+    /// camelCase に整形する (design.md の JSON 契約に準拠)。
     /// <c>CreateAssetMenu</c> は付与しない (sub-asset 専用)。
     /// </remarks>
     public sealed class OscRuntimeSettingsSO : AdapterRuntimeSettingsBase, ISerializationCallbackReceiver
@@ -23,6 +25,11 @@ namespace Hidano.FacialControl.Adapters.RuntimeSettings
         public const string DefaultListenEndpoint = "127.0.0.1";
         public const float DefaultBundleAccumulationTimeoutMs = 5f;
         public const float DefaultHeartbeatIntervalSeconds = 5f;
+
+        public const string FailSafeRevertToBase = "revertToBase";
+        public const string FailSafeHoldLastValue = "holdLastValue";
+        public const string BundleAtomicSwap = "atomicSwap";
+        public const string BundleIndividualMessage = "individualMessage";
 
         // Receiver section
         [SerializeField]
@@ -101,6 +108,156 @@ namespace Hidano.FacialControl.Adapters.RuntimeSettings
         public void OnAfterDeserialize()
         {
             NormalizeFields();
+        }
+
+        public override string ToJson()
+        {
+            NormalizeFields();
+            var dto = new JsonDto
+            {
+                schemaVersion = _schemaVersion,
+                label = _label ?? string.Empty,
+                receiverEnabled = _receiverEnabled,
+                listenEndpoint = _listenEndpoint,
+                listenPort = _listenPort,
+                stalenessSeconds = _stalenessSeconds,
+                failSafeMode = ToFailSafeModeString(_failSafeMode),
+                consistencyCheckWarnLog = _consistencyCheckWarnLog,
+                bundleMode = ToBundleModeString(_bundleMode),
+                bundleAccumulationTimeoutMs = _bundleAccumulationTimeoutMs,
+                senderEnabled = _senderEnabled,
+                endpoints = CloneEndpointsForJson(_endpoints),
+                heartbeatIntervalSeconds = _heartbeatIntervalSeconds,
+                suppressLoopback = _suppressLoopback,
+            };
+            return JsonUtility.ToJson(dto, true);
+        }
+
+        public override void FromJson(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                NormalizeFields();
+                return;
+            }
+
+            var dto = JsonUtility.FromJson<JsonDto>(json) ?? new JsonDto();
+
+            _schemaVersion = dto.schemaVersion > 0 ? dto.schemaVersion : 1;
+            _label = dto.label ?? string.Empty;
+
+            _receiverEnabled = dto.receiverEnabled;
+            _listenEndpoint = dto.listenEndpoint;
+            _listenPort = dto.listenPort;
+            _stalenessSeconds = dto.stalenessSeconds;
+            _failSafeMode = ToFailSafeMode(dto.failSafeMode);
+            _consistencyCheckWarnLog = dto.consistencyCheckWarnLog;
+            _bundleMode = ToBundleInterpretationMode(dto.bundleMode);
+            _bundleAccumulationTimeoutMs = dto.bundleAccumulationTimeoutMs;
+
+            _senderEnabled = dto.senderEnabled;
+            _endpoints = dto.endpoints != null
+                ? new List<OscSenderEndpointConfig>(dto.endpoints)
+                : new List<OscSenderEndpointConfig>();
+            _heartbeatIntervalSeconds = dto.heartbeatIntervalSeconds;
+            _suppressLoopback = dto.suppressLoopback;
+
+            NormalizeFields();
+        }
+
+        public static string ToFailSafeModeString(FailSafeMode mode)
+        {
+            switch (mode)
+            {
+                case FailSafeMode.HoldLastValue:
+                    return FailSafeHoldLastValue;
+                case FailSafeMode.RevertToBase:
+                default:
+                    return FailSafeRevertToBase;
+            }
+        }
+
+        public static FailSafeMode ToFailSafeMode(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return FailSafeMode.RevertToBase;
+            }
+
+            string normalized = value.Trim();
+            if (string.Equals(normalized, FailSafeHoldLastValue, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, nameof(FailSafeMode.HoldLastValue), StringComparison.OrdinalIgnoreCase))
+            {
+                return FailSafeMode.HoldLastValue;
+            }
+
+            return FailSafeMode.RevertToBase;
+        }
+
+        public static string ToBundleModeString(BundleInterpretationMode mode)
+        {
+            switch (mode)
+            {
+                case BundleInterpretationMode.IndividualMessage:
+                    return BundleIndividualMessage;
+                case BundleInterpretationMode.AtomicSwap:
+                default:
+                    return BundleAtomicSwap;
+            }
+        }
+
+        public static BundleInterpretationMode ToBundleInterpretationMode(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return BundleInterpretationMode.AtomicSwap;
+            }
+
+            string normalized = value.Trim();
+            if (string.Equals(normalized, BundleIndividualMessage, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, nameof(BundleInterpretationMode.IndividualMessage), StringComparison.OrdinalIgnoreCase))
+            {
+                return BundleInterpretationMode.IndividualMessage;
+            }
+
+            return BundleInterpretationMode.AtomicSwap;
+        }
+
+        private static OscSenderEndpointConfig[] CloneEndpointsForJson(List<OscSenderEndpointConfig> source)
+        {
+            if (source == null || source.Count == 0)
+            {
+                return Array.Empty<OscSenderEndpointConfig>();
+            }
+
+            var array = new OscSenderEndpointConfig[source.Count];
+            for (int i = 0; i < source.Count; i++)
+            {
+                OscSenderEndpointConfig src = source[i];
+                array[i] = src != null
+                    ? new OscSenderEndpointConfig(src.endpoint, src.port, src.enabled, src.preset)
+                    : new OscSenderEndpointConfig();
+            }
+            return array;
+        }
+
+        [Serializable]
+        private sealed class JsonDto
+        {
+            public int schemaVersion = 1;
+            public string label = string.Empty;
+            public bool receiverEnabled = true;
+            public string listenEndpoint = DefaultListenEndpoint;
+            public int listenPort = OscConfiguration.DefaultReceivePort;
+            public float stalenessSeconds;
+            public string failSafeMode = FailSafeRevertToBase;
+            public bool consistencyCheckWarnLog = true;
+            public string bundleMode = BundleAtomicSwap;
+            public float bundleAccumulationTimeoutMs = DefaultBundleAccumulationTimeoutMs;
+            public bool senderEnabled = true;
+            public OscSenderEndpointConfig[] endpoints = Array.Empty<OscSenderEndpointConfig>();
+            public float heartbeatIntervalSeconds = DefaultHeartbeatIntervalSeconds;
+            public bool suppressLoopback = true;
         }
 
         private void NormalizeFields()
