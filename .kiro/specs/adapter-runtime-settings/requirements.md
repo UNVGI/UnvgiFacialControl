@@ -16,6 +16,8 @@ Adapter 層の設定値のうち「環境依存」「運用依存」「マシン
 
 ### キャラ SO に残す (キャラ依存)
 - `OscAdapterBinding._mappings` (OSC アドレス ↔ BlendShape)
+- `OscSenderAdapterBinding._blendShapeNames` (キャラの BlendShape 名リスト override)
+- `OscSenderAdapterBinding._gazeExpressionIds` (キャラの Gaze 用 Expression ID リスト)
 - `ULipSyncAdapterBinding._analyzerProfile` (uLipSync.Profile)
 - `ULipSyncAdapterBinding._phonemeEntries` (音素 ↔ BlendShape/Clip)
 - `ULipSyncAdapterBinding._targetMeshHint`
@@ -107,7 +109,7 @@ AdapterRuntimeSettingsCollection.asset (Project ビューでは 1 ファイル)
 
 #### Acceptance Criteria
 1. The FacialCharacterProfileSO shall NOT serialize OSC receiver endpoint, OSC port, OSC staleness/failsafe/bundle 系設定, OSC sender endpoints list, heartbeat interval, suppress loopback, microphone device descriptor のいずれをも直接フィールドとして保持しない
-2. The FacialCharacterProfileSO shall キャラ依存項目 (`OscAdapterBinding._mappings`, `ULipSyncAdapterBinding._analyzerProfile`, `_phonemeEntries`, `_targetMeshHint`, `_maxWeightScale`) を引き続き保持する
+2. The FacialCharacterProfileSO shall キャラ依存項目 (`OscAdapterBinding._mappings`, `OscSenderAdapterBinding._blendShapeNames`, `OscSenderAdapterBinding._gazeExpressionIds`, `ULipSyncAdapterBinding._analyzerProfile`, `_phonemeEntries`, `_targetMeshHint`, `_maxWeightScale`) を引き続き保持する
 3. The AdapterRuntimeSettingsCollectionSO shall 環境/運用依存項目 (OSC Receiver/Sender セクション) を `OscRuntimeSettingsSO` sub-asset 経由で保持する
 4. The LipSyncDeviceStore shall マイクデバイス名と Disambiguator Index を PlayerPrefs キー `Hidano.FacialControl.LipSync.MicDevice.Name` / `Hidano.FacialControl.LipSync.MicDevice.Disambiguator` に格納する
 5. When 利用者が同一キャラ SO を異なる環境 (異なる IP/ポート/マイク) で使用する, the FacialControl パッケージ shall キャラ SO 側に git diff を発生させずに設定差し替えを可能にする
