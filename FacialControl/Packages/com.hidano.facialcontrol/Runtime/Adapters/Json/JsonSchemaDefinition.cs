@@ -332,8 +332,7 @@ namespace Hidano.FacialControl.Adapters.Json
                         ""transitionDuration"": 0.08,
                         ""transitionCurvePreset"": ""Linear"",
                         ""blendShapes"": [
-                            {""rendererPath"": ""Face"", ""name"": ""Fcl_EYE_Close_L"", ""value"": 1.0},
-                            {""rendererPath"": ""Face"", ""name"": ""Fcl_EYE_Close_R"", ""value"": 1.0}
+                            {""rendererPath"": ""Face"", ""name"": ""Fcl_EYE_Close_L"", ""value"": 1.0}
                         ],
                         ""bones"": [],
                         ""rendererPaths"": [""Face""],
