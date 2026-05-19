@@ -42,8 +42,7 @@
 - AdapterBindings リスト UI (キャラ SO 側の既存 UI に変更を加えない)
 
 ### Allowed Dependencies
-- `Hidano.FacialControl.Domain` (新規 Base/Collection の名前空間ルート)
-- `Hidano.FacialControl.Adapters` (Collection SO の実体配置先、`UnityEngine.ScriptableObject` 参照)
+- `Hidano.FacialControl.Adapters.RuntimeSettings` (新規 Base/Collection の名前空間ルートおよび実体配置先。`UnityEngine.ScriptableObject` 参照を持つため Adapters 層に配置)
 - `Hidano.FacialControl.Osc` (OscRuntimeSettingsSO 配置先)
 - `Hidano.FacialControl.LipSync` (LipSyncDeviceStore 配置先)
 - `UnityEditor.AssetDatabase` (Editor 側のみ)
@@ -299,8 +298,8 @@ sequenceDiagram
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
-| AdapterRuntimeSettingsBase | Adapters (core) | sub-asset 共通基底、_label/_schemaVersion/ToJson/FromJson 拡張点を提供 | 2.1, 5.1, 5.2, 5.6, 6.7 | UnityEngine.ScriptableObject (P0) | Service, State |
-| AdapterRuntimeSettingsCollectionSO | Adapters (core) | 親 SO、List<Base> + マイグレーション拡張点予約 | 1.3, 2.2, 2.3, 3.1-3.4, 5.4, 5.5 | UnityEngine.ScriptableObject (P0), AdapterRuntimeSettingsBase (P0) | Service, State |
+| AdapterRuntimeSettingsBase | `Hidano.FacialControl.Adapters.RuntimeSettings` | sub-asset 共通基底、_label/_schemaVersion/ToJson/FromJson 拡張点を提供 | 2.1, 5.1, 5.2, 5.6, 6.7 | UnityEngine.ScriptableObject (P0) | Service, State |
+| AdapterRuntimeSettingsCollectionSO | `Hidano.FacialControl.Adapters.RuntimeSettings` | 親 SO、List<Base> + マイグレーション拡張点予約 | 1.3, 2.2, 2.3, 3.1-3.4, 5.4, 5.5 | UnityEngine.ScriptableObject (P0), AdapterRuntimeSettingsBase (P0) | Service, State |
 | OscRuntimeSettingsSO | Adapters (osc) | Receiver/Sender セクション統合の具象 SettingsSO | 1.3, 2.4, 5.3, 7.2, 7.3 | AdapterRuntimeSettingsBase (P0), OscSenderEndpointConfig (P0), OscMappingEntry (P1) | Service, State |
 | OscAdapterBinding (改修) | Adapters (osc) | Receiver セクションを SettingsSO 経由で参照 | 1.1, 2.5, 2.7, 7.5 | OscRuntimeSettingsSO (P0) | Service |
 | OscSenderAdapterBinding (改修) | Adapters (osc) | Sender セクションを SettingsSO 経由で参照 | 1.1, 2.6, 2.7, 7.5 | OscRuntimeSettingsSO (P0) | Service |
@@ -319,6 +318,7 @@ sequenceDiagram
 | Requirements | 2.1, 5.1, 5.2, 5.6, 6.7 |
 
 **Responsibilities & Constraints**
+- `AdapterRuntimeSettingsBase` は `UnityEngine.ScriptableObject` を継承するため Domain には置かず、要件 2.1 のとおり Adapters 層の `Hidano.FacialControl.Adapters.RuntimeSettings` に定義する
 - `[SerializeField] private string _label` を保持し、同型 sub-asset の識別子を提供する
 - `[SerializeField] protected int _schemaVersion = 1` を保持し、サブクラスがバージョン判定可能にする
 - `virtual string ToJson()` / `virtual void FromJson(string json)` を公開し、サブクラスでの override を可能にする (基底実装はサブクラス未対応時に `string.Empty` を返し `Debug.LogWarning` を出す no-op フォールバック)
