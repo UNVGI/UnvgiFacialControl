@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Hidano.FacialControl.Adapters.AdapterBindings;
 using Hidano.FacialControl.Adapters.AdapterBindings.ARKit;
+using Hidano.FacialControl.Adapters.RuntimeSettings;
 using Hidano.FacialControl.Domain.Adapters;
 using NUnit.Framework;
 using UnityEditor;
@@ -133,18 +134,16 @@ namespace Hidano.FacialControl.Osc.Tests.EditMode.Adapters.AdapterBindings
         {
             // task 9.3 観測可能完了条件:
             // 単一 SO で OscAdapterBinding + ArKitOscAdapterBinding が同時に保持・round-trip できる。
+            // task 8.7: OscAdapterBinding は OscRuntimeSettingsSO sub-asset 経由で _settings を保持し
+            // round-trip させる新経路を使用する (旧 _endpoint / _port 直 SerializeField 経路は廃止済み)。
             var so = ScriptableObject.CreateInstance<OscArKitRoundTripTestProfileSO>();
 
-            var osc = new OscAdapterBinding { Slug = "osc-vrchat" };
-            osc.Configure(
-                endpoint: "127.0.0.1",
-                port: 9001,
-                mappings: new[]
-                {
-                    new global::Hidano.FacialControl.Domain.Models.OscMapping(
-                        "/avatar/parameters/smile", "smile", "emotion"),
-                });
-            osc.StalenessSeconds = 0.5f;
+            var oscSettings = ScriptableObject.CreateInstance<OscRuntimeSettingsSO>();
+            oscSettings.name = "OscRuntimeSettings";
+            oscSettings.FromJson(
+                "{\"listenEndpoint\":\"127.0.0.1\",\"listenPort\":9001,\"stalenessSeconds\":0.5}");
+
+            var osc = new OscAdapterBinding { Slug = "osc-vrchat", Settings = oscSettings };
             so.WritableAdapterBindings.Add(osc);
 
             string[] arkitNames = { "jawOpen", "eyeBlinkLeft", "eyeBlinkRight" };
@@ -157,6 +156,7 @@ namespace Hidano.FacialControl.Osc.Tests.EditMode.Adapters.AdapterBindings
             so.WritableAdapterBindings.Add(arkit);
 
             AssetDatabase.CreateAsset(so, _assetPath);
+            AssetDatabase.AddObjectToAsset(oscSettings, so);
             AssetDatabase.SaveAssets();
             Resources.UnloadAsset(so);
 
@@ -174,6 +174,8 @@ namespace Hidano.FacialControl.Osc.Tests.EditMode.Adapters.AdapterBindings
 
             var loadedOsc = (OscAdapterBinding)loaded.AdapterBindings[0];
             Assert.That(loadedOsc.Slug, Is.EqualTo("osc-vrchat"));
+            Assert.That(loadedOsc.Settings, Is.Not.Null,
+                "OscRuntimeSettingsSO sub-asset 参照が round-trip するべき。");
             Assert.That(loadedOsc.Endpoint, Is.EqualTo("127.0.0.1"));
             Assert.That(loadedOsc.Port, Is.EqualTo(9001));
             Assert.That(loadedOsc.StalenessSeconds, Is.EqualTo(0.5f).Within(1e-6f));

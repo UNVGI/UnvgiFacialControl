@@ -3,6 +3,7 @@ using NUnit.Framework;
 using Hidano.FacialControl.Adapters.AdapterBindings;
 using Hidano.FacialControl.Adapters.AdapterBindings.ARKit;
 using Hidano.FacialControl.Adapters.AdapterBindings.InputSystem;
+using Hidano.FacialControl.Adapters.RuntimeSettings;
 using UnityEditor;
 
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.AdapterBindings
@@ -56,6 +57,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
         public void AdapterBindings_InputSystemAndOscAndArKit_RoundTripPreservesConcreteTypeIdentity()
         {
             // 単一 SO に 3 種 binding を同時保持できることを round-trip で検証する。
+            // task 8.7: OscAdapterBinding は OscRuntimeSettingsSO sub-asset 経由で環境設定を保持する
+            // 新経路を使用する (旧 _endpoint / _port 直 SerializeField 経路は廃止済み)。
             var so = UnityEngine.ScriptableObject.CreateInstance<TestFacialCharacterProfileSO>();
 
             var input = new InputSystemAdapterBinding
@@ -65,12 +68,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
             };
             so.WritableAdapterBindings.Add(input);
 
+            var oscSettings = UnityEngine.ScriptableObject.CreateInstance<OscRuntimeSettingsSO>();
+            oscSettings.name = "OscRuntimeSettings";
+            oscSettings.FromJson(
+                "{\"listenEndpoint\":\"192.168.1.10\",\"listenPort\":39539,\"stalenessSeconds\":0.25}");
+
             var osc = new OscAdapterBinding
             {
                 Slug = "osc",
-                Endpoint = "192.168.1.10",
-                Port = 39539,
-                StalenessSeconds = 0.25f,
+                Settings = oscSettings,
             };
             so.WritableAdapterBindings.Add(osc);
 
@@ -85,6 +91,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
             so.WritableAdapterBindings.Add(arkit);
 
             AssetDatabase.CreateAsset(so, _assetPath);
+            AssetDatabase.AddObjectToAsset(oscSettings, so);
             AssetDatabase.SaveAssets();
             UnityEngine.Resources.UnloadAsset(so);
 
@@ -108,6 +115,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
 
             var loadedOsc = (OscAdapterBinding)loaded.AdapterBindings[1];
             Assert.That(loadedOsc.Slug, Is.EqualTo("osc"));
+            Assert.That(loadedOsc.Settings, Is.Not.Null,
+                "OscRuntimeSettingsSO sub-asset 参照が round-trip するべき。");
             Assert.That(loadedOsc.Endpoint, Is.EqualTo("192.168.1.10"));
             Assert.That(loadedOsc.Port, Is.EqualTo(39539));
             Assert.That(loadedOsc.StalenessSeconds, Is.EqualTo(0.25f).Within(1e-6f));

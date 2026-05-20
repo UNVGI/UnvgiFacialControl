@@ -3,37 +3,27 @@ using Hidano.FacialControl.LipSync.Adapters.Devices;
 using Hidano.FacialControl.LipSync.Editor.Inspector;
 using Hidano.FacialControl.LipSync.Tests.Shared;
 using NUnit.Framework;
-using UnityEditor;
-using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
 {
     public class DeviceDescriptorPopupTests
     {
-        private DeviceDescriptorPopupTestAsset _asset;
-        private SerializedObject _serializedObject;
-        private SerializedProperty _descriptorProperty;
+        private DeviceDescriptor _capturedDescriptor;
+        private int _changedCallCount;
 
         [SetUp]
         public void SetUp()
         {
-            _asset = ScriptableObject.CreateInstance<DeviceDescriptorPopupTestAsset>();
-            _serializedObject = new SerializedObject(_asset);
-            _descriptorProperty = _serializedObject.FindProperty(nameof(DeviceDescriptorPopupTestAsset.Descriptor));
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _serializedObject.Dispose();
-            Object.DestroyImmediate(_asset);
+            _capturedDescriptor = default;
+            _changedCallCount = 0;
         }
 
         [Test]
         public void Create_EnumeratedAsioAndMicrophone_AddsAllNamesToPopupChoices()
         {
             var popup = CreatePopup(
+                default,
                 new FakeAsioDriverEnumerator("ASIO Main", "ASIO Backup"),
                 new FakeMicrophoneDeviceEnumerator("Built-in Mic", "USB Mic"));
 
@@ -50,6 +40,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
         public void Create_ValidDescriptor_DoesNotExposeAsioMicToggle()
         {
             var popup = CreatePopup(
+                default,
                 new FakeAsioDriverEnumerator("ASIO Main"),
                 new FakeMicrophoneDeviceEnumerator("USB Mic"));
 
@@ -60,6 +51,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
         public void ManualOverride_Changed_UpdatesDeviceName()
         {
             var popup = CreatePopup(
+                default,
                 new FakeAsioDriverEnumerator("ASIO Main"),
                 new FakeMicrophoneDeviceEnumerator("USB Mic"));
             var manualOverride = popup.Q<TextField>(DeviceDescriptorPopup.ManualOverrideFieldName);
@@ -67,16 +59,15 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
             manualOverride.SetValueWithoutNotify("Disconnected Mic");
             InvokePrivate(popup, "ApplyDeviceNameFromManualOverride", manualOverride.value);
 
-            _serializedObject.Update();
-            Assert.That(
-                _descriptorProperty.FindPropertyRelative(nameof(DeviceDescriptor.DeviceName)).stringValue,
-                Is.EqualTo("Disconnected Mic"));
+            Assert.That(_capturedDescriptor.DeviceName, Is.EqualTo("Disconnected Mic"));
+            Assert.That(_changedCallCount, Is.EqualTo(1));
         }
 
         [Test]
         public void PopupSelection_Changed_UpdatesDeviceNameAndManualOverride()
         {
             var popup = CreatePopup(
+                default,
                 new FakeAsioDriverEnumerator("ASIO Main"),
                 new FakeMicrophoneDeviceEnumerator("USB Mic"));
             var devicePopup = popup.Q<PopupField<string>>(DeviceDescriptorPopup.DevicePopupName);
@@ -85,10 +76,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
             devicePopup.SetValueWithoutNotify("USB Mic");
             InvokePrivate(popup, "ApplyDeviceNameFromPopup", devicePopup.value);
 
-            _serializedObject.Update();
-            Assert.That(
-                _descriptorProperty.FindPropertyRelative(nameof(DeviceDescriptor.DeviceName)).stringValue,
-                Is.EqualTo("USB Mic"));
+            Assert.That(_capturedDescriptor.DeviceName, Is.EqualTo("USB Mic"));
             Assert.That(manualOverride.value, Is.EqualTo("USB Mic"));
         }
 
@@ -96,6 +84,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
         public void DisambiguatorIndex_Changed_UpdatesDescriptor()
         {
             var popup = CreatePopup(
+                default,
                 new FakeAsioDriverEnumerator("ASIO Main"),
                 new FakeMicrophoneDeviceEnumerator("USB Mic"));
             var disambiguatorIndex =
@@ -104,18 +93,45 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
             disambiguatorIndex.SetValueWithoutNotify(2);
             InvokePrivate(popup, "ApplyDisambiguatorIndex", disambiguatorIndex.value);
 
-            _serializedObject.Update();
-            Assert.That(
-                _descriptorProperty.FindPropertyRelative(nameof(DeviceDescriptor.DisambiguatorIndex)).intValue,
-                Is.EqualTo(2));
+            Assert.That(_capturedDescriptor.DisambiguatorIndex, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Create_WithInitialValue_DisplaysInitialDescriptor()
+        {
+            var initial = new DeviceDescriptor
+            {
+                DeviceName = "USB Mic",
+                DisambiguatorIndex = 4,
+            };
+
+            var popup = CreatePopup(
+                initial,
+                new FakeAsioDriverEnumerator("ASIO Main"),
+                new FakeMicrophoneDeviceEnumerator("USB Mic"));
+
+            var devicePopup = popup.Q<PopupField<string>>(DeviceDescriptorPopup.DevicePopupName);
+            var manualOverride = popup.Q<TextField>(DeviceDescriptorPopup.ManualOverrideFieldName);
+            var disambiguatorIndex =
+                popup.Q<IntegerField>(DeviceDescriptorPopup.DisambiguatorIndexFieldName);
+
+            Assert.That(devicePopup.value, Is.EqualTo("USB Mic"));
+            Assert.That(manualOverride.value, Is.EqualTo("USB Mic"));
+            Assert.That(disambiguatorIndex.value, Is.EqualTo(4));
         }
 
         private DeviceDescriptorPopup CreatePopup(
+            DeviceDescriptor initialValue,
             IAsioDriverEnumerator asioEnumerator,
             IMicrophoneDeviceEnumerator microphoneEnumerator)
         {
             return new DeviceDescriptorPopup(
-                _descriptorProperty,
+                initialValue,
+                descriptor =>
+                {
+                    _capturedDescriptor = descriptor;
+                    _changedCallCount++;
+                },
                 asioEnumerator,
                 microphoneEnumerator);
         }
@@ -130,11 +146,6 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(method, Is.Not.Null);
             method.Invoke(popup, args);
-        }
-
-        private sealed class DeviceDescriptorPopupTestAsset : ScriptableObject
-        {
-            public DeviceDescriptor Descriptor;
         }
     }
 }

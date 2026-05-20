@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Hidano.FacialControl.Adapters.AdapterBindings;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.OSC;
+using Hidano.FacialControl.Adapters.RuntimeSettings;
 using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
@@ -115,6 +116,122 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
 
             Assert.That(attr, Is.Not.Null);
             Assert.That(attr.DisplayName, Is.EqualTo(ExpectedDisplayName));
+        }
+
+        [Test]
+        public void OnStart_SettingsNull_LogsWarningAndSkipsStart()
+        {
+            // task 5.1 観測可能完了条件: _settings 未代入時に warning が出て binding 起動がスキップされる。
+            // 本テストでは Configure / プロパティ setter を一切呼ばないため _settings と _runtimeSettings の
+            // どちらも null となり、EffectiveSettings は null になる。
+            var registry = new InputSourceRegistry();
+            var binding = new OscAdapterBinding { Slug = "osc-no-settings" };
+
+            var host = new GameObject("OscAdapterBindingSettingsNullTests");
+            try
+            {
+                LogAssert.Expect(LogType.Warning, new Regex("_settings が未代入"));
+                binding.OnStart(CreateContext(registry, host));
+
+                Assert.That(binding.IsStarted, Is.False,
+                    "_settings 未代入時は OnStart が start をスキップするべき。");
+                Assert.That(host.GetComponent<OscReceiverHost>(), Is.Null,
+                    "_settings 未代入時は OscReceiverHost が AddComponent されないべき。");
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
+        public void OnStart_SettingsReceiverDisabled_LogsWarningAndSkipsStart()
+        {
+            // task 5.1 観測可能完了条件補強: ReceiverEnabled=false の SO が割り当てられている場合も skip。
+            var registry = new InputSourceRegistry();
+            var settings = ScriptableObject.CreateInstance<OscRuntimeSettingsSO>();
+            settings.hideFlags = HideFlags.HideAndDontSave;
+            settings.FromJson(
+                "{\"receiverEnabled\":false,\"listenEndpoint\":\"127.0.0.1\",\"listenPort\":19999}");
+
+            var binding = new OscAdapterBinding
+            {
+                Slug = "osc-receiver-disabled",
+                Settings = settings,
+                Mappings = new List<OscMappingEntry>
+                {
+                    new OscMappingEntry
+                    {
+                        mode = OscMappingMode.Normal_BlendShape,
+                        expressionId = "smile",
+                        addressPattern = "/avatar/parameters/smile",
+                    }
+                }
+            };
+
+            var host = new GameObject("OscAdapterBindingReceiverDisabledTests");
+            try
+            {
+                LogAssert.Expect(LogType.Warning, new Regex("ReceiverEnabled=false"));
+                binding.OnStart(CreateContext(registry, host));
+
+                Assert.That(binding.IsStarted, Is.False,
+                    "ReceiverEnabled=false の場合は OnStart が skip するべき。");
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
+        }
+
+        [Test]
+        public void OnStart_SettingsAssigned_ConfiguresHostWithSettingsValues()
+        {
+            // task 5.1 観測可能完了条件: _settings 経由で Host が configure される (EditMode 側で検証可能な範囲)。
+            // PlayMode で UDP 送受信を行う本格テストは task 8.5 で追加する。
+            var registry = new InputSourceRegistry();
+            int port = AllocatePort();
+            var settings = ScriptableObject.CreateInstance<OscRuntimeSettingsSO>();
+            settings.hideFlags = HideFlags.HideAndDontSave;
+            settings.FromJson(
+                "{\"receiverEnabled\":true,\"listenEndpoint\":\"127.0.0.1\",\"listenPort\":" + port
+                + ",\"bundleMode\":\"individualMessage\"}");
+
+            var binding = new OscAdapterBinding
+            {
+                Slug = "osc-settings-applied",
+                Settings = settings,
+                Mappings = new List<OscMappingEntry>
+                {
+                    new OscMappingEntry
+                    {
+                        mode = OscMappingMode.Normal_BlendShape,
+                        expressionId = "smile",
+                        addressPattern = "/avatar/parameters/smile",
+                    }
+                }
+            };
+
+            var host = new GameObject("OscAdapterBindingSettingsAppliedTests");
+            try
+            {
+                binding.OnStart(CreateContext(registry, host));
+
+                Assert.That(binding.IsStarted, Is.True);
+                Assert.That(binding.HelperHost, Is.Not.Null);
+                Assert.That(binding.HelperHost.Port, Is.EqualTo(port),
+                    "_settings.ListenPort が OscReceiverHost.Configure に伝播するべき。");
+                Assert.That(binding.HelperHost.Endpoint, Is.EqualTo("127.0.0.1"));
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
         }
 
         [Test]

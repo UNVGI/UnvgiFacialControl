@@ -70,9 +70,7 @@ MonoBehaviour:
       type: {class: OscAdapterBinding, ns: Hidano.FacialControl.Adapters.AdapterBindings, asm: Hidano.FacialControl.Osc}
       data:
         Slug: osc
-        _endpoint: 127.0.0.1
-        _port: 9000
-        _stalenessSeconds: 1
+        _settings: {fileID: 2279303358686531772, guid: ad0658dffa3b456490a48e50e22a0630, type: 2}
         _mappings:
         - mode: 0
           expressionId: Joy
@@ -104,7 +102,3 @@ MonoBehaviour:
           sourceIdLeft:
           sourceIdRight:
           leftRightIndependent: 0
-        _failSafeMode: 0
-        _consistencyCheckWarnLog: 1
-        _bundleMode: 0
-        _bundleAccumulationTimeoutMs: 5

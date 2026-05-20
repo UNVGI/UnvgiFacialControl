@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.OSC;
+using Hidano.FacialControl.Adapters.RuntimeSettings;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
@@ -36,29 +37,30 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         private const int MaxCachedBundleSenderDecisions = 32;
 
+        /// <summary>
+        /// 環境/運用依存の Receiver 設定を保持する SettingsSO (sub-asset)。
+        /// Inspector / CollectionSO 経由で割り当てられる本番経路。
+        /// </summary>
         [SerializeField]
-        private string _endpoint = "127.0.0.1";
-
-        [SerializeField]
-        private int _port = OscConfiguration.DefaultReceivePort;
-
-        [SerializeField]
-        private float _stalenessSeconds;
+        private OscRuntimeSettingsSO _settings;
 
         [SerializeField]
         private List<OscMappingEntry> _mappings = new List<OscMappingEntry>();
 
-        [SerializeField]
-        private FailSafeMode _failSafeMode = FailSafeMode.RevertToBase;
+        /// <summary>
+        /// 診断/テスト経路。Inspector で <see cref="_settings"/> を割り当てない代わりに
+        /// プロパティ setter や <see cref="Configure"/> から値を流し込むと on-demand で生成され、
+        /// <see cref="OnStart"/> で <see cref="_settings"/> のフォールバックとして採用される。
+        /// </summary>
+        [NonSerialized]
+        private OscRuntimeSettingsSO _runtimeSettings;
 
-        [SerializeField]
-        private bool _consistencyCheckWarnLog = true;
-
-        [SerializeField]
-        private BundleInterpretationMode _bundleMode = BundleInterpretationMode.AtomicSwap;
-
-        [SerializeField]
-        private float _bundleAccumulationTimeoutMs = 5f;
+        /// <summary>
+        /// <see cref="OnStart"/> で確定した有効な Settings 参照。<see cref="OnFixedTick"/> 等の
+        /// 読み出しは本フィールドを介して行い、起動後の SO 参照差し替えに左右されないようにする。
+        /// </summary>
+        [NonSerialized]
+        private OscRuntimeSettingsSO _effectiveSettings;
 
         [NonSerialized]
         private OscMapping[] _runtimeMappings;
@@ -158,25 +160,51 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         {
         }
 
+        /// <summary>
+        /// Inspector で割り当てられた <see cref="OscRuntimeSettingsSO"/>。診断 setter / Configure 経由で
+        /// 値を流し込む場合は <see cref="_runtimeSettings"/> が代わりに使われる。
+        /// </summary>
+        public OscRuntimeSettingsSO Settings
+        {
+            get => _settings;
+            set => _settings = value;
+        }
+
+        /// <summary>有効な Settings 参照を返す。<see cref="Settings"/> が未代入なら診断用 runtime SO にフォールバック。</summary>
+        public OscRuntimeSettingsSO EffectiveSettings =>
+            _settings != null ? _settings : _runtimeSettings;
+
         /// <summary>送信元エンドポイント（IP/host）。現状 uOSC は port のみ使用するが診断用に保持。</summary>
         public string Endpoint
         {
-            get => _endpoint;
-            set => _endpoint = value;
+            get
+            {
+                OscRuntimeSettingsSO settings = EffectiveSettings;
+                return settings != null ? settings.ListenEndpoint : OscRuntimeSettingsSO.DefaultListenEndpoint;
+            }
+            set => EnsureRuntimeSettings().SetListenEndpoint(value);
         }
 
         /// <summary>受信 UDP ポート。</summary>
         public int Port
         {
-            get => _port;
-            set => _port = value;
+            get
+            {
+                OscRuntimeSettingsSO settings = EffectiveSettings;
+                return settings != null ? settings.ListenPort : OscConfiguration.DefaultReceivePort;
+            }
+            set => EnsureRuntimeSettings().SetListenPort(value);
         }
 
         /// <summary>staleness 判定秒数（0 で staleness 無効）。</summary>
         public float StalenessSeconds
         {
-            get => _stalenessSeconds;
-            set => _stalenessSeconds = value;
+            get
+            {
+                OscRuntimeSettingsSO settings = EffectiveSettings;
+                return settings != null ? settings.StalenessSeconds : 0f;
+            }
+            set => EnsureRuntimeSettings().SetStalenessSeconds(value);
         }
 
         public List<OscMappingEntry> Mappings
@@ -187,28 +215,46 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         public FailSafeMode FailSafeMode
         {
-            get => _failSafeMode;
-            set => _failSafeMode = value;
+            get
+            {
+                OscRuntimeSettingsSO settings = EffectiveSettings;
+                return settings != null ? settings.FailSafeMode : FailSafeMode.RevertToBase;
+            }
+            set => EnsureRuntimeSettings().SetFailSafeMode(value);
         }
 
         public bool ConsistencyCheckWarnLog
         {
-            get => _consistencyCheckWarnLog;
-            set => _consistencyCheckWarnLog = value;
+            get
+            {
+                OscRuntimeSettingsSO settings = EffectiveSettings;
+                return settings != null ? settings.ConsistencyCheckWarnLog : true;
+            }
+            set => EnsureRuntimeSettings().SetConsistencyCheckWarnLog(value);
         }
 
         public BundleInterpretationMode BundleMode
         {
-            get => _bundleMode;
-            set => _bundleMode = value;
+            get
+            {
+                OscRuntimeSettingsSO settings = EffectiveSettings;
+                return settings != null ? settings.BundleMode : BundleInterpretationMode.AtomicSwap;
+            }
+            set => EnsureRuntimeSettings().SetBundleMode(value);
         }
 
         public float BundleAccumulationTimeoutMs
         {
-            get => _bundleAccumulationTimeoutMs;
+            get
+            {
+                OscRuntimeSettingsSO settings = EffectiveSettings;
+                return settings != null
+                    ? settings.BundleAccumulationTimeoutMs
+                    : OscRuntimeSettingsSO.DefaultBundleAccumulationTimeoutMs;
+            }
             set
             {
-                _bundleAccumulationTimeoutMs = value;
+                EnsureRuntimeSettings().SetBundleAccumulationTimeoutMs(value);
                 if (_bundleAccumulator != null)
                 {
                     _bundleAccumulator.BundleAccumulationTimeoutMs = value;
@@ -243,16 +289,42 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         /// Runtime / テストから endpoint・port・mappings をまとめて設定する。
         /// </summary>
         /// <remarks>
-        /// PropertyDrawer が完成するまでは inline serialized 化されたマッピングを直接持たないため、
-        /// テストや手動配線では本メソッドで mappings を渡す（task 9.4 の PropertyDrawer 実装後に inline 化予定）。
+        /// design.md の "Configure for diagnostic" 仕様に従い、内部 runtime SO に値を書き込む形で
+        /// <see cref="_settings"/> 未代入時の診断パスを保持する。
         /// </remarks>
         public void Configure(string endpoint, int port, OscMapping[] mappings)
         {
             if (mappings == null) throw new ArgumentNullException(nameof(mappings));
 
-            _endpoint = endpoint;
-            _port = port;
+            OscRuntimeSettingsSO settings = EnsureRuntimeSettings();
+            settings.SetListenEndpoint(endpoint);
+            settings.SetListenPort(port);
             _runtimeMappings = mappings;
+        }
+
+        /// <summary>
+        /// 明示的に <see cref="OscRuntimeSettingsSO"/> インスタンスと mappings を流し込む診断 API。
+        /// テストで sub-asset を経由せずに SettingsSO 経路をそのまま検証するために使用する。
+        /// </summary>
+        public void Configure(OscRuntimeSettingsSO settings, OscMapping[] mappings)
+        {
+            if (mappings == null) throw new ArgumentNullException(nameof(mappings));
+
+            _settings = settings;
+            _runtimeMappings = mappings;
+        }
+
+        private OscRuntimeSettingsSO EnsureRuntimeSettings()
+        {
+            if (_runtimeSettings == null)
+            {
+                // FQN で UnityEngine.ScriptableObject を指定する。Adapters 配下に同名の
+                // namespace (Hidano.FacialControl.Adapters.ScriptableObject) が存在するため
+                // 短縮形だと CS0234 で解決失敗するのを回避する。
+                _runtimeSettings = UnityEngine.ScriptableObject.CreateInstance<OscRuntimeSettingsSO>();
+                _runtimeSettings.hideFlags = HideFlags.HideAndDontSave;
+            }
+            return _runtimeSettings;
         }
 
         /// <inheritdoc />
@@ -266,6 +338,20 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             if (ctx.HostGameObject == null)
             {
                 Debug.LogError("[OscAdapterBinding] HostGameObject が null のため OSC binding を起動できません。");
+                return;
+            }
+
+            OscRuntimeSettingsSO settings = EffectiveSettings;
+            if (settings == null)
+            {
+                Debug.LogWarning(
+                    $"[OscAdapterBinding] _settings が未代入のため OSC Adapter は起動しません。slug='{Slug}'");
+                return;
+            }
+            if (!settings.ReceiverEnabled)
+            {
+                Debug.LogWarning(
+                    $"[OscAdapterBinding] _settings.ReceiverEnabled=false のため OSC Adapter は起動しません。slug='{Slug}'");
                 return;
             }
 
@@ -291,6 +377,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return;
             }
 
+            _effectiveSettings = settings;
             _timeProvider = ctx.TimeProvider;
             _lastAcceptedPacketTime = ctx.TimeProvider.UnscaledTimeSeconds;
             _failSafeActive = false;
@@ -305,7 +392,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
             BuildNormalLookup(runtimeMappings);
             _heartbeatChecker = hasBlendShapeMappings
-                ? new HeartbeatConsistencyChecker(meshBlendShapeNames, runtimeMappings, _consistencyCheckWarnLog)
+                ? new HeartbeatConsistencyChecker(meshBlendShapeNames, runtimeMappings, settings.ConsistencyCheckWarnLog)
                 : null;
 
             if (hasGazeMappings)
@@ -315,16 +402,16 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             _buffer = new OscDoubleBuffer(runtimeMappings.Length);
-            _bundleAccumulator = new OscBundleAccumulator(_buffer, _bundleAccumulationTimeoutMs);
+            _bundleAccumulator = new OscBundleAccumulator(_buffer, settings.BundleAccumulationTimeoutMs);
 
             _helperHost = ctx.HostGameObject.AddComponent<OscReceiverHost>();
             _helperHost.Configure(
-                _endpoint,
-                _port,
+                settings.ListenEndpoint,
+                settings.ListenPort,
                 _buffer,
                 runtimeMappings,
-                _bundleMode == BundleInterpretationMode.AtomicSwap ? _bundleAccumulator : null,
-                _bundleMode,
+                settings.BundleMode == BundleInterpretationMode.AtomicSwap ? _bundleAccumulator : null,
+                settings.BundleMode,
                 ctx.TimeProvider);
 
             if (_helperHost.Receiver != null)
@@ -336,9 +423,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             {
                 _inputSource = new OscInputSource(
                     _buffer,
-                    _stalenessSeconds,
+                    settings.StalenessSeconds,
                     ctx.TimeProvider,
-                    _failSafeMode,
+                    settings.FailSafeMode,
                     _heartbeatChecker?.SkipMask,
                     _heartbeatChecker?.ContributeMask,
                     mappingIndexToMeshIndex);
@@ -421,6 +508,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             _bundleAccumulator = null;
+            _effectiveSettings = null;
 
             _started = false;
         }
@@ -715,9 +803,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return false;
             }
 
+            BundleInterpretationMode currentBundleMode = _effectiveSettings != null
+                ? _effectiveSettings.BundleMode
+                : BundleInterpretationMode.AtomicSwap;
             for (int i = 0; i < routes.Count; i++)
             {
-                if (_bundleMode == BundleInterpretationMode.AtomicSwap)
+                if (currentBundleMode == BundleInterpretationMode.AtomicSwap)
                 {
                     RecordBufferedGazeMessage(message, routes[i], value);
                 }
@@ -782,7 +873,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         private void FlushBufferedGazeMessages(double nowSeconds)
         {
-            if (_bundleMode != BundleInterpretationMode.AtomicSwap || _gazeBundleSync == null)
+            BundleInterpretationMode currentBundleMode = _effectiveSettings != null
+                ? _effectiveSettings.BundleMode
+                : BundleInterpretationMode.AtomicSwap;
+            if (currentBundleMode != BundleInterpretationMode.AtomicSwap || _gazeBundleSync == null)
             {
                 return;
             }
@@ -830,7 +924,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return false;
             }
 
-            double timeoutSeconds = _bundleAccumulationTimeoutMs * 0.001d;
+            float timeoutMs = _effectiveSettings != null
+                ? _effectiveSettings.BundleAccumulationTimeoutMs
+                : OscRuntimeSettingsSO.DefaultBundleAccumulationTimeoutMs;
+            double timeoutSeconds = timeoutMs * 0.001d;
             return nowSeconds - _currentGazeBundleFirstReceivedAtSeconds >= timeoutSeconds;
         }
 
@@ -886,11 +983,15 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
             FlushBufferedGazeMessages(GetCurrentTimeSeconds());
 
-            bool stale = _stalenessSeconds > 0f &&
+            float stalenessSeconds = _effectiveSettings != null ? _effectiveSettings.StalenessSeconds : 0f;
+            FailSafeMode currentFailSafe = _effectiveSettings != null
+                ? _effectiveSettings.FailSafeMode
+                : FailSafeMode.RevertToBase;
+            bool stale = stalenessSeconds > 0f &&
                 _timeProvider != null &&
-                _timeProvider.UnscaledTimeSeconds - _lastAcceptedPacketTime > _stalenessSeconds;
+                _timeProvider.UnscaledTimeSeconds - _lastAcceptedPacketTime > stalenessSeconds;
 
-            if (stale && _failSafeMode == FailSafeMode.RevertToBase)
+            if (stale && currentFailSafe == FailSafeMode.RevertToBase)
             {
                 for (int i = 0; i < _gazeRuntimeEntries.Count; i++)
                 {

@@ -2,6 +2,15 @@
 
 `OscSenderOptionsDto` は `OscSenderAdapterBinding` の送信先、BlendShape 送信対象、Gaze 送信対象、ループバック抑制、heartbeat 周期を保存する JSON DTO です。Unity の `JsonUtility` 互換 DTO として扱うため、未知キーは無視され、欠落または不正な値は DTO 側の既定値で補完されます。
 
+> **環境依存項目の保存先**: `endpoints` / `suppressLoopback` / `heartbeatIntervalSeconds` の
+> Inspector 編集および永続化は、spec [`adapter-runtime-settings`](../../../../.kiro/specs/adapter-runtime-settings/)
+> で導入された `OscRuntimeSettingsSO` (sub-asset) の Sender セクションに移行済みです。
+> `OscSenderAdapterBinding._settings` 経由でアサインしてください。`blendShapeMapping` /
+> `gazeExpressionIds` はキャラ依存項目のため引き続き `OscSenderAdapterBinding._blendShapeNames` /
+> `_gazeExpressionIds` でキャラ SO 側に保存されます。詳細は
+> [`com.hidano.facialcontrol/Documentation~/adapter-runtime-settings.md`](../../com.hidano.facialcontrol/Documentation~/adapter-runtime-settings.md)
+> を参照してください。
+
 ## ルートフィールド
 
 | フィールド | 型 | 既定値 | 説明 |

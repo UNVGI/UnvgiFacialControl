@@ -1,5 +1,6 @@
 using Hidano.FacialControl.Editor.Inspector.AdapterBindings;
 using Hidano.FacialControl.LipSync.Adapters;
+using Hidano.FacialControl.LipSync.Adapters.Devices;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -11,7 +12,6 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
     public sealed class ULipSyncAdapterBindingDrawer : PropertyDrawer
     {
         private const string SlugPropertyName = "Slug";
-        private const string DeviceDescriptorPropertyName = "_deviceDescriptor";
         private const string AnalyzerProfilePropertyName = "_analyzerProfile";
         private const string PhonemeEntriesPropertyName = "_phonemeEntries";
         private const string MaxWeightScalePropertyName = "_maxWeightScale";
@@ -19,6 +19,8 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
         public const string RootClassName = "facial-control-lipsync-adapter-binding";
         public const string SlugPropertyFieldName = "ulipsync-adapter-binding-slug-field";
         public const string DeviceDescriptorSectionName = "ulipsync-adapter-binding-device-section";
+        public const string DeviceDescriptorHelpBoxName =
+            "ulipsync-adapter-binding-device-helpbox";
         public const string AnalyzerProfileObjectFieldName = "ulipsync-adapter-binding-analyzer-profile-field";
         public const string DefaultAnalyzerProfilePlaceholderName =
             "ulipsync-adapter-binding-default-profile-placeholder";
@@ -33,7 +35,7 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             root.style.marginBottom = 2;
 
             AddSlugField(root, property);
-            AddDeviceDescriptorPopup(root, property);
+            AddDeviceDescriptorPopup(root);
             AddAnalyzerProfileField(root, property);
             AddPhonemeEntryList(root, property);
             AddMaxWeightScaleField(root, property);
@@ -57,23 +59,45 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             root.Add(field);
         }
 
-        private static void AddDeviceDescriptorPopup(VisualElement root, SerializedProperty property)
+        private static void AddDeviceDescriptorPopup(VisualElement root)
         {
-            SerializedProperty descriptorProperty =
-                property.FindPropertyRelative(DeviceDescriptorPropertyName);
-            if (descriptorProperty == null)
-            {
-                AddMissingFieldLabel(root, DeviceDescriptorPropertyName);
-                return;
-            }
-
             var section = new VisualElement
             {
                 name = DeviceDescriptorSectionName,
             };
             section.style.marginTop = 4;
-            section.Add(new DeviceDescriptorPopup(descriptorProperty));
+
+            var helpBox = new HelpBox(
+                "マイクデバイス未選択時は OnStart で警告が出力されます。"
+                + "デバイス選択はマシンごとに PlayerPrefs に保存され、キャラ Profile には残りません。",
+                HelpBoxMessageType.Info)
+            {
+                name = DeviceDescriptorHelpBoxName,
+            };
+
+            DeviceDescriptor initialDescriptor = LipSyncDeviceStore.Load();
+            var popup = new DeviceDescriptorPopup(
+                initialDescriptor,
+                descriptor =>
+                {
+                    LipSyncDeviceStore.Save(descriptor);
+                    ApplyDeviceDescriptorHelpBoxVisibility(helpBox, descriptor);
+                });
+
+            ApplyDeviceDescriptorHelpBoxVisibility(helpBox, initialDescriptor);
+
+            section.Add(popup);
+            section.Add(helpBox);
             root.Add(section);
+        }
+
+        private static void ApplyDeviceDescriptorHelpBoxVisibility(
+            HelpBox helpBox,
+            DeviceDescriptor descriptor)
+        {
+            helpBox.style.display = string.IsNullOrEmpty(descriptor.DeviceName)
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
         }
 
         private static void AddAnalyzerProfileField(VisualElement root, SerializedProperty property)

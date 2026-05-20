@@ -5,6 +5,7 @@ using Hidano.FacialControl.LipSync.Adapters;
 using Hidano.FacialControl.LipSync.Adapters.Devices;
 using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
 using Hidano.FacialControl.LipSync.Editor.Inspector;
+using Hidano.FacialControl.LipSync.Tests.Shared;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -23,10 +24,14 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
         private SerializedObject _serializedObject;
         private SerializedProperty _bindingProperty;
         private string _assetPath;
+        private FakePlayerPrefsBackend _backend;
 
         [SetUp]
         public void SetUp()
         {
+            _backend = new FakePlayerPrefsBackend();
+            LipSyncDeviceStore.SetBackend(_backend);
+
             if (!AssetDatabase.IsValidFolder(TempFolderPath))
             {
                 AssetDatabase.CreateFolder(TempFolderParent, TempFolderName);
@@ -65,6 +70,11 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
                 UnityEngine.Object.DestroyImmediate(_asset);
                 _asset = null;
             }
+
+            LipSyncDeviceStore.ResetBackend();
+            _backend = null;
+            PlayerPrefs.DeleteKey(LipSyncDeviceStore.KeyName);
+            PlayerPrefs.DeleteKey(LipSyncDeviceStore.KeyDisambiguator);
         }
 
         [Test]
@@ -77,6 +87,9 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
                 root.Q<AdapterBindingSlugField>(ULipSyncAdapterBindingDrawer.SlugPropertyFieldName),
                 Is.Not.Null);
             Assert.That(root.Q<DeviceDescriptorPopup>(), Is.Not.Null);
+            Assert.That(
+                root.Q<HelpBox>(ULipSyncAdapterBindingDrawer.DeviceDescriptorHelpBoxName),
+                Is.Not.Null);
             Assert.That(
                 root.Q<ObjectField>(ULipSyncAdapterBindingDrawer.AnalyzerProfileObjectFieldName),
                 Is.Not.Null);
@@ -103,15 +116,75 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
         }
 
         [Test]
+        public void DeviceDescriptorPopup_InitialState_LoadsFromDeviceStore()
+        {
+            _backend.SetString(LipSyncDeviceStore.KeyName, "Preset Mic");
+            _backend.SetInt(LipSyncDeviceStore.KeyDisambiguator, 2);
+
+            VisualElement root = CreateDrawerRoot();
+            var popup = root.Q<DeviceDescriptorPopup>();
+
+            Assert.That(popup, Is.Not.Null);
+            Assert.That(popup.CurrentDescriptor.DeviceName, Is.EqualTo("Preset Mic"));
+            Assert.That(popup.CurrentDescriptor.DisambiguatorIndex, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void DeviceDescriptorPopup_DeviceNameMissing_ShowsHelpBox()
+        {
+            VisualElement root = CreateDrawerRoot();
+
+            var helpBox = root.Q<HelpBox>(ULipSyncAdapterBindingDrawer.DeviceDescriptorHelpBoxName);
+
+            Assert.That(helpBox, Is.Not.Null);
+            Assert.That(helpBox.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+        }
+
+        [Test]
+        public void DeviceDescriptorPopup_DeviceNamePresent_HidesHelpBox()
+        {
+            _backend.SetString(LipSyncDeviceStore.KeyName, "Active Mic");
+
+            VisualElement root = CreateDrawerRoot();
+
+            var helpBox = root.Q<HelpBox>(ULipSyncAdapterBindingDrawer.DeviceDescriptorHelpBoxName);
+
+            Assert.That(helpBox, Is.Not.Null);
+            Assert.That(helpBox.style.display.value, Is.EqualTo(DisplayStyle.None));
+        }
+
+        [Test]
+        public void DeviceDescriptorPopup_ManualOverrideChanged_PersistsToDeviceStore()
+        {
+            VisualElement root = CreateDrawerRoot();
+            var popup = root.Q<DeviceDescriptorPopup>();
+
+            InvokePrivate(popup, "ApplyDeviceNameFromManualOverride", "Disconnected Mic");
+
+            Assert.That(_backend.GetString(LipSyncDeviceStore.KeyName, string.Empty),
+                Is.EqualTo("Disconnected Mic"));
+            Assert.That(_backend.SaveCallCount, Is.GreaterThanOrEqualTo(1));
+        }
+
+        [Test]
+        public void DeviceDescriptorPopup_DisambiguatorIndexChanged_PersistsToDeviceStore()
+        {
+            VisualElement root = CreateDrawerRoot();
+            var popup = root.Q<DeviceDescriptorPopup>();
+
+            InvokePrivate(popup, "ApplyDisambiguatorIndex", 5);
+
+            Assert.That(_backend.GetInt(LipSyncDeviceStore.KeyDisambiguator, 0), Is.EqualTo(5));
+            Assert.That(_backend.SaveCallCount, Is.GreaterThanOrEqualTo(1));
+        }
+
+        [Test]
         public void EditedFields_ApplyModifiedProperties_RoundTripsSerializedValues()
         {
             VisualElement root = CreateDrawerRoot();
 
             var phonemeEntries = root.Q<PhonemeEntryListView>();
 
-            var devicePopup = root.Q<DeviceDescriptorPopup>();
-            InvokePrivate(devicePopup, "ApplyDeviceNameFromManualOverride", "Disconnected Mic");
-            InvokePrivate(devicePopup, "ApplyDisambiguatorIndex", 3);
             InvokePrivateStatic(
                 typeof(ULipSyncAdapterBindingDrawer),
                 "SetFloat",
@@ -121,15 +194,8 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
             phonemeEntries.AddEntry(PhonemeEntryListView.EntryKind.BlendShape);
 
             _serializedObject.Update();
-            SerializedProperty descriptor = _bindingProperty.FindPropertyRelative("_deviceDescriptor");
             SerializedProperty entries = _bindingProperty.FindPropertyRelative("_phonemeEntries");
 
-            Assert.That(
-                descriptor.FindPropertyRelative(nameof(DeviceDescriptor.DeviceName)).stringValue,
-                Is.EqualTo("Disconnected Mic"));
-            Assert.That(
-                descriptor.FindPropertyRelative(nameof(DeviceDescriptor.DisambiguatorIndex)).intValue,
-                Is.EqualTo(3));
             Assert.That(
                 _bindingProperty.FindPropertyRelative("_maxWeightScale").floatValue,
                 Is.EqualTo(1.5f).Within(1e-6f));
@@ -149,17 +215,9 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
             {
                 SerializedProperty loadedBinding =
                     serialized.FindProperty(nameof(ULipSyncAdapterBindingDrawerTestAsset.Binding));
-                SerializedProperty loadedDescriptor =
-                    loadedBinding.FindPropertyRelative("_deviceDescriptor");
                 SerializedProperty loadedEntries =
                     loadedBinding.FindPropertyRelative("_phonemeEntries");
 
-                Assert.That(
-                    loadedDescriptor.FindPropertyRelative(nameof(DeviceDescriptor.DeviceName)).stringValue,
-                    Is.EqualTo("Disconnected Mic"));
-                Assert.That(
-                    loadedDescriptor.FindPropertyRelative(nameof(DeviceDescriptor.DisambiguatorIndex)).intValue,
-                    Is.EqualTo(3));
                 Assert.That(
                     loadedBinding.FindPropertyRelative("_maxWeightScale").floatValue,
                     Is.EqualTo(1.5f).Within(1e-6f));

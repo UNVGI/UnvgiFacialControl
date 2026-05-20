@@ -22,6 +22,24 @@
 
 ## 短期（別 PR / preview.1 内に拾う候補）
 
+### S-19: `OscGazeE2ETests.GazeResolver_OscAndInputSystemSameExpressionId_SelectsLexicographicallyFirstSlug` の InputSystem 側 Gaze 値が 0 になる
+- **出典**: 2026-05-20 `/kiro:validate-impl adapter-runtime-settings` 検証直後の Unity Test Runner 実行で観測（PlayMode）
+- **内容**: 同 expressionId (`eye-look`) を OSC binding (slug `z-osc-gaze`) と InputSystem binding (slug `a-input-system-gaze`) の両方が提供する状況で、`GazeBindingConfigResolver.TryResolve` が Ordinal 順で `a-input-system-gaze` を選択するまでは正常（ログ `selected 'a-input-system-gaze'` 出力済み・LogAssert PASS）。しかしその後の `AssertVector(sources.LeftSource, inputValue, ...)` で `Expected: -0.55 ±0.06, But was: 0.0` で失敗する。`OscGazeE2ETests.cs:466` の Vector2 比較地点で、InputSystem 経由の Gaze source（`AnalogInputSourceWrapper` → `InputActionAnalogSource`）が cache されているはずの `-0.55` を返さず 0 を返している。
+  - 初見の見立て: (a) `InputState.Change(_gamepad.leftStick, inputValue)` + `InputSystem.Update()` 直後の `inputBinding.OnLateTick(0.016f)` で `InputActionAnalogSource.Tick` が走る経路は正しく見える。`_action.controls[0]` が `StickControl`（InputControl<Vector2>）として解決されている前提が崩れている可能性。Instantiate 後の `InputActionAsset` で controls の Gamepad 解決が `0.2s WaitForSecondsRealtime` 後に reset / loss されているか、Tick 時点で `controls.Count == 0` だった場合 `_isValid = false` のまま 0 が返り得る。ただしエラー形式は値比較失敗（IsValid==true で _cachedX==0）なので、controls 解決後に `v2.ReadValue()` が 0 を返した可能性が高い。(b) `StickDeadzoneProcessor` のデフォルト deadzone(0.125) は `-0.55` でも通過するはずで、Tolerance(0.06) 内で `-0.53` 程度に縮減されても PASS する想定。
+  - 検証方針: (1) `OnLateTick` 内で `InputActionAnalogSource._action.controls.Count` と `_action.controls[0]?.device?.name` をログ出力し、Tick 時点で Gamepad が解決されているかを切り分け、(2) `WaitForSecondsRealtime` を `yield return null` × n に置換して InputSystem.Update のタイミング揺らぎを除去、(3) `inputBinding.OnLateTick` を `receiver.OnFixedTick` の直前に再度呼んで「最終 Tick から cache を読むまでの間に control 値が reset されていないか」を切り分け。
+- **トリガ**: preview.1 リリース前のテストグリーン化、または adapter-runtime-settings PR の CI 通過要件として
+- **影響範囲**: `FacialControl/Packages/com.hidano.facialcontrol.osc/Tests/PlayMode/Integration/OscGazeE2ETests.cs:212-263`, `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/InputSources/InputActionAnalogSource.cs`（Tick 時の controls 解決診断ログ追加検討）, `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/AdapterBindings/InputSystemAdapterBinding.cs`（OnLateTick の Tick 経路）
+- **関連**: M-13（複数 Vector2 入力源での gaze 同時駆動。本テストは「重複 slug 時の deterministic 選択」を検証するもので、multi-source blending とは別概念だが Gaze resolver の挙動共通）
+
+### S-18: `DeviceHotSwapTests.SwapDevice_MicToMicSecondDevice_ZeroSettlesThenRebinds` の新規 mic index が 0 に戻る
+- **出典**: 2026-05-20 `/kiro:validate-impl adapter-runtime-settings` 検証直後の Unity Test Runner 実行で観測（PlayMode）
+- **内容**: `ULipSyncAdapterBinding.SwapDevice("Unit Test Mic", 1)` → `OnFixedTick(0.02f)` で旧 mic Destroy + 新 mic AddComponent するフローで、`DeviceHotSwapTests.cs:112` の `Assert.That(microphones[0].index, Is.EqualTo(2))` が `But was: 0` で失敗する。Fake enumerator は `["Unit Test Mic", "Other Mic", "Unit Test Mic"]` を返し、`DeviceResolver.TryResolve` の matchOrdinal ロジックは DisambiguatorIndex=1 → ResolvedIndex=2 を返すのが正しい挙動（ロジックは検証済み）。`ULipSyncAdapterBinding.AddInputComponent` も `_microphoneInput.index = resolution.ResolvedIndex;` を実行している。
+  - 初見の見立て: (a) `_hostGameObject.SetActive(false)` のまま AddComponent するため Awake/OnEnable は走らないはず → デフォルト `index = 0` から `index = 2` セットへの上書きは成立するはず。(b) しかし結果として 0 になっているということは、`uLipSyncMicrophone.OnEnable` が遅延キューイングで後から走り `_preIndex = index;` の時点で index=0 のまま保存、その後 `UpdateMicInfo` が `mics.Count <= 0`（batchmode 環境）で早期 return → index は変更されない経路で 0 を維持している可能性。あるいは Unity の `AddComponent` でフィールド初期化子の評価タイミングと外部書き込みの順序競合がある可能性。(c) 別仮説として「`UnityEngine.Object.Destroy(_microphoneInput)` 後にも `microphones[0]` で取れているのが古い firstMicrophone であり、`Is.Not.SameAs(firstMicrophone)` は false 化済み MonoBehaviour と新 instance の参照比較で PASS してしまっている」可能性は薄いが要検証。
+  - 検証方針: (1) `AddInputComponent` 内で `_microphoneInput.index = ...` の前後で `Debug.Log` を入れ、セット直後の index 値と `yield return null` 後の値を比較、(2) `_hostGameObject.SetActive(true)` を SetUp に追加してアクティブ GameObject 上での AddComponent + Destroy 経路に揃え、再現性が消えるか確認、(3) 新 mic の OnEnable が走るタイミングを `yield return null` を 2 回回して確認、(4) batchmode で `Microphone.devices` が空の場合に `UpdateMicInfo` が index を意図せず巻き戻していないか追跡。
+- **トリガ**: preview.1 リリース前のテストグリーン化、または adapter-runtime-settings PR の CI 通過要件として
+- **影響範囲**: `FacialControl/Packages/com.hidano.facialcontrol.lipsync/Tests/PlayMode/HotSwap/DeviceHotSwapTests.cs:82-113`, `FacialControl/Packages/com.hidano.facialcontrol.lipsync/Runtime/Adapters/ULipSyncAdapterBinding.cs:271-316`（SwapDevice / OnFixedTick / AddInputComponent）, `Library/PackageCache/com.hidano.ulipsync-asio@*/Runtime/uLipSyncMicrophone.cs`（OnEnable / UpdateMicInfo 挙動の確認）
+- **関連**: なし（adapter-runtime-settings spec の 5.3 で `_deviceDescriptor` SerializeField を削除し DeviceStore 経由読み込みに切り替えたが、本テストは `Configure(descriptor, ...)` で直接 DeviceDescriptor を注入するため `_hasConfiguredDescriptor = true` 経路を通り、DeviceStore.Load は呼ばれない。adapter-runtime-settings の修正影響外と判断）
+
 ### S-17: Expression の Phoneme Overlay スロット拡張（A/I/U/E/O の口形上書き）
 - **出典**: ユーザー報告（2026-05-19）「Lipsync のあいうえおの Overlay も設定できるようにする」
 - **内容**: ユーザー要望は「既存の Expression (Smile, Angry 等) に A/I/U/E/O 5 種の Overlay スロットを持たせる。何も設定されていなければ Lipsync 側で設定した AnimationClip/BlendShape がそのまま出る。Overlay が設定されている場合はそちらを使用する」。既存の blink overlay と同じ枠組みを a/i/u/e/o 5 phoneme へ広げる。
@@ -155,6 +173,41 @@
 - **トリガ**: preview.1 リリース前の UX 整備、または preview.2 着手時の「設定ミスを減らす」フェーズ
 - **影響範囲**: `Editor/Inspector/FacialCharacterProfileSOInspector.cs`, 各 AdapterBinding Drawer（InputSystem / OSC / Lipsync）, `Documentation~/architecture.md` 新設、README.md リンク追加
 
+### M-20: Sub-asset 削除時の AdapterBinding 逆引き確認ダイアログ
+- **出典**: `.kiro/specs/adapter-runtime-settings/tasks.md` 0.2 / validate-design Critical Issue #2（Sub-asset 削除時の binding 参照欠落）
+- **内容**: `AdapterRuntimeSettingsCollectionSO` の sub-asset を削除すると、`OscAdapterBinding._settings` / `OscSenderAdapterBinding._settings` など外部の serialized field 参照が null になる可能性がある。本 spec では Project 内の `AdapterBindingBase` 派生を削除前に逆引き検索して一覧表示する確認ダイアログは実装せず、暫定対応として各 Drawer の `_settings == null` HelpBox に「sub-asset 削除で参照欠落した可能性」「再アサインが必要」「未設定時は OSC Adapter が起動しない」ことを表示する。
+  - 後続対応案: (a) `AssetDatabase.FindAssets` / `SerializedObject` 走査で削除対象 sub-asset を参照する Profile/Prefab/Scene を列挙、(b) 削除確認ダイアログに参照元一覧と影響範囲を表示、(c) 可能なら対象 binding への ping / selection を提供、(d) 大規模 Project で重くならないよう検索範囲とキャッシュ戦略を設計する。
+- **トリガ**: adapter-runtime-settings 実装後に sub-asset 削除 UI を実運用で使い始めるタイミング / preview.1 リリース前の UX リスクレビュー
+- **影響範囲**: `AdapterRuntimeSettingsCollectionEditor`、`OscAdapterBindingDrawer`、`OscSenderAdapterBindingDrawer`、Profile/Prefab/Scene の serialized reference 走査 helper、対応 EditMode (Editor) テスト
+
+### M-21: Adapter 種別の C# 型削除/リネーム時の自動マイグレーション（対応レベル c）
+- **出典**: [`.kiro/specs/adapter-runtime-settings/requirements.md`](../.kiro/specs/adapter-runtime-settings/requirements.md) 要件 3.5 / 8.1（スコープ外明示）
+- **内容**: `adapter-runtime-settings` spec では「対応レベル b」（Inspector でのエントリ追加/削除 + 新規 C# 型追加）のみをパラメータ消失防止の保証範囲とし、**対応レベル c（C# 型削除/リネーム時の自動マイグレーション）はスコープ外**としている。preview 段階では破壊的変更を許容する前提で進めるが、1.0 リリースに向けては型削除/リネームを検知して既存 sub-asset を新型に救済する仕組みが必要になる。
+  - 設計判断項目: (a) Unity の `[MovedFrom]` 属性 / `FormerlySerializedAs` を Base から派生 SO まで一貫して扱えるか検証、(b) 削除型に対しては「孤児 sub-asset」を保持してダンプ JSON に退避する救済パスを設けるか、その場で `AssetDatabase.RemoveObjectFromAsset` で破棄するかの方針決定、(c) `_schemaVersion` をキーに既存 `ToJson`/`FromJson` ラウンドトリップ経路を再利用してマイグレーションを実装、(d) Editor 起動時に Collection を走査して `MissingScript` 化した sub-asset を Inspector に列挙する診断 UI。
+- **トリガ**: 1.0 リリース前に Public API（AdapterRuntimeSettings 型階層）を凍結するタイミング / 既存 RuntimeSettings 型のリネーム要望が顕在化したとき
+- **影響範囲**: `AdapterRuntimeSettingsBase`, `AdapterRuntimeSettingsCollectionSO.MigrateOnLoad`, 新規 `AdapterRuntimeSettingsTypeMigrator`（Editor）、Collection Inspector の診断ペイン、対応 EditMode (Editor) テスト
+- **関連**: M-11（analog binding 側の schema migration パス — 共通の migration 基盤として整合させる余地あり）、M-22（MigrateOnLoad 本実装と `_schemaVersion` 増分規約）
+
+### M-22: AdapterRuntimeSettingsCollectionSO.MigrateOnLoad の本実装と `_schemaVersion` 増分規約策定
+- **出典**: [`.kiro/specs/adapter-runtime-settings/requirements.md`](../.kiro/specs/adapter-runtime-settings/requirements.md) 要件 5.4 / 5.5 / 5.6 / [`.kiro/specs/adapter-runtime-settings/tasks.md`](../.kiro/specs/adapter-runtime-settings/tasks.md) 2.2 / 9.2
+- **内容**: 本 spec では `AdapterRuntimeSettingsBase._schemaVersion` フィールドと `ToJson` / `FromJson` 仮想 API、および `AdapterRuntimeSettingsCollectionSO.OnEnable` 内の **空 `MigrateOnLoad()` フック** までを v0 として仕込むに留め、マイグレーション処理本体は実装しない（要件 5.5）。後続では以下を確定させる:
+  - (a) `_schemaVersion` の **増分規約**: どの粒度（フィールド追加 / フィールド削除 / 既定値変更 / enum 値追加 etc.）でバージョンを上げるかのルール文書化。Sub-asset 単位で持つ `_schemaVersion` と Collection 側で持つ「アグリゲートバージョン」の関係整理。
+  - (b) `MigrateOnLoad` の本実装: Sub-asset ごとの `_schemaVersion` を読んで `FromJson` 経路で defaults を埋め直す or 旧フィールド名 → 新フィールド名のマッピングを適用する。マイグレーション失敗時のロールバックと Warning ログ方針を確定。
+  - (c) マイグレーションテスト基盤: 過去バージョンの JSON fixture を `Tests/Shared/Fixtures/` に置き、`FromJson` ラウンドトリップで全フィールドが救済されることを検証する EditMode テストの雛形。
+- **トリガ**: 本 spec マージ後に最初の破壊的フィールド変更（追加/削除/リネーム）が発生したタイミング / 1.0 凍結フェーズで `_schemaVersion` 規約を確定する必要が出たとき
+- **影響範囲**: `AdapterRuntimeSettingsBase`, `AdapterRuntimeSettingsCollectionSO.MigrateOnLoad`, 各派生 SettingsSO の `FromJson` 実装、`Documentation~/adapter-runtime-settings/migration-guide.md`（新設）、`Tests/Shared/Fixtures/` 配下の JSON fixture、EditMode マイグレーションテスト
+- **関連**: M-21（型削除/リネーム時の自動マイグレーション — `MigrateOnLoad` は両者の共通基盤）、M-11（analog binding 側の schema migration パス）
+
+### M-23: OscAdapterBinding と OscSenderAdapterBinding の統合解消（Receiver/Sender Binding 一本化）の再検討
+- **出典**: [`.kiro/specs/adapter-runtime-settings/requirements.md`](../.kiro/specs/adapter-runtime-settings/requirements.md) 要件 8.2（スコープ外明示） / `.kiro/specs/adapter-runtime-settings/design.md` Boundary Context
+- **内容**: 本 spec では Receiver/Sender セクションを **1 つの `OscRuntimeSettingsSO`** に統合しつつ、`OscAdapterBinding` (Receiver) と `OscSenderAdapterBinding` (Sender) の 2 MonoBehaviour 構造は維持する（要件 8.2）。両 Binding が同一 SettingsSO の異なるセクションを参照する形のため、運用上は「片方だけ起動したい」「片方だけ別 SettingsSO を参照したい」というケースで `_receiverEnabled` / `_senderEnabled` トグル + 同一 SO 参照の組み合わせで対応している。preview.2 以降で以下のいずれかを検討する:
+  - (a) **統合**: `OscAdapterBinding` と `OscSenderAdapterBinding` を 1 MonoBehaviour に統合し、Receiver/Sender セクションを単一 binding が両方扱う。MonoBehaviour ライフサイクル管理が単純化される一方、片方だけ disable する operational UX を別途用意する必要あり。
+  - (b) **SettingsSO 分割**: `OscRuntimeSettingsSO` を `OscReceiverRuntimeSettingsSO` / `OscSenderRuntimeSettingsSO` の 2 SO に分割し、現行 2 Binding 構造はそのまま維持。SettingsSO 側の責務が明確化される一方、Receiver/Sender 設定の一貫性を担保していた要件 2.7 を別途満たす仕組み（命名規則 / Inspector ヘルパー）が必要。
+  - (c) **現状維持**: 2 Binding + 統合 SO + `_receiverEnabled` / `_senderEnabled` トグルの組み合わせで運用を続け、混乱が出たら (a) または (b) に切り替える。
+- **トリガ**: Receiver/Sender 別個運用の UX 不満が顕在化したとき / 1.0 リリース前の AdapterBinding API 凍結タイミング / `_receiverEnabled` / `_senderEnabled` トグルの運用負荷が想定以上に高まったとき
+- **影響範囲**: `OscAdapterBinding`, `OscSenderAdapterBinding`, `OscRuntimeSettingsSO`, 各 Drawer、Profile 内 AdapterBindings リスト、対応 EditMode/PlayMode テスト、`Documentation~/adapter-runtime-settings/`
+- **関連**: M-20（Sub-asset 削除時の逆引き確認ダイアログ — 統合/分割いずれを採るかで参照関係の管理粒度が変わる）
+
 ---
 
 ## 横断フォローアップ（実装着手時に再確認するメモ）
@@ -191,3 +244,6 @@
 - 2026-05-10: 本セッションで以下を消化して削除: S-1（ボーン参照を相対 path / 単純名併用に拡張）、S-2（旧 schema field 残置なしを確認）、S-3（PlayMode 統合テスト追加）、S-4（Fork 先で確認済みのため不要と判断）、S-6（README に VContainer 依存と OpenUPM 設定例を追記）、S-8（slug 編集 UI を candidate ドロップダウン + 手動 override テキストの 2 段に変更）、M-7（同名ボーン衝突時の警告を追加。S-1 と同 PR で実装）。
 - 2026-05-19: ユーザー集中 FB セッションで S-17（A/I/U/E/O Overlay スロット拡張）を追加。中期: M-18（ベース表情の Layer / OverrideMask 保持）, M-19（Layer / InputSource / Adapter 関係視認性改善）。
 - 2026-05-19: preview1-polish-pack 完了後の `/kiro:validate-impl` で EditMode 7 件 fail を再検出。同件である M-17 を本ファイルから削除し、`.kiro/specs/overlay-clip-redesign/tasks.md` の Phase 10（10.1〜10.3）として吸収・移動。
+- 2026-05-19: adapter-runtime-settings spec の validate-design Critical Issue #2 を受け、M-20（Sub-asset 削除時の AdapterBinding 逆引き確認ダイアログ）を追加。本 spec 内では Drawer HelpBox 警告で暫定対応する方針に整理。
+- 2026-05-20: adapter-runtime-settings spec の Phase 9.2（スコープ外項目・将来マイグレーションの集約）を消化し、以下 3 件を追加。M-21（対応レベル c: 型削除/リネーム時の自動マイグレーション）、M-22（`MigrateOnLoad` 本実装と `_schemaVersion` 増分規約策定）、M-23（OscAdapterBinding / OscSenderAdapterBinding 統合解消の再検討）。
+- 2026-05-20: `/kiro:validate-impl adapter-runtime-settings` 検証後の Unity Test Runner で別 spec 由来の PlayMode テスト 2 件 fail を確認。adapter-runtime-settings spec 本体の判定は GO のまま維持し、別ブランチで対処するため S-18（`DeviceHotSwapTests.SwapDevice_MicToMicSecondDevice_ZeroSettlesThenRebinds` の新規 mic index 0 巻き戻り）と S-19（`OscGazeE2ETests.GazeResolver_OscAndInputSystemSameExpressionId_SelectsLexicographicallyFirstSlug` の InputSystem 側 Gaze 値 0）を追加。

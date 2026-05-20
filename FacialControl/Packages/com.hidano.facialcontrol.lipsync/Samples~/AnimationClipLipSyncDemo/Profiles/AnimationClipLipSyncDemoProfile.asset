@@ -36,9 +36,6 @@ MonoBehaviour:
       type: {class: ULipSyncAdapterBinding, ns: Hidano.FacialControl.LipSync.Adapters, asm: Hidano.FacialControl.LipSync}
       data:
         Slug: ulipsync
-        _deviceDescriptor:
-          DeviceName: 
-          DisambiguatorIndex: 0
         _analyzerProfile: {fileID: 0}
         _phonemeEntries:
         - rid: 4448593420807569409

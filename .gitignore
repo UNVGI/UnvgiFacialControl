@@ -157,6 +157,8 @@ ClientBin/
 *~
 !Samples~/
 !Samples~/**
+!FacialControl/Packages/com.hidano.facialcontrol/Documentation~/
+!FacialControl/Packages/com.hidano.facialcontrol/Documentation~/**
 !FacialControl/Packages/com.hidano.facialcontrol.lipsync/Documentation~/
 !FacialControl/Packages/com.hidano.facialcontrol.lipsync/Documentation~/**
 !FacialControl/Packages/com.hidano.facialcontrol.osc/Documentation~/
