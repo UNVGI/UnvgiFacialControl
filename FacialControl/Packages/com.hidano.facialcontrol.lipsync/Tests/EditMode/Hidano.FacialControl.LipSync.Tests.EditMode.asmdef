@@ -9,6 +9,7 @@
         "Hidano.FacialControl.LipSync",
         "Hidano.FacialControl.LipSync.Editor",
         "Hidano.FacialControl.LipSync.Tests.Shared",
+        "Hidano.FacialControl.Tests.Shared",
         "uLipSync.Runtime",
         "uLipSync.Runtime.Windows",
         "Unity.Animation",

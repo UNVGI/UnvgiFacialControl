@@ -251,7 +251,11 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 AddInputComponent(_hostGameObject, resolution);
 
                 _eventBridge = new ULipSyncEventBridge(_analyzer);
-                _provider = new ULipSyncProvider(_eventBridge, snapshots, ctx.BlendShapeNames.Count);
+                _provider = new ULipSyncProvider(
+                    _eventBridge,
+                    snapshots,
+                    ctx.BlendShapeNames.Count,
+                    smoothness: ULipSyncProvider.DefaultSmoothness);
                 _inputSource = new LipSyncInputSource(_provider, ctx.BlendShapeNames.Count);
                 ctx.InputSourceRegistry.Register(slug, _inputSource);
                 _inputSourceRegistry = ctx.InputSourceRegistry;
