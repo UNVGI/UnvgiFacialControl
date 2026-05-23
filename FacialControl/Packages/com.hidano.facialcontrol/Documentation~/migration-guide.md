@@ -8,6 +8,8 @@
 
 `docs/migration-guide.md`（リポジトリルート、preview.1 系の `layer-input-source-blending` 移行手順）および `com.hidano.facialcontrol.inputsystem/Documentation~/MIGRATION-v0.x-to-v1.0.md`（preview.1 → preview.2 の `inspector-and-data-model-redesign` 移行手順）と併読すること。本ガイドは **preview.2 → preview.3** の差分のみ扱う。
 
+uLipSync の A / I / U / E / O 出力を Expression Overlay 経由へ移す preview 段階の破壊的変更は、`com.hidano.facialcontrol.lipsync` 側の [`phoneme-overlay-migration.md`](../../com.hidano.facialcontrol.lipsync/Documentation~/phoneme-overlay-migration.md) を参照すること。旧 `lipsync` Layer / `ulipsync` 直書き参照は自動変換されないため、既存 profile / sample / JSON は手動で `Slots`、Expression overlay、`Layer.inputSources` を更新する必要がある。
+
 ---
 
 ## 1. 削除型一覧（compile error 必至）
@@ -315,4 +317,5 @@ YAML 編集時は、旧 `_gazeConfigs` の各 entry から `inputAction` / `inpu
   - `design.md` `## Migration Strategy > Phase 動作契約マトリクス`
 - preview.1 系の移行: [`docs/migration-guide.md`](../../../../docs/migration-guide.md)
 - preview.1 → preview.2 の移行: [`com.hidano.facialcontrol.inputsystem/Documentation~/MIGRATION-v0.x-to-v1.0.md`](../../com.hidano.facialcontrol.inputsystem/Documentation~/MIGRATION-v0.x-to-v1.0.md)
+- uLipSync phoneme overlay 移行: [`com.hidano.facialcontrol.lipsync/Documentation~/phoneme-overlay-migration.md`](../../com.hidano.facialcontrol.lipsync/Documentation~/phoneme-overlay-migration.md)
 - preview 段階の破壊的変更ポリシー: `docs/requirements.md` FR-001（`0.x.x-preview.*` では後方互換保証なし、1.0.0 以降のマイナーアップデートでは破壊的変更なし）
