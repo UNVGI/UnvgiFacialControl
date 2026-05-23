@@ -105,6 +105,17 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
                     builder.Register<IInputSourceRegistry, InputSourceRegistry>(Lifetime.Scoped);
                     builder.Register<IFacialOutputBus, FacialOutputBus>(Lifetime.Scoped);
 
+                    builder.RegisterEntryPoint<PhonemeOverlayInputSourceRegistrationHost>(
+                        resolver => new PhonemeOverlayInputSourceRegistrationHost(
+                            CreateAdapterBuildContext(
+                                resolver,
+                                capturedProfile,
+                                capturedBlendShapeNames,
+                                capturedBindings,
+                                capturedHostGameObject,
+                                capturedActiveProvider)),
+                        Lifetime.Scoped);
+
                     for (int i = 0; i < capturedBindings.Count; i++)
                     {
                         AdapterBindingBase binding = capturedBindings[i];
