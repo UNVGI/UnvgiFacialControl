@@ -465,6 +465,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
                                 renderers,
                                 savedWeights,
                                 ctx,
+                                nameToIndex,
                                 weights))
                         {
                             snapshots.Add(new PhonemeSnapshot(entry.PhonemeId, weights));
@@ -523,6 +524,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
             SkinnedMeshRenderer[] renderers,
             SavedBlendShapeWeights[] savedWeights,
             in AdapterBuildContext ctx,
+            IReadOnlyDictionary<string, int> nameToIndex,
             float[] weights)
         {
             if (entry.Clip == null)
@@ -576,6 +578,18 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
             if (!anyNonZero)
             {
+                if (TryFindExpressionByPhonemeIdHeuristic(ctx, entry.PhonemeId, out Expression expression)
+                    && TryFillExpressionSnapshotByExpression(
+                        entry.PhonemeId,
+                        expression,
+                        nameToIndex,
+                        entry.MaxWeight,
+                        weights))
+                {
+                    LogAnimationClipFallbackWarning(entry.PhonemeId, entry.Clip.name);
+                    return true;
+                }
+
                 // sample 後に 1 つも BlendShape weight が立たないクリップは、リップシンク中に何も
                 // 出力しない (= ContributeMask が空のまま) ため、ユーザーが「リップシンクが動かない」
                 // と感じる元になる。Clip 自体に BlendShape カーブが無いか、HostGameObject の
@@ -588,7 +602,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
                     + "') の SkinnedMeshRenderer 構造と Clip の rendererPath が一致していない可能性があります。");
             }
 
-            return true;
+            return anyNonZero;
         }
 
         private bool TryFillExpressionSnapshot(
@@ -617,17 +631,32 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 return false;
             }
 
-            ReadOnlySpan<BlendShapeMapping> mappings = expression.Value.BlendShapeValues.Span;
+            return TryFillExpressionSnapshotByExpression(
+                entry.PhonemeId,
+                expression.Value,
+                nameToIndex,
+                entry.MaxWeight,
+                weights);
+        }
+
+        private bool TryFillExpressionSnapshotByExpression(
+            string phonemeId,
+            Expression expression,
+            IReadOnlyDictionary<string, int> nameToIndex,
+            float maxWeight,
+            float[] weights)
+        {
+            ReadOnlySpan<BlendShapeMapping> mappings = expression.BlendShapeValues.Span;
             if (mappings.Length == 0)
             {
                 LogExpressionResolutionWarning(
-                    entry.PhonemeId,
-                    expressionId,
+                    phonemeId,
+                    expression.Id,
                     ExpressionWarningCause.EmptyBlendShapeValues);
                 return false;
             }
 
-            float scale = NormalizeWeight(entry.MaxWeight);
+            float scale = NormalizeWeight(maxWeight);
             bool anyNonZero = false;
             for (int i = 0; i < mappings.Length; i++)
             {

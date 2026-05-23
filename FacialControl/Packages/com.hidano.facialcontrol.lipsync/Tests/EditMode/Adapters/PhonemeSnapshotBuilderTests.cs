@@ -392,6 +392,93 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         }
 
         [Test]
+        public void BuildSnapshots_AnimationClipFallback_WhenSampleAllZeroAndPhonemeMatchExpression()
+        {
+            GameObject host = CreateHost();
+            SkinnedMeshRenderer renderer = AddRenderer(host, "FaceMesh", "Mouth_A", "Mouth_I");
+            renderer.SetBlendShapeWeight(0, 12f);
+            renderer.SetBlendShapeWeight(1, 34f);
+
+            AnimationClip clip = CreateClip();
+            clip.name = "LipSync_A";
+            ULipSyncAdapterBinding binding = CreateBinding(
+                new AnimationClipPhonemeEntry
+                {
+                    PhonemeId = "A",
+                    Clip = clip,
+                    MaxWeight = 50f,
+                });
+            var profile = new FacialProfile(
+                "1.0",
+                expressions: new[]
+                {
+                    new Expression(
+                        "A",
+                        "\u3042",
+                        "lipsync",
+                        blendShapeValues: new[]
+                        {
+                            new BlendShapeMapping("Mouth_A", 0.8f),
+                            new BlendShapeMapping("Mouth_I", 0.25f),
+                        }),
+                });
+
+            LogAssert.Expect(
+                LogType.Warning,
+                new Regex("ULipSyncAdapterBinding.*AnimationClip 'LipSync_A'.*phoneme 'A'.*fallback.*ExpressionPhonemeEntry"));
+
+            PhonemeSnapshot[] snapshots = BuildSnapshots(
+                binding,
+                CreateContext(host, profile, "Mouth_A", "Mouth_I"));
+
+            Assert.That(snapshots, Has.Length.EqualTo(1));
+            Assert.That(snapshots[0].PhonemeId, Is.EqualTo("A"));
+            AssertWeights(snapshots[0].Weights, 0.4f, 0.125f);
+            Assert.That(renderer.GetBlendShapeWeight(0), Is.EqualTo(12f).Within(1e-6f));
+            Assert.That(renderer.GetBlendShapeWeight(1), Is.EqualTo(34f).Within(1e-6f));
+        }
+
+        [Test]
+        public void BuildSnapshots_AnimationClipFallback_WhenSampleAllZeroAndNoMatch_PreservesExistingWarning()
+        {
+            GameObject host = CreateHost();
+            AddRenderer(host, "FaceMesh", "Mouth_A");
+
+            AnimationClip clip = CreateClip();
+            clip.name = "LipSync_A";
+            ULipSyncAdapterBinding binding = CreateBinding(
+                new AnimationClipPhonemeEntry
+                {
+                    PhonemeId = "A",
+                    Clip = clip,
+                    MaxWeight = 100f,
+                });
+            var profile = new FacialProfile(
+                "1.0",
+                expressions: new[]
+                {
+                    new Expression(
+                        "\u3042",
+                        "\u3042",
+                        "lipsync",
+                        blendShapeValues: new[]
+                        {
+                            new BlendShapeMapping("Mouth_A", 1f),
+                        }),
+                });
+
+            LogAssert.Expect(
+                LogType.Warning,
+                new Regex("ULipSyncAdapterBinding.*AnimationClip 'LipSync_A'.*phoneme 'A'.*sample.*0"));
+
+            PhonemeSnapshot[] snapshots = BuildSnapshots(
+                binding,
+                CreateContext(host, profile, "Mouth_A"));
+
+            Assert.That(snapshots, Is.Empty);
+        }
+
+        [Test]
         public void Build_AfterAnimationClipSampling_RestoresSmrWeights()
         {
             GameObject host = CreateHost();
