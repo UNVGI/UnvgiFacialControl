@@ -8,6 +8,7 @@ using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
 using Hidano.FacialControl.LipSync.Tests.Shared;
 using Hidano.FacialControl.Tests.Shared;
 using NUnit.Framework;
+using UnityEngine;
 using UnityEngine.TestTools;
 
 namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
@@ -183,6 +184,91 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
 
             Assert.That(afterFrame, Is.SameAs(first));
             Assert.That(afterZeroRequest, Is.SameAs(first));
+        }
+
+        [Test]
+        public void TryGetPhonemeIndex_KnownPhonemeId_ReturnsTrueWithIndex()
+        {
+            var source = new FakeULipSyncEventSource();
+            using var provider = CreateProvider(
+                source,
+                new ManualTimeProvider(),
+                2,
+                Snapshot("A", 1f, 0f),
+                Snapshot("I", 0f, 1f));
+
+            bool found = provider.TryGetPhonemeIndex("I", out int index);
+
+            Assert.That(found, Is.True);
+            Assert.That(index, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TryGetPhonemeIndex_UnknownPhonemeId_ReturnsFalse()
+        {
+            var source = new FakeULipSyncEventSource();
+            using var provider = CreateProvider(source, new ManualTimeProvider(), 1, Snapshot("A", 1f));
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("Phoneme 'Unknown' is not registered"));
+            bool found = provider.TryGetPhonemeIndex("Unknown", out int index);
+
+            Assert.That(found, Is.False);
+            Assert.That(index, Is.EqualTo(-1));
+        }
+
+        [Test]
+        public void TryComposePhonemeWeights_KnownPhonemeId_WritesExpectedWeights()
+        {
+            var source = new FakeULipSyncEventSource();
+            var time = new ManualTimeProvider();
+            using var provider = CreateProvider(
+                source,
+                time,
+                3,
+                Snapshot("A", 0.5f, 0.25f, 0f),
+                Snapshot("I", 0f, 0.4f, 0.8f));
+            var output = new float[3];
+
+            source.Invoke(Info(0.5f, ("A", 0.75f), ("I", 0.25f)));
+            bool composed = provider.TryComposePhonemeWeights("A", output);
+
+            Assert.That(composed, Is.True);
+            AssertValuesClose(output, 0.5f * 0.75f * 0.5f, 0.5f * 0.75f * 0.25f, 0f);
+        }
+
+        [Test]
+        public void TryComposePhonemeWeights_UnknownPhonemeId_ReturnsFalse()
+        {
+            var source = new FakeULipSyncEventSource();
+            using var provider = CreateProvider(source, new ManualTimeProvider(), 2, Snapshot("A", 1f, 0f));
+            var output = new[] { 0.25f, 0.5f };
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("Phoneme 'Unknown' is not registered"));
+            bool composed = provider.TryComposePhonemeWeights("Unknown", output);
+
+            Assert.That(composed, Is.False);
+            AssertValuesClose(output, 0.25f, 0.5f);
+        }
+
+        [Test]
+        public void GetPhonemeContributeMask_KnownPhonemeId_ReturnsNonNullBitArray()
+        {
+            var source = new FakeULipSyncEventSource();
+            using var provider = CreateProvider(
+                source,
+                new ManualTimeProvider(),
+                4,
+                Snapshot("A", 1f, 0f, 0.5f, 0f),
+                Snapshot("I", 0f, 0.25f, 0f, 0f));
+
+            BitArray mask = provider.GetPhonemeContributeMask("A");
+
+            Assert.That(mask, Is.Not.Null);
+            Assert.That(mask.Length, Is.EqualTo(4));
+            Assert.That(mask[0], Is.True);
+            Assert.That(mask[1], Is.False);
+            Assert.That(mask[2], Is.True);
+            Assert.That(mask[3], Is.False);
         }
 
         [Test]

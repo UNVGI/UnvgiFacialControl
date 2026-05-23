@@ -19,6 +19,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
         private readonly string[] _phonemeKeys;
         private readonly int[] _phonemeIndices;
         private readonly float[][] _snapshotWeights;
+        private readonly BitArray[] _phonemeContributeMasks;
         private readonly int _phonemeCount;
 
         private readonly ITimeProvider _timeProvider;
@@ -42,6 +43,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
         private bool _zeroOutputRequested;
         private bool _isDisposed;
+        private bool _unknownPhonemeWarningEmitted;
 
         public ULipSyncProvider(
             IULipSyncEventSource eventSource,
@@ -86,6 +88,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
             _phonemeKeys = snapshotCount == 0 ? Array.Empty<string>() : new string[snapshotCount];
             _phonemeIndices = snapshotCount == 0 ? Array.Empty<int>() : new int[snapshotCount];
             _snapshotWeights = snapshotCount == 0 ? Array.Empty<float[]>() : new float[snapshotCount][];
+            _phonemeContributeMasks = snapshotCount == 0 ? Array.Empty<BitArray>() : new BitArray[snapshotCount];
 
             int validCount = 0;
             for (int i = 0; i < snapshotCount; i++)
@@ -99,8 +102,11 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
                 _snapshotWeights[i] = CopyWeights(snapshot.Weights, blendShapeCount);
                 MarkContributeIndexes(_snapshotWeights[i], _contributeMask);
+                var phonemeMask = new BitArray(blendShapeCount, false);
+                MarkContributeIndexes(_snapshotWeights[i], phonemeMask);
                 _phonemeKeys[validCount] = snapshot.PhonemeId;
                 _phonemeIndices[validCount] = i;
+                _phonemeContributeMasks[validCount] = phonemeMask;
                 validCount++;
             }
 
@@ -119,6 +125,52 @@ namespace Hidano.FacialControl.LipSync.Adapters
         public ReadOnlySpan<string> BlendShapeNames => _blendShapeNames;
 
         public BitArray ContributeMask => _contributeMask;
+
+        public bool TryGetPhonemeIndex(string phonemeId, out int index)
+        {
+            index = FindPhonemeIndex(phonemeId);
+            if (index >= 0)
+            {
+                return true;
+            }
+
+            LogUnknownPhonemeWarning(phonemeId);
+            return false;
+        }
+
+        public BitArray GetPhonemeContributeMask(string phonemeId)
+        {
+            int index = FindPhonemeIndex(phonemeId);
+            if (index >= 0)
+            {
+                return _phonemeContributeMasks[index];
+            }
+
+            LogUnknownPhonemeWarning(phonemeId);
+            return null;
+        }
+
+        public bool TryComposePhonemeWeights(string phonemeId, Span<float> output)
+        {
+            int index = FindPhonemeIndex(phonemeId);
+            if (index < 0)
+            {
+                LogUnknownPhonemeWarning(phonemeId);
+                return false;
+            }
+
+            EnsureCurrentFrameComposed();
+
+            float factor = _phonemeSmoothedWeights[index] * _smoothedVolume;
+            float[] weights = _snapshotWeights[_phonemeIndices[index]];
+            int copyLength = output.Length < weights.Length ? output.Length : weights.Length;
+            for (int i = 0; i < copyLength; i++)
+            {
+                output[i] = factor * weights[i];
+            }
+
+            return true;
+        }
 
         public void GetLipSyncValues(Span<float> output)
         {
@@ -163,6 +215,36 @@ namespace Hidano.FacialControl.LipSync.Adapters
             {
                 output[i] = _accum[i];
             }
+        }
+
+        private int FindPhonemeIndex(string phonemeId)
+        {
+            if (string.IsNullOrEmpty(phonemeId))
+            {
+                return -1;
+            }
+
+            for (int i = 0; i < _phonemeCount; i++)
+            {
+                if (string.Equals(_phonemeKeys[i], phonemeId, StringComparison.Ordinal))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private void LogUnknownPhonemeWarning(string phonemeId)
+        {
+            if (_unknownPhonemeWarningEmitted)
+            {
+                return;
+            }
+
+            _unknownPhonemeWarningEmitted = true;
+            Debug.LogWarning(
+                $"[ULipSyncProvider] Phoneme '{phonemeId ?? "<null>"}' is not registered. Further unknown phoneme warnings are suppressed.");
         }
 
         private void EnsureCurrentFrameComposed()
