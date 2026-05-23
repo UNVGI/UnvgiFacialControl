@@ -91,9 +91,12 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.HotSwap
             Assert.That(firstMicrophone, Is.Not.Null);
             Assert.That(firstMicrophone.index, Is.EqualTo(0));
 
-            EmitPhonemeFrame();
+            // OnStart 末尾の RequestZeroOutputForNextFrame をフラッシュしてから phoneme frame を投入し、
+            // 1 frame 進めることで SmoothDamp が dt>0 で前進し output が立ち上がるのを検証する。
             var providerOutput = new float[] { -1f };
             _binding.Provider.GetLipSyncValues(providerOutput);
+            EmitPhonemeFrame();
+            yield return null;
             _binding.Provider.GetLipSyncValues(providerOutput);
             Assert.That(providerOutput[0], Is.GreaterThan(0f));
 

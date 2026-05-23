@@ -358,6 +358,10 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 _microphoneInput = hostGameObject.AddComponent<uLipSync.uLipSyncMicrophone>();
                 _microphoneInput.index = resolution.ResolvedIndex;
                 _microphoneInput.UpdateMicInfo();
+                // UpdateMicInfo は Microphone.devices の状態に応じて index を再設定する経路があり、
+                // batchmode / 未接続環境では解決済み index が 0 に巻き戻ることがある。
+                // DeviceResolver の解決結果を最終 source-of-truth として再度上書きする。
+                _microphoneInput.index = resolution.ResolvedIndex;
                 return;
             }
 

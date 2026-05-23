@@ -123,30 +123,59 @@ namespace Hidano.FacialControl.LipSync.Adapters
             if (_zeroOutputRequested)
             {
                 output.Clear();
-                ResetSmoothingState();
+                // smoothed values / velocity / accum を 0 リセット。target は維持し、次回呼出時に
+                // 「初回フレーム扱い (_lastTimeSeconds<0)」で target に即時 snap する。
+                _smoothedVolume = 0f;
+                _volumeVelocity = 0f;
+                for (int i = 0; i < _phonemeCount; i++)
+                {
+                    _phonemeSmoothedWeights[i] = 0f;
+                    _phonemeVelocities[i] = 0f;
+                }
+                Array.Clear(_accum, 0, _accum.Length);
                 _zeroOutputRequested = false;
+                _lastTimeSeconds = -1.0;
                 return;
             }
 
-            // dt は ITimeProvider 経由で算出する。初回 (= _lastTimeSeconds < 0) は dt=0 で立ち上げる。
+            // 初回 (= _lastTimeSeconds < 0) は target を smoothed に即時 snap する。
+            // 同一フレーム内の連続呼出でも一度値が立ち上がるよう、dt=0 では SmoothDamp が
+            // 進まない問題を回避する目的。次回以降は通常の dt ベース SmoothDamp 経路。
             double now = _timeProvider.UnscaledTimeSeconds;
-            float dt = _lastTimeSeconds < 0.0 ? 0f : (float)(now - _lastTimeSeconds);
-            if (dt < 0f) dt = 0f;
-            _lastTimeSeconds = now;
-
-            // (a) volume の SmoothDamp。本家 uLipSyncBlendShape.cs:117 と等価。
-            _smoothedVolume = Mathf.SmoothDamp(
-                _smoothedVolume, _targetVolume, ref _volumeVelocity,
-                _smoothness, Mathf.Infinity, dt);
-
-            // (b) 各 phoneme weight の SmoothDamp。本家 uLipSyncBlendShape.cs:139-142 と等価。
-            float sum = 0f;
-            for (int i = 0; i < _phonemeCount; i++)
+            float sum;
+            if (_lastTimeSeconds < 0.0)
             {
-                _phonemeSmoothedWeights[i] = Mathf.SmoothDamp(
-                    _phonemeSmoothedWeights[i], _phonemeTargetRatios[i],
-                    ref _phonemeVelocities[i], _smoothness, Mathf.Infinity, dt);
-                sum += _phonemeSmoothedWeights[i];
+                _smoothedVolume = _targetVolume;
+                _volumeVelocity = 0f;
+                sum = 0f;
+                for (int i = 0; i < _phonemeCount; i++)
+                {
+                    _phonemeSmoothedWeights[i] = _phonemeTargetRatios[i];
+                    _phonemeVelocities[i] = 0f;
+                    sum += _phonemeSmoothedWeights[i];
+                }
+                _lastTimeSeconds = now;
+            }
+            else
+            {
+                float dt = (float)(now - _lastTimeSeconds);
+                if (dt < 0f) dt = 0f;
+                _lastTimeSeconds = now;
+
+                // (a) volume の SmoothDamp。本家 uLipSyncBlendShape.cs:117 と等価。
+                _smoothedVolume = Mathf.SmoothDamp(
+                    _smoothedVolume, _targetVolume, ref _volumeVelocity,
+                    _smoothness, Mathf.Infinity, dt);
+
+                // (b) 各 phoneme weight の SmoothDamp。本家 uLipSyncBlendShape.cs:139-142 と等価。
+                sum = 0f;
+                for (int i = 0; i < _phonemeCount; i++)
+                {
+                    _phonemeSmoothedWeights[i] = Mathf.SmoothDamp(
+                        _phonemeSmoothedWeights[i], _phonemeTargetRatios[i],
+                        ref _phonemeVelocities[i], _smoothness, Mathf.Infinity, dt);
+                    sum += _phonemeSmoothedWeights[i];
+                }
             }
 
             // (c) 母音 sum=1 正規化。本家 uLipSyncBlendShape.cs:145-148 と等価。

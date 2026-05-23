@@ -10,9 +10,9 @@
 
 ### Phase 1: Domain 出力バス基盤と FacialController 結線
 
-- [ ] 1. Domain 層 FacialOutputBus と `AdapterBuildContext` 拡張で post-blend BlendShape + Gaze 観察基盤を構築する
+- [x] 1. Domain 層 FacialOutputBus と `AdapterBuildContext` 拡張で post-blend BlendShape + Gaze 観察基盤を構築する
 
-- [ ] 1.1 Domain 純度を保った Gaze スナップショット値型と観察契約を定義する
+- [x] 1.1 Domain 純度を保った Gaze スナップショット値型と観察契約を定義する
   - `Hidano.FacialControl.Domain.Models` 名前空間に `GazeSnapshot`（`expressionId` / x / y を保持する不変構造体）を新設し、`UnityEngine.Vector2` を Domain 層に持ち込まない構造とする
   - `Hidano.FacialControl.Domain.Adapters` 名前空間に `IFacialOutputObserver`（post-blend Span + Gaze Span を受け取る単一通知メソッド）と `IFacialOutputBus`（Subscribe / Unsubscribe / HasObservers / Publish を提供）の 2 インターフェースを定義する
   - Span 引数は呼出スコープ内のみ有効である旨と、observer 側は値をコピーすべき旨を XML doc コメントに明示する
@@ -20,7 +20,7 @@
   - _Requirements: 1.1, 1.3, 1.9_
   - _Boundary: Domain.Models, Domain.Adapters_
 
-- [ ] 1.2 FacialOutputBus 実装（subscribe/unsubscribe 並行安全 + 例外吸収 + 空オブザーバ skip）
+- [x] 1.2 FacialOutputBus 実装（subscribe/unsubscribe 並行安全 + 例外吸収 + 空オブザーバ skip）
   - 内部に `_observers` の主リストと `_pendingAdds` / `_pendingRemoves` の遅延適用リストを持ち、`Publish` 列挙中の `Subscribe` / `Unsubscribe` を列挙完了後に反映する
   - `HasObservers` が false の場合は `Publish` を即時 return し、Span コピーや列挙コストを発生させない
   - observer.OnFacialOutputPublished が例外を投げた場合は Unity 標準ログ（`Debug.LogException`）にログ出力し、他 observer への通知を継続する
@@ -29,14 +29,14 @@
   - _Requirements: 1.1, 1.4, 1.5, 1.6, 1.7, 1.8, 1.10_
   - _Boundary: Domain.Services_
 
-- [ ] 1.3 `AdapterBuildContext` への `IFacialOutputBus` 必須フィールド追加（破壊的拡張）
+- [x] 1.3 `AdapterBuildContext` への `IFacialOutputBus` 必須フィールド追加（破壊的拡張）
   - 既存 `AdapterBuildContext` のコンストラクタ引数に `IFacialOutputBus FacialOutputBus` を追加し、null 時は `ArgumentNullException` を投げる
   - 既存 binding（InputSystem / Bone / ARKit 等）が当該フィールドを参照しないことを確認し、追加によるロジック変化が無いことを単体テストで検証する
   - 観察完了状態: `AdapterBuildContext` の構築経路を通る既存 binding テストがすべて緑のまま、`FacialOutputBus` フィールドが非 null であることを確認するテストが追加されている
   - _Requirements: 1.1, 1.2, 2.4, 10.2_
   - _Boundary: Domain.Adapters_
 
-- [ ] 1.4 FacialController の LateUpdate に pull 型 Publish フックを追加し VContainer child scope に Bus を登録する
+- [x] 1.4 FacialController の LateUpdate に pull 型 Publish フックを追加し VContainer child scope に Bus を登録する
   - `BuildAdapterBindingsChildScope` で `IFacialOutputBus` を Scoped で register し、`AdapterBuildContext` コンストラクタへ渡す
   - `LateUpdate` 末尾、`_layerUseCase.UpdateWeights` 直後・`BoneWriter.Apply` 前後の規定位置（design 採用案 (a)）で `_bus.Publish(blendShapeSpan, gazeSnapshotBuffer.AsSpan())` を呼ぶフックを追加する
   - `_gazeSnapshotBuffer` を `OnEnable` で `_characterSO.GazeConfigs.Count` ぶん確保し、Gaze 入力源が `IsValid=false` の `expressionId` は通知から除外する
@@ -49,9 +49,9 @@
 
 > 本 phase は範囲が広いため 7a / 7b / 7c の 3 sub-task 単位で 3 PR に分割する選択肢を保持する（7a 完了で SO/Dto Round-trip 緑、7b 完了で InputSystem Gaze 緑、7c 完了で残る Gaze テストすべて緑）。Phase 2 より前に実施することで OSC 受信側 `.left` / `.right` publish 規約と GazeBindingConfig の解決経路の機能空白を回避する。
 
-- [ ] 2. `GazeBindingConfig` を `expressionId` 必須 + `useDistinctLeftRight` flag + 条件付き sourceIdLeft/Right の構造へ破壊的改修し、Cross-binding Slug Convention を導入する
+- [x] 2. `GazeBindingConfig` を `expressionId` 必須 + `useDistinctLeftRight` flag + 条件付き sourceIdLeft/Right の構造へ破壊的改修し、Cross-binding Slug Convention を導入する
 
-- [ ] 2.1 (7a) `GazeBindingConfig` / DTO / Converter の構造改修と Round-trip テスト
+- [x] 2.1 (7a) `GazeBindingConfig` / DTO / Converter の構造改修と Round-trip テスト
   - `GazeBindingConfig` から旧単一 `sourceId` フィールドを削除し、`expressionId`（必須 string） / `useDistinctLeftRight`（既定 false） / `sourceIdLeft` / `sourceIdRight`（true 時のみ意味を持つ）を追加する
   - 角度制限フィールド（`outerYawAngle` / `innerYawAngle` / `lookUpAngle` / `lookDownAngle`）は左目 / 右目に対して左右別に適用する既存ロジックを維持する
   - `GazeBindingConfigDto` および `FacialCharacterProfileConverter` の双方向変換を新構造に合わせて改修し、`useDistinctLeftRight = false` 既定パスと `true` パスの両方を JSON Round-trip テストで網羅する
@@ -59,7 +59,7 @@
   - _Requirements: 13.1, 13.4, 13.6_
   - _Boundary: Adapters.ScriptableObject.GazeBindingConfig, Adapters.Json.Dto.GazeBindingConfigDto, FacialCharacterProfileConverter_
 
-- [ ] 2.2 (7b) `InputSystemAdapterBinding.ExpressionBindingEntry`（bindingMode=Gaze）を `useDistinctLeftRight` + 左右別 actionName へ同調
+- [x] 2.2 (7b) `InputSystemAdapterBinding.ExpressionBindingEntry`（bindingMode=Gaze）を `useDistinctLeftRight` + 左右別 actionName へ同調
   - `ExpressionBindingEntry` の Gaze 用フィールドを `useDistinctLeftRight` flag + `actionNameLeft` / `actionNameRight` に置き換え、`useDistinctLeftRight = false` 時は既存単一 `actionName` を両目共通で使う動作と等価にする
   - `BuildGazeProvider` の InputAction 解決を左右別 actionName 解決に変更し、片方欠落時は解決済み側を両目 fallback、両方未解決時はベース姿勢維持とする
   - 観察完了状態: InputSystem 経由の Gaze 入力が `useDistinctLeftRight = false` / `true` 双方のパスで E2E 動作し、新構造で関連テストが緑になる
@@ -67,7 +67,7 @@
   - _Boundary: com.hidano.facialcontrol.inputsystem InputSystemAdapterBinding_
   - _Depends: 2.1_
 
-- [ ] 2.3 (7c) Cross-binding Slug Convention 実装 + 既存 Gaze テスト群一斉改修
+- [x] 2.3 (7c) Cross-binding Slug Convention 実装 + 既存 Gaze テスト群一斉改修
   - `GazeBindingConfig` の解決ロジックに Cross-binding Slug Convention（`useDistinctLeftRight=false` 時の `{any}:{expressionId}.left` / `.right` / `{expressionId}` 自動マッチ、`useDistinctLeftRight=true` 時の完全 slug 文字列 lookup）を実装する
   - 複数 binding が同一 `expressionId` を提供する場合、`binding.Slug` の Ordinal lexicographic 昇順で deterministic に先頭採用し、その旨を警告ログ出力する（D8 / CI2）
   - `expressionId` 内に予約接尾辞 `.left` / `.right` を含む値はパース時に警告 + 拒否する
@@ -79,9 +79,9 @@
 
 ### Phase 2: OscAdapterBinding（受信）破壊的拡張 — mode 別 entry / bundle アトミック / フェイルセーフ / ゾンビ排除 / heartbeat 整合性
 
-- [ ] 3. 受信側 `OscAdapterBinding` を mode 別 `OscMappingEntry` 統合 + bundle アトミック + フェイルセーフ + ゾンビ排除 + heartbeat 整合性検査の構造に破壊的拡張する
+- [x] 3. 受信側 `OscAdapterBinding` を mode 別 `OscMappingEntry` 統合 + bundle アトミック + フェイルセーフ + ゾンビ排除 + heartbeat 整合性検査の構造に破壊的拡張する
 
-- [ ] 3.1 受信側 mapping 型と enum の Serializable 定義
+- [x] 3.1 受信側 mapping 型と enum の Serializable 定義
   - `OscMappingMode` enum（`Normal_BlendShape` / `Gaze_VRChat_XY` / `Gaze_ARKit_8BS`）を新設する
   - `OscMappingEntry` を `[Serializable]` クラスとして定義し、`mode` / `expressionId` / `addressPattern` / `sourceIdLeft` / `sourceIdRight` / `leftRightIndependent` を保持する
   - `FailSafeMode` enum（`RevertToBase` / `HoldLastValue`） / `BundleInterpretationMode` enum（`AtomicSwap` / `IndividualMessage`） / `AddressPresetKind` enum（`VRChat` / `ARKit`）を新設する
@@ -98,7 +98,7 @@
   - _Requirements: 4.6, 4.7, 12.3, 8.3_
   - _Boundary: Adapters.OSC.PerfectSyncEyeLook_
 
-- [ ] 3.3 (P) `OscBundleAccumulator`（timestamp キー集積 + Swap タイミング決定）
+- [x] 3.3 (P) `OscBundleAccumulator`（timestamp キー集積 + Swap タイミング決定）
   - 同一 `Message.timestamp` を蓄積し、異なる timestamp 到着 or `bundleAccumulationTimeoutMs`（既定 5 ms）超過で `OscDoubleBuffer.Swap` を呼ぶ集積器を新設する
   - bundle 外の bare メッセージは受信時刻順にバッファへ書き込み、次の `OnFixedTick.Swap` で公開するパスを併設する
   - 受信スレッドで蓄積し、メインスレッド `OnFixedTick` 内で Swap を確定するスレッドモデルを実装する
@@ -106,7 +106,7 @@
   - _Requirements: 3.4, 11.7_
   - _Boundary: Adapters.OSC.OscBundleAccumulator_
 
-- [ ] 3.4 (P) `ZombieEvictionPolicy`（最新起動時刻 UUID 採用 + 切替時 Info ログ）
+- [x] 3.4 (P) `ZombieEvictionPolicy`（最新起動時刻 UUID 採用 + 切替時 Info ログ）
   - 観測された `SenderIdentity`（Guid + UTC ms）群を内部 dictionary に蓄積し、最も新しい `StartedAtUnixMs` の UUID のみを採用する
   - 採用送信元の切替が発生した時に切替前後の UUID / 起動時刻を Unity 標準 Info ログに出力する
   - 内部 dictionary に上限 16 件を保持し、FIFO eviction で古いエントリを破棄する
@@ -122,7 +122,7 @@
   - _Requirements: 11.8, 11.9, 11.10, 11.11_
   - _Boundary: Adapters.OSC.HeartbeatConsistencyChecker_
 
-- [ ] 3.6 `GazeVector2InputSource`（Vector2 を IAnalogInputSource として登録 + GC ゼロ publish）
+- [x] 3.6 `GazeVector2InputSource`（Vector2 を IAnalogInputSource として登録 + GC ゼロ publish）
   - `IAnalogInputSource` を実装し、Vector2 値を読み取りホットパスで GC アロケーションを発生させずに publish する
   - `OscAdapterBinding` 内部で Gaze 系 entry から構築され、`IInputSourceRegistry` に slug 登録される構造とする
   - フェイルセーフ時に `(0, 0)` へ publish 切替できるエントリポイントを持つ
@@ -145,7 +145,7 @@
 
 ### Phase 3: OscSenderAdapterBinding 骨格と単一 endpoint 送信
 
-- [ ] 4. `OscSenderAdapterBinding` の AdapterBinding lifecycle 結線骨格を構築し、単一 endpoint への BlendShape 送信を成立させる
+- [x] 4. `OscSenderAdapterBinding` の AdapterBinding lifecycle 結線骨格を構築し、単一 endpoint への BlendShape 送信を成立させる
 
 - [x] 4.1 (P) `OscSenderEndpointConfig`（[Serializable] endpoint 設定）と `OscAddressFormatter`（zero-alloc アドレス組立）
   - `OscSenderEndpointConfig` を `[Serializable]` クラスとして定義し、IP/host 文字列 / UDP port / 有効/無効 flag / `AddressPresetKind` を保持する
@@ -177,9 +177,9 @@
 
 ### Phase 4: multi-endpoint + OSC bundle 送信 + heartbeat
 
-- [ ] 5. multi-endpoint 同報送信、OSC bundle フレームアトミック送信、heartbeat（BlendShape 名一覧）送信を `OscSenderAdapterBinding` に追加する
+- [x] 5. multi-endpoint 同報送信、OSC bundle フレームアトミック送信、heartbeat（BlendShape 名一覧）送信を `OscSenderAdapterBinding` に追加する
 
-- [ ] 5.1 (P) `OscBundleBuilder`（zero-alloc bundle 構築 + MTU 超過分割）
+- [x] 5.1 (P) `OscBundleBuilder`（zero-alloc bundle 構築 + MTU 超過分割）
   - timestamp + 事前 UTF-8 化済みアドレス byte[] + float 値の列から bundle byte 列を `Span<byte>`（ArrayPool 貸出）に書き出す再利用可能 builder を新設する
   - heartbeat 用 string 列を含む bundle 構築 API を提供する
   - UDP MTU（1472 byte）超過時は複数 bundle に同 timestamp で分割し、警告ログを出力する
@@ -187,7 +187,7 @@
   - _Requirements: 3.4, 3.5_
   - _Boundary: Adapters.OSC.OscBundleBuilder（uOSC fork 配下相当、preview.2 では既存 uOSC 上に実装）_
 
-- [ ] 5.2 multi-endpoint 同報送信と loopback 抑制以外の endpoint 正規化
+- [x] 5.2 multi-endpoint 同報送信と loopback 抑制以外の endpoint 正規化
   - `_endpoints : List<OscSenderEndpointConfig>` を保持し、`OnStart` で endpoint ごとに独立した送信スロット（`OscSenderHost` インスタンスまたは uOSC client）を確保する
   - 同一 (IP, port) 重複を 1 件に正規化し、初回検出時に 1 回の警告ログを出す
   - `enabled = false` の endpoint は送信 skip、`enabled = true` のみ送信。endpoint 件数 0 件は `OnStart` no-op + 警告ログ
@@ -198,7 +198,7 @@
   - _Boundary: Adapters.AdapterBindings.OscSenderAdapterBinding multi-endpoint state_
   - _Depends: 4.3, 5.1_
 
-- [ ] 5.3 OSC bundle フレームアトミック化（1 フレームの全メッセージを単一 bundle に集約）
+- [x] 5.3 OSC bundle フレームアトミック化（1 フレームの全メッセージを単一 bundle に集約）
   - 1 フレーム分の全 OSC メッセージ（sender_id ヘッダ + N float BlendShape + M Gaze メッセージ + 必要なら heartbeat）を単一の OSC bundle にまとめる
   - bundle 単位で UDP 送信し、受信側 `OscBundleAccumulator` の timestamp キー集積と整合する
   - 観察完了状態: 受信側 `OscAdapterBinding` で 1 フレーム分の全メッセージが同じ Swap 周期に反映される（Phase 9 PlayMode で bundle atomicity test 緑）
@@ -221,9 +221,9 @@
 
 ### Phase 5: アドレスプリセット（VRChat / ARKit）+ Gaze 送信（PerfectSync 互換）
 
-- [ ] 6. endpoint ごとのアドレスプリセット切替（VRChat / ARKit）と Gaze Vector2 送信（VRChat 形式 X/Y + ARKit PerfectSync 互換 8 BlendShape）を実装する
+- [x] 6. endpoint ごとのアドレスプリセット切替（VRChat / ARKit）と Gaze Vector2 送信（VRChat 形式 X/Y + ARKit PerfectSync 互換 8 BlendShape）を実装する
 
-- [ ] 6.1 `OscAddressFormatter` プリセット切替（VRChat / ARKit）+ 事前 UTF-8 byte 化キャッシュ
+- [x] 6.1 `OscAddressFormatter` プリセット切替（VRChat / ARKit）+ 事前 UTF-8 byte 化キャッシュ
   - endpoint のプリセットが `AddressPresetKind.VRChat` の時 BlendShape を `/avatar/parameters/{BlendShape 名}` 形式で構築する
   - endpoint のプリセットが `AddressPresetKind.ARKit` の時 BlendShape を `/ARKit/{BlendShape 名}` 形式で構築する
   - プリセット切替時に BlendShape / Gaze 両系統でアドレス文字列を再構築し送信テーブルに反映する
@@ -244,7 +244,7 @@
   - _Boundary: Adapters.AdapterBindings.OscSenderAdapterBinding gaze sender_
   - _Depends: 5.3, 6.1_
 
-- [ ] 6.3 Gaze 送信パス（ARKit PerfectSync 互換 8 BlendShape 分解）
+- [x] 6.3 Gaze 送信パス（ARKit PerfectSync 互換 8 BlendShape 分解）
   - ARKit 形式 endpoint で Gaze 送信が有効な時、Gaze Vector2 を PerfectSync 互換 8 BlendShape（`eyeLookInLeft` / `eyeLookOutLeft` / `eyeLookUpLeft` / `eyeLookDownLeft` / `eyeLookInRight` / `eyeLookOutRight` / `eyeLookUpRight` / `eyeLookDownRight`）に `PerfectSyncEyeLook.Compose` で分解し、各 BlendShape を `/ARKit/{eyeLook 名}` 形式で送信する
   - 角度制限（`outerYawAngle` / `innerYawAngle` / `lookUpAngle` / `lookDownAngle`）を送信側では適用せず、正規化済み Vector2 をそのまま分解する（受信側責務）
   - PerfectSync 互換の eyeLookXxx 名は ARKit 規格の固定 ASCII 名を使用する
@@ -268,9 +268,9 @@
 
 ### Phase 8: JSON DTO + Editor Drawer + サンプル
 
-- [ ] 8. JSON 永続化 DTO 群、UI Toolkit ベース PropertyDrawer 2 種類、`OscOutputDemo` / `OscReceiverDemo` サンプル一式を整備する
+- [x] 8. JSON 永続化 DTO 群、UI Toolkit ベース PropertyDrawer 2 種類、`OscOutputDemo` / `OscReceiverDemo` サンプル一式を整備する
 
-- [ ] 8.1 (P) `OscSenderOptionsDto` / `OscSenderEndpointDto`（送信側 JSON DTO）
+- [x] 8.1 (P) `OscSenderOptionsDto` / `OscSenderEndpointDto`（送信側 JSON DTO）
   - `OscSenderOptionsDto` を `[Serializable]` 型として定義し、endpoint 配列 / BlendShape mapping / Gaze expressionId / `suppressLoopback` / `heartbeatIntervalSeconds` を保持する
   - `OscSenderEndpointDto` を `[Serializable]` 型として定義し、ip / port / preset（"vrchat" / "arkit"）/ enabled を保持する
   - `SystemTextJsonParser`（`JsonUtility` ベース、新規 JSON ライブラリ持ち込み禁止）で JSON 往復、未知キー無視、必須欠落時の警告 + 既定値補完を実装する
@@ -288,7 +288,7 @@
   - _Requirements: 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.9, 6.10_
   - _Boundary: Adapters.Json.Dto.OscReceiverOptionsDto, Adapters.Json.Dto.OscMappingEntryDto_
 
-- [ ] 8.3 JSON スキーマドキュメント（`Documentation~/osc-sender-options.md` / `osc-receiver-options.md`）
+- [x] 8.3 JSON スキーマドキュメント（`Documentation~/osc-sender-options.md` / `osc-receiver-options.md`）
   - 送信側スキーマドキュメントに endpoint 一覧 / プリセット enum / heartbeat 周期 / ループバック抑制 / Gaze 送信構成のフィールド一覧、型、既定値、サンプル JSON を Markdown で記載する
   - 受信側スキーマドキュメントに mode 別 entry 構造（`Normal_BlendShape` / `Gaze_VRChat_XY` / `Gaze_ARKit_8BS`）、フェイルセーフモード、整合性検査ポリシー、bundle 解釈モードのフィールド一覧、型、既定値、サンプル JSON を Markdown で記載する（3 mode 分のサンプル）
   - ARKit mode の `addressPattern` 省略形を例示し、`leftRightIndependent = false` 既定の Gaze 例も含める
@@ -297,7 +297,7 @@
   - _Boundary: com.hidano.facialcontrol.osc Documentation~_
   - _Depends: 8.1, 8.2_
 
-- [ ] 8.4 (P) `OscSenderAdapterBindingDrawer`（UI Toolkit）
+- [x] 8.4 (P) `OscSenderAdapterBindingDrawer`（UI Toolkit）
   - UI Toolkit ベース PropertyDrawer として実装（IMGUI 新規利用禁止）し、Editor 専用 asmdef 配下に配置する
   - endpoint 一覧を ReorderableList 相当の UI で表示し、追加 / 削除 / 並べ替え、各 endpoint の IP/host・ポート・プリセット（VRChat / ARKit）・有効/無効を編集する
   - ループバック抑制ポリシー（既定: 有効）、BlendShape mapping 名一覧、Gaze 送信対象 `expressionId` 一覧の編集 UI を提供する
@@ -307,7 +307,7 @@
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.7, 7.8_
   - _Boundary: Editor.AdapterBindings.OscSenderAdapterBindingDrawer_
 
-- [ ] 8.5 (P) `OscAdapterBindingDrawer`（UI Toolkit、mode 別 fold-out で BlendShape / Gaze 統合表示）
+- [x] 8.5 (P) `OscAdapterBindingDrawer`（UI Toolkit、mode 別 fold-out で BlendShape / Gaze 統合表示）
   - UI Toolkit ベース PropertyDrawer として実装（IMGUI 新規利用禁止）し、Editor 専用 asmdef 配下に配置する
   - listen endpoint 編集、`OscMappingEntry[]` の ReorderableList 編集、staleness 秒数編集、`FailSafeMode` 切替（既定: ベース表情復帰）、整合性検査の警告ログ ON/OFF、bundle 解釈モード、bundleAccumulationTimeoutMs を提供する
   - 各 entry の mode 選択（`Normal_BlendShape` / `Gaze_VRChat_XY` / `Gaze_ARKit_8BS`）に応じた fold-out UI:
@@ -319,7 +319,7 @@
   - _Requirements: 7.1, 7.5, 7.6, 7.7, 7.8_
   - _Boundary: Editor.AdapterBindings.OscAdapterBindingDrawer_
 
-- [ ] 8.6 (P) `Samples~/OscOutputDemo`（送信側サンプル、Samples~ + Assets/Samples 二重管理）
+- [x] 8.6 (P) `Samples~/OscOutputDemo`（送信側サンプル、Samples~ + Assets/Samples 二重管理）
   - `com.hidano.facialcontrol.osc/Samples~/OscOutputDemo` に Scene / FacialProfileSO / `OscSenderOptions` JSON / README をまとめて配置する
   - BlendShape 送信、Gaze Vector2 送信（VRChat 形式と ARKit 形式の両方）、複数 endpoint 同報、ループバック抑制設定例を含める
   - `FacialControl/Assets/Samples/` 配下に同名サンプルを二重管理として配置し、dev project で Scene 結線して動作確認できる状態にする
@@ -327,7 +327,7 @@
   - _Requirements: 9.1, 9.2, 9.4_
   - _Boundary: com.hidano.facialcontrol.osc Samples~/OscOutputDemo, Assets/Samples mirror_
 
-- [ ] 8.7 (P) `Samples~/OscReceiverDemo`（受信専用サンプル、Samples~ + Assets/Samples 二重管理）
+- [x] 8.7 (P) `Samples~/OscReceiverDemo`（受信専用サンプル、Samples~ + Assets/Samples 二重管理）
   - `com.hidano.facialcontrol.osc/Samples~/OscReceiverDemo` に Scene / 受信専用最小 `FacialProfileSO`（OSC 入力源を素通しする 1 Layer のみ、Expression 定義不要）/ `OscReceiverOptions` JSON / Gaze 受信 binding 設定 / README をまとめて配置する
   - `FacialControl/Assets/Samples/` 配下に同名サンプルを二重管理として配置する
   - 観察完了状態: Package Manager から `OscReceiverDemo` を Import 可能、dev project で同サンプルを Play して送信側からの OSC を受信し描画できる
@@ -347,7 +347,7 @@
 
 > 本 phase は preview.2 milestone の検証層。Phase 1〜8 が緑になった時点で実行する。GC スパイク完全達成は preview.3 (Phase 10) で行うため、ここでは「機能正しさ」と「処理遅延が許容範囲内」を確認し、GC 計測は計測のみ（baseline 取得）に留める。
 
-- [ ] 9. PlayMode E2E と性能テスト（GC 計測）を実装する
+- [x] 9. PlayMode E2E と性能テスト（GC 計測）を実装する
 
 - [x] 9.1 (P) `OscSendReceiveE2ETests`（BlendShape 経路 E2E）
   - `FacialController` → `FacialOutputBus` → `OscSenderAdapterBinding` → 実 UDP → `OscAdapterBinding`（拡張版）→ `LayerUseCase` への post-blend 到達を検証する
@@ -356,7 +356,7 @@
   - _Requirements: 8.4, 8.13_
   - _Boundary: Tests/PlayMode/Integration_
 
-- [ ] 9.2 (P) `OscGazeE2ETests`（Gaze VRChat / ARKit 双方の経路 + ARKit 左右非対称情報損失なし + deterministic 採用）
+- [x] 9.2 (P) `OscGazeE2ETests`（Gaze VRChat / ARKit 双方の経路 + ARKit 左右非対称情報損失なし + deterministic 採用）
   - 左右非対称 Gaze Vector2（寄り目、片目流し目）が VRChat 形式（X/Y 2 メッセージ）/ ARKit 形式（PerfectSync 互換 8 BlendShape）双方の経路で受信側に到達し、誤差範囲で再現されることを検証する
   - ARKit mode かつ `leftRightIndependent = false` 時にも左右非対称 Gaze が情報損失なく `useDistinctLeftRight = false` の `GazeBindingConfig` 経路で両目別駆動として再現されるケースを 1 件追加する（D7 / CI1）
   - OSC 受信 binding と InputSystem 受信 binding が同一 `expressionId` を提供した時に `binding.Slug` の Ordinal lexicographic 昇順で deterministic に先頭採用 + 警告ログが出るケースを E2E で確認する（D8 / CI2）
@@ -364,7 +364,7 @@
   - _Requirements: 8.5, 8.13_
   - _Boundary: Tests/PlayMode/Integration_
 
-- [ ] 9.3 (P) `OscMultiEndpointTests` + `OscBundleAtomicityTests`
+- [x] 9.3 (P) `OscMultiEndpointTests` + `OscBundleAtomicityTests`
   - 1 sender → 2 receiver への unicast 同報送信が BlendShape と Gaze の両方について両系統で受信されることを検証する
   - OSC bundle のフレームアトミック性: 1 フレーム分の全メッセージが受信側で同一フレーム（同一 Swap）に反映されることを検証する
   - 観察完了状態: PlayMode テストランナーで両ケース緑
@@ -378,14 +378,14 @@
   - _Requirements: 8.8, 8.9, 8.13_
   - _Boundary: Tests/PlayMode/Integration_
 
-- [ ] 9.5 (P) `OscZombieEvictionTests` + `OscHeartbeatConsistencyTests`
+- [x] 9.5 (P) `OscZombieEvictionTests` + `OscHeartbeatConsistencyTests`
   - ゾンビ送信元排除: 複数の送信元 UUID が同時に観測される場合、最も新しい起動時刻の送信元のみが採用され、古い起動時刻の送信元から到着する値は無視されることを検証する
   - BlendShape 名一覧整合性検査: 送信側 heartbeat 受信後、不一致 BlendShape のみ反映されず警告ログが出ることを検証する
   - 観察完了状態: PlayMode テストランナーで両ケース緑
   - _Requirements: 8.10, 8.11, 8.13_
   - _Boundary: Tests/PlayMode/Integration_
 
-- [ ] 9.6* (P) `OscSenderGCAllocationTests` / `OscReceiverGCAllocationTests` / `OscBundleMtuTests`（preview.2 では baseline 計測のみ）
+- [x] 9.6* (P) `OscSenderGCAllocationTests` / `OscReceiverGCAllocationTests` / `OscBundleMtuTests`（preview.2 では baseline 計測のみ）
   - `OnLateTick` のホットパスに GC アロケーションが発生しないことを `Profiler.GetTotalAllocatedMemoryLong` 差分で監視する（BlendShape のみ送信ケース、Gaze 同送ケース、bundle 化ケース、heartbeat 含むケース）
   - preview.2 段階では uOSC 側の string / object[] アロケーションは許容するため、本 spec ロジック側（mode 別 entry 分別 / Gaze 逆合成 / bundle accumulator）の GC ゼロのみを確認する
   - 大規模 mapping（1000 BlendShape）で MTU 超過時の分割動作と GC ゼロ維持を計測する

@@ -4,7 +4,7 @@
 
 ## Phase 1: Core SO + JSON 層
 
-- [ ] 1. SO ルート `_gazeConfigs` データモデルと JSON スキーマ（preview.1 で `"1.0"` 統一）を整備する
+- [x] 1. SO ルート `_gazeConfigs` データモデルと JSON スキーマ（preview.1 で `"1.0"` 統一）を整備する
 - [x] 1.1 `FacialCharacterProfileSO` ルートに gaze configs コレクションを追加し read-only 公開する
   - SO ルート直下に `GazeBindingConfig` の serialized list を平坦に追加し、既存の `[SerializeReference]` adapter bindings 構造に副作用が出ないことを EditMode で確認する
   - `IFacialCharacterProfile` に gaze configs の read-only accessor を追加し、`FacialCharacterProfileSO` が空 list を null 化せず実装することを保証する
@@ -46,7 +46,7 @@
 
 ## Phase 2: InputSystem binding
 
-- [ ] 2. InputSystem 結線レイヤを `InputSystemGazeBinding` に縮退し runtime pairing を実装する
+- [x] 2. InputSystem 結線レイヤを `InputSystemGazeBinding` に縮退し runtime pairing を実装する
 - [x] 2.1 `InputSystemGazeBinding` を新設し `GazeExpressionConfig` 派生型を削除する
   - `expressionId` + `InputActionReference` のみを保持する薄い `[Serializable]` 値クラスを導入する
   - 旧 `GazeExpressionConfig` 派生型を削除し、依存テストおよび Sample asset の `RefIds[].type` 参照箇所を同 PR 内で書き換え／削除する
@@ -87,7 +87,7 @@
 
 > 注意: Phase 3 の leaf はすべて `FacialCharacterProfileSOInspector.cs`（および同パッケージの `InputSystemAdapterBindingDrawer.cs`）への変更に集中する。同一ファイル編集のため leaf は逐次（`(P)` 不付与）で進める。
 
-- [ ] 3. Inspector セクション再編と GazeConfigs UX を実装する
+- [x] 3. Inspector セクション再編と GazeConfigs UX を実装する
 - [x] 3.1 `CreateInspectorGUI` のセクション build 順を再編する
   - 「Save Status / Reference Model / Layers and Expressions / GazeConfigs（空セクションでよい） / Adapter Bindings / Debug」の順に build 順を変更する
   - 各セクションを foldout / labeled container として独立した視覚グループに分離し、Save Status Bar は最上段固定を維持する
@@ -133,7 +133,7 @@
   - 観測条件: binding drawer 上で `_gazeInputBindings` の追加 / 編集 / 削除が動作し、bone path / look-clip 系 UI が drawer から消えている
   - _Requirements: 1.4, 1.8_
 
-- [ ] 3.8 Inspector 行為の Editor test 群を追加する
+- [x] 3.8 Inspector 行為の Editor test 群を追加する
   - opt-in 追加 / 単行 remove / Expression 削除での孤児削除 / Analog→Digital での孤児削除 / 単行「参照モデルから自動設定」上書き / 一括再解決上書き / reference model 新規割当て自動補完（手動値保持） / Undo 1 ステップ巻き戻し / Debug ID マッピングの追加・削除・kind 変更反映 / Expression 行に id ラベルが存在しない / 旧 dead 名前定数が query で見つからない を網羅する EditMode テストを追加する
   - 観測条件: 上記すべての観点が Editor test として緑になり、TDD の Red → Green → Refactor を 1 leaf 内で経て pass する
   - _Requirements: 11.4, 11.7_
@@ -143,7 +143,7 @@
 
 ## Phase 4: Samples + Docs
 
-- [ ] 4. Sample 二重管理同期と破壊変更ドキュメントを更新する
+- [x] 4. Sample 二重管理同期と破壊変更ドキュメントを更新する
 - [x] 4.1 (P) Sample asset（YAML）2 ファイルを新スキーマに同期手術する
   - `Assets/Samples/.../MultiSourceBlendDemoCharacter.asset` の YAML を直接編集し、SO ルートに `_gazeConfigs` を、binding 内部に `_gazeInputBindings` を配置する。`GazeExpressionConfig` 削除に伴い `RefIds[].type` も更新する
   - `Packages/com.hidano.facialcontrol.inputsystem/Samples~/.../MultiSourceBlendDemoCharacter.asset` を上記と同内容で同期する
@@ -160,7 +160,7 @@
   - _Boundary: Sample profile.json_
   - _Depends: 1.5_
 
-- [ ] 4.3 Multi Source Blend Demo scene を Editor で Play して HUD と console を目視確認する
+- [x] 4.3 Multi Source Blend Demo scene を Editor で Play して HUD と console を目視確認する
   - Unity Editor で Multi Source Blend Demo scene を開き Play、HUD 経由で gaze が駆動することと scene load 時 / 実行中に schema-version 警告 / null-reference 警告が出ないことを確認する
   - 観測条件: HUD 操作で gaze 出力が更新され、Console に gaze 関連の warning / error が 0 件
   - _Requirements: 3.4_
