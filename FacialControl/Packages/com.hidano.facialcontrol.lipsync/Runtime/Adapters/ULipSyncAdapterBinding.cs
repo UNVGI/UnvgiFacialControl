@@ -412,6 +412,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
         private PhonemeSnapshot[] BuildSnapshots(in AdapterBuildContext ctx)
         {
             var snapshots = new List<PhonemeSnapshot>(_phonemeEntries.Count);
+            Dictionary<string, int> nameToIndex = BuildNameToIndex(ctx.BlendShapeNames);
             SkinnedMeshRenderer[] renderers =
                 ctx.HostGameObject.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             SkinnedMeshRenderer targetRenderer = ResolveRenderer(ctx.HostGameObject, renderers);
@@ -443,7 +444,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
                         if (TryFillBlendShapeSnapshot(
                                 blendShapeEntry,
                                 targetRenderer,
-                                ctx.BlendShapeNames,
+                                nameToIndex,
                                 weights))
                         {
                             snapshots.Add(new PhonemeSnapshot(entry.PhonemeId, weights));
@@ -452,11 +453,25 @@ namespace Hidano.FacialControl.LipSync.Adapters
                         continue;
                     }
 
-                    if (entry is AnimationClipPhonemeEntry animationEntry
-                        && TryFillAnimationClipSnapshot(
-                            animationEntry,
-                            renderers,
-                            savedWeights,
+                    if (entry is AnimationClipPhonemeEntry animationEntry)
+                    {
+                        if (TryFillAnimationClipSnapshot(
+                                animationEntry,
+                                renderers,
+                                savedWeights,
+                                ctx,
+                                weights))
+                        {
+                            snapshots.Add(new PhonemeSnapshot(entry.PhonemeId, weights));
+                        }
+
+                        continue;
+                    }
+
+                    if (entry is ExpressionPhonemeEntry expressionEntry
+                        && TryFillExpressionSnapshot(
+                            expressionEntry,
+                            nameToIndex,
                             ctx,
                             weights))
                     {
@@ -475,7 +490,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
         private bool TryFillBlendShapeSnapshot(
             BlendShapePhonemeEntry entry,
             SkinnedMeshRenderer targetRenderer,
-            IReadOnlyList<string> blendShapeNames,
+            IReadOnlyDictionary<string, int> nameToIndex,
             float[] weights)
         {
             if (targetRenderer == null || targetRenderer.sharedMesh == null)
@@ -485,7 +500,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 return false;
             }
 
-            int index = FindBlendShapeIndex(blendShapeNames, entry.BlendShapeName);
+            int index = FindBlendShapeIndex(nameToIndex, entry.BlendShapeName);
             int meshIndex = targetRenderer.sharedMesh.GetBlendShapeIndex(entry.BlendShapeName);
             if (index < 0 || meshIndex < 0)
             {
@@ -569,6 +584,18 @@ namespace Hidano.FacialControl.LipSync.Adapters
             }
 
             return true;
+        }
+
+        private bool TryFillExpressionSnapshot(
+            ExpressionPhonemeEntry entry,
+            IReadOnlyDictionary<string, int> nameToIndex,
+            in AdapterBuildContext ctx,
+            float[] weights)
+        {
+            Debug.LogWarning(
+                $"[ULipSyncAdapterBinding] ExpressionPhonemeEntry for phoneme '{entry.PhonemeId}' " +
+                "is not implemented yet. Skipping.");
+            return false;
         }
 
         private SkinnedMeshRenderer ResolveRenderer(
@@ -720,22 +747,31 @@ namespace Hidano.FacialControl.LipSync.Adapters
             return Mathf.Clamp01((maxWeight / 100f) * Mathf.Max(0f, _maxWeightScale));
         }
 
-        private static int FindBlendShapeIndex(IReadOnlyList<string> blendShapeNames, string blendShapeName)
+        private static Dictionary<string, int> BuildNameToIndex(IReadOnlyList<string> blendShapeNames)
+        {
+            var nameToIndex = new Dictionary<string, int>(blendShapeNames.Count);
+            for (int i = 0; i < blendShapeNames.Count; i++)
+            {
+                string name = blendShapeNames[i];
+                if (!string.IsNullOrEmpty(name) && !nameToIndex.ContainsKey(name))
+                {
+                    nameToIndex.Add(name, i);
+                }
+            }
+
+            return nameToIndex;
+        }
+
+        private static int FindBlendShapeIndex(
+            IReadOnlyDictionary<string, int> nameToIndex,
+            string blendShapeName)
         {
             if (string.IsNullOrEmpty(blendShapeName))
             {
                 return -1;
             }
 
-            for (int i = 0; i < blendShapeNames.Count; i++)
-            {
-                if (string.Equals(blendShapeNames[i], blendShapeName, StringComparison.Ordinal))
-                {
-                    return i;
-                }
-            }
-
-            return -1;
+            return nameToIndex.TryGetValue(blendShapeName, out int index) ? index : -1;
         }
 
         private void RegisterPhonemeOverlayInputSources(in AdapterBuildContext ctx, AdapterSlug slug)

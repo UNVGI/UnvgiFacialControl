@@ -138,6 +138,27 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         }
 
         [Test]
+        public void Build_ExpressionEntryStub_LogsWarningAndSkips()
+        {
+            GameObject host = CreateHost();
+            AddRenderer(host, "FaceMesh", "Mouth_A");
+            ULipSyncAdapterBinding binding = CreateBinding(
+                new ExpressionPhonemeEntry
+                {
+                    PhonemeId = "A",
+                    MaxWeight = 100f,
+                });
+
+            LogAssert.Expect(
+                LogType.Warning,
+                new Regex("ULipSyncAdapterBinding.*ExpressionPhonemeEntry.*phoneme 'A'.*not implemented.*Skipping"));
+
+            PhonemeSnapshot[] snapshots = BuildSnapshots(binding, CreateContext(host, "Mouth_A"));
+
+            Assert.That(snapshots, Is.Empty);
+        }
+
+        [Test]
         public void Build_AfterAnimationClipSampling_RestoresSmrWeights()
         {
             GameObject host = CreateHost();
