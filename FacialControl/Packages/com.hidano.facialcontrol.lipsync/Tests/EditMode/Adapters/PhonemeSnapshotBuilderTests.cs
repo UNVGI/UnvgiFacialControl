@@ -138,24 +138,48 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         }
 
         [Test]
-        public void Build_ExpressionEntryStub_LogsWarningAndSkips()
+        public void BuildSnapshots_WithExpressionPhonemeEntry_ResolvesFromProfile()
         {
             GameObject host = CreateHost();
-            AddRenderer(host, "FaceMesh", "Mouth_A");
+            SkinnedMeshRenderer renderer = AddRenderer(host, "FaceMesh", "Mouth_A", "Mouth_I", "Unused");
+            renderer.SetBlendShapeWeight(0, 45f);
+            renderer.SetBlendShapeWeight(1, 55f);
+            renderer.SetBlendShapeWeight(2, 65f);
+
+            var entry = new ExpressionPhonemeEntry
+            {
+                PhonemeId = "A",
+                MaxWeight = 50f,
+            };
+            SetPrivateField(entry, "_expressionId", "expr-a");
             ULipSyncAdapterBinding binding = CreateBinding(
-                new ExpressionPhonemeEntry
+                entry);
+            var profile = new FacialProfile(
+                "1.0",
+                expressions: new[]
                 {
-                    PhonemeId = "A",
-                    MaxWeight = 100f,
+                    new Expression(
+                        "expr-a",
+                        "A",
+                        "lipsync",
+                        blendShapeValues: new[]
+                        {
+                            new BlendShapeMapping("Mouth_A", 0.8f),
+                            new BlendShapeMapping("Mouth_I", 0.25f),
+                            new BlendShapeMapping("MissingBlendShape", 1f),
+                        }),
                 });
 
-            LogAssert.Expect(
-                LogType.Warning,
-                new Regex("ULipSyncAdapterBinding.*ExpressionPhonemeEntry.*phoneme 'A'.*not implemented.*Skipping"));
+            PhonemeSnapshot[] snapshots = BuildSnapshots(
+                binding,
+                CreateContext(host, profile, "Mouth_A", "Mouth_I", "Unused"));
 
-            PhonemeSnapshot[] snapshots = BuildSnapshots(binding, CreateContext(host, "Mouth_A"));
-
-            Assert.That(snapshots, Is.Empty);
+            Assert.That(snapshots, Has.Length.EqualTo(1));
+            Assert.That(snapshots[0].PhonemeId, Is.EqualTo("A"));
+            AssertWeights(snapshots[0].Weights, 0.4f, 0.125f, 0f);
+            Assert.That(renderer.GetBlendShapeWeight(0), Is.EqualTo(45f).Within(1e-6f));
+            Assert.That(renderer.GetBlendShapeWeight(1), Is.EqualTo(55f).Within(1e-6f));
+            Assert.That(renderer.GetBlendShapeWeight(2), Is.EqualTo(65f).Within(1e-6f));
         }
 
         [Test]
@@ -331,8 +355,16 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
             GameObject host,
             params string[] blendShapeNames)
         {
+            return CreateContext(host, new FacialProfile("1.0"), blendShapeNames);
+        }
+
+        private static AdapterBuildContext CreateContext(
+            GameObject host,
+            FacialProfile profile,
+            params string[] blendShapeNames)
+        {
             return new AdapterBuildContext(
-                new FacialProfile("1.0"),
+                profile,
                 new List<string>(blendShapeNames),
                 new InputSourceRegistry(),
                 new FacialOutputBus(),

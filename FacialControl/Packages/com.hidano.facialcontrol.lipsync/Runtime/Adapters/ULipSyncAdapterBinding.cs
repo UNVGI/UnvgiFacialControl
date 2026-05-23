@@ -597,10 +597,55 @@ namespace Hidano.FacialControl.LipSync.Adapters
             in AdapterBuildContext ctx,
             float[] weights)
         {
-            Debug.LogWarning(
-                $"[ULipSyncAdapterBinding] ExpressionPhonemeEntry for phoneme '{entry.PhonemeId}' " +
-                "is not implemented yet. Skipping.");
-            return false;
+            string expressionId = entry.ExpressionId;
+            if (string.IsNullOrEmpty(expressionId))
+            {
+                LogExpressionResolutionWarning(
+                    entry.PhonemeId,
+                    expressionId,
+                    ExpressionWarningCause.EmptyExpressionId);
+                return false;
+            }
+
+            Expression? expression = ctx.Profile.FindExpressionById(expressionId);
+            if (!expression.HasValue)
+            {
+                LogExpressionResolutionWarning(
+                    entry.PhonemeId,
+                    expressionId,
+                    ExpressionWarningCause.ExpressionNotFound);
+                return false;
+            }
+
+            ReadOnlySpan<BlendShapeMapping> mappings = expression.Value.BlendShapeValues.Span;
+            if (mappings.Length == 0)
+            {
+                LogExpressionResolutionWarning(
+                    entry.PhonemeId,
+                    expressionId,
+                    ExpressionWarningCause.EmptyBlendShapeValues);
+                return false;
+            }
+
+            float scale = NormalizeWeight(entry.MaxWeight);
+            bool anyNonZero = false;
+            for (int i = 0; i < mappings.Length; i++)
+            {
+                int index = FindBlendShapeIndex(nameToIndex, mappings[i].Name);
+                if (index < 0)
+                {
+                    continue;
+                }
+
+                float weight = Mathf.Clamp01(mappings[i].Value * scale);
+                weights[index] = weight;
+                if (weight > 0f)
+                {
+                    anyNonZero = true;
+                }
+            }
+
+            return anyNonZero;
         }
 
         private void LogExpressionResolutionWarning(
