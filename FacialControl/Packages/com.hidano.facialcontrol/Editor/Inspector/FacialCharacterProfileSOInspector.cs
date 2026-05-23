@@ -53,6 +53,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string TabExpressionsName = TabExpressionLibraryName;
 
         public const string SlotsDeclarationFoldoutName = "facial-character-slots-declaration-foldout";
+        public const string SlotsInitPhonemeButtonName = "slots-init-phoneme-button";
         public const string DefaultOverlaysFoldoutName = "facial-character-default-overlays-foldout";
         public const string ExpressionLibraryFoldoutName = "facial-character-expression-library-foldout";
         public const string ExpressionLibraryAddButtonName = "facial-character-expression-library-add-button";
@@ -540,8 +541,79 @@ namespace Hidano.FacialControl.Editor.Inspector
             };
             listView.itemsRemoved += _ => OnSlotsPropertyChanged();
 
+            var initPhonemeButton = new Button(() =>
+            {
+                AddMissingPhonemeSlots();
+                var indexProxy = new List<int>();
+                for (int i = 0; i < _slotsProperty.arraySize; i++)
+                {
+                    indexProxy.Add(i);
+                }
+
+                listView.itemsSource = indexProxy;
+                listView.Rebuild();
+            })
+            {
+                name = SlotsInitPhonemeButtonName,
+                text = "Phoneme slots を初期化 (a/i/u/e/o)",
+            };
+            initPhonemeButton.AddToClassList(FacialControlStyles.ActionButton);
+            initPhonemeButton.style.alignSelf = Align.FlexStart;
+            initPhonemeButton.style.marginTop = 4;
+            initPhonemeButton.style.marginBottom = 4;
+            foldout.Add(initPhonemeButton);
+
             foldout.Add(listView);
             root.Add(foldout);
+        }
+
+        private void AddMissingPhonemeSlots()
+        {
+            if (_slotsProperty == null) return;
+
+            serializedObject.Update();
+            bool changed = false;
+            foreach (var reservedSlot in PhonemeOverlaySlots.ReservedNames)
+            {
+                if (ContainsSlot(_slotsProperty, reservedSlot))
+                {
+                    continue;
+                }
+
+                int index = _slotsProperty.arraySize;
+                _slotsProperty.InsertArrayElementAtIndex(index);
+                var slotProp = _slotsProperty.GetArrayElementAtIndex(index);
+                if (slotProp != null)
+                {
+                    slotProp.stringValue = reservedSlot;
+                    changed = true;
+                }
+            }
+
+            if (!changed) return;
+
+            serializedObject.ApplyModifiedProperties();
+            EditorUtility.SetDirty(target);
+            OnSlotsPropertyChanged();
+        }
+
+        private static bool ContainsSlot(SerializedProperty slotsProperty, string slot)
+        {
+            if (slotsProperty == null || string.IsNullOrEmpty(slot))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < slotsProperty.arraySize; i++)
+            {
+                var element = slotsProperty.GetArrayElementAtIndex(i);
+                if (element != null && string.Equals(element.stringValue, slot, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void BindSlotDeclarationRow(VisualElement row, int slotIndex)
