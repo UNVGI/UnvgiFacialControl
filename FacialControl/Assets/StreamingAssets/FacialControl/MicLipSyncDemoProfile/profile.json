@@ -13,7 +13,17 @@
             ]
         }
     ],
+    "slots": [],
     "expressions": [],
+    "baseExpression": {
+        "transitionDuration": 0.06666667014360428,
+        "transitionCurvePreset": "Linear",
+        "blendShapes": [],
+        "bones": [],
+        "rendererPaths": [],
+        "overlays": []
+    },
     "rendererPaths": [],
-    "gaze_configs": []
+    "gaze_configs": [],
+    "defaultOverlays": []
 }
