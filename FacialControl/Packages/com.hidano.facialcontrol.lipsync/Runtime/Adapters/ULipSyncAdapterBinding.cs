@@ -104,6 +104,9 @@ namespace Hidano.FacialControl.LipSync.Adapters
         [NonSerialized]
         private bool _addedAudioSource;
 
+        [NonSerialized]
+        private HashSet<string> _loggedWarnings;
+
         public ULipSyncAdapterBinding()
         {
             Slug = DefaultSlug;
@@ -190,6 +193,8 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
         public override void OnStart(in AdapterBuildContext ctx)
         {
+            ClearLoggedWarnings();
+
             if (_started)
             {
                 return;
@@ -598,6 +603,79 @@ namespace Hidano.FacialControl.LipSync.Adapters
             return false;
         }
 
+        private void LogExpressionResolutionWarning(
+            string phonemeId,
+            string expressionId,
+            ExpressionWarningCause cause)
+        {
+            string normalizedPhonemeId = string.IsNullOrEmpty(phonemeId) ? "<empty>" : phonemeId;
+            string normalizedExpressionId = string.IsNullOrEmpty(expressionId) ? "<empty>" : expressionId;
+            string key = cause switch
+            {
+                ExpressionWarningCause.EmptyExpressionId => $"expr-empty:{normalizedPhonemeId}",
+                ExpressionWarningCause.ExpressionNotFound =>
+                    $"expr-not-found:{normalizedPhonemeId}:{normalizedExpressionId}",
+                ExpressionWarningCause.EmptyBlendShapeValues =>
+                    $"expr-empty-bs:{normalizedPhonemeId}:{normalizedExpressionId}",
+                _ => $"expr-unknown:{normalizedPhonemeId}:{normalizedExpressionId}",
+            };
+
+            if (!TryMarkWarningLogged(key))
+            {
+                return;
+            }
+
+            string message = cause switch
+            {
+                ExpressionWarningCause.EmptyExpressionId =>
+                    "Expression is not assigned. Assign an Expression in the Inspector.",
+                ExpressionWarningCause.ExpressionNotFound =>
+                    $"ExpressionId='{normalizedExpressionId}' does not exist in the profile.",
+                ExpressionWarningCause.EmptyBlendShapeValues =>
+                    $"Expression '{normalizedExpressionId}' has no BlendShape values.",
+                _ => "Expression could not be resolved.",
+            };
+
+            Debug.LogWarning(
+                $"[ULipSyncAdapterBinding] {message} PhonemeId='{normalizedPhonemeId}'.");
+        }
+
+        private void LogAnimationClipFallbackWarning(string phonemeId, string clipName)
+        {
+            string normalizedPhonemeId = string.IsNullOrEmpty(phonemeId) ? "<empty>" : phonemeId;
+            if (!TryMarkWarningLogged($"clip-fallback:{normalizedPhonemeId}"))
+            {
+                return;
+            }
+
+            string normalizedClipName = string.IsNullOrEmpty(clipName) ? "<null>" : clipName;
+            Debug.LogWarning(
+                $"[ULipSyncAdapterBinding] AnimationClip '{normalizedClipName}' "
+                + $"for phoneme '{normalizedPhonemeId}' sampled all zero values; fallback 採用済み. "
+                + "Use ExpressionPhonemeEntry as a more reliable alternative.");
+        }
+
+        private bool TryMarkWarningLogged(string key)
+        {
+            if (_loggedWarnings == null)
+            {
+                _loggedWarnings = new HashSet<string>(StringComparer.Ordinal);
+            }
+
+            return _loggedWarnings.Add(key);
+        }
+
+        private void ClearLoggedWarnings()
+        {
+            if (_loggedWarnings == null)
+            {
+                _loggedWarnings = new HashSet<string>(StringComparer.Ordinal);
+                return;
+            }
+
+            _loggedWarnings.Clear();
+        }
+
         private SkinnedMeshRenderer ResolveRenderer(
             GameObject hostGameObject,
             SkinnedMeshRenderer[] renderers)
@@ -904,6 +982,13 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 Renderer = renderer;
                 Weights = weights;
             }
+        }
+
+        private enum ExpressionWarningCause
+        {
+            EmptyExpressionId,
+            ExpressionNotFound,
+            EmptyBlendShapeValues,
         }
 
         private void RollbackStartedResources()

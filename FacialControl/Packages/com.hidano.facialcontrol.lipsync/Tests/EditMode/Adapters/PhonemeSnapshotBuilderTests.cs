@@ -159,6 +159,32 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         }
 
         [Test]
+        public void LogExpressionResolutionWarning_SameCauseTwice_LogsWarningOnce()
+        {
+            ULipSyncAdapterBinding binding = CreateBinding();
+
+            LogAssert.Expect(
+                LogType.Warning,
+                new Regex("ULipSyncAdapterBinding.*Expression is not assigned.*PhonemeId='A'"));
+
+            InvokeExpressionResolutionWarning(binding, "A", string.Empty, "EmptyExpressionId");
+            InvokeExpressionResolutionWarning(binding, "A", string.Empty, "EmptyExpressionId");
+        }
+
+        [Test]
+        public void LogAnimationClipFallbackWarning_SameCauseTwice_LogsWarningOnce()
+        {
+            ULipSyncAdapterBinding binding = CreateBinding();
+
+            LogAssert.Expect(
+                LogType.Warning,
+                new Regex("ULipSyncAdapterBinding.*AnimationClip 'LipSync_A'.*phoneme 'A'.*fallback"));
+
+            InvokeAnimationClipFallbackWarning(binding, "A", "LipSync_A");
+            InvokeAnimationClipFallbackWarning(binding, "A", "LipSync_A");
+        }
+
+        [Test]
         public void Build_AfterAnimationClipSampling_RestoresSmrWeights()
         {
             GameObject host = CreateHost();
@@ -355,6 +381,37 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
             {
                 Assert.That(actual[i], Is.EqualTo(expected[i]).Within(1e-6f), "index " + i);
             }
+        }
+
+        private static void InvokeExpressionResolutionWarning(
+            ULipSyncAdapterBinding binding,
+            string phonemeId,
+            string expressionId,
+            string causeName)
+        {
+            Type causeType = typeof(ULipSyncAdapterBinding).GetNestedType(
+                "ExpressionWarningCause",
+                BindingFlags.NonPublic);
+            Assert.That(causeType, Is.Not.Null);
+            object cause = Enum.Parse(causeType, causeName);
+
+            MethodInfo method = typeof(ULipSyncAdapterBinding).GetMethod(
+                "LogExpressionResolutionWarning",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(binding, new[] { phonemeId, expressionId, cause });
+        }
+
+        private static void InvokeAnimationClipFallbackWarning(
+            ULipSyncAdapterBinding binding,
+            string phonemeId,
+            string clipName)
+        {
+            MethodInfo method = typeof(ULipSyncAdapterBinding).GetMethod(
+                "LogAnimationClipFallbackWarning",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(binding, new object[] { phonemeId, clipName });
         }
 
         private readonly struct ClipCurve
