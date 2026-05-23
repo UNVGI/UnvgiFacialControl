@@ -9,6 +9,7 @@ using Hidano.FacialControl.Domain.Services;
 using Hidano.FacialControl.LipSync.Adapters;
 using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.TestTools;
 
@@ -17,12 +18,34 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
     [TestFixture]
     public class PhonemeSnapshotBuilderTests
     {
+        private const string TempFolderParent = "Assets";
+        private const string TempFolderName = "__Temp_ULipSyncPhonemeSnapshotBuilderTests";
+        private static readonly string TempFolderPath = TempFolderParent + "/" + TempFolderName;
+
         private readonly List<UnityEngine.Object> _createdObjects =
             new List<UnityEngine.Object>();
+
+        private readonly List<string> _createdAssetPaths = new List<string>();
 
         [TearDown]
         public void TearDown()
         {
+            for (int i = _createdAssetPaths.Count - 1; i >= 0; i--)
+            {
+                AssetDatabase.DeleteAsset(_createdAssetPaths[i]);
+            }
+
+            _createdAssetPaths.Clear();
+
+            if (AssetDatabase.IsValidFolder(TempFolderPath))
+            {
+                var remaining = AssetDatabase.FindAssets(string.Empty, new[] { TempFolderPath });
+                if (remaining == null || remaining.Length == 0)
+                {
+                    AssetDatabase.DeleteAsset(TempFolderPath);
+                }
+            }
+
             for (int i = _createdObjects.Count - 1; i >= 0; i--)
             {
                 if (_createdObjects[i] != null)
@@ -648,6 +671,120 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
             AssertWeights(snapshots[0].Weights, 0.2f);
         }
 
+        [Test]
+        public void BackwardCompatibility_BlendShapeSerializeReferenceFixture_LoadsAndBuildsExpectedSnapshots()
+        {
+            GameObject host = CreateHost();
+            AddRenderer(host, "FaceMesh", "Mouth_A", "Mouth_I");
+            var entries = new PhonemeEntryBase[]
+            {
+                new BlendShapePhonemeEntry
+                {
+                    PhonemeId = "A",
+                    BlendShapeName = "Mouth_A",
+                    MaxWeight = 87.5f,
+                },
+            };
+
+            PhonemeEntryFixtureAsset fixture = SaveAndReloadFixture("BlendShapeOnly", entries);
+            Assert.That(fixture.Entries, Has.Count.EqualTo(1));
+            Assert.That(fixture.Entries[0], Is.InstanceOf<BlendShapePhonemeEntry>());
+            AssertCommonFieldsAreBackwardCompatible(fixture.Entries[0], "A", 87.5f);
+            Assert.That(((BlendShapePhonemeEntry)fixture.Entries[0]).BlendShapeName, Is.EqualTo("Mouth_A"));
+            AssertSerializedEntryTypes(
+                fixture,
+                typeof(BlendShapePhonemeEntry));
+
+            PhonemeSnapshot[] snapshots = BuildSnapshots(
+                CreateBinding(fixture.Entries.ToArray()),
+                CreateContext(host, "Mouth_A", "Mouth_I"));
+
+            AssertSnapshotsBitExact(
+                snapshots,
+                ExpectedSnapshot("A", 0.875f, 0f));
+        }
+
+        [Test]
+        public void BackwardCompatibility_AnimationClipSerializeReferenceFixture_LoadsAndBuildsExpectedSnapshots()
+        {
+            GameObject host = CreateHost();
+            SkinnedMeshRenderer renderer = AddRenderer(host, "FaceMesh", "Mouth_A", "Mouth_I");
+            renderer.SetBlendShapeWeight(0, 21f);
+            renderer.SetBlendShapeWeight(1, 42f);
+            AnimationClip clip = CreateAssetClip("LegacyClip_I", Curve("FaceMesh", "Mouth_I", 66f));
+            var entries = new PhonemeEntryBase[]
+            {
+                new AnimationClipPhonemeEntry
+                {
+                    PhonemeId = "I",
+                    Clip = clip,
+                    MaxWeight = 50f,
+                },
+            };
+
+            PhonemeEntryFixtureAsset fixture = SaveAndReloadFixture("AnimationClipOnly", entries, clip);
+            Assert.That(fixture.Entries, Has.Count.EqualTo(1));
+            Assert.That(fixture.Entries[0], Is.InstanceOf<AnimationClipPhonemeEntry>());
+            AssertCommonFieldsAreBackwardCompatible(fixture.Entries[0], "I", 50f);
+            Assert.That(((AnimationClipPhonemeEntry)fixture.Entries[0]).Clip, Is.Not.Null);
+            AssertSerializedEntryTypes(
+                fixture,
+                typeof(AnimationClipPhonemeEntry));
+
+            PhonemeSnapshot[] snapshots = BuildSnapshots(
+                CreateBinding(fixture.Entries.ToArray()),
+                CreateContext(host, "Mouth_A", "Mouth_I"));
+
+            AssertSnapshotsBitExact(
+                snapshots,
+                ExpectedSnapshot("I", 0f, 0.33f));
+            Assert.That(renderer.GetBlendShapeWeight(0), Is.EqualTo(21f).Within(1e-6f));
+            Assert.That(renderer.GetBlendShapeWeight(1), Is.EqualTo(42f).Within(1e-6f));
+        }
+
+        [Test]
+        public void BackwardCompatibility_MixedSerializeReferenceFixture_LoadsAndBuildsExpectedSnapshots()
+        {
+            GameObject host = CreateHost();
+            AddRenderer(host, "FaceMesh", "Mouth_A", "Mouth_I", "Mouth_U");
+            AnimationClip clip = CreateAssetClip("LegacyClip_U", Curve("FaceMesh", "Mouth_U", 25f));
+            var entries = new PhonemeEntryBase[]
+            {
+                new BlendShapePhonemeEntry
+                {
+                    PhonemeId = "A",
+                    BlendShapeName = "Mouth_A",
+                    MaxWeight = 100f,
+                },
+                new AnimationClipPhonemeEntry
+                {
+                    PhonemeId = "U",
+                    Clip = clip,
+                    MaxWeight = 80f,
+                },
+            };
+
+            PhonemeEntryFixtureAsset fixture = SaveAndReloadFixture("Mixed", entries, clip);
+            Assert.That(fixture.Entries, Has.Count.EqualTo(2));
+            Assert.That(fixture.Entries[0], Is.InstanceOf<BlendShapePhonemeEntry>());
+            Assert.That(fixture.Entries[1], Is.InstanceOf<AnimationClipPhonemeEntry>());
+            AssertCommonFieldsAreBackwardCompatible(fixture.Entries[0], "A", 100f);
+            AssertCommonFieldsAreBackwardCompatible(fixture.Entries[1], "U", 80f);
+            AssertSerializedEntryTypes(
+                fixture,
+                typeof(BlendShapePhonemeEntry),
+                typeof(AnimationClipPhonemeEntry));
+
+            PhonemeSnapshot[] snapshots = BuildSnapshots(
+                CreateBinding(fixture.Entries.ToArray()),
+                CreateContext(host, "Mouth_A", "Mouth_I", "Mouth_U"));
+
+            AssertSnapshotsBitExact(
+                snapshots,
+                ExpectedSnapshot("A", 1f, 0f, 0f),
+                ExpectedSnapshot("U", 0f, 0f, 0.2f));
+        }
+
         private GameObject CreateHost()
         {
             var host = new GameObject("PhonemeSnapshotBuilderTestsHost");
@@ -704,6 +841,21 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         {
             var clip = new AnimationClip();
             _createdObjects.Add(clip);
+            for (int i = 0; i < curves.Length; i++)
+            {
+                clip.SetCurve(
+                    curves[i].RelativePath,
+                    typeof(SkinnedMeshRenderer),
+                    "blendShape." + curves[i].BlendShapeName,
+                    new AnimationCurve(new Keyframe(0f, curves[i].Weight)));
+            }
+
+            return clip;
+        }
+
+        private AnimationClip CreateAssetClip(string name, params ClipCurve[] curves)
+        {
+            var clip = new AnimationClip { name = name };
             for (int i = 0; i < curves.Length; i++)
             {
                 clip.SetCurve(
@@ -809,6 +961,129 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
             }
         }
 
+        private PhonemeEntryFixtureAsset SaveAndReloadFixture(
+            string fixtureName,
+            IReadOnlyList<PhonemeEntryBase> entries,
+            params AnimationClip[] clips)
+        {
+            if (!AssetDatabase.IsValidFolder(TempFolderPath))
+            {
+                AssetDatabase.CreateFolder(TempFolderParent, TempFolderName);
+            }
+
+            string assetPath = TempFolderPath
+                + "/PhonemeSnapshotBuilder_"
+                + fixtureName
+                + "_"
+                + Guid.NewGuid().ToString("N")
+                + ".asset";
+            _createdAssetPaths.Add(assetPath);
+
+            var fixture = ScriptableObject.CreateInstance<PhonemeEntryFixtureAsset>();
+            AssetDatabase.CreateAsset(fixture, assetPath);
+            for (int i = 0; i < clips.Length; i++)
+            {
+                AssetDatabase.AddObjectToAsset(clips[i], fixture);
+            }
+
+            using (var serialized = new SerializedObject(fixture))
+            {
+                SerializedProperty entriesProperty =
+                    serialized.FindProperty(nameof(PhonemeEntryFixtureAsset.Entries));
+                entriesProperty.arraySize = entries.Count;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                serialized.Update();
+
+                for (int i = 0; i < entries.Count; i++)
+                {
+                    SerializedProperty entry = entriesProperty.GetArrayElementAtIndex(i);
+                    entry.managedReferenceValue = entries[i];
+                }
+
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            EditorUtility.SetDirty(fixture);
+            for (int i = 0; i < clips.Length; i++)
+            {
+                EditorUtility.SetDirty(clips[i]);
+            }
+
+            AssetDatabase.SaveAssets();
+            Resources.UnloadAsset(fixture);
+
+            PhonemeEntryFixtureAsset loaded =
+                AssetDatabase.LoadAssetAtPath<PhonemeEntryFixtureAsset>(assetPath);
+            Assert.That(loaded, Is.Not.Null);
+            return loaded;
+        }
+
+        private static void AssertCommonFieldsAreBackwardCompatible(
+            PhonemeEntryBase entry,
+            string expectedPhonemeId,
+            float expectedMaxWeight)
+        {
+            Assert.That(entry.PhonemeId, Is.EqualTo(expectedPhonemeId));
+            Assert.That(entry.MaxWeight, Is.EqualTo(expectedMaxWeight).Within(1e-6f));
+            Assert.That(
+                typeof(PhonemeEntryBase).GetField(nameof(PhonemeEntryBase.PhonemeId)).FieldType,
+                Is.EqualTo(typeof(string)));
+            Assert.That(
+                typeof(PhonemeEntryBase).GetField(nameof(PhonemeEntryBase.MaxWeight)).FieldType,
+                Is.EqualTo(typeof(float)));
+        }
+
+        private static void AssertSerializedEntryTypes(
+            PhonemeEntryFixtureAsset fixture,
+            params Type[] expectedTypes)
+        {
+            using (var serialized = new SerializedObject(fixture))
+            {
+                SerializedProperty entriesProperty =
+                    serialized.FindProperty(nameof(PhonemeEntryFixtureAsset.Entries));
+                Assert.That(entriesProperty.arraySize, Is.EqualTo(expectedTypes.Length));
+
+                for (int i = 0; i < expectedTypes.Length; i++)
+                {
+                    SerializedProperty entry = entriesProperty.GetArrayElementAtIndex(i);
+                    Assert.That(entry.propertyType, Is.EqualTo(SerializedPropertyType.ManagedReference));
+                    Assert.That(entry.managedReferenceValue, Is.InstanceOf(expectedTypes[i]));
+                    Assert.That(
+                        entry.managedReferenceFullTypename,
+                        Does.Contain(expectedTypes[i].FullName));
+                }
+            }
+        }
+
+        private static ExpectedPhonemeSnapshot ExpectedSnapshot(string phonemeId, params float[] weights)
+        {
+            return new ExpectedPhonemeSnapshot(phonemeId, weights);
+        }
+
+        private static void AssertSnapshotsBitExact(
+            PhonemeSnapshot[] actual,
+            params ExpectedPhonemeSnapshot[] expected)
+        {
+            Assert.That(actual, Has.Length.EqualTo(expected.Length));
+            for (int snapshotIndex = 0; snapshotIndex < expected.Length; snapshotIndex++)
+            {
+                Assert.That(actual[snapshotIndex].PhonemeId, Is.EqualTo(expected[snapshotIndex].PhonemeId));
+                Assert.That(actual[snapshotIndex].Weights, Has.Length.EqualTo(expected[snapshotIndex].Weights.Length));
+                for (int weightIndex = 0; weightIndex < expected[snapshotIndex].Weights.Length; weightIndex++)
+                {
+                    Assert.That(
+                        FloatBits(actual[snapshotIndex].Weights[weightIndex]),
+                        Is.EqualTo(FloatBits(expected[snapshotIndex].Weights[weightIndex])),
+                        "snapshot " + snapshotIndex + ", weight " + weightIndex);
+                }
+            }
+        }
+
+        private static int FloatBits(float value)
+        {
+            return BitConverter.ToInt32(BitConverter.GetBytes(value), 0);
+        }
+
         private static void InvokeExpressionResolutionWarning(
             ULipSyncAdapterBinding binding,
             string phonemeId,
@@ -870,5 +1145,19 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
                 Weight = weight;
             }
         }
+
+        private readonly struct ExpectedPhonemeSnapshot
+        {
+            public readonly string PhonemeId;
+            public readonly float[] Weights;
+
+            public ExpectedPhonemeSnapshot(string phonemeId, float[] weights)
+            {
+                PhonemeId = phonemeId;
+                Weights = weights;
+            }
+        }
+
     }
+
 }
