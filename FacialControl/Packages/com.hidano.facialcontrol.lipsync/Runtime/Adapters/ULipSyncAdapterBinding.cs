@@ -212,6 +212,8 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 return;
             }
 
+            WarnIfLegacyLipSyncSourceAlsoRegistered(ctx, slug);
+
             DeviceResolution resolution = ResolveDevice(_runtimeDescriptor);
             if (resolution.Kind == DeviceKind.Unresolved)
             {
@@ -790,6 +792,36 @@ namespace Hidano.FacialControl.LipSync.Adapters
                         "Duplicate binding initialization was skipped.");
                     return true;
                 }
+            }
+
+            return false;
+        }
+
+        internal static bool WarnIfLegacyLipSyncSourceAlsoRegistered(
+            in AdapterBuildContext ctx,
+            AdapterSlug slug)
+        {
+            if (!ctx.InputSourceRegistry.TryResolve(slug.Value, out _))
+            {
+                return false;
+            }
+
+            ReadOnlySpan<string> declaredSlots = ctx.Profile.Slots.Span;
+            ReadOnlySpan<string> reservedSlots = PhonemeOverlaySlots.ReservedNames;
+            for (int i = 0; i < reservedSlots.Length; i++)
+            {
+                string slot = reservedSlots[i];
+                if (!ContainsSlot(declaredSlots, slot))
+                {
+                    continue;
+                }
+
+                Debug.LogWarning(
+                    $"[ULipSyncAdapterBinding] Legacy LipSync input source '{slug.Value}' is already registered " +
+                    $"while phoneme overlay slot '{slot}' is declared. This can double-write the same phoneme " +
+                    "BlendShape in one frame. Remove the legacy lipsync layer/input source and migrate to " +
+                    $"'{slug.Value}:{slot}' plus overlay input sources.");
+                return true;
             }
 
             return false;
