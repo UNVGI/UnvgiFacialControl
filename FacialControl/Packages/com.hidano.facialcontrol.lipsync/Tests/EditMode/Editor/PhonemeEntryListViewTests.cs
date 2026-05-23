@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
@@ -31,7 +32,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
         public void TearDown()
         {
             _serializedObject.Dispose();
-            Object.DestroyImmediate(_asset);
+            UnityEngine.Object.DestroyImmediate(_asset);
             Undo.ClearAll();
         }
 
@@ -104,6 +105,57 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
             Assert.That(
                 entry.FindPropertyRelative(nameof(PhonemeEntryBase.MaxWeight)).floatValue,
                 Is.EqualTo(80f).Within(1e-6f));
+        }
+
+        [TestCase(
+            PhonemeEntryListView.EntryKind.BlendShape,
+            PhonemeEntryListView.EntryKind.AnimationClip,
+            typeof(AnimationClipPhonemeEntry))]
+        [TestCase(
+            PhonemeEntryListView.EntryKind.BlendShape,
+            PhonemeEntryListView.EntryKind.Expression,
+            typeof(ExpressionPhonemeEntry))]
+        [TestCase(
+            PhonemeEntryListView.EntryKind.AnimationClip,
+            PhonemeEntryListView.EntryKind.BlendShape,
+            typeof(BlendShapePhonemeEntry))]
+        [TestCase(
+            PhonemeEntryListView.EntryKind.AnimationClip,
+            PhonemeEntryListView.EntryKind.Expression,
+            typeof(ExpressionPhonemeEntry))]
+        [TestCase(
+            PhonemeEntryListView.EntryKind.Expression,
+            PhonemeEntryListView.EntryKind.BlendShape,
+            typeof(BlendShapePhonemeEntry))]
+        [TestCase(
+            PhonemeEntryListView.EntryKind.Expression,
+            PhonemeEntryListView.EntryKind.AnimationClip,
+            typeof(AnimationClipPhonemeEntry))]
+        public void SetEntryKind_BetweenAllFormats_PreservesCommonFields(
+            PhonemeEntryListView.EntryKind sourceKind,
+            PhonemeEntryListView.EntryKind targetKind,
+            Type expectedEntryType)
+        {
+            var view = CreateView();
+            view.AddEntry(sourceKind);
+
+            _serializedObject.Update();
+            SerializedProperty entry = _entriesProperty.GetArrayElementAtIndex(0);
+            entry.FindPropertyRelative(nameof(PhonemeEntryBase.PhonemeId)).stringValue = "U";
+            entry.FindPropertyRelative(nameof(PhonemeEntryBase.MaxWeight)).floatValue = 72.5f;
+            _serializedObject.ApplyModifiedProperties();
+
+            view.SetEntryKind(0, targetKind);
+
+            _serializedObject.Update();
+            entry = _entriesProperty.GetArrayElementAtIndex(0);
+            Assert.That(entry.managedReferenceValue, Is.TypeOf(expectedEntryType));
+            Assert.That(
+                entry.FindPropertyRelative(nameof(PhonemeEntryBase.PhonemeId)).stringValue,
+                Is.EqualTo("U"));
+            Assert.That(
+                entry.FindPropertyRelative(nameof(PhonemeEntryBase.MaxWeight)).floatValue,
+                Is.EqualTo(72.5f).Within(1e-6f));
         }
 
         [Test]
