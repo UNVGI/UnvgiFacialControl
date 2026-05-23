@@ -72,6 +72,17 @@ namespace Hidano.FacialControl.Adapters.InputSources
         }
 
         /// <inheritdoc />
+        public void Unregister(AdapterSlug slug, string sub)
+        {
+            if (string.IsNullOrEmpty(sub))
+            {
+                return;
+            }
+
+            UnregisterInternal(slug.Value + CompositeSeparator + sub);
+        }
+
+        /// <inheritdoc />
         public bool TryResolve(string layerInputSourceId, out IInputSource source)
         {
             if (string.IsNullOrEmpty(layerInputSourceId))

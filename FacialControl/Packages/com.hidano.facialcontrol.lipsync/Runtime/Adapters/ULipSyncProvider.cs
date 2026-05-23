@@ -159,6 +159,14 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 return false;
             }
 
+            if (_zeroOutputRequested)
+            {
+                output.Clear();
+                ResetSmoothedOutputPreservingTargets();
+                _zeroOutputRequested = false;
+                return false;
+            }
+
             EnsureCurrentFrameComposed();
 
             float factor = _phonemeSmoothedWeights[index] * _smoothedVolume;
@@ -361,6 +369,20 @@ namespace Hidano.FacialControl.LipSync.Adapters
             for (int i = 0; i < _phonemeCount; i++)
             {
                 _phonemeTargetRatios[i] = 0f;
+                _phonemeSmoothedWeights[i] = 0f;
+                _phonemeVelocities[i] = 0f;
+            }
+            Array.Clear(_accum, 0, _accum.Length);
+            _lastTimeSeconds = -1.0;
+            _currentFrameStamp = double.NaN;
+        }
+
+        private void ResetSmoothedOutputPreservingTargets()
+        {
+            _smoothedVolume = 0f;
+            _volumeVelocity = 0f;
+            for (int i = 0; i < _phonemeCount; i++)
+            {
                 _phonemeSmoothedWeights[i] = 0f;
                 _phonemeVelocities[i] = 0f;
             }

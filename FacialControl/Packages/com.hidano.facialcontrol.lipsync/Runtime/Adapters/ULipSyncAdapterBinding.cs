@@ -81,7 +81,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
         private ULipSyncProvider _provider;
 
         [NonSerialized]
-        private LipSyncInputSource _inputSource;
+        private List<string> _registeredPhonemeSlots;
 
         [NonSerialized]
         private GameObject _hostGameObject;
@@ -94,9 +94,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
         [NonSerialized]
         private AdapterSlug _registeredSlug;
-
-        [NonSerialized]
-        private bool _registeredInputSource;
 
         [NonSerialized]
         private bool _swapPending;
@@ -143,7 +140,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
         public ULipSyncProvider Provider => _provider;
 
-        public LipSyncInputSource InputSource => _inputSource;
+        public LipSyncInputSource InputSource => null;
 
         public bool IsStarted => _started;
 
@@ -210,11 +207,8 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 return;
             }
 
-            if (ctx.InputSourceRegistry.TryResolve(slug.Value, out _))
+            if (HasReservedSlotRegistrationConflict(ctx, slug))
             {
-                Debug.LogError(
-                    $"[ULipSyncAdapterBinding] Input source slug '{slug.Value}' is already registered. " +
-                    "Duplicate binding initialization was skipped.");
                 return;
             }
 
@@ -256,11 +250,9 @@ namespace Hidano.FacialControl.LipSync.Adapters
                     snapshots,
                     ctx.BlendShapeNames.Count,
                     smoothness: ULipSyncProvider.DefaultSmoothness);
-                _inputSource = new LipSyncInputSource(_provider, ctx.BlendShapeNames.Count);
-                ctx.InputSourceRegistry.Register(slug, _inputSource);
                 _inputSourceRegistry = ctx.InputSourceRegistry;
                 _registeredSlug = slug;
-                _registeredInputSource = true;
+                RegisterPhonemeOverlayInputSources(ctx, slug);
 
                 _provider.RequestZeroOutputForNextFrame();
                 _started = true;
@@ -731,6 +723,91 @@ namespace Hidano.FacialControl.LipSync.Adapters
             return -1;
         }
 
+        private void RegisterPhonemeOverlayInputSources(in AdapterBuildContext ctx, AdapterSlug slug)
+        {
+            if (_registeredPhonemeSlots == null)
+            {
+                _registeredPhonemeSlots = new List<string>(PhonemeOverlaySlots.ReservedNames.Length);
+            }
+            else
+            {
+                _registeredPhonemeSlots.Clear();
+            }
+
+            ReadOnlySpan<string> declaredSlots = ctx.Profile.Slots.Span;
+            ReadOnlySpan<string> reservedSlots = PhonemeOverlaySlots.ReservedNames;
+            for (int i = 0; i < reservedSlots.Length; i++)
+            {
+                string slot = reservedSlots[i];
+                if (!ContainsSlot(declaredSlots, slot))
+                {
+                    continue;
+                }
+
+                string phonemeId = PhonemeOverlaySlots.MapReservedToPhonemeId(slot);
+                if (!_provider.TryGetPhonemeIndex(phonemeId, out _))
+                {
+                    continue;
+                }
+
+                var id = InputSourceId.Parse($"{LipSyncPhonemeOverlayInputSource.SlugPrefix}:{slot}");
+                var source = new LipSyncPhonemeOverlayInputSource(
+                    id,
+                    phonemeId,
+                    _provider,
+                    ctx.BlendShapeNames.Count);
+                ctx.InputSourceRegistry.Register(slug, slot, source);
+                _registeredPhonemeSlots.Add(slot);
+            }
+
+            if (_registeredPhonemeSlots.Count == 0)
+            {
+                Debug.LogWarning(
+                    "[ULipSyncAdapterBinding] No reserved phoneme overlay slots are declared in FacialProfile.Slots. " +
+                    "LipSync overlay input source registration was skipped.");
+            }
+        }
+
+        private static bool HasReservedSlotRegistrationConflict(
+            in AdapterBuildContext ctx,
+            AdapterSlug slug)
+        {
+            ReadOnlySpan<string> declaredSlots = ctx.Profile.Slots.Span;
+            ReadOnlySpan<string> reservedSlots = PhonemeOverlaySlots.ReservedNames;
+            for (int i = 0; i < reservedSlots.Length; i++)
+            {
+                string slot = reservedSlots[i];
+                if (!ContainsSlot(declaredSlots, slot))
+                {
+                    continue;
+                }
+
+                string id = $"{slug.Value}:{slot}";
+                if (ctx.InputSourceRegistry.TryResolve(id, out _))
+                {
+                    Debug.LogError(
+                        $"[ULipSyncAdapterBinding] Input source slug '{id}' is already registered. " +
+                        "Duplicate binding initialization was skipped.");
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsSlot(ReadOnlySpan<string> slots, string slot)
+        {
+            for (int i = 0; i < slots.Length; i++)
+            {
+                if (string.Equals(slots[i], slot, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private readonly struct SavedBlendShapeWeights
         {
             public readonly SkinnedMeshRenderer Renderer;
@@ -751,15 +828,17 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 _provider = null;
             }
 
-            if (_registeredInputSource && _inputSourceRegistry != null)
+            if (_inputSourceRegistry != null && _registeredPhonemeSlots != null)
             {
-                _inputSourceRegistry.Unregister(_registeredSlug);
+                for (int i = _registeredPhonemeSlots.Count - 1; i >= 0; i--)
+                {
+                    _inputSourceRegistry.Unregister(_registeredSlug, _registeredPhonemeSlots[i]);
+                }
             }
 
-            _registeredInputSource = false;
+            _registeredPhonemeSlots?.Clear();
             _inputSourceRegistry = null;
             _registeredSlug = default;
-            _inputSource = null;
 
             if (_eventBridge != null)
             {

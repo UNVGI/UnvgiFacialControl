@@ -49,6 +49,8 @@ namespace Hidano.FacialControl.Adapters.InputSources
         /// </summary>
         void Unregister(AdapterSlug slug);
 
+        void Unregister(AdapterSlug slug, string sub);
+
         /// <summary>
         /// layer.inputSources[].id 形式の文字列（<c>&lt;slug&gt;</c> または <c>&lt;slug&gt;:&lt;sub&gt;</c>）
         /// を登録済 <see cref="IInputSource"/> に解決する。

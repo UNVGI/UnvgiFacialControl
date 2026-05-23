@@ -21,6 +21,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.HotSwap
     public class DeviceHotSwapTests
     {
         private const string Slug = "ulipsync";
+        private const string OverlayASlug = "ulipsync:a";
         private const string MicDeviceName = "Unit Test Mic";
         private const string MissingDeviceName = "Missing Mic";
         private const string BlendShapeName = "Mouth_A";
@@ -125,7 +126,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.HotSwap
 
             var analyzer = _binding.Analyzer;
             var provider = _binding.Provider;
-            var inputSource = _binding.InputSource;
+            Assert.That(_registry.TryResolve(OverlayASlug, out IInputSource inputSource), Is.True);
             Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncMicrophone>(), Is.Not.Null);
 
             LogAssert.Expect(
@@ -144,8 +145,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.HotSwap
             Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncAsioInput>(), Is.Null);
             Assert.That(_binding.Analyzer, Is.SameAs(analyzer));
             Assert.That(_binding.Provider, Is.SameAs(provider));
-            Assert.That(_binding.InputSource, Is.SameAs(inputSource));
-            Assert.That(_registry.TryResolve(Slug, out IInputSource resolved), Is.True);
+            Assert.That(_registry.TryResolve(OverlayASlug, out IInputSource resolved), Is.True);
             Assert.That(resolved, Is.SameAs(inputSource));
         }
 
@@ -159,7 +159,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.HotSwap
 
             var analyzer = _binding.Analyzer;
             var provider = _binding.Provider;
-            var inputSource = _binding.InputSource;
+            Assert.That(_registry.TryResolve(OverlayASlug, out IInputSource inputSource), Is.True);
 
             _binding.SwapDevice(MicDeviceName, 1);
             _binding.OnFixedTick(0.02f);
@@ -167,10 +167,9 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.HotSwap
 
             Assert.That(_binding.Analyzer, Is.SameAs(analyzer));
             Assert.That(_binding.Provider, Is.SameAs(provider));
-            Assert.That(_binding.InputSource, Is.SameAs(inputSource));
-            Assert.That(_registry.TryResolve(Slug, out IInputSource resolved), Is.True);
+            Assert.That(_registry.TryResolve(OverlayASlug, out IInputSource resolved), Is.True);
             Assert.That(resolved, Is.SameAs(inputSource));
-            CollectionAssert.AreEqual(new[] { Slug }, _registry.RegisteredIds);
+            CollectionAssert.AreEqual(new[] { OverlayASlug }, _registry.RegisteredIds);
         }
 
         private ULipSyncAdapterBinding CreateBinding()
@@ -200,7 +199,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.HotSwap
         private AdapterBuildContext CreateContext()
         {
             return new AdapterBuildContext(
-                profile: new FacialProfile("1.0"),
+                profile: new FacialProfile("1.0", slots: new[] { PhonemeOverlaySlots.A }),
                 blendShapeNames: new List<string> { BlendShapeName },
                 inputSourceRegistry: _registry,
                 facialOutputBus: new FacialOutputBus(),
