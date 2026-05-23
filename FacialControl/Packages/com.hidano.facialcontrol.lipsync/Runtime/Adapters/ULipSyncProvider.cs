@@ -38,6 +38,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
         // ITimeProvider.UnscaledTimeSeconds の差分から dt を算出する。
         // 初期値 -1 は「初回呼び出しなので dt=0 で再起動」のセンチネル。
         private double _lastTimeSeconds;
+        private double _currentFrameStamp;
 
         private bool _zeroOutputRequested;
         private bool _isDisposed;
@@ -110,6 +111,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
             _phonemeVelocities = validCount == 0 ? Array.Empty<float>() : new float[validCount];
 
             _lastTimeSeconds = -1.0;
+            _currentFrameStamp = double.NaN;
 
             _eventSource.OnLipSyncUpdate += OnLipSyncUpdate;
         }
@@ -135,13 +137,47 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 Array.Clear(_accum, 0, _accum.Length);
                 _zeroOutputRequested = false;
                 _lastTimeSeconds = -1.0;
+                _currentFrameStamp = double.NaN;
                 return;
             }
+
+            EnsureCurrentFrameComposed();
+
+            // _accum 組み立て: factor_i = smoothedWeight_i * smoothedVolume。
+            // 本家 uLipSyncBlendShape.cs:173 (bs.weight * bs.maxWeight * volume) と等価な合成。
+            Array.Clear(_accum, 0, _accum.Length);
+            for (int i = 0; i < _phonemeCount; i++)
+            {
+                float factor = _phonemeSmoothedWeights[i] * _smoothedVolume;
+                if (factor == 0f) continue;
+                float[] weights = _snapshotWeights[_phonemeIndices[i]];
+                for (int k = 0; k < weights.Length; k++)
+                {
+                    _accum[k] += factor * weights[k];
+                }
+            }
+
+            // output コピー。
+            int copyLength = output.Length < _accum.Length ? output.Length : _accum.Length;
+            for (int i = 0; i < copyLength; i++)
+            {
+                output[i] = _accum[i];
+            }
+        }
+
+        private void EnsureCurrentFrameComposed()
+        {
+            double now = _timeProvider.UnscaledTimeSeconds;
+            if (!double.IsNaN(_currentFrameStamp) && now == _currentFrameStamp)
+            {
+                return;
+            }
+
+            _currentFrameStamp = now;
 
             // 初回 (= _lastTimeSeconds < 0) は target を smoothed に即時 snap する。
             // 同一フレーム内の連続呼出でも一度値が立ち上がるよう、dt=0 では SmoothDamp が
             // 進まない問題を回避する目的。次回以降は通常の dt ベース SmoothDamp 経路。
-            double now = _timeProvider.UnscaledTimeSeconds;
             float sum;
             if (_lastTimeSeconds < 0.0)
             {
@@ -186,27 +222,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 {
                     _phonemeSmoothedWeights[i] *= inv;
                 }
-            }
-
-            // (d) _accum 組み立て: factor_i = smoothedWeight_i * smoothedVolume。
-            // 本家 uLipSyncBlendShape.cs:173 (bs.weight * bs.maxWeight * volume) と等価な合成。
-            Array.Clear(_accum, 0, _accum.Length);
-            for (int i = 0; i < _phonemeCount; i++)
-            {
-                float factor = _phonemeSmoothedWeights[i] * _smoothedVolume;
-                if (factor == 0f) continue;
-                float[] weights = _snapshotWeights[_phonemeIndices[i]];
-                for (int k = 0; k < weights.Length; k++)
-                {
-                    _accum[k] += factor * weights[k];
-                }
-            }
-
-            // (e) output コピー。
-            int copyLength = output.Length < _accum.Length ? output.Length : _accum.Length;
-            for (int i = 0; i < copyLength; i++)
-            {
-                output[i] = _accum[i];
             }
         }
 
@@ -269,6 +284,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
             }
             Array.Clear(_accum, 0, _accum.Length);
             _lastTimeSeconds = -1.0;
+            _currentFrameStamp = double.NaN;
         }
 
         private static float[] CopyWeights(float[] source, int blendShapeCount)
