@@ -28,10 +28,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
         public string DefaultLayerName => DefaultLayerNameValue;
 
         /// <inheritdoc />
-        /// <remarks>
-        /// LipSyncInputSource は AdapterSlug と同じ slug を InputSourceId として登録するため、
-        /// 既定 Layer の入力源 ID も binding の Slug をそのまま採用する。
-        /// </remarks>
         public string DefaultLayerInputSourceId => string.IsNullOrEmpty(Slug) ? DefaultSlug : Slug;
 
         /// <inheritdoc />
@@ -158,8 +154,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
         public uLipSync.uLipSync Analyzer => _analyzer;
 
         public ULipSyncProvider Provider => _provider;
-
-        public LipSyncInputSource InputSource => null;
 
         public bool IsStarted => _started;
 

@@ -121,7 +121,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
         }
 
         [Test]
-        public void OnStart_DoesNotRegisterLegacyLipSyncInputSource()
+        public void OnStart_DoesNotRegisterLegacyLipSyncSource()
         {
             _binding = CreateBinding();
             AdapterBuildContext ctx = CreateContext(PhonemeOverlaySlots.ReservedNames.ToArray());

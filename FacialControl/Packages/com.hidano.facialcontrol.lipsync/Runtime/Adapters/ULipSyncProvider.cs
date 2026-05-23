@@ -416,7 +416,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
         // ContributeMask に取り込む閾値。これ未満の |weights[i]| は「触らない BlendShape」と扱う。
         // Animation Recording で誤って小さな値 (= 0.0001 程度) が混入したスナップショットが
         // ContributeMask を膨らませて、表情レイヤー側の BlendShape を不必要に上書きするのを防ぐ。
-        // <see cref="LipSyncInputSource.SilenceThreshold"/> と同値で整合させる。
+        // Overlay input source の silence threshold と同値で整合させる。
         private const float ContributeThreshold = 1e-4f;
 
         private static void MarkContributeIndexes(float[] weights, BitArray mask)

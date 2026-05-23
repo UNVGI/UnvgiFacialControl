@@ -42,7 +42,11 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Performance
                 new PhonemeSnapshot(PhonemeId, new[] { 0.75f, 0.25f, 0.50f, 0.10f }),
             };
             using var provider = new ULipSyncProvider(bridge, snapshots, BlendShapeCount);
-            var inputSource = new LipSyncInputSource(provider, BlendShapeCount);
+            var inputSource = new LipSyncPhonemeOverlayInputSource(
+                InputSourceId.Parse("lipsync-overlay:a"),
+                PhonemeId,
+                provider,
+                BlendShapeCount);
 
             var profile = new FacialProfile(
                 "1.0",
@@ -88,7 +92,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Performance
             long allocatedBytes = after - before;
 
             Assert.That(allocatedBytes, Is.EqualTo(0L),
-                "uLipSync UnityEvent -> ULipSyncProvider -> LipSyncInputSource -> " +
+                "uLipSync UnityEvent -> ULipSyncProvider -> LipSyncPhonemeOverlayInputSource -> " +
                 "LayerInputSourceAggregator hot path allocated " + allocatedBytes + " bytes.");
             Assert.That(finalOutput[0], Is.EqualTo(0.75f).Within(1e-6f),
                 "End-to-end 計測経路が phoneme weight を最終 BlendShape 出力へ反映していること。");

@@ -113,7 +113,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
                 "Fake enumerator で解決した Mic の列挙 index が uLipSyncMicrophone に反映されるべき。");
 
             Assert.That(_registry.TryResolve(OverlayASlug, out IInputSource source), Is.True,
-                "OnStart 成功後は Slug をキーに LipSyncInputSource が登録されるべき。");
+                "OnStart 成功後は phoneme overlay source が登録されるべき。");
             Assert.That(source, Is.InstanceOf<LipSyncPhonemeOverlayInputSource>());
             Assert.That(_registry.TryResolve(Slug, out _), Is.False);
         }
@@ -174,7 +174,6 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
 
             Assert.That(_binding.IsStarted, Is.False);
             Assert.That(_binding.Provider, Is.Null);
-            Assert.That(_binding.InputSource, Is.Null);
             Assert.That(_binding.Analyzer, Is.Null);
             Assert.That(audioSource == null, Is.True);
             Assert.That(analyzer == null, Is.True);
@@ -223,7 +222,6 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
 
             Assert.That(_binding.IsStarted, Is.False);
             Assert.That(_binding.Provider, Is.Null);
-            Assert.That(_binding.InputSource, Is.Null);
             Assert.That(_binding.Analyzer, Is.Null);
             Assert.That(_hostGameObject.GetComponent<AudioSource>(), Is.Null);
             Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSync>(), Is.Null);
@@ -275,7 +273,6 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
 
             Assert.That(duplicate.IsStarted, Is.False);
             Assert.That(duplicate.Provider, Is.Null);
-            Assert.That(duplicate.InputSource, Is.Null);
             Assert.That(_hostGameObject.GetComponents<uLipSync.uLipSync>().Length, Is.EqualTo(analyzerCountBefore));
             Assert.That(_registry.TryResolve(OverlayASlug, out IInputSource source), Is.True);
             Assert.That(source, Is.InstanceOf<LipSyncPhonemeOverlayInputSource>());

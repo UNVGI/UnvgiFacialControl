@@ -23,6 +23,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
 
         // SmoothDamp 後の収束値の許容誤差。1e-4 で母音 sum 正規化挙動を十分検証できる。
         private const float ConvergenceTolerance = 1e-4f;
+        private const float SilenceThreshold = 1e-4f;
 
         [Test]
         public void Constructor_NullSource_ThrowsArgumentNullException()
@@ -108,7 +109,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
 
             // volume=0 で SmoothDamp 収束後 _smoothedVolume ≒ 0 → output 全要素 ≒ 0
             // → sum < SilenceThreshold (1e-4)
-            Assert.That(Sum(output), Is.LessThan(LipSyncInputSource.SilenceThreshold));
+            Assert.That(Sum(output), Is.LessThan(SilenceThreshold));
         }
 
         [Test]
@@ -326,7 +327,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         {
             // 本対応の本丸: ロングトーン中に volume が瞬間的に 0 へディップしても、
             // SmoothDamp で smoothedVolume が緩やかに減衰するため sum < SilenceThreshold には
-            // 即座には落ちず、LipSyncInputSource が IsValid=true を維持する。
+            // 即座には落ちず、overlay source が valid output を維持する。
             var source = new FakeULipSyncEventSource();
             var time = new ManualTimeProvider();
             using var provider = CreateProvider(source, time, 3, Snapshot("A", 1f, 0.5f, 0.25f));
@@ -335,7 +336,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
             // 発声中: volume=1.0 で収束させる。
             source.Invoke(Info(1f, ("A", 1f)));
             AdvanceUntilConverged(time, provider, output);
-            Assert.That(Sum(output), Is.GreaterThan(LipSyncInputSource.SilenceThreshold));
+            Assert.That(Sum(output), Is.GreaterThan(SilenceThreshold));
 
             // 1 フレーム (16ms) だけ volume=0 のディップが来る。
             source.Invoke(Info(0f, ("A", 1f)));
@@ -343,7 +344,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
 
             // SmoothDamp により smoothedVolume は 1 フレームでゼロまで落ちないので
             // output sum は SilenceThreshold を割らない (= LipSync 層が降りない)。
-            Assert.That(Sum(output), Is.GreaterThan(LipSyncInputSource.SilenceThreshold));
+            Assert.That(Sum(output), Is.GreaterThan(SilenceThreshold));
         }
 
         [Test]
