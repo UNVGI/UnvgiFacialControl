@@ -129,8 +129,8 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
         /// <summary>
         /// Inspector で binding を新規追加した直後に呼ばれ、
-        /// AIUEO 5 音素分の <see cref="AnimationClipPhonemeEntry"/> をプリセットする。
-        /// (Clip = null の状態で追加され、ユーザーが各音素に AnimationClip を割り当てる前提)。
+        /// AIUEO 5 音素分の <see cref="ExpressionPhonemeEntry"/> をプリセットする。
+        /// ExpressionId は未割り当てのまま追加され、ユーザーが Inspector で割り当てる。
         /// </summary>
         public void ApplyInitialDefaults()
         {
@@ -146,7 +146,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
             for (int i = 0; i < DefaultPhonemeIds.Length; i++)
             {
-                _phonemeEntries.Add(new AnimationClipPhonemeEntry
+                _phonemeEntries.Add(new ExpressionPhonemeEntry
                 {
                     PhonemeId = DefaultPhonemeIds[i],
                     MaxWeight = 100f,
