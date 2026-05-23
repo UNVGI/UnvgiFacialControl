@@ -13,12 +13,16 @@ namespace Hidano.FacialControl.LipSync.Adapters
     [Serializable]
     [FacialAdapterBinding(displayName: "uLipSync")]
     public sealed class ULipSyncAdapterBinding
-        : AdapterBindingBase, IAdapterBindingInitialDefaults, IAdapterBindingDefaultLayer
+        : AdapterBindingBase,
+            IAdapterBindingInitialDefaults,
+            IAdapterBindingDefaultLayer,
+            IAdapterBindingDefaultLayerInputs
     {
         private static readonly string[] DefaultPhonemeIds = { "A", "I", "U", "E", "O" };
 
         private const string DefaultSlug = "ulipsync";
         private const string DefaultLayerNameValue = "lipsync";
+        private const string OverlayLayerNameValue = "overlay";
 
         /// <inheritdoc />
         public string DefaultLayerName => DefaultLayerNameValue;
@@ -107,6 +111,21 @@ namespace Hidano.FacialControl.LipSync.Adapters
         public ULipSyncAdapterBinding()
         {
             Slug = DefaultSlug;
+        }
+
+        /// <inheritdoc />
+        public IEnumerable<(string id, float weight)> GetDefaultLayerInputSources(string layerName)
+        {
+            if (!string.Equals(layerName, OverlayLayerNameValue, StringComparison.Ordinal))
+            {
+                yield break;
+            }
+
+            for (int i = 0; i < PhonemeOverlaySlots.ReservedNames.Length; i++)
+            {
+                string slot = GetReservedPhonemeSlot(i);
+                yield return ($"{LipSyncPhonemeOverlayInputSource.SlugPrefix}:{slot}", 1f);
+            }
         }
 
         /// <summary>
@@ -838,6 +857,11 @@ namespace Hidano.FacialControl.LipSync.Adapters
             }
 
             return false;
+        }
+
+        private static string GetReservedPhonemeSlot(int index)
+        {
+            return PhonemeOverlaySlots.ReservedNames[index];
         }
 
         private readonly struct SavedBlendShapeWeights
