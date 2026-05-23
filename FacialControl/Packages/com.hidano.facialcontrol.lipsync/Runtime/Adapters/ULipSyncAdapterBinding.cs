@@ -673,16 +673,18 @@ namespace Hidano.FacialControl.LipSync.Adapters
             string message = cause switch
             {
                 ExpressionWarningCause.EmptyExpressionId =>
-                    "Expression is not assigned. Assign an Expression in the Inspector.",
+                    $"Expression is not assigned (ExpressionId='{normalizedExpressionId}'). "
+                    + "Assign an Expression in the Inspector.",
                 ExpressionWarningCause.ExpressionNotFound =>
                     $"ExpressionId='{normalizedExpressionId}' does not exist in the profile.",
                 ExpressionWarningCause.EmptyBlendShapeValues =>
-                    $"Expression '{normalizedExpressionId}' has no BlendShape values.",
+                    $"ExpressionId='{normalizedExpressionId}' has no BlendShape values.",
                 _ => "Expression could not be resolved.",
             };
 
             Debug.LogWarning(
-                $"[ULipSyncAdapterBinding] {message} PhonemeId='{normalizedPhonemeId}'.");
+                $"[ULipSyncAdapterBinding] {message} PhonemeId='{normalizedPhonemeId}'. "
+                + "The phoneme entry will be skipped; configure the Expression assignment in the Inspector.");
         }
 
         private void LogAnimationClipFallbackWarning(string phonemeId, string clipName)
