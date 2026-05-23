@@ -168,6 +168,13 @@
 - **影響範囲**: `OscAdapterBinding`, `OscSenderAdapterBinding`, `OscRuntimeSettingsSO`, 各 Drawer、Profile 内 AdapterBindings リスト、対応 EditMode/PlayMode テスト、`Documentation~/adapter-runtime-settings/`
 - **関連**: M-20（Sub-asset 削除時の逆引き確認ダイアログ — 統合/分割いずれを採るかで参照関係の管理粒度が変わる）
 
+### M-24: LipSync AnimationClip の Editor 事前検証 / runtime path 補正
+- **出典**: S-9（LipSync の AnimationClip 形式が動かない件の根本対応） / [`.kiro/specs/lipsync-animationclip-rework/requirements.md`](../.kiro/specs/lipsync-animationclip-rework/requirements.md) 要件 1.3 / [`.kiro/specs/lipsync-animationclip-rework/design.md`](../.kiro/specs/lipsync-animationclip-rework/design.md) Non-Goals
+- **内容**: S-9 の主要対応は `lipsync-animationclip-rework` spec で対応済み。`ExpressionPhonemeEntry` の追加と `AnimationClipPhonemeEntry` sample 失敗時 fallback により、「AnimationClip 形式が rendererPath 不一致などで動かない」体験は本 spec で解消した。一方、候補 (b)「`AnimationUtility.GetCurveBindings` による Editor 事前検証 + runtime path 補正」は本 spec のスコープ外とし、将来課題として残置する。
+- **トリガ**: AnimationClip 形式を引き続き主経路として使いたいユーザー要望が増えたとき / rendererPath 不一致を Inspector 上で自動診断・補正したい需要が顕在化したとき / AnimationClip 作成支援ツールの spec を切るとき
+- **影響範囲**: `com.hidano.facialcontrol.lipsync` の Editor 検証 UI、`AnimationClipPhonemeEntry` の Inspector 表示、AnimationClip path 解決 helper、対応 EditMode テスト
+- **関連**: `lipsync-animationclip-rework` spec（S-9 本体対応済み）、将来の AnimationClip 作成支援ツール
+
 ---
 
 ## 横断フォローアップ（実装着手時に再確認するメモ）
@@ -210,3 +217,4 @@
 - 2026-05-23: S-19 を `OscGazeE2ETests` の `InputTestFixture` 継承で input system 分離して解消。S-18 を `ULipSyncAdapterBinding.AddInputComponent` の `UpdateMicInfo` 後 index 巻き戻り対策 + `ULipSyncProvider` zero-flush 後の初回 target snap ロジックで解消。両 backlog エントリを削除。
 - 2026-05-23: S-7 が `analog-input-binding` spec の `AnalogExpressionInputSource` で既に実装済みであることを確認（`BindingMode.Analog` 経路）。backlog から S-7 を削除し、誤って初期化した `.kiro/specs/analog-expression-weight/` ディレクトリも撤去。
 - 2026-05-23: S-17 を spec `phoneme-overlay-slots`、S-9 を spec `lipsync-animationclip-rework` として独立化。それぞれ requirements / design / tasks 生成済み (tasks-generated)。本 backlog からは削除し、以降は spec 内で進行管理。
+- 2026-05-23: S-9 は `lipsync-animationclip-rework` spec で対応済みとして完了反映。候補 (b)「`AnimationUtility.GetCurveBindings` による Editor 事前検証 + runtime path 補正」は将来課題として M-24 に残置。
