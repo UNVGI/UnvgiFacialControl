@@ -15,6 +15,7 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
         {
             BlendShape,
             AnimationClip,
+            Expression,
         }
 
         public const string RootClassName = "facial-control-lipsync-phoneme-entry-list-view";
@@ -26,6 +27,8 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
         public const string BlendShapeLabel = "BlendShape 形式";
         public const string AnimationClipLabel = "AnimationClip 形式";
 
+        public const string ExpressionLabel = "Expression 形式";
+
         private const string PhonemeEntriesFieldName = "_phonemeEntries";
         private const string PhonemeIdFieldName = nameof(PhonemeEntryBase.PhonemeId);
         private const string MaxWeightFieldName = nameof(PhonemeEntryBase.MaxWeight);
@@ -36,6 +39,7 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
         {
             BlendShapeLabel,
             AnimationClipLabel,
+            ExpressionLabel,
         };
 
         private static readonly List<string> PhonemeIdChoices = new List<string>
@@ -220,6 +224,10 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
                 new GUIContent(AnimationClipLabel),
                 false,
                 () => AddEntry(EntryKind.AnimationClip));
+            menu.AddItem(
+                new GUIContent(ExpressionLabel),
+                false,
+                () => AddEntry(EntryKind.Expression));
             menu.DropDown(anchor != null ? anchor.worldBound : _listView.worldBound);
         }
 
@@ -260,7 +268,7 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             {
                 AddBlendShapeFields(row, entryProperty);
             }
-            else
+            else if (kind == EntryKind.AnimationClip)
             {
                 AddAnimationClipFields(row, entryProperty);
             }
@@ -566,9 +574,15 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
 
         private static PhonemeEntryBase CreateEntry(EntryKind kind)
         {
-            return kind == EntryKind.AnimationClip
-                ? (PhonemeEntryBase)new AnimationClipPhonemeEntry()
-                : new BlendShapePhonemeEntry();
+            switch (kind)
+            {
+                case EntryKind.AnimationClip:
+                    return new AnimationClipPhonemeEntry();
+                case EntryKind.Expression:
+                    return new ExpressionPhonemeEntry();
+                default:
+                    return new BlendShapePhonemeEntry();
+            }
         }
 
         private static void CopyCommonFields(PhonemeEntryBase source, PhonemeEntryBase destination)
@@ -590,6 +604,11 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
                 return EntryKind.AnimationClip;
             }
 
+            if (value is ExpressionPhonemeEntry)
+            {
+                return EntryKind.Expression;
+            }
+
             if (value is BlendShapePhonemeEntry)
             {
                 return EntryKind.BlendShape;
@@ -601,16 +620,35 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
                 return EntryKind.AnimationClip;
             }
 
+            if (fullTypename.Contains(typeof(ExpressionPhonemeEntry).FullName))
+            {
+                return EntryKind.Expression;
+            }
+
             return EntryKind.BlendShape;
         }
 
         private static string ToLabel(EntryKind kind)
         {
-            return kind == EntryKind.AnimationClip ? AnimationClipLabel : BlendShapeLabel;
+            switch (kind)
+            {
+                case EntryKind.AnimationClip:
+                    return AnimationClipLabel;
+                case EntryKind.Expression:
+                    return ExpressionLabel;
+                default:
+                    return BlendShapeLabel;
+            }
         }
 
         private static bool TryParseKind(string label, out EntryKind kind)
         {
+            if (string.Equals(label, ExpressionLabel, StringComparison.Ordinal))
+            {
+                kind = EntryKind.Expression;
+                return true;
+            }
+
             if (string.Equals(label, AnimationClipLabel, StringComparison.Ordinal))
             {
                 kind = EntryKind.AnimationClip;

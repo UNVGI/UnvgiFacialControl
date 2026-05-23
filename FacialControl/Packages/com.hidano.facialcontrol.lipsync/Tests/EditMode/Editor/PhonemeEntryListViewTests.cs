@@ -65,6 +65,22 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
         }
 
         [Test]
+        public void AddEntry_Expression_InsertsExpressionPhonemeEntry()
+        {
+            var view = CreateView();
+
+            view.AddEntry(PhonemeEntryListView.EntryKind.Expression);
+
+            _serializedObject.Update();
+            Assert.That(_entriesProperty.arraySize, Is.EqualTo(1));
+            SerializedProperty entry = _entriesProperty.GetArrayElementAtIndex(0);
+            Assert.That(entry.managedReferenceValue, Is.InstanceOf<ExpressionPhonemeEntry>());
+            Assert.That(
+                entry.managedReferenceFullTypename,
+                Does.Contain(typeof(ExpressionPhonemeEntry).FullName));
+        }
+
+        [Test]
         public void SetEntryKind_FromBlendShapeToAnimationClip_PreservesCommonFields()
         {
             var view = CreateView();
