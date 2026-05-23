@@ -648,6 +648,33 @@ namespace Hidano.FacialControl.LipSync.Adapters
             return anyNonZero;
         }
 
+        private bool TryFindExpressionByPhonemeIdHeuristic(
+            in AdapterBuildContext ctx,
+            string phonemeId,
+            out Expression expression)
+        {
+            expression = default;
+            if (string.IsNullOrEmpty(phonemeId))
+            {
+                return false;
+            }
+
+            ReadOnlySpan<Expression> expressions = ctx.Profile.Expressions.Span;
+            for (int i = 0; i < expressions.Length; i++)
+            {
+                Expression candidate = expressions[i];
+                if (string.Equals(candidate.Id, phonemeId, StringComparison.Ordinal)
+                    || string.Equals(candidate.Name, phonemeId, StringComparison.Ordinal))
+                {
+                    expression = candidate;
+                    return true;
+                }
+            }
+
+            // Japanese display names such as "a" in kana intentionally do not match AIUEO phoneme ids.
+            return false;
+        }
+
         private void LogExpressionResolutionWarning(
             string phonemeId,
             string expressionId,

@@ -276,6 +276,96 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         }
 
         [Test]
+        public void TryFindExpressionByPhonemeIdHeuristic_WhenExpressionIdMatches_ReturnsExpression()
+        {
+            GameObject host = CreateHost();
+            var expected = new Expression(
+                "A",
+                "\u3042",
+                "lipsync",
+                blendShapeValues: new[]
+                {
+                    new BlendShapeMapping("Mouth_A", 1f),
+                });
+            var profile = new FacialProfile(
+                "1.0",
+                expressions: new[]
+                {
+                    expected,
+                });
+            AdapterBuildContext ctx = CreateContext(host, profile, "Mouth_A");
+
+            bool found = InvokeTryFindExpressionByPhonemeIdHeuristic(
+                CreateBinding(),
+                ctx,
+                "A",
+                out Expression actual);
+
+            Assert.That(found, Is.True);
+            Assert.That(actual.Id, Is.EqualTo(expected.Id));
+            Assert.That(actual.Name, Is.EqualTo(expected.Name));
+        }
+
+        [Test]
+        public void TryFindExpressionByPhonemeIdHeuristic_WhenExpressionNameMatches_ReturnsExpression()
+        {
+            GameObject host = CreateHost();
+            var expected = new Expression(
+                "expr-a",
+                "A",
+                "lipsync",
+                blendShapeValues: new[]
+                {
+                    new BlendShapeMapping("Mouth_A", 1f),
+                });
+            var profile = new FacialProfile(
+                "1.0",
+                expressions: new[]
+                {
+                    expected,
+                });
+            AdapterBuildContext ctx = CreateContext(host, profile, "Mouth_A");
+
+            bool found = InvokeTryFindExpressionByPhonemeIdHeuristic(
+                CreateBinding(),
+                ctx,
+                "A",
+                out Expression actual);
+
+            Assert.That(found, Is.True);
+            Assert.That(actual.Id, Is.EqualTo(expected.Id));
+            Assert.That(actual.Name, Is.EqualTo(expected.Name));
+        }
+
+        [Test]
+        public void TryFindExpressionByPhonemeIdHeuristic_WhenOnlyJapaneseIdAndNameExist_ReturnsFalse()
+        {
+            GameObject host = CreateHost();
+            var profile = new FacialProfile(
+                "1.0",
+                expressions: new[]
+                {
+                    new Expression(
+                        "\u3042",
+                        "\u3042",
+                        "lipsync",
+                        blendShapeValues: new[]
+                        {
+                            new BlendShapeMapping("Mouth_A", 1f),
+                        }),
+                });
+            AdapterBuildContext ctx = CreateContext(host, profile, "Mouth_A");
+
+            bool found = InvokeTryFindExpressionByPhonemeIdHeuristic(
+                CreateBinding(),
+                ctx,
+                "A",
+                out _);
+
+            Assert.That(found, Is.False);
+        }
+
+        [Test]
         public void LogExpressionResolutionWarning_SameCauseTwice_LogsWarningOnce()
         {
             ULipSyncAdapterBinding binding = CreateBinding();
@@ -548,6 +638,23 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(method, Is.Not.Null);
             method.Invoke(binding, new object[] { phonemeId, clipName });
+        }
+
+        private static bool InvokeTryFindExpressionByPhonemeIdHeuristic(
+            ULipSyncAdapterBinding binding,
+            AdapterBuildContext ctx,
+            string phonemeId,
+            out Expression expression)
+        {
+            MethodInfo method = typeof(ULipSyncAdapterBinding).GetMethod(
+                "TryFindExpressionByPhonemeIdHeuristic",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+
+            object[] parameters = { ctx, phonemeId, null };
+            bool found = (bool)method.Invoke(binding, parameters);
+            expression = found ? (Expression)parameters[2] : default;
+            return found;
         }
 
         private readonly struct ClipCurve
