@@ -433,10 +433,16 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
                 return;
             }
 
+            var warning = new HelpBox(ExpressionUnassignedMessage, HelpBoxMessageType.Warning)
+            {
+                name = ExpressionWarningName,
+            };
+            ApplyExpressionWarningVisibility(warning, expressionIdProperty.stringValue);
+
             var choices = new List<ExpressionChoice>();
             if (TryGetExpressionChoices(entryProperty.serializedObject, choices))
             {
-                AddExpressionDropdown(row, expressionIdProperty, choices);
+                AddExpressionDropdown(row, expressionIdProperty, choices, warning);
             }
             else
             {
@@ -445,21 +451,21 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
                     name = ExpressionTextFieldName,
                 };
                 field.BindProperty(expressionIdProperty);
+                field.RegisterValueChangedCallback(evt =>
+                {
+                    ApplyExpressionWarningVisibility(warning, evt.newValue);
+                });
                 row.Add(field);
             }
 
-            var warning = new HelpBox(ExpressionUnassignedMessage, HelpBoxMessageType.Warning)
-            {
-                name = ExpressionWarningName,
-            };
-            ApplyExpressionWarningVisibility(warning, expressionIdProperty.stringValue);
             row.Add(warning);
         }
 
         private static void AddExpressionDropdown(
             VisualElement row,
             SerializedProperty expressionIdProperty,
-            List<ExpressionChoice> expressionChoices)
+            List<ExpressionChoice> expressionChoices,
+            HelpBox warning)
         {
             string currentExpressionId = expressionIdProperty.stringValue ?? string.Empty;
             var displayChoices = new List<string>(expressionChoices.Count + 1)
@@ -485,9 +491,10 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             {
                 SerializedObject serializedObject = expressionIdProperty.serializedObject;
                 serializedObject.Update();
-                expressionIdProperty.stringValue =
-                    FindExpressionIdByDisplayName(expressionChoices, evt.newValue);
+                string expressionId = FindExpressionIdByDisplayName(expressionChoices, evt.newValue);
+                expressionIdProperty.stringValue = expressionId;
                 serializedObject.ApplyModifiedProperties();
+                ApplyExpressionWarningVisibility(warning, expressionId);
             });
             row.Add(field);
         }

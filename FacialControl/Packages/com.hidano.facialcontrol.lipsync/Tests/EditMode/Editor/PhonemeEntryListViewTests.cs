@@ -296,6 +296,57 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
         }
 
         [Test]
+        public void BindRow_ExpressionWithoutId_ShowsWarningHelpBox()
+        {
+            _asset.Entries.Add(new ExpressionPhonemeEntry
+            {
+                PhonemeId = "A",
+                MaxWeight = 100f,
+            });
+            _serializedObject.Update();
+            var view = CreateView();
+
+            VisualElement row = view.CreateBoundRowForIndex(0);
+            var warning = row.Q<HelpBox>(PhonemeEntryListView.ExpressionWarningName);
+
+            Assert.That(warning, Is.Not.Null);
+            Assert.That(warning.messageType, Is.EqualTo(HelpBoxMessageType.Warning));
+            Assert.That(warning.text, Is.EqualTo("Expression 未割り当てです。リップシンクが動作しません"));
+            Assert.That(warning.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+        }
+
+        [Test]
+        public void BindRow_ExpressionWithId_HidesWarningHelpBox()
+        {
+            _asset.Entries.Add(new ExpressionPhonemeEntry
+            {
+                PhonemeId = "A",
+                MaxWeight = 100f,
+            });
+            _serializedObject.Update();
+            var view = CreateView();
+
+            VisualElement rowBeforeAssignment = view.CreateBoundRowForIndex(0);
+            var warningBeforeAssignment =
+                rowBeforeAssignment.Q<HelpBox>(PhonemeEntryListView.ExpressionWarningName);
+            Assert.That(warningBeforeAssignment, Is.Not.Null);
+            Assert.That(warningBeforeAssignment.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+
+            _entriesProperty.GetArrayElementAtIndex(0)
+                .FindPropertyRelative("_expressionId")
+                .stringValue = "expr-a";
+            _serializedObject.ApplyModifiedProperties();
+            _serializedObject.Update();
+
+            VisualElement rowAfterAssignment = view.CreateBoundRowForIndex(0);
+            var warningAfterAssignment =
+                rowAfterAssignment.Q<HelpBox>(PhonemeEntryListView.ExpressionWarningName);
+
+            Assert.That(warningAfterAssignment, Is.Not.Null);
+            Assert.That(warningAfterAssignment.style.display.value, Is.EqualTo(DisplayStyle.None));
+        }
+
+        [Test]
         public void UndoAfterSetEntryKind_DisplaysSerializedPropertyCurrentValue()
         {
             _asset.Entries.Add(new BlendShapePhonemeEntry
