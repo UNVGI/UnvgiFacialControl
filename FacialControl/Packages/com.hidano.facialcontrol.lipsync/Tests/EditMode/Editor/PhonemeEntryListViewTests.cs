@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
 using Hidano.FacialControl.LipSync.Editor.Inspector;
 using NUnit.Framework;
@@ -236,6 +237,65 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
         }
 
         [Test]
+        public void ExpressionRow_WithProfileExpressions_RendersDropdownAndResolvesSelectionDisplayName()
+        {
+            var profileAsset = ScriptableObject.CreateInstance<PhonemeEntryListViewProfileAsset>();
+            SerializedObject serializedProfile = null;
+            try
+            {
+                profileAsset.Expressions.Add(new ExpressionSerializable { id = "expr-a", name = "A" });
+                profileAsset.Expressions.Add(new ExpressionSerializable { id = "expr-i", name = "I" });
+                profileAsset.Expressions.Add(new ExpressionSerializable { id = "expr-u", name = "U" });
+                profileAsset.Entries.Add(new ExpressionPhonemeEntry
+                {
+                    PhonemeId = "A",
+                    MaxWeight = 100f,
+                });
+
+                serializedProfile = new SerializedObject(profileAsset);
+                SerializedProperty entries =
+                    serializedProfile.FindProperty(nameof(PhonemeEntryListViewProfileAsset.Entries));
+                var view = new PhonemeEntryListView(entries);
+
+                VisualElement row = view.CreateBoundRowForIndex(0);
+                var dropdown = row.Q<DropdownField>(PhonemeEntryListView.ExpressionDropdownName);
+
+                Assert.That(dropdown, Is.Not.Null);
+                Assert.That(dropdown.choices, Has.Count.EqualTo(4));
+                Assert.That(dropdown.choices, Does.Contain(string.Empty));
+                Assert.That(dropdown.choices, Does.Contain("A (expr-a)"));
+                Assert.That(dropdown.choices, Does.Contain("I (expr-i)"));
+                Assert.That(dropdown.choices, Does.Contain("U (expr-u)"));
+
+                Assert.That(ResolveExpressionIdByDisplayNameForTest("I (expr-i)"), Is.EqualTo("expr-i"));
+            }
+            finally
+            {
+                serializedProfile?.Dispose();
+                UnityEngine.Object.DestroyImmediate(profileAsset);
+            }
+        }
+
+        [Test]
+        public void ExpressionRow_WithoutProfileExpressions_RendersTextFieldFallback()
+        {
+            _asset.Entries.Add(new ExpressionPhonemeEntry
+            {
+                PhonemeId = "A",
+                MaxWeight = 100f,
+            });
+            _serializedObject.Update();
+            var view = CreateView();
+
+            VisualElement row = null;
+            Assert.DoesNotThrow(() => row = view.CreateBoundRowForIndex(0));
+
+            Assert.That(row.Q<TextField>(PhonemeEntryListView.ExpressionTextFieldName), Is.Not.Null);
+            Assert.That(row.Q<DropdownField>(PhonemeEntryListView.ExpressionDropdownName), Is.Null);
+            Assert.That(row.Q<HelpBox>(PhonemeEntryListView.ExpressionWarningName), Is.Not.Null);
+        }
+
+        [Test]
         public void UndoAfterSetEntryKind_DisplaysSerializedPropertyCurrentValue()
         {
             _asset.Entries.Add(new BlendShapePhonemeEntry
@@ -340,7 +400,40 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
                 .stringValue;
         }
 
+        private static string ResolveExpressionIdByDisplayNameForTest(string displayName)
+        {
+            Type choiceType = typeof(PhonemeEntryListView).GetNestedType(
+                "ExpressionChoice",
+                BindingFlags.NonPublic);
+            Assert.That(choiceType, Is.Not.Null);
+
+            Type listType = typeof(List<>).MakeGenericType(choiceType);
+            object choices = Activator.CreateInstance(listType);
+            ConstructorInfo constructor = choiceType.GetConstructor(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(string), typeof(string) },
+                null);
+            Assert.That(constructor, Is.Not.Null);
+
+            listType.GetMethod("Add").Invoke(
+                choices,
+                new[] { constructor.Invoke(new object[] { "expr-i", "I (expr-i)" }) });
+
+            MethodInfo method = typeof(PhonemeEntryListView).GetMethod(
+                "FindExpressionIdByDisplayName",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            return (string)method.Invoke(null, new[] { choices, displayName });
+        }
+
         private sealed class PhonemeEntryListViewTestAsset : ScriptableObject
+        {
+            [SerializeReference]
+            public List<PhonemeEntryBase> Entries = new List<PhonemeEntryBase>();
+        }
+
+        private sealed class PhonemeEntryListViewProfileAsset : FacialCharacterProfileSO
         {
             [SerializeReference]
             public List<PhonemeEntryBase> Entries = new List<PhonemeEntryBase>();
