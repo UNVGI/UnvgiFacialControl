@@ -183,6 +183,74 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         }
 
         [Test]
+        public void BuildSnapshots_WithEmptyAiueoExpressionId_HeuristicAutoLinksWithoutPersisting()
+        {
+            GameObject host = CreateHost();
+            AddRenderer(host, "FaceMesh", "Mouth_A", "Mouth_I");
+            ExpressionPhonemeEntry entry = CreateExpressionEntry("A", string.Empty);
+            ULipSyncAdapterBinding binding = CreateBinding(entry);
+            var profile = new FacialProfile(
+                "1.0",
+                expressions: new[]
+                {
+                    new Expression(
+                        "A",
+                        "\u3042",
+                        "lipsync",
+                        blendShapeValues: new[]
+                        {
+                            new BlendShapeMapping("Mouth_A", 0.8f),
+                            new BlendShapeMapping("Mouth_I", 0.25f),
+                        }),
+                });
+
+            PhonemeSnapshot[] snapshots = BuildSnapshots(
+                binding,
+                CreateContext(host, profile, "Mouth_A", "Mouth_I"));
+
+            Assert.That(snapshots, Has.Length.EqualTo(1));
+            Assert.That(snapshots[0].PhonemeId, Is.EqualTo("A"));
+            AssertWeights(snapshots[0].Weights, 0.8f, 0.25f);
+            Assert.That(entry.ExpressionId, Is.Empty);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [Test]
+        public void BuildSnapshots_WithEmptyAiueoExpressionIdAndNoHeuristicMatch_LogsWarningAndSkips()
+        {
+            GameObject host = CreateHost();
+            AddRenderer(host, "FaceMesh", "Mouth_A");
+            ExpressionPhonemeEntry entry = CreateExpressionEntry("A", string.Empty);
+            ULipSyncAdapterBinding binding = CreateBinding(entry);
+            var profile = new FacialProfile(
+                "1.0",
+                expressions: new[]
+                {
+                    new Expression(
+                        "\u3042",
+                        "\u3042",
+                        "lipsync",
+                        blendShapeValues: new[]
+                        {
+                            new BlendShapeMapping("Mouth_A", 1f),
+                        }),
+                });
+
+            LogAssert.Expect(
+                LogType.Warning,
+                new Regex(
+                    "ULipSyncAdapterBinding.*Expression is not assigned.*ExpressionId='<empty>'.*"
+                    + "PhonemeId='A'.*Inspector"));
+
+            PhonemeSnapshot[] snapshots = BuildSnapshots(
+                binding,
+                CreateContext(host, profile, "Mouth_A"));
+
+            Assert.That(snapshots, Is.Empty);
+            Assert.That(entry.ExpressionId, Is.Empty);
+        }
+
+        [Test]
         public void BuildSnapshots_WithExpressionPhonemeEntryEmptyExpressionId_LogsWarningSkipsAndContinues()
         {
             GameObject host = CreateHost();

@@ -614,6 +614,17 @@ namespace Hidano.FacialControl.LipSync.Adapters
             string expressionId = entry.ExpressionId;
             if (string.IsNullOrEmpty(expressionId))
             {
+                if (IsDefaultPhonemeId(entry.PhonemeId)
+                    && TryFindExpressionByPhonemeIdHeuristic(ctx, entry.PhonemeId, out Expression autoLinkedExpression))
+                {
+                    return TryFillExpressionSnapshotByExpression(
+                        entry.PhonemeId,
+                        autoLinkedExpression,
+                        nameToIndex,
+                        entry.MaxWeight,
+                        weights);
+                }
+
                 LogExpressionResolutionWarning(
                     entry.PhonemeId,
                     expressionId,
@@ -637,6 +648,19 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 nameToIndex,
                 entry.MaxWeight,
                 weights);
+        }
+
+        private static bool IsDefaultPhonemeId(string phonemeId)
+        {
+            for (int i = 0; i < DefaultPhonemeIds.Length; i++)
+            {
+                if (string.Equals(DefaultPhonemeIds[i], phonemeId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private bool TryFillExpressionSnapshotByExpression(
