@@ -479,6 +479,51 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         }
 
         [Test]
+        public void BuildSnapshots_AnimationClipNonZeroWithMatchingExpression_UsesSampledClipWeights()
+        {
+            GameObject host = CreateHost();
+            SkinnedMeshRenderer renderer = AddRenderer(host, "FaceMesh", "Mouth_A", "Mouth_I");
+            renderer.SetBlendShapeWeight(0, 17f);
+            renderer.SetBlendShapeWeight(1, 29f);
+
+            AnimationClip clip = CreateClip(
+                Curve("FaceMesh", "Mouth_A", 60f));
+            clip.name = "LipSync_A";
+            ULipSyncAdapterBinding binding = CreateBinding(
+                new AnimationClipPhonemeEntry
+                {
+                    PhonemeId = "A",
+                    Clip = clip,
+                    MaxWeight = 50f,
+                });
+            var profile = new FacialProfile(
+                "1.0",
+                expressions: new[]
+                {
+                    new Expression(
+                        "A",
+                        "A",
+                        "lipsync",
+                        blendShapeValues: new[]
+                        {
+                            new BlendShapeMapping("Mouth_A", 0.1f),
+                            new BlendShapeMapping("Mouth_I", 1f),
+                        }),
+                });
+
+            PhonemeSnapshot[] snapshots = BuildSnapshots(
+                binding,
+                CreateContext(host, profile, "Mouth_A", "Mouth_I"));
+
+            Assert.That(snapshots, Has.Length.EqualTo(1));
+            Assert.That(snapshots[0].PhonemeId, Is.EqualTo("A"));
+            AssertWeights(snapshots[0].Weights, 0.3f, 0f);
+            Assert.That(renderer.GetBlendShapeWeight(0), Is.EqualTo(17f).Within(1e-6f));
+            Assert.That(renderer.GetBlendShapeWeight(1), Is.EqualTo(29f).Within(1e-6f));
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [Test]
         public void Build_AfterAnimationClipSampling_RestoresSmrWeights()
         {
             GameObject host = CreateHost();
