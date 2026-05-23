@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Hidano.FacialControl.Adapters.InputSources;
+using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
@@ -33,14 +35,93 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Performance
         [Test]
         public void UnityEventToAggregator_OneThousandFrames_AllocatesZeroBytes()
         {
-            _hostGameObject = new GameObject("EndToEndGcAllocationTestsHost");
-            var analyzer = _hostGameObject.AddComponent<uLipSync.uLipSync>();
-            using var bridge = new ULipSyncEventBridge(analyzer);
-
             var snapshots = new[]
             {
                 new PhonemeSnapshot(PhonemeId, new[] { 0.75f, 0.25f, 0.50f, 0.10f }),
             };
+
+            AssertUnityEventToAggregatorAllocatesZeroBytes(snapshots, "direct");
+        }
+
+        [Test]
+        public void UnityEventToAggregator_WithBlendShapeEntrySnapshots_OneThousandFrames_AllocatesZeroBytes()
+        {
+            _hostGameObject = CreateHostGameObject();
+            AddFaceRenderer(_hostGameObject);
+            var binding = CreateBinding(
+                new BlendShapePhonemeEntry
+                {
+                    PhonemeId = PhonemeId,
+                    BlendShapeName = "Mouth_A",
+                    MaxWeight = 75f,
+                });
+
+            PhonemeSnapshot[] snapshots = BuildSnapshots(
+                binding,
+                CreateContext(_hostGameObject, CreateProfileWithoutExpressions()));
+
+            AssertUnityEventToAggregatorAllocatesZeroBytes(snapshots, "blendshape");
+        }
+
+        [Test]
+        public void UnityEventToAggregator_WithAnimationClipEntrySnapshots_OneThousandFrames_AllocatesZeroBytes()
+        {
+            _hostGameObject = CreateHostGameObject();
+            AddFaceRenderer(_hostGameObject);
+            var clip = new AnimationClip();
+            clip.SetCurve(
+                "FaceMesh",
+                typeof(SkinnedMeshRenderer),
+                "blendShape.Mouth_A",
+                AnimationCurve.Constant(0f, 0.01f, 75f));
+            var binding = CreateBinding(
+                new AnimationClipPhonemeEntry
+                {
+                    PhonemeId = PhonemeId,
+                    Clip = clip,
+                    MaxWeight = 100f,
+                });
+
+            PhonemeSnapshot[] snapshots = BuildSnapshots(
+                binding,
+                CreateContext(_hostGameObject, CreateProfileWithoutExpressions()));
+
+            AssertUnityEventToAggregatorAllocatesZeroBytes(snapshots, "animationclip");
+        }
+
+        [Test]
+        public void UnityEventToAggregator_WithExpressionPhonemeEntrySnapshots_OneThousandFrames_AllocatesZeroBytes()
+        {
+            _hostGameObject = CreateHostGameObject();
+            var expressionEntry = new ExpressionPhonemeEntry
+            {
+                PhonemeId = PhonemeId,
+                MaxWeight = 100f,
+            };
+            SetPrivateField(expressionEntry, "_expressionId", "expr-a");
+            var binding = CreateBinding(expressionEntry);
+
+            PhonemeSnapshot[] snapshots = BuildSnapshots(
+                binding,
+                CreateContext(_hostGameObject, CreateProfileWithExpression()));
+
+            AssertUnityEventToAggregatorAllocatesZeroBytes(snapshots, "expression");
+        }
+
+        private void AssertUnityEventToAggregatorAllocatesZeroBytes(
+            PhonemeSnapshot[] snapshots,
+            string scenario)
+        {
+            if (_hostGameObject == null)
+            {
+                _hostGameObject = CreateHostGameObject();
+            }
+
+            Assert.That(snapshots, Has.Length.EqualTo(1), scenario);
+            Assert.That(snapshots[0].PhonemeId, Is.EqualTo(PhonemeId), scenario);
+
+            var analyzer = _hostGameObject.AddComponent<uLipSync.uLipSync>();
+            using var bridge = new ULipSyncEventBridge(analyzer);
             using var provider = new ULipSyncProvider(bridge, snapshots, BlendShapeCount);
             var inputSource = new LipSyncPhonemeOverlayInputSource(
                 InputSourceId.Parse("lipsync-overlay:a"),
@@ -93,9 +174,10 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Performance
 
             Assert.That(allocatedBytes, Is.EqualTo(0L),
                 "uLipSync UnityEvent -> ULipSyncProvider -> LipSyncPhonemeOverlayInputSource -> " +
-                "LayerInputSourceAggregator hot path allocated " + allocatedBytes + " bytes.");
+                "LayerInputSourceAggregator hot path allocated " + allocatedBytes +
+                " bytes. scenario=" + scenario);
             Assert.That(finalOutput[0], Is.EqualTo(0.75f).Within(1e-6f),
-                "End-to-end 計測経路が phoneme weight を最終 BlendShape 出力へ反映していること。");
+                "End-to-end phoneme weight did not reach final BlendShape output. scenario=" + scenario);
         }
 
         private static void WarmUp(
@@ -123,6 +205,118 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Performance
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
+        }
+
+        private static GameObject CreateHostGameObject()
+        {
+            return new GameObject("EndToEndGcAllocationTestsHost");
+        }
+
+        private static void AddFaceRenderer(GameObject host)
+        {
+            var face = new GameObject("FaceMesh");
+            face.transform.SetParent(host.transform, false);
+            var renderer = face.AddComponent<SkinnedMeshRenderer>();
+            var mesh = new Mesh();
+            mesh.vertices = new[]
+            {
+                Vector3.zero,
+                Vector3.right,
+                Vector3.up,
+            };
+            mesh.triangles = new[] { 0, 1, 2 };
+            mesh.AddBlendShapeFrame("Mouth_A", 100f, CreateDeltaVertices(0.01f), null, null);
+            mesh.AddBlendShapeFrame("Mouth_I", 100f, CreateDeltaVertices(0.02f), null, null);
+            mesh.AddBlendShapeFrame("Mouth_U", 100f, CreateDeltaVertices(0.03f), null, null);
+            mesh.AddBlendShapeFrame("Mouth_O", 100f, CreateDeltaVertices(0.04f), null, null);
+            renderer.sharedMesh = mesh;
+        }
+
+        private static Vector3[] CreateDeltaVertices(float x)
+        {
+            return new[]
+            {
+                new Vector3(x, 0f, 0f),
+                new Vector3(x, 0f, 0f),
+                new Vector3(x, 0f, 0f),
+            };
+        }
+
+        private static ULipSyncAdapterBinding CreateBinding(params PhonemeEntryBase[] entries)
+        {
+            var binding = new ULipSyncAdapterBinding();
+            binding.Configure(default, null, entries);
+            return binding;
+        }
+
+        private static AdapterBuildContext CreateContext(GameObject host, FacialProfile profile)
+        {
+            return new AdapterBuildContext(
+                profile,
+                new List<string> { "Mouth_A", "Mouth_I", "Mouth_U", "Mouth_O" },
+                new InputSourceRegistry(),
+                new FacialOutputBus(),
+                new UnityTimeProvider(),
+                host,
+                null);
+        }
+
+        private static FacialProfile CreateProfileWithoutExpressions()
+        {
+            return new FacialProfile("1.0");
+        }
+
+        private static FacialProfile CreateProfileWithExpression()
+        {
+            return new FacialProfile(
+                "1.0",
+                expressions: new[]
+                {
+                    new Expression(
+                        "expr-a",
+                        "A",
+                        "lipsync",
+                        blendShapeValues: new[]
+                        {
+                            new BlendShapeMapping("Mouth_A", 0.75f),
+                            new BlendShapeMapping("Mouth_I", 0.25f),
+                            new BlendShapeMapping("Mouth_U", 0.50f),
+                            new BlendShapeMapping("Mouth_O", 0.10f),
+                        }),
+                });
+        }
+
+        private static PhonemeSnapshot[] BuildSnapshots(
+            ULipSyncAdapterBinding binding,
+            AdapterBuildContext ctx)
+        {
+            MethodInfo method = typeof(ULipSyncAdapterBinding).GetMethod(
+                "BuildSnapshots",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+
+            try
+            {
+                return (PhonemeSnapshot[])method.Invoke(binding, new object[] { ctx });
+            }
+            catch (TargetInvocationException exception)
+            {
+                if (exception.InnerException != null)
+                {
+                    throw exception.InnerException;
+                }
+
+                throw;
+            }
+        }
+
+        private static void SetPrivateField(object target, string fieldName, object value)
+        {
+            FieldInfo field = target.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            field.SetValue(target, value);
         }
 
         private delegate long TotalAllocatedBytesReader(bool forceFullCollection);
