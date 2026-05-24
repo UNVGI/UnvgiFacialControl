@@ -22,6 +22,13 @@
 
 ## 短期（別 PR / preview.1 内に拾う候補）
 
+### S-20: OscOutputDemo の動作確認完了後、`OscOutputDemoSignalBinding` を削除
+- **出典**: 2026-05-25 セッション「`OscOutputDemoSignalBinding` と `OscSenderAdapterBinding` の役割確認」
+- **背景**: `OscOutputDemoSignalBinding`（[`Packages/com.hidano.facialcontrol.osc/Samples~/OscOutputDemo/OscOutputDemoBootstrap.cs:28`](../FacialControl/Packages/com.hidano.facialcontrol.osc/Samples~/OscOutputDemo/OscOutputDemoBootstrap.cs)）は demo 専用に sin 波で BlendShape / Gaze を生成する `IInputSource` を登録する AdapterBinding。`OscSenderAdapterBinding` の OSC 送信動作を demo Scene 内で検証するためだけに存在するため、実機で OSC 出力が想定通り動くことを確認できた時点で sample 側からは撤去する。
+- **削除時の影響**: `OscOutputDemoProfile.asset` の `RefIds` 内 `OscOutputDemoSignalBinding` エントリも併せて除去が必要。撤去後の demo 入力源の扱い（別の入力源 sample に差し替え / `OscOutputDemo` Scene 自体を撤去 / README で「ユーザー持ち込みの入力源を結線する」誘導に変更）を併せて決定する。
+- **トリガ**: `OscOutputDemo` Scene の OSC 出力動作確認が完了したタイミング
+- **影響範囲**: `Packages/com.hidano.facialcontrol.osc/Samples~/OscOutputDemo/OscOutputDemoBootstrap.cs`（`OscOutputDemoSignalBinding` / `DemoSignalState` / `DemoBlendShapeSource` / `DemoGazeSource` の削除）, 同 `OscOutputDemoProfile.asset`, 同 `README.md`, 関連 `.meta`
+
 ---
 
 ## 中期（preview.2 以降 / 別 spec 候補）
@@ -218,3 +225,4 @@
 - 2026-05-23: S-7 が `analog-input-binding` spec の `AnalogExpressionInputSource` で既に実装済みであることを確認（`BindingMode.Analog` 経路）。backlog から S-7 を削除し、誤って初期化した `.kiro/specs/analog-expression-weight/` ディレクトリも撤去。
 - 2026-05-23: S-17 を spec `phoneme-overlay-slots`、S-9 を spec `lipsync-animationclip-rework` として独立化。それぞれ requirements / design / tasks 生成済み (tasks-generated)。本 backlog からは削除し、以降は spec 内で進行管理。
 - 2026-05-23: S-9 は `lipsync-animationclip-rework` spec で対応済みとして完了反映。候補 (b)「`AnimationUtility.GetCurveBindings` による Editor 事前検証 + runtime path 補正」は将来課題として M-24 に残置。
+- 2026-05-25: `OscOutputDemoSignalBinding` と `OscSenderAdapterBinding` の役割確認セッションで S-20（OscOutputDemo の動作確認完了後の `OscOutputDemoSignalBinding` 撤去）を追加。
