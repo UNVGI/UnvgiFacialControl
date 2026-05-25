@@ -133,9 +133,19 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
                 initial.ApplyInitialDefaults();
             }
 
-            var list = ResolveUnderlyingList();
-            if (list == null) return;
-            list.Add(instance);
+            // SerializeReference リストへの追加は SerializedProperty 経由で行う。
+            // 直接 C# List に Add すると、SerializeReference の子フィールド
+            // (Drawer 内の FindPropertyRelative("_settings") 等) が次の
+            // ApplyModifiedProperties 完了まで SerializedObject に反映されず、
+            // 初回 Rebuild の Drawer.CreatePropertyGUI が空の PropertyField を
+            // 生成して「ObjectField のスロットが描画されない」現象が発生する。
+            var so = _listProperty.serializedObject;
+            so.Update();
+            int newIndex = _listProperty.arraySize;
+            _listProperty.InsertArrayElementAtIndex(newIndex);
+            var elementProp = _listProperty.GetArrayElementAtIndex(newIndex);
+            elementProp.managedReferenceValue = instance;
+            so.ApplyModifiedProperties();
 
             // 自身用の Layer がプロファイルに無い場合のみ自動的に作成する
             // (例: uLipSync は専用 Layer を必要とするため Inspector 操作の手間を減らす)。
