@@ -28,7 +28,7 @@
   - `OscRuntimeSettingsSO` は `[CreateAssetMenu]` を付けない方針で設計
 
 ### Topic 2: ScriptableObject の SerializeField による polymorphic 参照
-- **Context**: `OscAdapterBinding._settings` を Collection ではなく具象 SO (`OscRuntimeSettingsSO`) で持つことの可否を確認
+- **Context**: `OscReceiverAdapterBinding._settings` を Collection ではなく具象 SO (`OscRuntimeSettingsSO`) で持つことの可否を確認
 - **Sources Consulted**:
   - Unity ScriptingReference: Script Serialization — ScriptableObject 派生型は通常の `[SerializeField]` で参照可能
   - 既存パターン: `FacialCharacterProfileSO._referenceModel` (GameObject 参照) 等
@@ -36,7 +36,7 @@
   - ScriptableObject 派生型を `[SerializeField]` するのは Unity の常套手段。`[SerializeReference]` は **マネージドオブジェクト (`[Serializable]` plain C# class)** の polymorphic 直列化用であり、`ScriptableObject` 系には不要
   - sub-asset であっても、別 Asset であっても、参照経路は等価
 - **Implications**:
-  - `OscAdapterBinding._settings` は `[SerializeField] private OscRuntimeSettingsSO _settings` で実装する。`AdapterRuntimeSettingsBase` への参照 (interface 風) ではなく具象型参照のほうが IDE 補完と型安全性で勝る
+  - `OscReceiverAdapterBinding._settings` は `[SerializeField] private OscRuntimeSettingsSO _settings` で実装する。`AdapterRuntimeSettingsBase` への参照 (interface 風) ではなく具象型参照のほうが IDE 補完と型安全性で勝る
 
 ### Topic 3: TypeCache による派生型探索 (Editor)
 - **Context**: 要件 6.2 が「型一覧から追加対象を選択する UI」を要求。Reflection ベースの全 assembly スキャンは遅いので Unity 標準の高速代替を探した
@@ -115,7 +115,7 @@
     - Receiver のみ運用するケース (例: モブキャラの観測用) で Sender セクションが意味不明な値で残らない
   - 統合派の懸念は要件 6.6 (同型 sub-asset 複数登録 OK) で緩和される → Sender セクションを空のままにする「Receiver 専用 SO」と「Sender 専用 SO」を別 sub-asset として並べる運用は可能
 - **Implications**:
-  - 要件 2.4 に従い統合する。フィールドアクセス時の懸念は `OscAdapterBinding` / `OscSenderAdapterBinding` がそれぞれ自分のセクションだけ参照するため解消
+  - 要件 2.4 に従い統合する。フィールドアクセス時の懸念は `OscReceiverAdapterBinding` / `OscSenderAdapterBinding` がそれぞれ自分のセクションだけ参照するため解消
   - Drawer 側で Receiver セクション / Sender セクションのフォールドアウト分割を Inspector UX として提供
 
 ## Architecture Pattern Evaluation
@@ -137,7 +137,7 @@
   2. 方式 3 + 具象 sub-asset 直接参照 — binding は `[SerializeField] OscRuntimeSettingsSO _settings` で sub-asset を直接参照
 - **Selected Approach**: 方式 3 + 具象 sub-asset 直接参照 (alternative 2)
 - **Rationale**:
-  - 要件 2.5/2.6 で「`OscAdapterBinding` shall `OscRuntimeSettingsSO` への参照を `[SerializeField]` で 1 つ保持」と明記されている
+  - 要件 2.5/2.6 で「`OscReceiverAdapterBinding` shall `OscRuntimeSettingsSO` への参照を `[SerializeField]` で 1 つ保持」と明記されている
   - Collection 経由参照だと runtime での sub-asset lookup が必要になり、起動コスト・型誤接続リスクが増える
   - sub-asset を直接参照しても、Unity の Asset 依存解決は親 Collection を含めて Asset を読み込むため、参照経路の安全性は同等
 - **Trade-offs**:

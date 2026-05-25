@@ -120,8 +120,8 @@
   - `AddComponent<OscReceiverHost>(gameObject)` で動的生成し、binding が直接保持。`HideFlags = HideFlags.None`（= Inspector で見える、Req 13.6）。`OnDestroy` 内では `Object.Destroy(_helperHost)` で先に helper を破棄してから socket close する（Req 13.7）。
   - 「ユーザーが手動で OscReceiver を追加してしまった場合」は preview スコープ外として扱う（Req 8.4 で再オーサリング前提）。binding は同 GameObject 上に既存 helper があってもそれを参照せず、新規 `AddComponent` する。重複時は dispose 時に自分が `AddComponent` した helper のみを Destroy する（reference 等値で識別）。
 - **Implications**:
-  - `OscAdapterBinding.OnStart(in AdapterBuildContext ctx)` で `_helperHost = ctx.HostGameObject.AddComponent<OscReceiverHost>()` し、`_helperHost.Configure(port, endpoint, _doubleBuffer)` を呼ぶ。`Dispose()` で `if (_helperHost != null) Object.Destroy(_helperHost);`。
-  - 同様の pattern を `OscSenderHost`（送信用）にも適用する。
+  - `OscReceiverAdapterBinding.OnStart(in AdapterBuildContext ctx)` で `_helperHost = ctx.HostGameObject.AddComponent<OscReceiverHost>()` し、`_helperHost.Configure(port, endpoint, _doubleBuffer)` を呼ぶ。`Dispose()` で `if (_helperHost != null) Object.Destroy(_helperHost);`。
+  - 同様の pattern を `OscSender`（送信用）にも適用する。
   - 既存 `OscReceiver.cs` / `OscSender.cs` の MonoBehaviour 自体は名称・責務を温存し、Public Setter (`SetEndpoint(...)`, `SetBuffer(...)`) を追加して binding から `Configure` できるようにする。インスペクタからの手動配置 path は preview.2 以降に再評価。
 
 ## Architecture Pattern Evaluation
@@ -238,7 +238,7 @@
 ### Decision: ARKit binding は `com.hidano.facialcontrol.osc` 内に新設（C-6 解決）
 - **Context**: 現状 ARKit 入力経路は OSC 経由 `ArKitOscAnalogSource`（osc package）のみ。ARKit binding は (a) osc package 内 / (b) 新パッケージ / (c) core 内 のどこに置くかが未確定。
 - **Alternatives Considered**:
-  1. **osc package 内に `ArKitOscAdapterBinding`**: 採用。ARKit 入力は OSC 受信経路を再利用するため osc package と同居が自然。`OscAdapterBinding` と `ArKitOscAdapterBinding` は別 binding として並存（Req 6.3 が「binding として提供」を明示）。
+  1. **osc package 内に `ArKitOscAdapterBinding`**: 採用。ARKit 入力は OSC 受信経路を再利用するため osc package と同居が自然。`OscReceiverAdapterBinding` と `ArKitOscAdapterBinding` は別 binding として並存（Req 6.3 が「binding として提供」を明示）。
   2. 新パッケージ `com.hidano.facialcontrol.arkit`: package 数が増え管理コスト増。preview 段階では osc 同居で十分。
   3. core 内: core は ARKit / OSC を知らない契約（Req 4.1）に違反。
 - **Selected Approach**:

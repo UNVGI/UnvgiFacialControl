@@ -21,20 +21,20 @@ using UnityEngine.TestTools;
 namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
 {
     /// <summary>
-    /// task 9.1 EditMode 観測可能完了条件: <see cref="OscAdapterBinding"/> が
+    /// task 9.1 EditMode 観測可能完了条件: <see cref="OscReceiverAdapterBinding"/> が
     /// <c>[Serializable]</c> + <c>[FacialAdapterBinding(displayName: "OSC")]</c> 付きであり、
     /// <c>UnityEditor.TypeCache.GetTypesWithAttribute&lt;FacialAdapterBindingAttribute&gt;()</c>
     /// で discovery 列挙されることを assert する。
     /// </summary>
     /// <remarks>
     /// 本ファイルは Red 段階のテストであり、
-    /// <c>Hidano.FacialControl.Adapters.AdapterBindings.OscAdapterBinding</c> が未実装のため
+    /// <c>Hidano.FacialControl.Adapters.AdapterBindings.OscReceiverAdapterBinding</c> が未実装のため
     /// コンパイル時に CS0246 / CS0234 が発生して Red 状態となる（task 9.2 の Green 化対象）。
     /// </remarks>
     [TestFixture]
-    public class OscAdapterBindingTests
+    public class OscReceiverAdapterBindingTests
     {
-        private const string ExpectedDisplayName = "OSC";
+        private const string ExpectedDisplayName = "OSC Receiver";
         private const int PortBase = 19320;
 
         private static int s_portCounter;
@@ -42,21 +42,21 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         [Test]
         public void Type_HasSerializableAttribute_ForSerializeReferenceRoundTrip()
         {
-            object[] attrs = typeof(OscAdapterBinding)
+            object[] attrs = typeof(OscReceiverAdapterBinding)
                 .GetCustomAttributes(typeof(SerializableAttribute), inherit: false);
 
             Assert.That(attrs.Length, Is.EqualTo(1),
-                "OscAdapterBinding に [Serializable] が付いていないと [SerializeReference] の round-trip が破綻する。");
+                "OscReceiverAdapterBinding に [Serializable] が付いていないと [SerializeReference] の round-trip が破綻する。");
         }
 
         [Test]
-        public void Type_HasFacialAdapterBindingAttributeWithDisplayNameOSC()
+        public void Type_HasFacialAdapterBindingAttributeWithDisplayNameOSCReceiver()
         {
-            object[] attrs = typeof(OscAdapterBinding)
+            object[] attrs = typeof(OscReceiverAdapterBinding)
                 .GetCustomAttributes(typeof(FacialAdapterBindingAttribute), inherit: false);
 
             Assert.That(attrs.Length, Is.EqualTo(1),
-                "OscAdapterBinding には [FacialAdapterBinding] が 1 件だけ付与されているべき。");
+                "OscReceiverAdapterBinding には [FacialAdapterBinding] が 1 件だけ付与されているべき。");
 
             var attr = (FacialAdapterBindingAttribute)attrs[0];
             Assert.That(attr.DisplayName, Is.EqualTo(ExpectedDisplayName),
@@ -66,26 +66,26 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         [Test]
         public void Type_DerivesFromAdapterBindingBase()
         {
-            Assert.That(typeof(AdapterBindingBase).IsAssignableFrom(typeof(OscAdapterBinding)), Is.True,
-                "OscAdapterBinding は AdapterBindingBase の派生でなければならない。");
+            Assert.That(typeof(AdapterBindingBase).IsAssignableFrom(typeof(OscReceiverAdapterBinding)), Is.True,
+                "OscReceiverAdapterBinding は AdapterBindingBase の派生でなければならない。");
         }
 
         [Test]
         public void Type_IsConcreteSealedClass()
         {
-            Type type = typeof(OscAdapterBinding);
+            Type type = typeof(OscReceiverAdapterBinding);
 
             Assert.That(type.IsAbstract, Is.False,
-                "OscAdapterBinding は具象（非 abstract）クラスでなければならない。");
+                "OscReceiverAdapterBinding は具象（非 abstract）クラスでなければならない。");
             Assert.That(type.IsSealed, Is.True,
-                "OscAdapterBinding は sealed でなければならない（拡張は別 binding で実現）。");
+                "OscReceiverAdapterBinding は sealed でなければならない（拡張は別 binding で実現）。");
         }
 
         [Test]
         public void Type_HasParameterlessConstructor_ForActivatorCreateInstance()
         {
             // Inspector の Add ドロップダウンが Activator.CreateInstance 等で具象を生成できる必要がある。
-            System.Reflection.ConstructorInfo ctor = typeof(OscAdapterBinding)
+            System.Reflection.ConstructorInfo ctor = typeof(OscReceiverAdapterBinding)
                 .GetConstructor(Type.EmptyTypes);
 
             Assert.That(ctor, Is.Not.Null,
@@ -100,16 +100,16 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 .GetTypesWithAttribute<FacialAdapterBindingAttribute>()
                 .ToList();
 
-            CollectionAssert.Contains(discovered, typeof(OscAdapterBinding),
-                "TypeCache discovery で OscAdapterBinding が列挙されるべき。");
+            CollectionAssert.Contains(discovered, typeof(OscReceiverAdapterBinding),
+                "TypeCache discovery で OscReceiverAdapterBinding が列挙されるべき。");
         }
 
         [Test]
-        public void TypeCache_DiscoveredEntry_DisplayNameMatchesOSC()
+        public void TypeCache_DiscoveredEntry_DisplayNameMatchesOSCReceiver()
         {
             FacialAdapterBindingAttribute attr = TypeCache
                 .GetTypesWithAttribute<FacialAdapterBindingAttribute>()
-                .Where(t => t == typeof(OscAdapterBinding))
+                .Where(t => t == typeof(OscReceiverAdapterBinding))
                 .Select(t => (FacialAdapterBindingAttribute)t
                     .GetCustomAttributes(typeof(FacialAdapterBindingAttribute), inherit: false)[0])
                 .FirstOrDefault();
@@ -125,7 +125,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
             // 本テストでは Configure / プロパティ setter を一切呼ばないため _settings と _runtimeSettings の
             // どちらも null となり、EffectiveSettings は null になる。
             var registry = new InputSourceRegistry();
-            var binding = new OscAdapterBinding { Slug = "osc-no-settings" };
+            var binding = new OscReceiverAdapterBinding { Slug = "osc-no-settings" };
 
             var host = new GameObject("OscAdapterBindingSettingsNullTests");
             try
@@ -155,7 +155,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
             settings.FromJson(
                 "{\"receiverEnabled\":false,\"listenEndpoint\":\"127.0.0.1\",\"listenPort\":19999}");
 
-            var binding = new OscAdapterBinding
+            var binding = new OscReceiverAdapterBinding
             {
                 Slug = "osc-receiver-disabled",
                 Settings = settings,
@@ -200,7 +200,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 "{\"receiverEnabled\":true,\"listenEndpoint\":\"127.0.0.1\",\"listenPort\":" + port
                 + ",\"bundleMode\":\"individualMessage\"}");
 
-            var binding = new OscAdapterBinding
+            var binding = new OscReceiverAdapterBinding
             {
                 Slug = "osc-settings-applied",
                 Settings = settings,
@@ -238,7 +238,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         public void OnStart_GazeVrchatMapping_RegistersVector2InputSourceUnderExpressionId()
         {
             var registry = new InputSourceRegistry();
-            var binding = new OscAdapterBinding { Slug = "osc" };
+            var binding = new OscReceiverAdapterBinding { Slug = "osc" };
             binding.Port = AllocatePort();
             binding.Mappings = new List<OscMappingEntry>
             {
@@ -251,7 +251,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 }
             };
 
-            var host = new GameObject("OscAdapterBindingTests");
+            var host = new GameObject("OscReceiverAdapterBindingTests");
             try
             {
                 AdapterBuildContext ctx = CreateContext(registry, host);
@@ -290,7 +290,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         public void OnFixedTick_GazeVrchatMessages_PublishesVector2InputSource()
         {
             var registry = new InputSourceRegistry();
-            var binding = new OscAdapterBinding
+            var binding = new OscReceiverAdapterBinding
             {
                 Slug = "osc",
                 Port = AllocatePort(),
@@ -335,7 +335,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         {
             var registry = new InputSourceRegistry();
             var time = new ManualTimeProvider { UnscaledTimeSeconds = 0.0 };
-            var binding = new OscAdapterBinding
+            var binding = new OscReceiverAdapterBinding
             {
                 Slug = "osc",
                 Port = AllocatePort(),
@@ -385,7 +385,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         public void OnFixedTick_GazeArKitMessages_PublishesLeftAndRightVector2Sources()
         {
             var registry = new InputSourceRegistry();
-            var binding = new OscAdapterBinding
+            var binding = new OscReceiverAdapterBinding
             {
                 Slug = "osc",
                 Port = AllocatePort(),
@@ -439,7 +439,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         public void OnStart_GazeLeftRightIndependentMissingSourceIds_SkipsEntry()
         {
             var registry = new InputSourceRegistry();
-            var binding = new OscAdapterBinding
+            var binding = new OscReceiverAdapterBinding
             {
                 Slug = "osc",
                 Port = AllocatePort(),
@@ -477,7 +477,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         {
             var registry = new InputSourceRegistry();
             var time = new ManualTimeProvider { UnscaledTimeSeconds = 0.0 };
-            var binding = new OscAdapterBinding
+            var binding = new OscReceiverAdapterBinding
             {
                 Slug = "osc",
                 Port = AllocatePort(),
@@ -526,7 +526,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         public void HeartbeatMismatch_SkipsOnlyMissingBlendShape()
         {
             var registry = new InputSourceRegistry();
-            var binding = new OscAdapterBinding
+            var binding = new OscReceiverAdapterBinding
             {
                 Slug = "osc",
                 Port = AllocatePort(),
@@ -546,7 +546,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
 
                 LogAssert.Expect(LogType.Warning, new Regex("HeartbeatConsistencyChecker mismatch"));
                 binding.HelperHost.Receiver.HandleOscMessage(
-                    new uOSC.Message(OscAdapterBinding.BlendShapeNamesAddress, "smile"));
+                    new uOSC.Message(OscReceiverAdapterBinding.BlendShapeNamesAddress, "smile"));
                 binding.HelperHost.Receiver.HandleOscMessage(
                     new uOSC.Message("/avatar/parameters/smile", 0.25f));
                 binding.HelperHost.Receiver.HandleOscMessage(
@@ -572,7 +572,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         public void OnStart_MappingOrderDiffersFromMeshOrder_InitializesCheckerAndSourceInMeshIndexSpace()
         {
             var registry = new InputSourceRegistry();
-            var binding = new OscAdapterBinding
+            var binding = new OscReceiverAdapterBinding
             {
                 Slug = "osc",
                 Port = AllocatePort(),
@@ -623,7 +623,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         {
             var registry = new InputSourceRegistry();
             var time = new ManualTimeProvider { UnscaledTimeSeconds = 0.0 };
-            var binding = new OscAdapterBinding
+            var binding = new OscReceiverAdapterBinding
             {
                 Slug = "osc",
                 Port = AllocatePort(),
@@ -686,7 +686,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
             return PortBase + System.Threading.Interlocked.Increment(ref s_portCounter);
         }
 
-        private static void SendArKit(OscAdapterBinding binding, string name, float value)
+        private static void SendArKit(OscReceiverAdapterBinding binding, string name, float value)
         {
             binding.HelperHost.Receiver.HandleOscMessage(
                 new uOSC.Message(PerfectSyncEyeLook.ArKitAddressPrefix + name, value));
@@ -702,7 +702,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         private static uOSC.Message SenderMessage(SenderIdentity identity, ulong timestamp)
         {
             var message = new uOSC.Message(
-                OscAdapterBinding.SenderIdentityAddress,
+                OscReceiverAdapterBinding.SenderIdentityAddress,
                 identity.SenderId.ToByteArray(),
                 identity.StartedAtUnixMs);
             message.timestamp = new uOSC.Timestamp(timestamp);

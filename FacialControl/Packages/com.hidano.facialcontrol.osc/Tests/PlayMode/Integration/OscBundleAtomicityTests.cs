@@ -25,7 +25,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         private static int s_portCounter;
 
         private GameObject _host;
-        private OscAdapterBinding _binding;
+        private OscReceiverAdapterBinding _binding;
 
         [TearDown]
         public void TearDown()
@@ -79,9 +79,9 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             AssertGaze(registry, 0.4f, -0.6f);
         }
 
-        private static OscAdapterBinding CreateReceiver()
+        private static OscReceiverAdapterBinding CreateReceiver()
         {
-            return new OscAdapterBinding
+            return new OscReceiverAdapterBinding
             {
                 Slug = Slug,
                 Port = AllocatePort(),
@@ -157,7 +157,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         private static uOSC.Message SenderMessage(SenderIdentity identity, ulong timestamp)
         {
             var message = new uOSC.Message(
-                OscAdapterBinding.SenderIdentityAddress,
+                OscReceiverAdapterBinding.SenderIdentityAddress,
                 identity.SenderId.ToByteArray(),
                 identity.StartedAtUnixMs);
             message.timestamp = new uOSC.Timestamp(timestamp);

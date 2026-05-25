@@ -213,7 +213,7 @@
 - [x] 9.3 `ULipSyncAdapterBindingDrawer` を統合する
   - `[CustomPropertyDrawer(typeof(ULipSyncAdapterBinding))]` を `Editor/Inspector/ULipSyncAdapterBindingDrawer.cs` に実装し、`CreatePropertyGUI(SerializedProperty property)` を override する
   - VisualElement ツリー: Slug 行（`PropertyField`）/ `DeviceDescriptorPopup` / Analyzer Profile `ObjectField`（未指定時「パッケージ同梱既定」プレースホルダ）/ `PhonemeEntryListView` / `_maxWeightScale` 行を配置する
-  - 既存 `OscAdapterBindingDrawer` の折りたたみ・余白・Validation 配置と整合させる（**12.7**）
+  - 既存 `OscReceiverAdapterBindingDrawer` の折りたたみ・余白・Validation 配置と整合させる（**12.7**）
   - 観測可能完了条件: Inspector に `ULipSyncAdapterBinding` を含む `FacialCharacterProfileSO._adapterBindings` を表示すると、Drawer が UI Toolkit で構築された各セクションを描画し、編集後に `ApplyModifiedProperties` 経由で値が round-trip 保存される
   - _Requirements: 12.1, 12.2, 12.5, 12.7_
 
@@ -280,7 +280,7 @@
   - `OnStart_AnalyzerProfileMissing_LogsErrorAndRollsBack`（6.6）
   - `OnStart_DuplicateBindingOnSameCharacter_LogsErrorAndSkips`（10.3）
   - `Dispose_AfterStart_RemovesAllAddedComponents`（2.4, 6.5）
-  - 既存 `OscAdapterBindingTests` のライフサイクル / Registry / 例外時安全停止項目と 1:1 対応する surface を確保する（**14.3**）
+  - 既存 `OscReceiverAdapterBindingTests` のライフサイクル / Registry / 例外時安全停止項目と 1:1 対応する surface を確保する（**14.3**）
   - 観測可能完了条件: 全シナリオが PlayMode で green、Console に期待通りの LogError / LogWarning が出力される
   - _Requirements: 2.4, 6.5, 6.6, 9.1, 9.2, 10.3, 14.2, 14.3, 14.5_
   - _Boundary: Tests/PlayMode/Lifecycle_

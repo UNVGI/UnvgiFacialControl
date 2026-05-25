@@ -18,13 +18,13 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 {
     /// <summary>
     /// task 8.5 PlayMode 観測可能完了条件:
-    /// <see cref="OscAdapterBinding"/> / <see cref="OscSenderAdapterBinding"/> が
+    /// <see cref="OscReceiverAdapterBinding"/> / <see cref="OscSenderAdapterBinding"/> が
     /// <see cref="OscRuntimeSettingsSO"/> 経由で割り当てられた listenPort / endpoints を
     /// 用いて実 UDP loopback の送受信を成立させられること、および同一 SO を双方の binding に
     /// 注入したときに設定が一貫することを assert する。
     /// </summary>
     [TestFixture]
-    public sealed class OscAdapterBindingSettingsReferenceTests
+    public sealed class OscReceiverAdapterBindingSettingsReferenceTests
     {
         private const string Endpoint = "127.0.0.1";
         private const int LoopbackPortBase = 19620;
@@ -89,15 +89,15 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             int port = AllocatePort();
 
             OscRuntimeSettingsSO settings = CreateSettings(BuildReceiverJson(port));
-            OscAdapterBinding receiver = CreateReceiver(slug, settings);
-            GameObject receiverHost = CreateGameObject("OscAdapterBindingSettingsReferenceTests_Receiver");
+            OscReceiverAdapterBinding receiver = CreateReceiver(slug, settings);
+            GameObject receiverHost = CreateGameObject("OscReceiverAdapterBindingSettingsReferenceTests_Receiver");
             var registry = new InputSourceRegistry();
 
             StartBinding(receiver, CreateContext(registry, new FacialOutputBus(), receiverHost,
                 new[] { BlendShapeNameA, BlendShapeNameB }));
 
             Assert.That(receiver.IsStarted, Is.True,
-                "OscAdapterBinding は _settings 経由でも起動できるべき。");
+                "OscReceiverAdapterBinding は _settings 経由でも起動できるべき。");
             Assert.That(receiver.HelperHost, Is.Not.Null,
                 "OnStart 後は OscReceiverHost が AddComponent されているべき。");
             Assert.That(receiver.HelperHost.Port, Is.EqualTo(port),
@@ -105,9 +105,9 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             yield return new WaitForSecondsRealtime(0.2f);
 
-            GameObject senderHost = CreateGameObject("OscAdapterBindingSettingsReferenceTests_RawSender");
+            GameObject senderHost = CreateGameObject("OscReceiverAdapterBindingSettingsReferenceTests_RawSender");
             OscSender sender = senderHost.AddComponent<OscSender>();
-            sender.Address = Endpoint;
+            sender.Endpoint = Endpoint;
             sender.Port = port;
             OscMapping[] mappings = new[]
             {
@@ -155,11 +155,11 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             OscRuntimeSettingsSO settings = CreateSettings(BuildSenderJson(port));
             OscSenderAdapterBinding sender = CreateSender("osc-sender-settings-endpoints", settings,
                 new[] { BlendShapeNameA });
-            GameObject senderHost = CreateGameObject("OscAdapterBindingSettingsReferenceTests_Sender");
+            GameObject senderHost = CreateGameObject("OscReceiverAdapterBindingSettingsReferenceTests_Sender");
             var outputBus = new FacialOutputBus();
 
             // 受信側は通常の OscReceiver MonoBehaviour を直接 bind して値を観測する。
-            GameObject receiverHost = CreateGameObject("OscAdapterBindingSettingsReferenceTests_RawReceiver");
+            GameObject receiverHost = CreateGameObject("OscReceiverAdapterBindingSettingsReferenceTests_RawReceiver");
             OscReceiver rawReceiver = receiverHost.AddComponent<OscReceiver>();
             var buffer = new OscDoubleBuffer(1);
             OscMapping[] mappings = new[]
@@ -179,10 +179,10 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
                 Assert.That(sender.IsStarted, Is.True,
                     "OscSenderAdapterBinding は _settings 経由でも起動できるべき。");
-                Assert.That(sender.HelperHostCount, Is.EqualTo(1),
-                    "_settings.Endpoints の件数だけ OscSenderHost が AddComponent されるべき。");
-                Assert.That(sender.GetHelperHost(0).Port, Is.EqualTo(port),
-                    "_settings.Endpoints[0].port が OscSenderHost.Configure に伝播するべき。");
+                Assert.That(sender.HelperSenderCount, Is.EqualTo(1),
+                    "_settings.Endpoints の件数だけ OscSender が AddComponent されるべき。");
+                Assert.That(sender.GetHelperSender(0).Port, Is.EqualTo(port),
+                    "_settings.Endpoints[0].port が OscSender.Configure に伝播するべき。");
 
                 yield return new WaitForSecondsRealtime(0.2f);
 
@@ -204,7 +204,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
                 }
 
                 Assert.That(received, Is.True,
-                    "_settings.Endpoints 経由で起動した OscSenderHost が UDP 経由で値を送信するべき。");
+                    "_settings.Endpoints 経由で起動した OscSender が UDP 経由で値を送信するべき。");
             }
             finally
             {
@@ -224,12 +224,12 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             int port = AllocatePort();
 
             OscRuntimeSettingsSO shared = CreateSettings(BuildSharedJson(port));
-            OscAdapterBinding receiver = CreateReceiver("osc-receiver-shared", shared);
+            OscReceiverAdapterBinding receiver = CreateReceiver("osc-receiver-shared", shared);
             OscSenderAdapterBinding sender = CreateSender("osc-sender-shared", shared,
                 new[] { BlendShapeNameA });
 
-            GameObject receiverHost = CreateGameObject("OscAdapterBindingSettingsReferenceTests_SharedReceiver");
-            GameObject senderHost = CreateGameObject("OscAdapterBindingSettingsReferenceTests_SharedSender");
+            GameObject receiverHost = CreateGameObject("OscReceiverAdapterBindingSettingsReferenceTests_SharedReceiver");
+            GameObject senderHost = CreateGameObject("OscReceiverAdapterBindingSettingsReferenceTests_SharedSender");
 
             var registry = new InputSourceRegistry();
             var outputBus = new FacialOutputBus();
@@ -244,7 +244,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             Assert.That(sender.IsStarted, Is.True);
             Assert.That(receiver.HelperHost.Port, Is.EqualTo(port),
                 "共有 SO の ListenPort が Receiver に反映されること。");
-            Assert.That(sender.GetHelperHost(0).Port, Is.EqualTo(port),
+            Assert.That(sender.GetHelperSender(0).Port, Is.EqualTo(port),
                 "共有 SO の Endpoints[0].port が Sender に反映され、Receiver と同じ値であること。");
             Assert.That(receiver.Settings, Is.SameAs(sender.Settings),
                 "Receiver と Sender が同一 OscRuntimeSettingsSO インスタンスを参照していること。");
@@ -293,9 +293,9 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             return settings;
         }
 
-        private OscAdapterBinding CreateReceiver(string slug, OscRuntimeSettingsSO settings)
+        private OscReceiverAdapterBinding CreateReceiver(string slug, OscRuntimeSettingsSO settings)
         {
-            return new OscAdapterBinding
+            return new OscReceiverAdapterBinding
             {
                 Slug = slug,
                 Settings = settings,

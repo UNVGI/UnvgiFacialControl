@@ -55,7 +55,7 @@ public sealed class MyCustomAdapterBinding : AdapterBindingBase
 
 ## サンプル
 
-- **Multi Source Blend Demo** — 同一レイヤーに `input-system` (Trigger Action 経由) と `osc` の 2 系統入力源を並置して加重和ブレンドを目視確認するサンプル。Scene / `FacialCharacterProfileSO` (`InputSystemAdapterBinding` + `OscAdapterBinding` 同時保持) / InputActionAsset / HUD を同梱、ユーザーはモデルを Scene の Character の子に配置するだけで動作。Package Manager から Import 可能
+- **Multi Source Blend Demo** — 同一レイヤーに `input-system` (Trigger Action 経由) と `osc` の 2 系統入力源を並置して加重和ブレンドを目視確認するサンプル。Scene / `FacialCharacterProfileSO` (`InputSystemAdapterBinding` + `OscReceiverAdapterBinding` 同時保持) / InputActionAsset / HUD を同梱、ユーザーはモデルを Scene の Character の子に配置するだけで動作。Package Manager から Import 可能
 - **Analog Binding Demo** — 右スティック等の連続値を BlendShape / BonePose 軸に写像するアナログ結線サンプル
 
 各サンプルの詳細は `Samples~/<sample-name>/README.md` を参照。

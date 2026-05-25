@@ -40,7 +40,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         public void OscContract_ConstantsMatchReceiverParserContract()
         {
             Assert.AreEqual("/_facialcontrol/sender_id", SenderIdentity.OscAddress);
-            Assert.AreEqual(SenderIdentity.OscAddress, OscAdapterBinding.SenderIdentityAddress);
+            Assert.AreEqual(SenderIdentity.OscAddress, OscReceiverAdapterBinding.SenderIdentityAddress);
             Assert.AreEqual(16, SenderIdentity.UuidByteLength);
         }
     }

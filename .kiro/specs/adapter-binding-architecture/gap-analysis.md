@@ -86,14 +86,14 @@
 | AC | 既存資産 | ギャップ |
 |----|---------|---------|
 | 6.1 `InputSystemAdapterBinding`（`displayName: "Input System"`）提供 | **Missing**。`FacialCharacterSO.cs` + `FacialCharacterInputExtension.cs` + `InputFacialControllerExtension.cs` + `InputRegistration.cs` の責務を 1 binding に統合する大規模作業 | 新規実装 + 既存 4 ファイル削除 |
-| 6.2 `OscAdapterBinding`（`displayName: "OSC"`）提供 | **Missing**。`OscFacialControllerExtension.cs` + `OscRegistration.cs` の責務を 1 binding に統合。さらに `OscReceiver` の socket lifecycle を binding 配下へ移管 | 新規 + 既存 2 ファイル削除 + `OscReceiver` を helper 化 |
+| 6.2 `OscReceiverAdapterBinding`（`displayName: "OSC"`）提供 | **Missing**。`OscFacialControllerExtension.cs` + `OscRegistration.cs` の責務を 1 binding に統合。さらに `OscReceiver` の socket lifecycle を binding 配下へ移管 | 新規 + 既存 2 ファイル削除 + `OscReceiver` を helper 化 |
 | 6.3 `ARKitAdapterBinding`（`displayName: "ARKit / PerfectSync"`）提供 | **Constraint**。現状 ARKit は `Runtime/Application/UseCases/ARKitUseCase.cs` + `Runtime/Domain/Services/ARKitDetector.cs` + `Editor/Windows/ARKitDetectorWindow.cs` で **Editor 検出 → Expression 自動生成のみ**（runtime input source ではない）。OSC 経由で `ArKitOscAnalogSource` (osc package) を介して入力する形 | Research Needed: ARKit binding が「runtime 入力源」として何を produce するのか（ARKit OSC 受信を担うのか、別チャネルなのか）の決定。requirement 6.3 は **新規パッケージ or osc package 内 binding として再構成** |
 | 6.4 `FacialCharacterSO`（inputsystem 派生）削除 | **Existing Asset**。`Runtime/Adapters/ScriptableObject/FacialCharacterSO.cs:36`（200 行超） | 削除対象 |
 | 6.5 各 migrated adapter package が PropertyDrawer 提供 | **Partial**。現 `FacialCharacterSOInspector.cs` の UI ロジックは流用可能だが PropertyDrawer 形式への再構成が必要 | 新規（既存 inspector 流用） |
 | 6.6 単一 SO に Input/OSC/ARKit 同時保持・round-trip | **Missing** | Req 2 + 6.1〜6.3 完了後に検証 |
 | 6.7 preview-stage 破壊変更扱い | **Process constraint** | CHANGELOG / Documentation 更新で対応 |
 | 6.8 `FacialCharacterInputExtension` / `InputFacialControllerExtension` 削除 + `InputSystemAdapterBinding.OnStart` 等へ移植 | **Existing**。`FacialCharacterInputExtension.cs:48`（576 行）のロジック（ActionMap Instantiate / Enable, Analog source 構築, BonePose / GazeBone provider 構築, BindAllExpressions, LateUpdate Tick）すべて binding lifecycle へ再配置 | 大規模リファクタ。`OnStart`（asset/action map setup）→ `OnLateTick`（Tick + Apply）→ `Dispose`（teardown）への分割が必要 |
-| 6.9 `OscFacialControllerExtension` 削除 + `OscAdapterBinding` が socket lifecycle 管理（補助 MonoBehaviour `AddComponent` 許容） | **Existing**。`OscFacialControllerExtension.cs:19`（76 行）+ 別 MonoBehaviour `OscReceiver` / `OscSender`（`Runtime/Adapters/OSC/`） | 大規模リファクタ。binding 内で `_facialController.gameObject.AddComponent<OscSocketHelper>()` 形に再構成 |
+| 6.9 `OscFacialControllerExtension` 削除 + `OscReceiverAdapterBinding` が socket lifecycle 管理（補助 MonoBehaviour `AddComponent` 許容） | **Existing**。`OscFacialControllerExtension.cs:19`（76 行）+ 別 MonoBehaviour `OscReceiver` / `OscSender`（`Runtime/Adapters/OSC/`） | 大規模リファクタ。binding 内で `_facialController.gameObject.AddComponent<OscSocketHelper>()` 形に再構成 |
 | 6.10 reserved-id 登録経路撤廃 | **Existing**。`InputRegistration.cs` / `OscRegistration.cs` / `InputSourceFactory` ビルトイン登録（`InputSourceFactory.cs:104-120`）を全廃 | 削除対象 |
 
 ### Requirement 7: 単一 SO ファイル UX
@@ -104,7 +104,7 @@
 | 7.2 単一 asset への永続化 | **Already Met**（`[SerializeReference]` 採用後） | 維持 |
 | 7.3 secondary asset / SO / component 不要 | **Conflict**。現状は `FacialCharacterInputExtension` 等の MonoBehaviour 配置が必須。Req 6.8 / 6.9 移行で解消 | 移行で対応 |
 | 7.4 inline Asset 参照（`InputActionAsset` 等） | **Conflict**。`InputActionAsset` への参照は `FacialCharacterSO._inputActionAsset` で持っている既存資産あり。binding に inline で同等のフィールドを再配置 | 移行で対応 |
-| 7.5 inline 設定（OSC port 等） | **Missing**。現 `OscReceiver` は MonoBehaviour 上で port を持っているため、`OscAdapterBinding` 内に port フィールドを移す | 移行で対応 |
+| 7.5 inline 設定（OSC port 等） | **Missing**。現 `OscReceiver` は MonoBehaviour 上で port を持っているため、`OscReceiverAdapterBinding` 内に port フィールドを移す | 移行で対応 |
 
 ### Requirement 8: 破壊的変更ポリシー
 
@@ -245,7 +245,7 @@
 | Adapters: `FacialController` の Initialize / Cleanup を VContainer build 経路へ移行 | **M** (3〜5 日) | High | 既存 `BuildAdditionalInputSources` / `ApplyExtensions` を全置換。回帰テスト範囲広 |
 | Editor: `[SerializeReference] List<AdapterBindingBase>` 編集 UI（Add ドロップダウン + Remove + Reorder + Missing placeholder + Slug 自動生成 + 重複検証） | **L** (1〜2 週) | **High** | Unity の `[SerializeReference]` + UI Toolkit の polymorphic list は project 内未経験。null entry / type missing / save block API の研究必要 |
 | Editor: `AdapterBindingDiscovery`（`TypeCache.GetTypesWithAttribute` + 重複 displayName 警告） | **S** (1〜2 日) | Low | Editor 専用 static helper |
-| osc: `OscAdapterBinding` + PropertyDrawer + `OscReceiver` を helper MonoBehaviour として再構成 | **M** (5〜7 日) | Medium | socket lifecycle の binding 内自動管理は新 pattern。実 UDP テスト維持必要 |
+| osc: `OscReceiverAdapterBinding` + PropertyDrawer + `OscReceiver` を helper MonoBehaviour として再構成 | **M** (5〜7 日) | Medium | socket lifecycle の binding 内自動管理は新 pattern。実 UDP テスト維持必要 |
 | inputsystem: `InputSystemAdapterBinding`（trigger + analog + gaze 全部統合） + PropertyDrawer + 既存 4 ファイル削除 | **L** (1〜2 週) | Medium | `FacialCharacterInputExtension.cs` 576 行のロジックを binding lifecycle へ再分割。Gaze / BonePose / AnalogBlendShape 3 系統の動作維持が必要 |
 | ARKit binding（Req 6.3 解釈次第） | **M** (3〜5 日) | Medium | osc package 内に `ArKitOscAdapterBinding` を新設するか core or 新 package で実装するかは design phase で決定 |
 | `InputSourceId.IsReservedId` / `RegisterExtension` 廃止 + slug-based id resolve（`<slug>` / `<slug>:<sub>`） | **M** (3〜5 日) | High | 既存全コード（`InputRegistration.cs`、`OscRegistration.cs`、`FacialController.BuildAdditionalInputSources`、テスト群）の依存箇所抽出 + 置換 |

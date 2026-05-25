@@ -102,7 +102,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
 
                 Assert.That(binding.IsStarted, Is.False);
-                Assert.That(binding.HelperHostCount, Is.EqualTo(0));
+                Assert.That(binding.HelperSenderCount, Is.EqualTo(0));
                 Assert.That(bus.Observer, Is.Null);
             }
             finally
@@ -137,7 +137,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
 
                 Assert.That(binding.IsStarted, Is.False);
-                Assert.That(binding.HelperHostCount, Is.EqualTo(0));
+                Assert.That(binding.HelperSenderCount, Is.EqualTo(0));
                 Assert.That(bus.Observer, Is.Null);
             }
             finally
@@ -176,9 +176,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
 
                 Assert.That(binding.IsStarted, Is.True);
-                Assert.That(binding.HelperHostCount, Is.EqualTo(2));
-                Assert.That(binding.GetHelperHost(0).Port, Is.EqualTo(firstPort));
-                Assert.That(binding.GetHelperHost(1).Port, Is.EqualTo(secondPort));
+                Assert.That(binding.HelperSenderCount, Is.EqualTo(2));
+                Assert.That(binding.GetHelperSender(0).Port, Is.EqualTo(firstPort));
+                Assert.That(binding.GetHelperSender(1).Port, Is.EqualTo(secondPort));
                 Assert.That(bus.Observer, Is.SameAs(binding));
             }
             finally
@@ -233,8 +233,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
 
                 Assert.That(binding.IsStarted, Is.True);
-                Assert.That(binding.HelperHost, Is.Not.Null);
-                Assert.That(binding.HelperHost.IsConfigured, Is.True);
+                Assert.That(binding.HelperSender, Is.Not.Null);
+                Assert.That(binding.HelperSender.IsConfigured, Is.True);
                 Assert.That(bus.Observer, Is.SameAs(binding));
                 Assert.That(binding.Identity.Uuid, Is.Not.EqualTo(Guid.Empty));
                 Assert.That(binding.Identity.StartedAtUnixMs, Is.GreaterThanOrEqualTo(0L));
@@ -265,10 +265,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
 
                 Assert.That(binding.IsStarted, Is.True);
-                Assert.That(binding.HelperHostCount, Is.EqualTo(2));
-                Assert.That(binding.GetHelperHost(0).Port, Is.EqualTo(firstPort));
-                Assert.That(binding.GetHelperHost(1).Port, Is.EqualTo(secondPort));
-                Assert.That(binding.GetHelperHost(0), Is.Not.SameAs(binding.GetHelperHost(1)));
+                Assert.That(binding.HelperSenderCount, Is.EqualTo(2));
+                Assert.That(binding.GetHelperSender(0).Port, Is.EqualTo(firstPort));
+                Assert.That(binding.GetHelperSender(1).Port, Is.EqualTo(secondPort));
+                Assert.That(binding.GetHelperSender(0), Is.Not.SameAs(binding.GetHelperSender(1)));
                 Assert.That(host.GetComponents<uOSC.uOscClient>().Length, Is.EqualTo(2));
                 Assert.That(bus.Observer, Is.SameAs(binding));
             }
@@ -297,22 +297,22 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 binding.OnStart(CreateContext(bus, host, new[] { "eyeBlinkLeft" }));
 
                 Assert.That(binding.IsStarted, Is.True);
-                Assert.That(binding.HelperHostCount, Is.EqualTo(3));
+                Assert.That(binding.HelperSenderCount, Is.EqualTo(3));
 
                 string[] vrchatAddresses = GetPrivateField<string[]>(
-                    binding.GetHelperHost(0).Sender,
+                    binding.GetHelperSender(0),
                     "_oscAddresses");
                 string[] arkitAddresses = GetPrivateField<string[]>(
-                    binding.GetHelperHost(1).Sender,
+                    binding.GetHelperSender(1),
                     "_oscAddresses");
                 byte[][] vrchatBytes = GetPrivateField<byte[][]>(
-                    binding.GetHelperHost(0).Sender,
+                    binding.GetHelperSender(0),
                     "_oscAddressUtf8");
                 byte[][] firstArKitBytes = GetPrivateField<byte[][]>(
-                    binding.GetHelperHost(1).Sender,
+                    binding.GetHelperSender(1),
                     "_oscAddressUtf8");
                 byte[][] secondArKitBytes = GetPrivateField<byte[][]>(
-                    binding.GetHelperHost(2).Sender,
+                    binding.GetHelperSender(2),
                     "_oscAddressUtf8");
 
                 Assert.That(vrchatAddresses[0], Is.EqualTo("/avatar/parameters/eyeBlinkLeft"));
@@ -347,7 +347,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
 
                 Assert.That(binding.IsStarted, Is.True);
                 string[] addresses = GetPrivateField<string[]>(
-                    binding.HelperHost.Sender,
+                    binding.HelperSender,
                     "_oscAddresses");
 
                 CollectionAssert.AreEqual(
@@ -384,7 +384,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
 
                 Assert.That(binding.IsStarted, Is.True);
                 string[] addresses = GetPrivateField<string[]>(
-                    binding.HelperHost.Sender,
+                    binding.HelperSender,
                     "_oscAddresses");
 
                 Assert.That(addresses.Length, Is.EqualTo(1 + PerfectSyncEyeLook.Count));
@@ -522,8 +522,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
 
                 Assert.That(binding.IsStarted, Is.True);
-                Assert.That(binding.HelperHostCount, Is.EqualTo(2));
-                Assert.That(binding.GetHelperHost(0).Port, Is.EqualTo(port));
+                Assert.That(binding.HelperSenderCount, Is.EqualTo(2));
+                Assert.That(binding.GetHelperSender(0).Port, Is.EqualTo(port));
                 Assert.That(bus.Observer, Is.SameAs(binding));
             }
             finally
@@ -538,7 +538,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         {
             var bus = new RecordingFacialOutputBus();
             int port = AllocatePort();
-            var receiver = new OscAdapterBinding
+            var receiver = new OscReceiverAdapterBinding
             {
                 Slug = "osc-receiver",
                 Endpoint = "127.0.0.1",
@@ -564,7 +564,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                     new AdapterBindingBase[] { receiver, binding }));
 
                 Assert.That(binding.IsStarted, Is.True);
-                Assert.That(binding.HelperHostCount, Is.EqualTo(0));
+                Assert.That(binding.HelperSenderCount, Is.EqualTo(0));
                 Assert.That(bus.Observer, Is.SameAs(binding));
                 Assert.That(binding.LoopbackPolicy, Is.Not.Null);
             }
@@ -580,7 +580,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         {
             var bus = new RecordingFacialOutputBus();
             int port = AllocatePort();
-            var receiver = new OscAdapterBinding
+            var receiver = new OscReceiverAdapterBinding
             {
                 Slug = "osc-receiver",
                 Endpoint = "127.0.0.1",
@@ -603,8 +603,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                     new AdapterBindingBase[] { receiver, binding }));
 
                 Assert.That(binding.IsStarted, Is.True);
-                Assert.That(binding.HelperHostCount, Is.EqualTo(1));
-                Assert.That(binding.HelperHost.Port, Is.EqualTo(port));
+                Assert.That(binding.HelperSenderCount, Is.EqualTo(1));
+                Assert.That(binding.HelperSender.Port, Is.EqualTo(port));
                 Assert.That(bus.Observer, Is.SameAs(binding));
                 Assert.That(binding.LoopbackPolicy, Is.Null);
             }
@@ -633,7 +633,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
 
                 Assert.That(binding.IsStarted, Is.False);
-                Assert.That(binding.HelperHostCount, Is.EqualTo(0));
+                Assert.That(binding.HelperSenderCount, Is.EqualTo(0));
                 Assert.That(bus.Observer, Is.Null);
             }
             finally
@@ -658,7 +658,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 binding.OnStart(CreateContext(bus, host, new[] { "smile" }));
 
                 Assert.That(binding.IsStarted, Is.False);
-                Assert.That(binding.HelperHost, Is.Null);
+                Assert.That(binding.HelperSender, Is.Null);
                 Assert.That(bus.Observer, Is.Null);
             }
             finally
@@ -684,7 +684,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 binding.Dispose();
 
                 Assert.That(binding.IsStarted, Is.False);
-                Assert.That(binding.HelperHost, Is.Null);
+                Assert.That(binding.HelperSender, Is.Null);
                 Assert.That(bus.Observer, Is.Null);
             }
             finally

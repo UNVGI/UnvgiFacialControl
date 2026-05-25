@@ -11,11 +11,11 @@ using UnityEngine.UIElements;
 namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
 {
     /// <summary>
-    /// <see cref="OscAdapterBinding"/> の inline UI を提供する UI Toolkit ベースの
+    /// <see cref="OscReceiverAdapterBinding"/> の inline UI を提供する UI Toolkit ベースの
     /// <see cref="PropertyDrawer"/>。
     /// </summary>
-    [CustomPropertyDrawer(typeof(OscAdapterBinding))]
-    public sealed class OscAdapterBindingDrawer : PropertyDrawer
+    [CustomPropertyDrawer(typeof(OscReceiverAdapterBinding))]
+    public sealed class OscReceiverAdapterBindingDrawer : PropertyDrawer
     {
         private const string SlugFieldName = "Slug";
         private const string SettingsFieldName = "_settings";
@@ -76,7 +76,7 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
             root.Add(settingsField);
 
             var missingHelpBox = new HelpBox(
-                "OSC Runtime Settings が未設定のため、この OSC Adapter Binding は起動しません。"
+                "OSC Runtime Settings が未設定のため、この OSC Receiver は起動しません。"
                 + "Collection (AdapterRuntimeSettingsCollection) 内の sub-asset を削除すると、この参照も null になる可能性があります。",
                 HelpBoxMessageType.Warning)
             {
@@ -649,7 +649,7 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
                 return;
             }
 
-            root.Add(new AdapterBindingSlugField(slugProp, typeof(OscAdapterBinding)));
+            root.Add(new AdapterBindingSlugField(slugProp, typeof(OscReceiverAdapterBinding)));
         }
 
         private static void AddBoundField(

@@ -59,7 +59,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             var registry = new InputSourceRegistry();
             var outputBus = new FacialOutputBus();
             GameObject host = CreateGameObject("OscLoopbackSuppressionTests_DefaultOn");
-            OscAdapterBinding receiver = CreateReceiver(port);
+            OscReceiverAdapterBinding receiver = CreateReceiver(port);
             OscSenderAdapterBinding sender = CreateSender(port, suppressLoopback: true);
             AdapterBindingBase[] sameScopeBindings = { receiver, sender };
 
@@ -75,7 +75,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             StartBinding(sender, CreateContext(registry, outputBus, host, sameScopeBindings));
 
             Assert.That(sender.IsStarted, Is.True);
-            Assert.That(sender.HelperHostCount, Is.EqualTo(0));
+            Assert.That(sender.HelperSenderCount, Is.EqualTo(0));
             Assert.That(sender.LoopbackPolicy, Is.Not.Null);
 
             outputBus.Publish(new[] { SentValue }, Array.Empty<GazeSnapshot>());
@@ -94,7 +94,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             var registry = new InputSourceRegistry();
             var outputBus = new FacialOutputBus();
             GameObject host = CreateGameObject("OscLoopbackSuppressionTests_Disabled");
-            OscAdapterBinding receiver = CreateReceiver(port);
+            OscReceiverAdapterBinding receiver = CreateReceiver(port);
             OscSenderAdapterBinding sender = CreateSender(port, suppressLoopback: false);
             AdapterBindingBase[] sameScopeBindings = { receiver, sender };
 
@@ -104,7 +104,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             StartBinding(sender, CreateContext(registry, outputBus, host, sameScopeBindings));
 
             Assert.That(sender.IsStarted, Is.True);
-            Assert.That(sender.HelperHostCount, Is.EqualTo(1));
+            Assert.That(sender.HelperSenderCount, Is.EqualTo(1));
             Assert.That(sender.LoopbackPolicy, Is.Null);
 
             bool received = false;
@@ -123,9 +123,9 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             Assert.That(received, Is.True);
         }
 
-        private static OscAdapterBinding CreateReceiver(int port)
+        private static OscReceiverAdapterBinding CreateReceiver(int port)
         {
-            var receiver = new OscAdapterBinding
+            var receiver = new OscReceiverAdapterBinding
             {
                 Slug = ReceiverSlug,
                 BundleMode = BundleInterpretationMode.IndividualMessage
@@ -186,7 +186,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         }
 
         private static void AssertBlendShape(
-            OscAdapterBinding receiver,
+            OscReceiverAdapterBinding receiver,
             float expected,
             float tolerance)
         {
@@ -194,7 +194,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             Assert.That(actual, Is.EqualTo(expected).Within(tolerance));
         }
 
-        private static bool TryReadBlendShape(OscAdapterBinding receiver, out float value)
+        private static bool TryReadBlendShape(OscReceiverAdapterBinding receiver, out float value)
         {
             value = default;
             if (receiver.InputSource == null)

@@ -115,7 +115,7 @@
 ## 5. Core: AdapterBinding 改修 (OSC / ULipSync)
 
 - [x] 5. AdapterBinding を SettingsSO / DeviceStore 参照経路に切り替える
-- [x] 5.1 (P) OscAdapterBinding から環境依存フィールドを削除し OscRuntimeSettingsSO 参照に切り替える
+- [x] 5.1 (P) OscReceiverAdapterBinding から環境依存フィールドを削除し OscRuntimeSettingsSO 参照に切り替える
   - 削除: `_endpoint`, `_port`, `_stalenessSeconds`, `_failSafeMode`, `_bundleMode`, `_bundleAccumulationTimeoutMs`, `_consistencyCheckWarnLog`
   - 追加: `[SerializeField] private OscRuntimeSettingsSO _settings`
   - `OnStart` で `_settings == null` or `_settings.ReceiverEnabled == false` の場合は warning + skip、それ以外は `_settings` の Receiver セクションを `OscReceiverHost` に流し込む
@@ -146,13 +146,13 @@
 ## 6. Editor: PropertyDrawer 改修と CollectionEditor 新規実装
 
 - [x] 6. Inspector / Editor 拡張の整備
-- [x] 6.1 (P) OscAdapterBindingDrawer / OscSenderAdapterBindingDrawer を改修して SettingsSO ObjectField に差し替える
+- [x] 6.1 (P) OscReceiverAdapterBindingDrawer / OscSenderAdapterBindingDrawer を改修して SettingsSO ObjectField に差し替える
   - 削除した環境依存フィールドの inline 編集 UI を取り除き、`OscRuntimeSettingsSO` 用 ObjectField を追加する
   - `_settings == null` の場合に「未設定時は OSC Adapter は起動しない」HelpBox を表示する
   - validate-design Critical Issue #2 暫定対応として「sub-asset 削除でこの参照が null になる可能性あり」の HelpBox 警告を `_settings == null` 表示と統合する
   - 観測可能な完了条件: Drawer を含む Inspector を起動し、SettingsSO 割当て有/無で HelpBox 表示が切り替わることを EditMode (Editor) テスト or 手動確認で観測できる
   - _Requirements: 2.5, 2.6, 3.3, 6.4_
-  - _Boundary: OscAdapterBindingDrawer, OscSenderAdapterBindingDrawer_
+  - _Boundary: OscReceiverAdapterBindingDrawer, OscSenderAdapterBindingDrawer_
   - _Depends: 5.1, 5.2_
 - [x] 6.2 (P) ULipSyncAdapterBindingDrawer から `_deviceDescriptor` UI を取り除き DeviceStore 連動の DeviceDescriptorPopup を結線する
   - SerializedProperty 経路をやめて、Editor 起動時に `LipSyncDeviceStore.Load()` した値を VisualElement にバインドし、変更時に `Save` を呼ぶ設計に置き換える
@@ -185,7 +185,7 @@
 - [x] 7.1 既存 `*Profile.asset` と Samples~ 内の fixture を新構造に再構築する
   - 各 `FacialCharacterProfileSO` Asset を開き、新規 `AdapterRuntimeSettingsCollection.asset` を作成
   - `OscRuntimeSettingsSO` sub-asset を Collection に Add し、旧 `_endpoint` / `_port` / 各種値を転記
-  - `OscAdapterBinding._settings` / `OscSenderAdapterBinding._settings` に新 SO をアサイン
+  - `OscReceiverAdapterBinding._settings` / `OscSenderAdapterBinding._settings` に新 SO をアサイン
   - `_deviceDescriptor` 旧値はテスト初期化スクリプト経由で `LipSyncDeviceStore.Save` 相当に変換し、PlayerPrefs (Fake) シナリオに移す
   - 観測可能な完了条件: 移行後の Project を Unity で開き、既存 PlayMode 起動シーンが新構造で正常に起動し、`_settings` 未設定の binding が無いことを Project 内検索で確認できる
   - _Requirements: 1.5, 8.5_
@@ -224,13 +224,13 @@
   - _Requirements: 3.1, 3.3, 6.3, 6.4, 6.8, 7.1_
   - _Boundary: AdapterRuntimeSettingsCollectionEditorTests_
   - _Depends: 6.4_
-- [x] 8.5 (P) OscAdapterBinding / OscSenderAdapterBinding が SettingsSO 経由で UDP 送受信できることを PlayMode で検証する
+- [x] 8.5 (P) OscReceiverAdapterBinding / OscSenderAdapterBinding が SettingsSO 経由で UDP 送受信できることを PlayMode で検証する
   - Receiver: 実 UDP で OSC メッセージを受信し、`_settings.ListenPort` 経由で port が反映される
   - Sender: `_settings.Endpoints` 経由で UDP 送信が行われる
   - Receiver/Sender が同一 SO を参照したとき設定が一貫することを別ケースで検証 (要件 2.7)
   - 観測可能な完了条件: 3 ケース以上の PlayMode テストが緑
   - _Requirements: 2.5, 2.6, 2.7, 7.5, 7.8_
-  - _Boundary: OscAdapterBindingSettingsReferenceTests_
+  - _Boundary: OscReceiverAdapterBindingSettingsReferenceTests_
   - _Depends: 5.1, 5.2_
 - [x] 8.6 (P) ULipSyncAdapterBinding が DeviceStore 経由 DeviceName でマイク初期化フローを開始することを PlayMode で検証する
   - `LipSyncDeviceStore.Save` で DeviceName を投入後、binding `OnStart` で `uLipSyncMicrophone` が当該 DeviceName で初期化される

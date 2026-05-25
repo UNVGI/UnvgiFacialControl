@@ -30,7 +30,7 @@ namespace Hidano.FacialControl.Adapters.OSC
 
             for (int i = 0; i < bindings.Count; i++)
             {
-                if (bindings[i] is OscAdapterBinding receiver)
+                if (bindings[i] is OscReceiverAdapterBinding receiver)
                 {
                     policy.AddReceiverEndpoint(receiver.Endpoint, receiver.Port);
                 }

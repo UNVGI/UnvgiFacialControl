@@ -34,7 +34,7 @@
 - `FacialCharacterProfileSO` への `[SerializeReference] List<AdapterBindingBase> AdapterBindings` フィールド追加と関連 API（`GetAdapterBindings()` 等）。
 - `FacialController` の lifecycle 改修：旧 `IFacialControllerExtension` 経路の撤去、VContainer LifetimeScope build/dispose 経路への置換。
 - core 同梱サンプル `Samples~/MultiSourceBlendBasicSample/`（HUD なし最小コード + Mock binding 2 種 + JSON プロファイル + README）。
-- `com.hidano.facialcontrol.osc` package の `OscAdapterBinding` / `ArKitOscAdapterBinding` および各 PropertyDrawer 提供。`OscFacialControllerExtension` / `OscRegistration` の削除。
+- `com.hidano.facialcontrol.osc` package の `OscReceiverAdapterBinding` / `ArKitOscAdapterBinding` および各 PropertyDrawer 提供。`OscFacialControllerExtension` / `OscRegistration` の削除。
 - `com.hidano.facialcontrol.inputsystem` package の `InputSystemAdapterBinding` および PropertyDrawer 提供。`FacialCharacterSO` / `FacialCharacterInputExtension` / `InputFacialControllerExtension` / `InputRegistration` の削除。
 - 既存 `InputSourceId.ReservedIds` / `IsReservedId` / `IsReserved` の削除と、`AdapterSlug` への移行。
 
@@ -76,7 +76,7 @@
 | `FacialCharacterProfileSO` (Adapters/ScriptableObject) | core SO 基底（`abstract`） | フィールド追加と `abstract` 解除 |
 | `FacialCharacterSO : FacialCharacterProfileSO` (inputsystem) | InputSystem 結線統合 SO | **削除**（Req 6.4） |
 | `IFacialControllerExtension` (core/Adapters/Playable) | MonoBehaviour 拡張 interface | **削除**（Req 6.8, C-2） |
-| `OscFacialControllerExtension` (osc) | OSC 結線 MonoBehaviour | **削除**、`OscAdapterBinding` に置換 |
+| `OscFacialControllerExtension` (osc) | OSC 結線 MonoBehaviour | **削除**、`OscReceiverAdapterBinding` に置換 |
 | `FacialCharacterInputExtension` (inputsystem) | Input 結線 MonoBehaviour | **削除**、`InputSystemAdapterBinding` に置換 |
 | `InputSourceFactory` (core/Adapters/InputSources) | (id, options) → IInputSource ディスパッチ + JSON deserialize | **`InputSourceRegistry` にリネーム + 責務縮小**（slug-keyed lookup のみ）|
 | `InputSourceId.ReservedIds` / `IsReserved` (core/Domain) | `osc` / `lipsync` / `input` 等の予約 id | **削除**（Req 12.5、D-13） |
@@ -122,10 +122,10 @@ graph TB
     end
 
     subgraph OscPkg[com.hidano.facialcontrol.osc]
-        OscBinding[OscAdapterBinding]
+        OscBinding[OscReceiverAdapterBinding]
         ArKitBinding[ArKitOscAdapterBinding]
         OscReceiverHost[OscReceiverHost helper MonoBehaviour]
-        OscDrawer[OscAdapterBindingDrawer PropertyDrawer]
+        OscDrawer[OscReceiverAdapterBindingDrawer PropertyDrawer]
     end
 
     subgraph InputSystemPkg[com.hidano.facialcontrol.inputsystem]
@@ -275,16 +275,16 @@ FacialControl/Packages/
 │   ├── Runtime/
 │   │   ├── Adapters/
 │   │   │   ├── AdapterBindings/                         # NEW dir
-│   │   │   │   ├── OscAdapterBinding.cs                 # NEW (Phase 2)
+│   │   │   │   ├── OscReceiverAdapterBinding.cs                 # NEW (Phase 2)
 │   │   │   │   └── ARKit/ArKitOscAdapterBinding.cs      # NEW (Phase 2)
 │   │   │   └── OSC/
 │   │   │       ├── OscReceiver.cs                       # MODIFIED: helper 化 (public Configure 追加)
 │   │   │       ├── OscReceiverHost.cs                   # NEW: binding 内 AddComponent 用 (helper)
-│   │   │       └── OscSenderHost.cs                     # NEW: 同上
+│   │   │       └── OscSender.cs                     # NEW: 同上
 │   │   ├── OscFacialControllerExtension.cs              # DELETED (Phase 2)
 │   │   └── Registration/OscRegistration.cs              # DELETED (Phase 2)
 │   └── Editor/AdapterBindings/
-│       ├── OscAdapterBindingDrawer.cs                   # NEW (Phase 2)
+│       ├── OscReceiverAdapterBindingDrawer.cs                   # NEW (Phase 2)
 │       └── ArKitOscAdapterBindingDrawer.cs              # NEW (Phase 2)
 └── com.hidano.facialcontrol.inputsystem/
     ├── Runtime/
@@ -407,7 +407,7 @@ flowchart TB
 | 2.6 | Remove で dirty 化 | AdapterBindingsListView | — | Flow 2 |
 | 2.7 | Missing Adapter placeholder | MissingAdapterPlaceholderElement | — | Flow 2 |
 | 3.1 | core が PropertyDrawer を登録しない | core Editor 制約 | — | — |
-| 3.2 | 各 adapter package が `[CustomPropertyDrawer]` 提供 | OscAdapterBindingDrawer, InputSystemAdapterBindingDrawer, ArKitOscAdapterBindingDrawer | — | — |
+| 3.2 | 各 adapter package が `[CustomPropertyDrawer]` 提供 | OscReceiverAdapterBindingDrawer, InputSystemAdapterBindingDrawer, ArKitOscAdapterBindingDrawer | — | — |
 | 3.3 | core list が PropertyDrawer 解決を委任 | AdapterBindingsListView (UI Toolkit `PropertyField`) | — | Flow 2 |
 | 3.4 | PropertyDrawer 不在時の Unity 標準 fallback | Unity 標準 | — | — |
 | 3.5 | UI Toolkit の list chrome | AdapterBindingsListView | — | — |
@@ -421,14 +421,14 @@ flowchart TB
 | 5.6 | core サンプル | MultiSourceBlendBasicSample (Mock binding 2 種 + Runner + JSON) | — | — |
 | 5.7 | 0-alloc | LayerInputSourceAggregator (既存) + AdapterBindingHost (新規 0-alloc) | — | — |
 | 6.1 | `InputSystemAdapterBinding` | InputSystemAdapterBinding | overrides `OnStart` / `OnLateTick` / `Dispose` | — |
-| 6.2 | `OscAdapterBinding` | OscAdapterBinding | overrides `OnStart` / `OnFixedTick` / `Dispose` | — |
+| 6.2 | `OscReceiverAdapterBinding` | OscReceiverAdapterBinding | overrides `OnStart` / `OnFixedTick` / `Dispose` | — |
 | 6.3 | `ArKitOscAdapterBinding` | ArKitOscAdapterBinding | — | — |
 | 6.4 | `FacialCharacterSO` 削除 | FacialCharacterSO (DELETED) | — | — |
 | 6.5 | 各 adapter package PropertyDrawer 提供 | (3.2 と同) | — | — |
 | 6.6 | 単一 SO に Input/OSC/ARKit 同時保持 | FacialCharacterProfileSO + 各 binding | — | — |
 | 6.7 | preview 破壊変更扱い | CHANGELOG, migration-guide.md | — | — |
 | 6.8 | `FacialCharacterInputExtension` / `InputFacialControllerExtension` 削除 + binding 統合 | InputSystemAdapterBinding | — | Flow 1 |
-| 6.9 | `OscFacialControllerExtension` 削除 + helper MonoBehaviour | OscAdapterBinding, OscReceiverHost | — | Flow 1 |
+| 6.9 | `OscFacialControllerExtension` 削除 + helper MonoBehaviour | OscReceiverAdapterBinding, OscReceiverHost | — | Flow 1 |
 | 6.10 | reserved-id 登録経路撤廃 | InputSourceRegistry (新), InputSourceFactory (削除) | — | — |
 | 7.1-7.5 | 単一 SO ファイル UX | FacialCharacterProfileSOInspector + AdapterBindingsListView + 各 PropertyDrawer | — | Flow 2 |
 | 8.1-8.5 | 破壊的変更ポリシー | CHANGELOG, migration-guide.md | — | — |
@@ -445,7 +445,7 @@ flowchart TB
 | 13.1-13.2 | Lifecycle virtual + Host 実装 | AdapterBindingBase, AdapterBindingHost | (4.9 と同) | Flow 1 |
 | 13.3 | 必要なものだけ override | AdapterBindingBase virtual no-op | — | — |
 | 13.4-13.5 | 例外 catch + skip | AdapterBindingHost | — | Flow 1 |
-| 13.6-13.7 | helper MonoBehaviour AddComponent + Destroy | OscReceiverHost, OscSenderHost, OscAdapterBinding | — | — |
+| 13.6-13.7 | helper MonoBehaviour AddComponent + Destroy | OscReceiverHost, OscSender, OscReceiverAdapterBinding | — | — |
 
 ## Components and Interfaces
 
@@ -466,11 +466,11 @@ flowchart TB
 | AdapterBindingDiscovery | core/Editor/Inspector | `[FacialAdapterBinding]` 付き型を TypeCache 列挙 + sort + dup 検出 | 1.3, 1.4, 1.7 | TypeCache (P0), FacialAdapterBindingAttribute (P0) | Service, State |
 | AdapterBindingsListView | core/Editor/Inspector | UI Toolkit reorderable polymorphic list | 1.4, 2.4, 2.5, 2.6, 2.7, 3.3, 3.5, 3.6, 7.1, 12.2, 12.3 | AdapterBindingDiscovery (P0), Unity ListView (P0), Unity PropertyField (P0) | Service |
 | FacialCharacterProfileAssetGuard | core/Editor/Inspector | 重複 slug の save block | 12.3 | AssetModificationProcessor (P0), FacialCharacterProfileSO (P0) | Service |
-| OscAdapterBinding | osc/Adapters | OSC 結線 binding（旧 OscFacialControllerExtension 後継） | 6.2, 6.9, 13.6, 13.7 | AdapterBindingBase (P0), OscReceiverHost (P0), InputSourceRegistry (P0) | Service |
-| OscReceiverHost / OscSenderHost | osc/Adapters | binding が AddComponent する helper MonoBehaviour | 6.9, 13.6, 13.7 | OscReceiver/OscSender 既存 (P0) | State |
+| OscReceiverAdapterBinding | osc/Adapters | OSC 結線 binding（旧 OscFacialControllerExtension 後継） | 6.2, 6.9, 13.6, 13.7 | AdapterBindingBase (P0), OscReceiverHost (P0), InputSourceRegistry (P0) | Service |
+| OscReceiverHost / OscSender | osc/Adapters | binding が AddComponent する helper MonoBehaviour | 6.9, 13.6, 13.7 | OscReceiver/OscSender 既存 (P0) | State |
 | ArKitOscAdapterBinding | osc/Adapters/ARKit | ARKit OSC float 入力源 binding | 6.3 | AdapterBindingBase (P0), OscReceiverHost (P0) | Service |
 | InputSystemAdapterBinding | inputsystem/Adapters | InputSystem 結線 binding（旧 4 ファイルの責務を統合） | 6.1, 6.8 | AdapterBindingBase (P0), InputActionAsset (P0), InputSourceRegistry (P0) | Service, State |
-| OscAdapterBindingDrawer / InputSystemAdapterBindingDrawer / ArKitOscAdapterBindingDrawer | adapter package Editor | 各 binding の inline 編集 UI | 3.2, 6.5, 7.4, 7.5 | UI Toolkit / PropertyField (P0) | (UI) |
+| OscReceiverAdapterBindingDrawer / InputSystemAdapterBindingDrawer / ArKitOscAdapterBindingDrawer | adapter package Editor | 各 binding の inline 編集 UI | 3.2, 6.5, 7.4, 7.5 | UI Toolkit / PropertyField (P0) | (UI) |
 | MultiSourceBlendBasicSample | core Samples~ | core 同梱の最小コードサンプル + Mock binding | 5.6 | AdapterBindingBase (P0) | (sample) |
 
 > 詳細ブロックは新境界を導入する component のみ提供。PropertyDrawer / Sample は実装ノートで簡潔に記述。
@@ -990,7 +990,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
 
 ### Adapter Packages（osc / inputsystem）
 
-#### OscAdapterBinding（osc package）
+#### OscReceiverAdapterBinding（osc package）
 
 | Field | Detail |
 |-------|--------|
@@ -1061,7 +1061,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
 
 | Component | 配置 | 役割 |
 |-----------|------|------|
-| OscAdapterBindingDrawer | osc/Editor/AdapterBindings | OSC binding の inline UI（endpoint / port / blendshape マッピング） |
+| OscReceiverAdapterBindingDrawer | osc/Editor/AdapterBindings | OSC binding の inline UI（endpoint / port / blendshape マッピング） |
 | ArKitOscAdapterBindingDrawer | osc/Editor/AdapterBindings | ARKit binding の inline UI |
 | InputSystemAdapterBindingDrawer | inputsystem/Editor/AdapterBindings | Input binding の inline UI（旧 `FacialCharacterSOInspector` の UI を移植） |
 
@@ -1123,7 +1123,7 @@ classDiagram
         OnFixedTick fixedDeltaTime
         Dispose
     }
-    class OscAdapterBinding {
+    class OscReceiverAdapterBinding {
         string _endpoint
         int _port
         OscReceiverHost _helperHost runtime
@@ -1146,7 +1146,7 @@ classDiagram
     }
 
     FacialCharacterProfileSO "1" --> "0..*" AdapterBindingBase : SerializeReference
-    AdapterBindingBase <|-- OscAdapterBinding
+    AdapterBindingBase <|-- OscReceiverAdapterBinding
     AdapterBindingBase <|-- InputSystemAdapterBinding
     AdapterBindingBase <|-- ArKitOscAdapterBinding
     AdapterBindingBase <|-- MockTriggerAdapterBinding
@@ -1173,7 +1173,7 @@ classDiagram
 
 **Cross-package data ownership**:
 - core: `FacialCharacterProfileSO`、`AdapterBindingBase`、`FacialAdapterBindingAttribute`、`AdapterSlug`、`AdapterBuildContext`、`InputSourceRegistry`。
-- osc: `OscAdapterBinding`、`ArKitOscAdapterBinding`、`OscReceiverHost`、`OscSenderHost`、各 PropertyDrawer。
+- osc: `OscReceiverAdapterBinding`、`ArKitOscAdapterBinding`、`OscReceiverHost`、`OscSender`、各 PropertyDrawer。
 - inputsystem: `InputSystemAdapterBinding`、PropertyDrawer、各種 Processor / Adapter 既存資産。
 
 ## Error Handling
@@ -1222,7 +1222,7 @@ classDiagram
    - (b) **skip 確定後 steady-state**: 1 binding が `OnTick` で例外を投げて `_skipped = true` 確定後、後続 60 フレームで delta が 0 byte（skip fast path が 0-alloc であることを保証）。
    - (c) **例外発生フレーム単発**: 例外を投げたフレーム単発の delta が < 1 KB（`Debug.LogError` の string interpolation を含む許容範囲、Performance & Scalability 目標値テーブル参照）。
 4. `MultiSourceBlendThreeBindingsTests` — Mock trigger + Mock analog + 既存 `LipSyncInputSource` の 3 binding 構成で MultiSourceBlend が期待値を出すことを assert（Req 5.1-5.5）。
-5. `OscAdapterBindingIntegrationTests` — 実 UDP loopback + `OscReceiverHost` AddComponent + binding `Dispose` 時の helper destroy（Phase 2、Req 6.9, 13.6, 13.7）。
+5. `OscReceiverAdapterBindingIntegrationTests` — 実 UDP loopback + `OscReceiverHost` AddComponent + binding `Dispose` 時の helper destroy（Phase 2、Req 6.9, 13.6, 13.7）。
 6. `InputSystemAdapterBindingIntegrationTests` — InputAction 仮想 device → ExpressionTrigger / Analog / Gaze の 3 経路が動作（Phase 2、Req 6.1）。
 
 ### CI/CD Integration
@@ -1239,7 +1239,7 @@ flowchart TB
     P1 --> P1Detail[manifest.json: VContainer scoped registry 追加<br/>Domain: AdapterBindingBase / FacialAdapterBindingAttribute / AdapterSlug<br/>Adapters: AdapterBuildContext / AdapterBindingHost / LifetimeScope / InputSourceRegistry<br/>SO: AdapterBindings field 追加 abstract 解除<br/>Editor: Discovery / ListView / SaveGuard<br/>Sample: MultiSourceBlendBasicSample]
     P1Detail --> P1Tests[Phase 1 PR: 既存テスト全 green 維持<br/>新 binding 経路の EditMode/PlayMode テスト追加<br/>並走期間中: IFacialControllerExtension 旧経路維持]
     P1Tests --> P2[Phase 2: osc / inputsystem migration + 旧資産削除]
-    P2 --> P2Detail[osc: OscAdapterBinding / ArKitOscAdapterBinding / OscReceiverHost / 各 PropertyDrawer<br/>inputsystem: InputSystemAdapterBinding / PropertyDrawer / FacialCharacterSO 削除<br/>core: IFacialControllerExtension 削除 / InputSourceFactory 削除 / InputSourceId.ReservedIds 削除<br/>Sample: MultiSourceBlendDemo HUD slug 化]
+    P2 --> P2Detail[osc: OscReceiverAdapterBinding / ArKitOscAdapterBinding / OscReceiverHost / 各 PropertyDrawer<br/>inputsystem: InputSystemAdapterBinding / PropertyDrawer / FacialCharacterSO 削除<br/>core: IFacialControllerExtension 削除 / InputSourceFactory 削除 / InputSourceId.ReservedIds 削除<br/>Sample: MultiSourceBlendDemo HUD slug 化]
     P2Detail --> P2Tests[Phase 2 PR: 旧テスト群削除 + 新 binding テスト追加<br/>CHANGELOG breaking change 記載<br/>Documentation~/migration-guide.md 整備]
     P2Tests --> Done[preview.3 リリース: Adapter Binding アーキテクチャ完成]
 
@@ -1264,7 +1264,7 @@ Phase 1 / Phase 2 で各コンポーネントが「定義のみ」「empty-list 
 | `FacialCharacterSO`（inputsystem 派生 SO） | 維持 | deleted |
 | `InputSourceId.ReservedIds` / `IsReserved` / `IsReservedId` | 維持（既存テストが依存） | deleted |
 | Editor: `AdapterBindingDiscovery` / `AdapterBindingsListView` / `FacialCharacterProfileAssetGuard` | fully wired（Inspector で新 list が編集可能） | 同左 |
-| `OscAdapterBinding` / `ArKitOscAdapterBinding` / `InputSystemAdapterBinding` + 各 PropertyDrawer | 未実装（または Mock 相当のみ） | fully wired |
+| `OscReceiverAdapterBinding` / `ArKitOscAdapterBinding` / `InputSystemAdapterBinding` + 各 PropertyDrawer | 未実装（または Mock 相当のみ） | fully wired |
 | core `Samples~/MultiSourceBlendBasicSample/` | 配布（Mock binding ベース、HUD なし） | 同左 |
 | inputsystem `Samples~/MultiSourceBlendDemo/` HUD | 旧 `_inputSourceIndex` 駆動を維持 | slug 駆動に書き換え（二重管理ミラー `Assets/Samples/` も同期） |
 | CHANGELOG / Documentation~/migration-guide.md | Phase 1 PR で「Phase 1 は並走期、両経路の同時利用は非推奨」を明記 | Phase 2 PR で breaking change と削除型一覧を明記 |

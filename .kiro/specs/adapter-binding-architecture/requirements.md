@@ -3,7 +3,7 @@
 ## Project Description (Input)
 FacialControl のアダプタパッケージ統合アーキテクチャ刷新。現状、`com.hidano.facialcontrol.inputsystem` パッケージが core の `FacialCharacterProfileSO` を継承して `FacialCharacterSO` を作る形になっており、単一継承のため OSC / ARKit / Lipsync 等の複数アダプタを 1 キャラクターで併用するとアーキテクチャ的に行き詰まる。各アダプタパッケージが個別に MonoBehaviour Extension + 専用 ScriptableObject を提供しているため、ユーザーは複数の Inspector を並べて設定する必要があり、UX が悪い。さらに `MultiSourceBlend`（同一レイヤーに複数入力源を並置し加重和ブレンドする）という重要概念が InputSystem パッケージのサンプルにしか存在せず、core の一般機能として昇格していない。
 
-採用する設計（Approach A、ユーザー確定済み）: core 側の `FacialCharacterProfileSO` に `[SerializeReference] List<AdapterBindingBase> AdapterBindings` フィールドを追加し、各アダプタパッケージが `AdapterBindingBase` を継承した具象クラス（例: `InputSystemAdapterBinding`, `OscAdapterBinding`, `ARKitAdapterBinding`）を提供する。具象クラスには `[FacialAdapterBinding(displayName: "Input System")]` 属性を付与し、core 側 Inspector は `TypeCache.GetTypesWithAttribute<FacialAdapterBindingAttribute>()` で attribute 付きクラスを auto-discovery してメニューに列挙する。各アダプタ専用の PropertyDrawer は当該パッケージで `[CustomPropertyDrawer(typeof(InputSystemAdapterBinding))]` として提供（core は変更不要）。これにより新規アダプタパッケージを追加する際 core の変更が一切要らないことを必須要件とする。
+採用する設計（Approach A、ユーザー確定済み）: core 側の `FacialCharacterProfileSO` に `[SerializeReference] List<AdapterBindingBase> AdapterBindings` フィールドを追加し、各アダプタパッケージが `AdapterBindingBase` を継承した具象クラス（例: `InputSystemAdapterBinding`, `OscReceiverAdapterBinding`, `ARKitAdapterBinding`）を提供する。具象クラスには `[FacialAdapterBinding(displayName: "Input System")]` 属性を付与し、core 側 Inspector は `TypeCache.GetTypesWithAttribute<FacialAdapterBindingAttribute>()` で attribute 付きクラスを auto-discovery してメニューに列挙する。各アダプタ専用の PropertyDrawer は当該パッケージで `[CustomPropertyDrawer(typeof(InputSystemAdapterBinding))]` として提供（core は変更不要）。これにより新規アダプタパッケージを追加する際 core の変更が一切要らないことを必須要件とする。
 
 同時に `MultiSourceBlend` の概念（レイヤーごとの `inputSources[]` 加重和ブレンド）を core 一般機能に昇格させ、`MultiSourceBlendDemo` 相当のサンプルも core 側で提供する。
 
@@ -73,7 +73,7 @@ FacialControl のアダプタパッケージ統合アーキテクチャ刷新。
 2. The FacialControl Core package shall define an attribute `FacialAdapterBindingAttribute` whose constructor takes at least a `displayName: string`; the attribute shall be applicable only to non-abstract classes derived from `AdapterBindingBase`.
 3. The FacialControl Core Inspector shall discover all concrete `AdapterBindingBase` subclasses annotated with `FacialAdapterBindingAttribute` at Editor load time using `UnityEditor.TypeCache.GetTypesWithAttribute<FacialAdapterBindingAttribute>()`.
 4. When discovery completes, the FacialControl Core Inspector shall populate the "Add Adapter Binding" dropdown using each discovered type's `displayName` and shall sort the entries in stable alphabetical order by `displayName`.
-5. The FacialControl Core package shall NOT contain any compile-time reference to specific adapter types (e.g., `InputSystemAdapterBinding`, `OscAdapterBinding`, `ARKitAdapterBinding`).
+5. The FacialControl Core package shall NOT contain any compile-time reference to specific adapter types (e.g., `InputSystemAdapterBinding`, `OscReceiverAdapterBinding`, `ARKitAdapterBinding`).
 6. Where a new adapter package is added with a class extending `AdapterBindingBase` and annotated with `FacialAdapterBindingAttribute`, the FacialControl Core package shall expose that adapter in the Inspector dropdown without any source-level change to the Core package.
 7. If two discovered adapter types declare the same `displayName`, the FacialControl Core Inspector shall log a warning via `Debug.LogWarning` listing both fully qualified type names and shall append the type name as a disambiguating suffix in the dropdown.
 
@@ -86,7 +86,7 @@ FacialControl のアダプタパッケージ統合アーキテクチャ刷新。
 1. The FacialCharacterProfileSO shall declare a serialized field `AdapterBindings` typed as `List<AdapterBindingBase>` and annotated with `[SerializeReference]` to support polymorphic serialization across adapter package boundaries.
 2. The FacialCharacterProfileSO shall allow zero or more `AdapterBindingBase` instances in `AdapterBindings`, with no compile-time upper bound enforced by the Core package.
 3. When a `FacialCharacterProfileSO` is serialized to disk, the `AdapterBindings` field shall persist concrete subclass type identity using Unity's `[SerializeReference]` mechanism so that round-trip load reconstructs the original concrete type.
-4. The FacialCharacterProfileSO shall allow the same concrete `AdapterBindingBase` subclass to appear multiple times in `AdapterBindings` (e.g., two `OscAdapterBinding` instances bound to different ports) unless the specific subclass declares otherwise via its own attribute.
+4. The FacialCharacterProfileSO shall allow the same concrete `AdapterBindingBase` subclass to appear multiple times in `AdapterBindings` (e.g., two `OscReceiverAdapterBinding` instances bound to different ports) unless the specific subclass declares otherwise via its own attribute.
 5. When the user adds a new adapter via the Inspector dropdown described in Requirement 1.4, the FacialControl Core Inspector shall instantiate the chosen subclass via `Activator.CreateInstance` (or equivalent) and shall append it to `AdapterBindings`.
 6. When the user removes an adapter entry from the Inspector, the FacialControl Core Inspector shall remove the corresponding element from `AdapterBindings` and shall mark the asset dirty.
 7. If `AdapterBindings` contains a `null` element after deserialization (e.g., due to a missing assembly), the FacialControl Core Inspector shall display a "Missing Adapter" placeholder entry with a remove button and shall NOT abort loading the rest of the asset.
@@ -147,14 +147,14 @@ FacialControl のアダプタパッケージ統合アーキテクチャ刷新。
 #### Acceptance Criteria
 
 1. The `com.hidano.facialcontrol.inputsystem` package shall provide a concrete `InputSystemAdapterBinding` class that derives from `AdapterBindingBase` and is annotated with `[FacialAdapterBinding(displayName: "Input System")]`.
-2. The `com.hidano.facialcontrol.osc` package shall provide a concrete `OscAdapterBinding` class that derives from `AdapterBindingBase` and is annotated with `[FacialAdapterBinding(displayName: "OSC")]`.
+2. The `com.hidano.facialcontrol.osc` package shall provide a concrete `OscReceiverAdapterBinding` class that derives from `AdapterBindingBase` and is annotated with `[FacialAdapterBinding(displayName: "OSC")]`.
 3. The ARKit / PerfectSync adapter (whether shipped as a separate package or inside an existing package, per the `product.md` release plan) shall provide a concrete `ARKitAdapterBinding` class that derives from `AdapterBindingBase` and is annotated with `[FacialAdapterBinding(displayName: "ARKit / PerfectSync")]`.
 4. The `com.hidano.facialcontrol.inputsystem` package shall remove the existing `FacialCharacterSO` derived ScriptableObject (which inherits from `FacialCharacterProfileSO`) as part of this migration, since it is incompatible with the new composition-based model.
 5. Each migrated adapter package shall provide a `[CustomPropertyDrawer(typeof(<ConcreteAdapterBinding>))]` in its Editor assembly to preserve the existing per-adapter editing UX.
-6. When the migration is complete, a single `FacialCharacterProfileSO` asset shall be capable of holding `InputSystemAdapterBinding` + `OscAdapterBinding` + `ARKitAdapterBinding` simultaneously and shall serialize / deserialize all three round-trip without loss.
+6. When the migration is complete, a single `FacialCharacterProfileSO` asset shall be capable of holding `InputSystemAdapterBinding` + `OscReceiverAdapterBinding` + `ARKitAdapterBinding` simultaneously and shall serialize / deserialize all three round-trip without loss.
 7. The migration shall be treated as a preview-stage breaking change per `docs/requirements.md` FR-001; existing assets created against the old single-inheritance model shall NOT be expected to load and shall require manual recreation.
 8. The `com.hidano.facialcontrol.inputsystem` package shall remove `FacialCharacterInputExtension` (and `InputFacialControllerExtension`); the equivalent functionality shall be moved into `InputSystemAdapterBinding.OnStart` / `OnLateTick` / `Dispose` and managed automatically by `FacialController` via VContainer LifetimeScope (see D-2, D-10, D-12).
-9. The `com.hidano.facialcontrol.osc` package shall remove `OscFacialControllerExtension`; OSC socket lifecycle shall be managed by `OscAdapterBinding` itself, optionally via an internal helper MonoBehaviour attached via `AddComponent` in `OnStart` (see D-2, D-11).
+9. The `com.hidano.facialcontrol.osc` package shall remove `OscFacialControllerExtension`; OSC socket lifecycle shall be managed by `OscReceiverAdapterBinding` itself, optionally via an internal helper MonoBehaviour attached via `AddComponent` in `OnStart` (see D-2, D-11).
 10. All migrated adapter packages shall remove any code that registers id strings into the old reserved-id list (`InputSourceId.IsReservedId` etc.); slug-based id resolution per Requirement 12 shall replace it (see D-13).
 
 ### Requirement 7: 単一 SO ファイル UX
@@ -209,7 +209,7 @@ FacialControl のアダプタパッケージ統合アーキテクチャ刷新。
 
 ### Requirement 12: Slug 命名と ID 解決（D-4, D-7, D-13）
 
-**Objective:** Unity エンジニアとして、複数の同型 binding を識別する一意な slug を簡潔に管理したい。これにより `OscAdapterBinding × 2` のような構成でも layer.inputSources[].id で衝突なく参照できる。
+**Objective:** Unity エンジニアとして、複数の同型 binding を識別する一意な slug を簡潔に管理したい。これにより `OscReceiverAdapterBinding × 2` のような構成でも layer.inputSources[].id で衝突なく参照できる。
 
 #### Acceptance Criteria
 

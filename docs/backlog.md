@@ -142,10 +142,10 @@
 
 ### M-20: Sub-asset 削除時の AdapterBinding 逆引き確認ダイアログ
 - **出典**: `.kiro/specs/adapter-runtime-settings/tasks.md` 0.2 / validate-design Critical Issue #2（Sub-asset 削除時の binding 参照欠落）
-- **内容**: `AdapterRuntimeSettingsCollectionSO` の sub-asset を削除すると、`OscAdapterBinding._settings` / `OscSenderAdapterBinding._settings` など外部の serialized field 参照が null になる可能性がある。本 spec では Project 内の `AdapterBindingBase` 派生を削除前に逆引き検索して一覧表示する確認ダイアログは実装せず、暫定対応として各 Drawer の `_settings == null` HelpBox に「sub-asset 削除で参照欠落した可能性」「再アサインが必要」「未設定時は OSC Adapter が起動しない」ことを表示する。
+- **内容**: `AdapterRuntimeSettingsCollectionSO` の sub-asset を削除すると、`OscReceiverAdapterBinding._settings` / `OscSenderAdapterBinding._settings` など外部の serialized field 参照が null になる可能性がある。本 spec では Project 内の `AdapterBindingBase` 派生を削除前に逆引き検索して一覧表示する確認ダイアログは実装せず、暫定対応として各 Drawer の `_settings == null` HelpBox に「sub-asset 削除で参照欠落した可能性」「再アサインが必要」「未設定時は OSC Adapter が起動しない」ことを表示する。
   - 後続対応案: (a) `AssetDatabase.FindAssets` / `SerializedObject` 走査で削除対象 sub-asset を参照する Profile/Prefab/Scene を列挙、(b) 削除確認ダイアログに参照元一覧と影響範囲を表示、(c) 可能なら対象 binding への ping / selection を提供、(d) 大規模 Project で重くならないよう検索範囲とキャッシュ戦略を設計する。
 - **トリガ**: adapter-runtime-settings 実装後に sub-asset 削除 UI を実運用で使い始めるタイミング / preview.1 リリース前の UX リスクレビュー
-- **影響範囲**: `AdapterRuntimeSettingsCollectionEditor`、`OscAdapterBindingDrawer`、`OscSenderAdapterBindingDrawer`、Profile/Prefab/Scene の serialized reference 走査 helper、対応 EditMode (Editor) テスト
+- **影響範囲**: `AdapterRuntimeSettingsCollectionEditor`、`OscReceiverAdapterBindingDrawer`、`OscSenderAdapterBindingDrawer`、Profile/Prefab/Scene の serialized reference 走査 helper、対応 EditMode (Editor) テスト
 
 ### M-21: Adapter 種別の C# 型削除/リネーム時の自動マイグレーション（対応レベル c）
 - **出典**: [`.kiro/specs/adapter-runtime-settings/requirements.md`](../.kiro/specs/adapter-runtime-settings/requirements.md) 要件 3.5 / 8.1（スコープ外明示）
@@ -165,14 +165,14 @@
 - **影響範囲**: `AdapterRuntimeSettingsBase`, `AdapterRuntimeSettingsCollectionSO.MigrateOnLoad`, 各派生 SettingsSO の `FromJson` 実装、`Documentation~/adapter-runtime-settings/migration-guide.md`（新設）、`Tests/Shared/Fixtures/` 配下の JSON fixture、EditMode マイグレーションテスト
 - **関連**: M-21（型削除/リネーム時の自動マイグレーション — `MigrateOnLoad` は両者の共通基盤）、M-11（analog binding 側の schema migration パス）
 
-### M-23: OscAdapterBinding と OscSenderAdapterBinding の統合解消（Receiver/Sender Binding 一本化）の再検討
+### M-23: OscReceiverAdapterBinding と OscSenderAdapterBinding の統合解消（Receiver/Sender Binding 一本化）の再検討
 - **出典**: [`.kiro/specs/adapter-runtime-settings/requirements.md`](../.kiro/specs/adapter-runtime-settings/requirements.md) 要件 8.2（スコープ外明示） / `.kiro/specs/adapter-runtime-settings/design.md` Boundary Context
-- **内容**: 本 spec では Receiver/Sender セクションを **1 つの `OscRuntimeSettingsSO`** に統合しつつ、`OscAdapterBinding` (Receiver) と `OscSenderAdapterBinding` (Sender) の 2 MonoBehaviour 構造は維持する（要件 8.2）。両 Binding が同一 SettingsSO の異なるセクションを参照する形のため、運用上は「片方だけ起動したい」「片方だけ別 SettingsSO を参照したい」というケースで `_receiverEnabled` / `_senderEnabled` トグル + 同一 SO 参照の組み合わせで対応している。preview.2 以降で以下のいずれかを検討する:
-  - (a) **統合**: `OscAdapterBinding` と `OscSenderAdapterBinding` を 1 MonoBehaviour に統合し、Receiver/Sender セクションを単一 binding が両方扱う。MonoBehaviour ライフサイクル管理が単純化される一方、片方だけ disable する operational UX を別途用意する必要あり。
+- **内容**: 本 spec では Receiver/Sender セクションを **1 つの `OscRuntimeSettingsSO`** に統合しつつ、`OscReceiverAdapterBinding` (Receiver) と `OscSenderAdapterBinding` (Sender) の 2 MonoBehaviour 構造は維持する（要件 8.2）。両 Binding が同一 SettingsSO の異なるセクションを参照する形のため、運用上は「片方だけ起動したい」「片方だけ別 SettingsSO を参照したい」というケースで `_receiverEnabled` / `_senderEnabled` トグル + 同一 SO 参照の組み合わせで対応している。preview.2 以降で以下のいずれかを検討する:
+  - (a) **統合**: `OscReceiverAdapterBinding` と `OscSenderAdapterBinding` を 1 MonoBehaviour に統合し、Receiver/Sender セクションを単一 binding が両方扱う。MonoBehaviour ライフサイクル管理が単純化される一方、片方だけ disable する operational UX を別途用意する必要あり。
   - (b) **SettingsSO 分割**: `OscRuntimeSettingsSO` を `OscReceiverRuntimeSettingsSO` / `OscSenderRuntimeSettingsSO` の 2 SO に分割し、現行 2 Binding 構造はそのまま維持。SettingsSO 側の責務が明確化される一方、Receiver/Sender 設定の一貫性を担保していた要件 2.7 を別途満たす仕組み（命名規則 / Inspector ヘルパー）が必要。
   - (c) **現状維持**: 2 Binding + 統合 SO + `_receiverEnabled` / `_senderEnabled` トグルの組み合わせで運用を続け、混乱が出たら (a) または (b) に切り替える。
 - **トリガ**: Receiver/Sender 別個運用の UX 不満が顕在化したとき / 1.0 リリース前の AdapterBinding API 凍結タイミング / `_receiverEnabled` / `_senderEnabled` トグルの運用負荷が想定以上に高まったとき
-- **影響範囲**: `OscAdapterBinding`, `OscSenderAdapterBinding`, `OscRuntimeSettingsSO`, 各 Drawer、Profile 内 AdapterBindings リスト、対応 EditMode/PlayMode テスト、`Documentation~/adapter-runtime-settings/`
+- **影響範囲**: `OscReceiverAdapterBinding`, `OscSenderAdapterBinding`, `OscRuntimeSettingsSO`, 各 Drawer、Profile 内 AdapterBindings リスト、対応 EditMode/PlayMode テスト、`Documentation~/adapter-runtime-settings/`
 - **関連**: M-20（Sub-asset 削除時の逆引き確認ダイアログ — 統合/分割いずれを採るかで参照関係の管理粒度が変わる）
 
 ### M-24: LipSync AnimationClip の Editor 事前検証 / runtime path 補正
@@ -219,7 +219,7 @@
 - 2026-05-19: ユーザー集中 FB セッションで S-17（A/I/U/E/O Overlay スロット拡張）を追加。中期: M-18（ベース表情の Layer / OverrideMask 保持）, M-19（Layer / InputSource / Adapter 関係視認性改善）。
 - 2026-05-19: preview1-polish-pack 完了後の `/kiro:validate-impl` で EditMode 7 件 fail を再検出。同件である M-17 を本ファイルから削除し、`.kiro/specs/overlay-clip-redesign/tasks.md` の Phase 10（10.1〜10.3）として吸収・移動。
 - 2026-05-19: adapter-runtime-settings spec の validate-design Critical Issue #2 を受け、M-20（Sub-asset 削除時の AdapterBinding 逆引き確認ダイアログ）を追加。本 spec 内では Drawer HelpBox 警告で暫定対応する方針に整理。
-- 2026-05-20: adapter-runtime-settings spec の Phase 9.2（スコープ外項目・将来マイグレーションの集約）を消化し、以下 3 件を追加。M-21（対応レベル c: 型削除/リネーム時の自動マイグレーション）、M-22（`MigrateOnLoad` 本実装と `_schemaVersion` 増分規約策定）、M-23（OscAdapterBinding / OscSenderAdapterBinding 統合解消の再検討）。
+- 2026-05-20: adapter-runtime-settings spec の Phase 9.2（スコープ外項目・将来マイグレーションの集約）を消化し、以下 3 件を追加。M-21（対応レベル c: 型削除/リネーム時の自動マイグレーション）、M-22（`MigrateOnLoad` 本実装と `_schemaVersion` 増分規約策定）、M-23（OscReceiverAdapterBinding / OscSenderAdapterBinding 統合解消の再検討）。
 - 2026-05-20: `/kiro:validate-impl adapter-runtime-settings` 検証後の Unity Test Runner で別 spec 由来の PlayMode テスト 2 件 fail を確認。adapter-runtime-settings spec 本体の判定は GO のまま維持し、別ブランチで対処するため S-18（`DeviceHotSwapTests.SwapDevice_MicToMicSecondDevice_ZeroSettlesThenRebinds` の新規 mic index 0 巻き戻り）と S-19（`OscGazeE2ETests.GazeResolver_OscAndInputSystemSameExpressionId_SelectsLexicographicallyFirstSlug` の InputSystem 側 Gaze 値 0）を追加。
 - 2026-05-23: S-19 を `OscGazeE2ETests` の `InputTestFixture` 継承で input system 分離して解消。S-18 を `ULipSyncAdapterBinding.AddInputComponent` の `UpdateMicInfo` 後 index 巻き戻り対策 + `ULipSyncProvider` zero-flush 後の初回 target snap ロジックで解消。両 backlog エントリを削除。
 - 2026-05-23: S-7 が `analog-input-binding` spec の `AnalogExpressionInputSource` で既に実装済みであることを確認（`BindingMode.Analog` 経路）。backlog から S-7 を削除し、誤って初期化した `.kiro/specs/analog-expression-weight/` ディレクトリも撤去。

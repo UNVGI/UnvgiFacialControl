@@ -16,7 +16,7 @@
 - **Context**: `OscReceiverDemo` と `OscOutputDemo` 同一プロセスで毎フレーム `ArgumentException: Array lengths must be the same.` が `BitArray.Or` 経由で発生する報告。`LayerInputSourceAggregator.AggregateInternal:323` の `layerMask.Or(source.ContributeMask)` が trigger 箇所。
 - **Sources Consulted**:
   - `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/OSC/HeartbeatConsistencyChecker.cs:56-58`
-  - `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/AdapterBindings/OscAdapterBinding.cs:302-303, 312, 332-340`
+  - `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/AdapterBindings/OscReceiverAdapterBinding.cs:302-303, 312, 332-340`
   - `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/InputSources/OscInputSource.cs:99-136`
   - `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Adapters/InputSources/AnalogBlendShapeInputSource.cs:73-125`（参考実装）
   - `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Services/LayerInputSourceAggregator.cs:155-167, 295-298, 313-323`
@@ -28,7 +28,7 @@
   3. `OscInputSource.ContributeMask` を `LayerInputSourceAggregator.AggregateInternal` 内で `layerMask.Or(...)` するため、2 つの BitArray の長さが一致しない限り例外で死ぬ。
   4. `OscInputSource.TryWriteValues` は `for (i in 0..copyLength) output[i] = readBuffer[i]` と書いており、`readBuffer` (= `OscDoubleBuffer` の mapping index 空間) と `output` (= layer scratch の mesh index 空間) で同 index を使うのは構造的に誤り。値が「mapping 順で並んだ output」になり、mesh の BlendShape 並びと一致しなければ値が誤った BlendShape に書かれる。
   5. `AnalogBlendShapeInputSource` は同種の問題を、ctor で `blendShapeNames` を受けて `nameToIndex` 逆引きを 1 回構築し、`_contributeMask` を mesh-index 空間で立て、`TryWriteValues` でも mesh-index 空間に書き込むことで解決済み。同じパターンを OSC 側にも適用するのが整合的。
-  6. `AdapterBuildContext` には既に `BlendShapeNames` が含まれており、`OscAdapterBinding.OnStart(in ctx)` から `ctx.BlendShapeNames` を `HeartbeatConsistencyChecker` と `OscInputSource` に渡せる。
+  6. `AdapterBuildContext` には既に `BlendShapeNames` が含まれており、`OscReceiverAdapterBinding.OnStart(in ctx)` から `ctx.BlendShapeNames` を `HeartbeatConsistencyChecker` と `OscInputSource` に渡せる。
 - **Implications**:
   - `HeartbeatConsistencyChecker` を mesh BlendShape 数 + 各 mapping name → mesh index 逆引きで再構築する必要がある（対応方針候補 (a)）。
   - 同時に `OscInputSource.TryWriteValues` を mapping index → mesh index 空間で書き込む経路に揃える必要がある（候補 (b)）。

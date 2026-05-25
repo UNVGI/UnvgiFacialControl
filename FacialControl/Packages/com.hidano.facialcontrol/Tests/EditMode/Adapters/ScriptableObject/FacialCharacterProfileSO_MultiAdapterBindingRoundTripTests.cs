@@ -10,7 +10,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
 {
     /// <summary>
     /// 1 個の <see cref="Hidano.FacialControl.Adapters.ScriptableObject.Serializable.FacialCharacterProfileSO"/>
-    /// に <see cref="InputSystemAdapterBinding"/> + <see cref="OscAdapterBinding"/> +
+    /// に <see cref="InputSystemAdapterBinding"/> + <see cref="OscReceiverAdapterBinding"/> +
     /// <see cref="ArKitOscAdapterBinding"/> の 3 種を同時に保持し、
     /// <c>AssetDatabase.CreateAsset</c> → <c>LoadAssetAtPath</c> の round-trip で
     /// 3 種の concrete type identity と各 inline serialized field が維持されることを assert する。
@@ -57,7 +57,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
         public void AdapterBindings_InputSystemAndOscAndArKit_RoundTripPreservesConcreteTypeIdentity()
         {
             // 単一 SO に 3 種 binding を同時保持できることを round-trip で検証する。
-            // task 8.7: OscAdapterBinding は OscRuntimeSettingsSO sub-asset 経由で環境設定を保持する
+            // task 8.7: OscReceiverAdapterBinding は OscRuntimeSettingsSO sub-asset 経由で環境設定を保持する
             // 新経路を使用する (旧 _endpoint / _port 直 SerializeField 経路は廃止済み)。
             var so = UnityEngine.ScriptableObject.CreateInstance<TestFacialCharacterProfileSO>();
 
@@ -73,7 +73,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
             oscSettings.FromJson(
                 "{\"listenEndpoint\":\"192.168.1.10\",\"listenPort\":39539,\"stalenessSeconds\":0.25}");
 
-            var osc = new OscAdapterBinding
+            var osc = new OscReceiverAdapterBinding
             {
                 Slug = "osc",
                 Settings = oscSettings,
@@ -104,8 +104,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
             // 3 種の concrete type identity が維持されていること。
             Assert.That(loaded.AdapterBindings[0], Is.InstanceOf<InputSystemAdapterBinding>(),
                 "Index 0 は InputSystemAdapterBinding として round-trip するはず");
-            Assert.That(loaded.AdapterBindings[1], Is.InstanceOf<OscAdapterBinding>(),
-                "Index 1 は OscAdapterBinding として round-trip するはず");
+            Assert.That(loaded.AdapterBindings[1], Is.InstanceOf<OscReceiverAdapterBinding>(),
+                "Index 1 は OscReceiverAdapterBinding として round-trip するはず");
             Assert.That(loaded.AdapterBindings[2], Is.InstanceOf<ArKitOscAdapterBinding>(),
                 "Index 2 は ArKitOscAdapterBinding として round-trip するはず");
 
@@ -113,7 +113,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
             Assert.That(loadedInput.Slug, Is.EqualTo("input-system"));
             Assert.That(loadedInput.ActionMapName, Is.EqualTo("Expression"));
 
-            var loadedOsc = (OscAdapterBinding)loaded.AdapterBindings[1];
+            var loadedOsc = (OscReceiverAdapterBinding)loaded.AdapterBindings[1];
             Assert.That(loadedOsc.Slug, Is.EqualTo("osc"));
             Assert.That(loadedOsc.Settings, Is.Not.Null,
                 "OscRuntimeSettingsSO sub-asset 参照が round-trip するべき。");
@@ -149,7 +149,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ada
 
                 var elemOsc = listProp.GetArrayElementAtIndex(1);
                 Assert.That(elemOsc.managedReferenceFullTypename,
-                    Does.Contain(typeof(OscAdapterBinding).FullName));
+                    Does.Contain(typeof(OscReceiverAdapterBinding).FullName));
 
                 var elemArKit = listProp.GetArrayElementAtIndex(2);
                 Assert.That(elemArKit.managedReferenceFullTypename,

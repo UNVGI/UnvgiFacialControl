@@ -27,8 +27,8 @@ uLipSync の A / I / U / E / O 出力を Expression Overlay 経由へ移す prev
 
 | 削除型 | 置換先 | 備考 |
 |--------|--------|------|
-| `OscFacialControllerExtension` (MonoBehaviour) | `OscAdapterBinding`（`[Serializable]` + `[FacialAdapterBinding(displayName: "OSC")]`） | scene 上の component から SO 内 `_adapterBindings` 要素に移動（Req 6.9） |
-| `OscRegistration` (static helper) | （消滅） | `InputSourceRegistry` への直接 `Register(slug, source)` 呼び出しが `OscAdapterBinding.OnStart` 内で行われる（Req 6.10） |
+| `OscFacialControllerExtension` (MonoBehaviour) | `OscReceiverAdapterBinding`（`[Serializable]` + `[FacialAdapterBinding(displayName: "OSC")]`） | scene 上の component から SO 内 `_adapterBindings` 要素に移動（Req 6.9） |
+| `OscRegistration` (static helper) | （消滅） | `InputSourceRegistry` への直接 `Register(slug, source)` 呼び出しが `OscReceiverAdapterBinding.OnStart` 内で行われる（Req 6.10） |
 
 ### 1.3 InputSystem パッケージ (`com.hidano.facialcontrol.inputsystem`)
 
@@ -78,7 +78,7 @@ uLipSync の A / I / U / E / O 出力を Expression Overlay 経由へ移す prev
 3. `FacialController.CharacterSO` フィールドを 2.2 で作成した新 `FacialCharacterProfileSO` に差し替える
 4. scene を保存
 
-> **OSC HelperHost の補足**: `OscAdapterBinding` は `OnStart` で `OscReceiverHost` を `AddComponent` する。Inspector で見える状態で残るが、これは仕様（Req 13.6）。Disable / Remove はしないこと。`Dispose` 時に `OscAdapterBinding` 自身が `Object.Destroy` する。
+> **OSC HelperHost の補足**: `OscReceiverAdapterBinding` は `OnStart` で `OscReceiverHost` を `AddComponent` する。Inspector で見える状態で残るが、これは仕様（Req 13.6）。Disable / Remove はしないこと。`Dispose` 時に `OscReceiverAdapterBinding` 自身が `Object.Destroy` する。
 
 ### 2.4 自前の `IFacialControllerExtension` 派生からの移植
 
@@ -141,8 +141,8 @@ internal sealed class MyCustomAdapterBindingDrawer : PropertyDrawer
 | `controller-expr` | `input-system` または `input-system:controller` | `InputSystemAdapterBinding` に統合。device 種別は `InputSystem.Action` の `bindingPath` で識別される |
 | `keyboard-expr` | `input-system` または `input-system:keyboard` | 同上。1 binding に統合済みの場合は `<slug>` のみで参照可 |
 | `input` | `input-system` | 旧仕様の暫定統一名。新 slug は binding displayName 由来 |
-| `osc` | `osc` | `OscAdapterBinding` の slug が `displayName: "OSC"` → `"osc"` に自動採番される（変更なし、ただし binding 由来である点が新仕様） |
-| `osc:secondary` 等 | `osc:secondary` | 同 SO に `OscAdapterBinding` を 2 個並置するケースは `slug:sub` 形式で識別（Req 12.4） |
+| `osc` | `osc` | `OscReceiverAdapterBinding` の slug が `displayName: "OSC"` → `"osc"` に自動採番される（変更なし、ただし binding 由来である点が新仕様） |
+| `osc:secondary` 等 | `osc:secondary` | 同 SO に `OscReceiverAdapterBinding` を 2 個並置するケースは `slug:sub` 形式で識別（Req 12.4） |
 | `arkit` / `arkit-perfectsync` | `arkit-perfectsync` | `ArKitOscAdapterBinding` の slug |
 | `lipsync` | `lipsync` または `lip-sync` | binding を提供するパッケージの `[FacialAdapterBinding]` displayName による |
 | `analog-blendshape` / `analog-bonepose` | （binding-defined） | binding が register する sub-id に依存。各 binding の README を参照 |
