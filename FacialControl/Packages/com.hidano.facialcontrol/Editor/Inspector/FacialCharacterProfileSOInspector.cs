@@ -53,10 +53,14 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string TabExpressionsName = TabExpressionLibraryName;
 
         public const string SlotsDeclarationFoldoutName = "facial-character-slots-declaration-foldout";
+        public const string SlotsInitPhonemeButtonName = "slots-init-phoneme-button";
         public const string DefaultOverlaysFoldoutName = "facial-character-default-overlays-foldout";
         public const string ExpressionLibraryFoldoutName = "facial-character-expression-library-foldout";
         public const string ExpressionLibraryAddButtonName = "facial-character-expression-library-add-button";
         public const string ExpressionOverlaysSectionName = "expression-row-overlays-section";
+        public const string ExpressionPhonemeOverlaysFoldoutName = "expression-row-phoneme-overlays-foldout";
+        public const string ExpressionPhonemeOverlaysSummaryName = "expression-row-phoneme-overlays-summary";
+        public const string ExpressionPhonemeOverlayUndeclaredSlotHelpName = "expression-row-phoneme-overlay-undeclared-slot-help";
         public const string DefaultOverlaySlotDropdownName = "default-overlay-slot-dropdown";
         public const string DefaultOverlayAnimationClipFieldName = "default-overlay-animation-clip-field";
         public const string DefaultOverlayUndeclaredSlotHelpName = "default-overlay-undeclared-slot-help";
@@ -540,8 +544,79 @@ namespace Hidano.FacialControl.Editor.Inspector
             };
             listView.itemsRemoved += _ => OnSlotsPropertyChanged();
 
+            var initPhonemeButton = new Button(() =>
+            {
+                AddMissingPhonemeSlots();
+                var indexProxy = new List<int>();
+                for (int i = 0; i < _slotsProperty.arraySize; i++)
+                {
+                    indexProxy.Add(i);
+                }
+
+                listView.itemsSource = indexProxy;
+                listView.Rebuild();
+            })
+            {
+                name = SlotsInitPhonemeButtonName,
+                text = "Phoneme slots を初期化 (a/i/u/e/o)",
+            };
+            initPhonemeButton.AddToClassList(FacialControlStyles.ActionButton);
+            initPhonemeButton.style.alignSelf = Align.FlexStart;
+            initPhonemeButton.style.marginTop = 4;
+            initPhonemeButton.style.marginBottom = 4;
+            foldout.Add(initPhonemeButton);
+
             foldout.Add(listView);
             root.Add(foldout);
+        }
+
+        private void AddMissingPhonemeSlots()
+        {
+            if (_slotsProperty == null) return;
+
+            serializedObject.Update();
+            bool changed = false;
+            foreach (var reservedSlot in PhonemeOverlaySlots.ReservedNames)
+            {
+                if (ContainsSlot(_slotsProperty, reservedSlot))
+                {
+                    continue;
+                }
+
+                int index = _slotsProperty.arraySize;
+                _slotsProperty.InsertArrayElementAtIndex(index);
+                var slotProp = _slotsProperty.GetArrayElementAtIndex(index);
+                if (slotProp != null)
+                {
+                    slotProp.stringValue = reservedSlot;
+                    changed = true;
+                }
+            }
+
+            if (!changed) return;
+
+            serializedObject.ApplyModifiedProperties();
+            EditorUtility.SetDirty(target);
+            OnSlotsPropertyChanged();
+        }
+
+        private static bool ContainsSlot(SerializedProperty slotsProperty, string slot)
+        {
+            if (slotsProperty == null || string.IsNullOrEmpty(slot))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < slotsProperty.arraySize; i++)
+            {
+                var element = slotsProperty.GetArrayElementAtIndex(i);
+                if (element != null && string.Equals(element.stringValue, slot, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void BindSlotDeclarationRow(VisualElement row, int slotIndex)
@@ -1928,15 +2003,86 @@ namespace Hidano.FacialControl.Editor.Inspector
                 var empty = new Label("宣言済み slot はありません。");
                 empty.style.color = new StyleColor(new Color(0.55f, 0.55f, 0.55f));
                 section.Add(empty);
-                return section;
             }
 
             for (int i = 0; i < slots.Count; i++)
             {
-                section.Add(BuildExpressionOverlayRow(overlaysProp, exprIndex, slots[i]));
+                if (!PhonemeOverlaySlots.IsReserved(slots[i]))
+                {
+                    section.Add(BuildExpressionOverlayRow(overlaysProp, exprIndex, slots[i]));
+                }
             }
 
+            section.Add(BuildPhonemeOverlaysFoldout(overlaysProp, exprIndex));
             return section;
+        }
+
+        private VisualElement BuildPhonemeOverlaysFoldout(SerializedProperty overlaysProp, int exprIndex)
+        {
+            var foldout = new Foldout
+            {
+                name = ExpressionPhonemeOverlaysFoldoutName,
+                text = "Phoneme Overlays",
+                value = false,
+            };
+            foldout.style.marginTop = 6;
+
+            var summary = new Label(BuildPhonemeOverlaySummaryText(overlaysProp, exprIndex))
+            {
+                name = ExpressionPhonemeOverlaysSummaryName,
+            };
+            summary.style.marginBottom = 4;
+            summary.style.color = new StyleColor(new Color(0.55f, 0.55f, 0.55f));
+            foldout.Add(summary);
+
+            foreach (var slot in PhonemeOverlaySlots.ReservedNames)
+            {
+                if (IsDeclaredSlot(slot))
+                {
+                    foldout.Add(BuildExpressionOverlayRow(overlaysProp, exprIndex, slot));
+                    continue;
+                }
+
+                var help = MakeHelpBox(
+                    $"Slots section に '{slot}' を追加すると編集できます。",
+                    HelpBoxMessageType.Info);
+                help.name = ExpressionPhonemeOverlayUndeclaredSlotHelpName;
+                foldout.Add(help);
+            }
+
+            return foldout;
+        }
+
+        private string BuildPhonemeOverlaySummaryText(SerializedProperty overlaysProp, int exprIndex)
+        {
+            int declared = 0;
+            int overrides = 0;
+            int suppress = 0;
+
+            foreach (var slot in PhonemeOverlaySlots.ReservedNames)
+            {
+                if (!IsDeclaredSlot(slot))
+                {
+                    continue;
+                }
+
+                declared++;
+                int bindingIndex = FindOverlayBindingIndex(overlaysProp, slot);
+                SerializedProperty bindingProp = bindingIndex >= 0
+                    ? overlaysProp.GetArrayElementAtIndex(bindingIndex)
+                    : null;
+                var state = ReadExpressionOverlayBindingState(exprIndex, slot, bindingProp);
+                if (state == OverlaySlotBindingState.Override)
+                {
+                    overrides++;
+                }
+                else if (state == OverlaySlotBindingState.Suppress)
+                {
+                    suppress++;
+                }
+            }
+
+            return $"{declared}/5 declared (override={overrides}, suppress={suppress})";
         }
 
         private VisualElement BuildExpressionOverlayRow(
@@ -1975,7 +2121,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             radio.style.minWidth = 240;
             line.Add(radio);
 
-            var clipField = new ObjectField("AnimationClip")
+            var clipField = new OverlayAnimationClipObjectField("AnimationClip")
             {
                 name = ExpressionOverlayAnimationClipFieldName,
                 objectType = typeof(AnimationClip),
@@ -2003,10 +2149,7 @@ namespace Hidano.FacialControl.Editor.Inspector
                     ? DisplayStyle.Flex
                     : DisplayStyle.None;
             };
-            clipField.RegisterValueChangedCallback(evt =>
-            {
-                ApplyExpressionOverlayClip(exprIndex, slot, evt.newValue as AnimationClip);
-            });
+            clipField.OnValueAssigned = clip => ApplyExpressionOverlayClip(exprIndex, slot, clip);
 
             row.Add(line);
 
@@ -2149,6 +2292,13 @@ namespace Hidano.FacialControl.Editor.Inspector
             {
                 binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
             }
+            else if (target is FacialCharacterProfileSO profileSO)
+            {
+                FacialCharacterProfileExporter.SampleAnimationClipsIntoCachedSnapshots(
+                    profileSO,
+                    _sampler ?? new AnimationClipExpressionSampler());
+            }
+
             EditorUtility.SetDirty(target);
             serializedObject.Update();
         }

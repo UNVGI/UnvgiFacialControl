@@ -34,6 +34,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             public void Unregister(AdapterSlug slug) =>
                 throw new NotImplementedException();
 
+            public void Unregister(AdapterSlug slug, string sub) =>
+                throw new NotImplementedException();
+
             public bool TryResolve(string layerInputSourceId, out IInputSource source) =>
                 throw new NotImplementedException();
         }

@@ -5,7 +5,7 @@
 集約構造です。本ガイドでは spec [`adapter-runtime-settings`](../../../../.kiro/specs/adapter-runtime-settings/) で導入された
 新構造の作成手順・運用フロー・マイグレーション手順をまとめます。
 
-> **重要**: preview 段階のため、旧構造 (`OscAdapterBinding._endpoint` 等を持つキャラ SO) との
+> **重要**: preview 段階のため、旧構造 (`OscReceiverAdapterBinding._endpoint` 等を持つキャラ SO) との
 > 後方互換は提供しません。既存 Asset は本ガイドの「Migration Strategy」節に従って **手動再構築** してください。
 
 ---
@@ -24,7 +24,7 @@ AdapterRuntimeSettingsCollection.asset (Project ビュー上は 1 ファイル)
 - `AdapterRuntimeSettingsCollectionSO` は `List<AdapterRuntimeSettingsBase> _items` で
   複数の sub-asset を 1 親 Asset に束ねます (要件 2.1-2.3)
 - `OscRuntimeSettingsSO` は Receiver / Sender を 1 sub-asset に統合した派生 SO です (要件 2.4)
-- `OscAdapterBinding._settings` と `OscSenderAdapterBinding._settings` は同一の
+- `OscReceiverAdapterBinding._settings` と `OscSenderAdapterBinding._settings` は同一の
   `OscRuntimeSettingsSO` を `[SerializeField]` 参照し、それぞれ Receiver / Sender セクションだけを読みます
   (要件 2.5-2.7)
 - マイクデバイス指定は `LipSyncDeviceStore` 経由で PlayerPrefs に保存され、git 管理外に置かれます
@@ -71,7 +71,7 @@ AdapterRuntimeSettingsCollection.asset (Project ビュー上は 1 ファイル)
    (パラメータ消失防止保証、対応レベル b)
 
 > **HelpBox 警告**: sub-asset を削除した場合、それを `[SerializeField]` で参照していた
-> AdapterBinding (`OscAdapterBinding._settings` 等) は参照欠落になり、Inspector 側 Drawer が
+> AdapterBinding (`OscReceiverAdapterBinding._settings` 等) は参照欠落になり、Inspector 側 Drawer が
 > HelpBox で「未設定」警告を表示します。Binding の `OnStart` は `_settings == null` を検出すると
 > warning を出して起動を skip するため、scene 起動時に silent な無動作にはなりません (要件 2.7)。
 > 削除前に逆引き確認ダイアログを出す機能は本 spec のスコープ外で、`docs/backlog.md` に登録済みです。
@@ -84,13 +84,13 @@ AdapterRuntimeSettingsCollection.asset (Project ビュー上は 1 ファイル)
 
 | フィールド | 既定値 | 効果 |
 |---|---|---|
-| `_receiverEnabled` | `true` | `false` の場合、`OscAdapterBinding._settings` がこの SO を参照していても `OnStart` は warning を出して `OscReceiverHost` を起動せず skip する |
+| `_receiverEnabled` | `true` | `false` の場合、`OscReceiverAdapterBinding._settings` がこの SO を参照していても `OnStart` は warning を出して `OscReceiverHost` を起動せず skip する |
 | `_senderEnabled` | `true` | `false` の場合、`OscSenderAdapterBinding._settings` がこの SO を参照していても `OnStart` は warning を出して送信側 Host を起動せず skip する |
 
 典型的な運用パターン:
 
 - **本番 / 配信時**: `_receiverEnabled = true`, `_senderEnabled = true`
-  - 同じ SO を `OscAdapterBinding._settings` と `OscSenderAdapterBinding._settings` の双方に
+  - 同じ SO を `OscReceiverAdapterBinding._settings` と `OscSenderAdapterBinding._settings` の双方に
     アサインすることで Receiver / Sender 両系統で一貫した設定値を読み出せる (要件 2.7)
 - **受信のみ検証 (例: VRChat OSC 受信デバッグ)**: `_receiverEnabled = true`, `_senderEnabled = false`
 - **送信のみ検証 (例: PerfectSync 送信単体テスト)**: `_receiverEnabled = false`, `_senderEnabled = true`
@@ -151,7 +151,7 @@ LipSyncDeviceStore.Save(new DeviceDescriptor
 
 ## 6. Migration Strategy (旧構造からの手動再構築)
 
-旧構造ではキャラ SO 直下の `OscAdapterBinding` / `OscSenderAdapterBinding` / `ULipSyncAdapterBinding` に
+旧構造ではキャラ SO 直下の `OscReceiverAdapterBinding` / `OscSenderAdapterBinding` / `ULipSyncAdapterBinding` に
 環境依存フィールドが inline されていました。preview 段階のポリシー (`docs/requirements.md` FR-001) に基づき、
 自動マイグレーションは提供しません。以下の手順で **手動で再構築** してください (要件 1.5, 8.5)。
 
@@ -164,7 +164,7 @@ LipSyncDeviceStore.Save(new DeviceDescriptor
 
 新構造に転記するため、旧 SO Inspector で以下の値を控えておく:
 
-- `OscAdapterBinding._endpoint`, `_port`, `_stalenessSeconds`, `_failSafeMode`,
+- `OscReceiverAdapterBinding._endpoint`, `_port`, `_stalenessSeconds`, `_failSafeMode`,
   `_consistencyCheckWarnLog`, `_bundleMode`, `_bundleAccumulationTimeoutMs`
 - `OscSenderAdapterBinding._endpoints` (各 endpoint の `ip` / `port` / `preset` / `enabled`),
   `_heartbeatIntervalSeconds`, `_suppressLoopback`
@@ -179,7 +179,7 @@ LipSyncDeviceStore.Save(new DeviceDescriptor
 ### 6.4 AdapterBinding 参照の差し替え
 
 - 対象キャラ SO (`FacialCharacterProfileSO`) を Inspector で開く
-- **Adapter Bindings** セクションで `OscAdapterBinding` を展開し、`_settings` フィールドに
+- **Adapter Bindings** セクションで `OscReceiverAdapterBinding` を展開し、`_settings` フィールドに
   6.3 で作成した `OscRuntimeSettings` sub-asset をアサインする
 - `OscSenderAdapterBinding._settings` にも同じ sub-asset (または別構成が必要なら別 sub-asset) をアサインする
 - 旧 `_endpoint` / `_port` / `_endpoints` / `_heartbeatIntervalSeconds` 等の inline フィールドは
@@ -195,7 +195,7 @@ LipSyncDeviceStore.Save(new DeviceDescriptor
 
 ### 6.6 検証チェックリスト
 
-- [ ] `OscAdapterBinding` / `OscSenderAdapterBinding` の `_settings` が全て `null` ではない
+- [ ] `OscReceiverAdapterBinding` / `OscSenderAdapterBinding` の `_settings` が全て `null` ではない
       (Project 内検索で binding を列挙し、Inspector 上で確認)
 - [ ] 旧 `_endpoint` / `_port` / `_endpoints` / `_deviceDescriptor` を直接参照していた
       テストコードが新構造 (`OscRuntimeSettingsSO` インスタンス生成 + `Configure` API 経路、または

@@ -184,7 +184,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
         private AdapterBuildContext CreateContext()
         {
             return new AdapterBuildContext(
-                profile: new FacialProfile("1.0"),
+                profile: new FacialProfile("1.0", slots: new[] { PhonemeOverlaySlots.A }),
                 blendShapeNames: new List<string> { BlendShapeName },
                 inputSourceRegistry: _registry,
                 facialOutputBus: new FacialOutputBus(),

@@ -13,21 +13,21 @@ namespace Hidano.FacialControl.LipSync.Adapters
     [Serializable]
     [FacialAdapterBinding(displayName: "uLipSync")]
     public sealed class ULipSyncAdapterBinding
-        : AdapterBindingBase, IAdapterBindingInitialDefaults, IAdapterBindingDefaultLayer
+        : AdapterBindingBase,
+            IAdapterBindingInitialDefaults,
+            IAdapterBindingDefaultLayer,
+            IAdapterBindingDefaultLayerInputs
     {
         private static readonly string[] DefaultPhonemeIds = { "A", "I", "U", "E", "O" };
 
         private const string DefaultSlug = "ulipsync";
         private const string DefaultLayerNameValue = "lipsync";
+        private const string OverlayLayerNameValue = "overlay";
 
         /// <inheritdoc />
         public string DefaultLayerName => DefaultLayerNameValue;
 
         /// <inheritdoc />
-        /// <remarks>
-        /// LipSyncInputSource は AdapterSlug と同じ slug を InputSourceId として登録するため、
-        /// 既定 Layer の入力源 ID も binding の Slug をそのまま採用する。
-        /// </remarks>
         public string DefaultLayerInputSourceId => string.IsNullOrEmpty(Slug) ? DefaultSlug : Slug;
 
         /// <inheritdoc />
@@ -81,7 +81,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
         private ULipSyncProvider _provider;
 
         [NonSerialized]
-        private LipSyncInputSource _inputSource;
+        private List<string> _registeredPhonemeSlots;
 
         [NonSerialized]
         private GameObject _hostGameObject;
@@ -96,9 +96,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
         private AdapterSlug _registeredSlug;
 
         [NonSerialized]
-        private bool _registeredInputSource;
-
-        [NonSerialized]
         private bool _swapPending;
 
         [NonSerialized]
@@ -107,15 +104,33 @@ namespace Hidano.FacialControl.LipSync.Adapters
         [NonSerialized]
         private bool _addedAudioSource;
 
+        [NonSerialized]
+        private HashSet<string> _loggedWarnings;
+
         public ULipSyncAdapterBinding()
         {
             Slug = DefaultSlug;
         }
 
+        /// <inheritdoc />
+        public IEnumerable<(string id, float weight)> GetDefaultLayerInputSources(string layerName)
+        {
+            if (!string.Equals(layerName, OverlayLayerNameValue, StringComparison.Ordinal))
+            {
+                yield break;
+            }
+
+            for (int i = 0; i < PhonemeOverlaySlots.ReservedNames.Length; i++)
+            {
+                string slot = GetReservedPhonemeSlot(i);
+                yield return ($"{LipSyncPhonemeOverlayInputSource.SlugPrefix}:{slot}", 1f);
+            }
+        }
+
         /// <summary>
         /// Inspector で binding を新規追加した直後に呼ばれ、
-        /// AIUEO 5 音素分の <see cref="AnimationClipPhonemeEntry"/> をプリセットする。
-        /// (Clip = null の状態で追加され、ユーザーが各音素に AnimationClip を割り当てる前提)。
+        /// AIUEO 5 音素分の <see cref="ExpressionPhonemeEntry"/> をプリセットする。
+        /// ExpressionId は未割り当てのまま追加され、ユーザーが Inspector で割り当てる。
         /// </summary>
         public void ApplyInitialDefaults()
         {
@@ -131,7 +146,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
             for (int i = 0; i < DefaultPhonemeIds.Length; i++)
             {
-                _phonemeEntries.Add(new AnimationClipPhonemeEntry
+                _phonemeEntries.Add(new ExpressionPhonemeEntry
                 {
                     PhonemeId = DefaultPhonemeIds[i],
                     MaxWeight = 100f,
@@ -142,8 +157,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
         public uLipSync.uLipSync Analyzer => _analyzer;
 
         public ULipSyncProvider Provider => _provider;
-
-        public LipSyncInputSource InputSource => _inputSource;
 
         public bool IsStarted => _started;
 
@@ -180,6 +193,8 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
         public override void OnStart(in AdapterBuildContext ctx)
         {
+            ClearLoggedWarnings();
+
             if (_started)
             {
                 return;
@@ -210,13 +225,12 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 return;
             }
 
-            if (ctx.InputSourceRegistry.TryResolve(slug.Value, out _))
+            if (HasReservedSlotRegistrationConflict(ctx, slug))
             {
-                Debug.LogError(
-                    $"[ULipSyncAdapterBinding] Input source slug '{slug.Value}' is already registered. " +
-                    "Duplicate binding initialization was skipped.");
                 return;
             }
+
+            WarnIfLegacyLipSyncSourceAlsoRegistered(ctx, slug);
 
             DeviceResolution resolution = ResolveDevice(_runtimeDescriptor);
             if (resolution.Kind == DeviceKind.Unresolved)
@@ -256,11 +270,9 @@ namespace Hidano.FacialControl.LipSync.Adapters
                     snapshots,
                     ctx.BlendShapeNames.Count,
                     smoothness: ULipSyncProvider.DefaultSmoothness);
-                _inputSource = new LipSyncInputSource(_provider, ctx.BlendShapeNames.Count);
-                ctx.InputSourceRegistry.Register(slug, _inputSource);
                 _inputSourceRegistry = ctx.InputSourceRegistry;
                 _registeredSlug = slug;
-                _registeredInputSource = true;
+                RegisterPhonemeOverlayInputSources(ctx, slug);
 
                 _provider.RequestZeroOutputForNextFrame();
                 _started = true;
@@ -358,6 +370,10 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 _microphoneInput = hostGameObject.AddComponent<uLipSync.uLipSyncMicrophone>();
                 _microphoneInput.index = resolution.ResolvedIndex;
                 _microphoneInput.UpdateMicInfo();
+                // UpdateMicInfo は Microphone.devices の状態に応じて index を再設定する経路があり、
+                // batchmode / 未接続環境では解決済み index が 0 に巻き戻ることがある。
+                // DeviceResolver の解決結果を最終 source-of-truth として再度上書きする。
+                _microphoneInput.index = resolution.ResolvedIndex;
                 return;
             }
 
@@ -401,6 +417,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
         private PhonemeSnapshot[] BuildSnapshots(in AdapterBuildContext ctx)
         {
             var snapshots = new List<PhonemeSnapshot>(_phonemeEntries.Count);
+            Dictionary<string, int> nameToIndex = BuildNameToIndex(ctx.BlendShapeNames);
             SkinnedMeshRenderer[] renderers =
                 ctx.HostGameObject.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             SkinnedMeshRenderer targetRenderer = ResolveRenderer(ctx.HostGameObject, renderers);
@@ -432,7 +449,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
                         if (TryFillBlendShapeSnapshot(
                                 blendShapeEntry,
                                 targetRenderer,
-                                ctx.BlendShapeNames,
+                                nameToIndex,
                                 weights))
                         {
                             snapshots.Add(new PhonemeSnapshot(entry.PhonemeId, weights));
@@ -441,11 +458,26 @@ namespace Hidano.FacialControl.LipSync.Adapters
                         continue;
                     }
 
-                    if (entry is AnimationClipPhonemeEntry animationEntry
-                        && TryFillAnimationClipSnapshot(
-                            animationEntry,
-                            renderers,
-                            savedWeights,
+                    if (entry is AnimationClipPhonemeEntry animationEntry)
+                    {
+                        if (TryFillAnimationClipSnapshot(
+                                animationEntry,
+                                renderers,
+                                savedWeights,
+                                ctx,
+                                nameToIndex,
+                                weights))
+                        {
+                            snapshots.Add(new PhonemeSnapshot(entry.PhonemeId, weights));
+                        }
+
+                        continue;
+                    }
+
+                    if (entry is ExpressionPhonemeEntry expressionEntry
+                        && TryFillExpressionSnapshot(
+                            expressionEntry,
+                            nameToIndex,
                             ctx,
                             weights))
                     {
@@ -464,7 +496,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
         private bool TryFillBlendShapeSnapshot(
             BlendShapePhonemeEntry entry,
             SkinnedMeshRenderer targetRenderer,
-            IReadOnlyList<string> blendShapeNames,
+            IReadOnlyDictionary<string, int> nameToIndex,
             float[] weights)
         {
             if (targetRenderer == null || targetRenderer.sharedMesh == null)
@@ -474,7 +506,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 return false;
             }
 
-            int index = FindBlendShapeIndex(blendShapeNames, entry.BlendShapeName);
+            int index = FindBlendShapeIndex(nameToIndex, entry.BlendShapeName);
             int meshIndex = targetRenderer.sharedMesh.GetBlendShapeIndex(entry.BlendShapeName);
             if (index < 0 || meshIndex < 0)
             {
@@ -492,6 +524,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
             SkinnedMeshRenderer[] renderers,
             SavedBlendShapeWeights[] savedWeights,
             in AdapterBuildContext ctx,
+            IReadOnlyDictionary<string, int> nameToIndex,
             float[] weights)
         {
             if (entry.Clip == null)
@@ -545,6 +578,18 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
             if (!anyNonZero)
             {
+                if (TryFindExpressionByPhonemeIdHeuristic(ctx, entry.PhonemeId, out Expression expression)
+                    && TryFillExpressionSnapshotByExpression(
+                        entry.PhonemeId,
+                        expression,
+                        nameToIndex,
+                        entry.MaxWeight,
+                        weights))
+                {
+                    LogAnimationClipFallbackWarning(entry.PhonemeId, entry.Clip.name);
+                    return true;
+                }
+
                 // sample 後に 1 つも BlendShape weight が立たないクリップは、リップシンク中に何も
                 // 出力しない (= ContributeMask が空のまま) ため、ユーザーが「リップシンクが動かない」
                 // と感じる元になる。Clip 自体に BlendShape カーブが無いか、HostGameObject の
@@ -557,7 +602,205 @@ namespace Hidano.FacialControl.LipSync.Adapters
                     + "') の SkinnedMeshRenderer 構造と Clip の rendererPath が一致していない可能性があります。");
             }
 
-            return true;
+            return anyNonZero;
+        }
+
+        private bool TryFillExpressionSnapshot(
+            ExpressionPhonemeEntry entry,
+            IReadOnlyDictionary<string, int> nameToIndex,
+            in AdapterBuildContext ctx,
+            float[] weights)
+        {
+            string expressionId = entry.ExpressionId;
+            if (string.IsNullOrEmpty(expressionId))
+            {
+                if (IsDefaultPhonemeId(entry.PhonemeId)
+                    && TryFindExpressionByPhonemeIdHeuristic(ctx, entry.PhonemeId, out Expression autoLinkedExpression))
+                {
+                    return TryFillExpressionSnapshotByExpression(
+                        entry.PhonemeId,
+                        autoLinkedExpression,
+                        nameToIndex,
+                        entry.MaxWeight,
+                        weights);
+                }
+
+                LogExpressionResolutionWarning(
+                    entry.PhonemeId,
+                    expressionId,
+                    ExpressionWarningCause.EmptyExpressionId);
+                return false;
+            }
+
+            Expression? expression = ctx.Profile.FindExpressionById(expressionId);
+            if (!expression.HasValue)
+            {
+                LogExpressionResolutionWarning(
+                    entry.PhonemeId,
+                    expressionId,
+                    ExpressionWarningCause.ExpressionNotFound);
+                return false;
+            }
+
+            return TryFillExpressionSnapshotByExpression(
+                entry.PhonemeId,
+                expression.Value,
+                nameToIndex,
+                entry.MaxWeight,
+                weights);
+        }
+
+        private static bool IsDefaultPhonemeId(string phonemeId)
+        {
+            for (int i = 0; i < DefaultPhonemeIds.Length; i++)
+            {
+                if (string.Equals(DefaultPhonemeIds[i], phonemeId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool TryFillExpressionSnapshotByExpression(
+            string phonemeId,
+            Expression expression,
+            IReadOnlyDictionary<string, int> nameToIndex,
+            float maxWeight,
+            float[] weights)
+        {
+            ReadOnlySpan<BlendShapeMapping> mappings = expression.BlendShapeValues.Span;
+            if (mappings.Length == 0)
+            {
+                LogExpressionResolutionWarning(
+                    phonemeId,
+                    expression.Id,
+                    ExpressionWarningCause.EmptyBlendShapeValues);
+                return false;
+            }
+
+            float scale = NormalizeWeight(maxWeight);
+            bool anyNonZero = false;
+            for (int i = 0; i < mappings.Length; i++)
+            {
+                int index = FindBlendShapeIndex(nameToIndex, mappings[i].Name);
+                if (index < 0)
+                {
+                    continue;
+                }
+
+                float weight = Mathf.Clamp01(mappings[i].Value * scale);
+                weights[index] = weight;
+                if (weight > 0f)
+                {
+                    anyNonZero = true;
+                }
+            }
+
+            return anyNonZero;
+        }
+
+        private bool TryFindExpressionByPhonemeIdHeuristic(
+            in AdapterBuildContext ctx,
+            string phonemeId,
+            out Expression expression)
+        {
+            expression = default;
+            if (string.IsNullOrEmpty(phonemeId))
+            {
+                return false;
+            }
+
+            ReadOnlySpan<Expression> expressions = ctx.Profile.Expressions.Span;
+            for (int i = 0; i < expressions.Length; i++)
+            {
+                Expression candidate = expressions[i];
+                if (string.Equals(candidate.Id, phonemeId, StringComparison.Ordinal)
+                    || string.Equals(candidate.Name, phonemeId, StringComparison.Ordinal))
+                {
+                    expression = candidate;
+                    return true;
+                }
+            }
+
+            // Japanese display names such as "a" in kana intentionally do not match AIUEO phoneme ids.
+            return false;
+        }
+
+        private void LogExpressionResolutionWarning(
+            string phonemeId,
+            string expressionId,
+            ExpressionWarningCause cause)
+        {
+            string normalizedPhonemeId = string.IsNullOrEmpty(phonemeId) ? "<empty>" : phonemeId;
+            string normalizedExpressionId = string.IsNullOrEmpty(expressionId) ? "<empty>" : expressionId;
+            string key = cause switch
+            {
+                ExpressionWarningCause.EmptyExpressionId => $"expr-empty:{normalizedPhonemeId}",
+                ExpressionWarningCause.ExpressionNotFound =>
+                    $"expr-not-found:{normalizedPhonemeId}:{normalizedExpressionId}",
+                ExpressionWarningCause.EmptyBlendShapeValues =>
+                    $"expr-empty-bs:{normalizedPhonemeId}:{normalizedExpressionId}",
+                _ => $"expr-unknown:{normalizedPhonemeId}:{normalizedExpressionId}",
+            };
+
+            if (!TryMarkWarningLogged(key))
+            {
+                return;
+            }
+
+            string message = cause switch
+            {
+                ExpressionWarningCause.EmptyExpressionId =>
+                    $"Expression is not assigned (ExpressionId='{normalizedExpressionId}'). "
+                    + "Assign an Expression in the Inspector.",
+                ExpressionWarningCause.ExpressionNotFound =>
+                    $"ExpressionId='{normalizedExpressionId}' does not exist in the profile.",
+                ExpressionWarningCause.EmptyBlendShapeValues =>
+                    $"ExpressionId='{normalizedExpressionId}' has no BlendShape values.",
+                _ => "Expression could not be resolved.",
+            };
+
+            Debug.LogWarning(
+                $"[ULipSyncAdapterBinding] {message} PhonemeId='{normalizedPhonemeId}'. "
+                + "The phoneme entry will be skipped; configure the Expression assignment in the Inspector.");
+        }
+
+        private void LogAnimationClipFallbackWarning(string phonemeId, string clipName)
+        {
+            string normalizedPhonemeId = string.IsNullOrEmpty(phonemeId) ? "<empty>" : phonemeId;
+            if (!TryMarkWarningLogged($"clip-fallback:{normalizedPhonemeId}"))
+            {
+                return;
+            }
+
+            string normalizedClipName = string.IsNullOrEmpty(clipName) ? "<null>" : clipName;
+            Debug.LogWarning(
+                $"[ULipSyncAdapterBinding] AnimationClip '{normalizedClipName}' "
+                + $"for phoneme '{normalizedPhonemeId}' sampled all zero values; fallback 採用済み. "
+                + "Use ExpressionPhonemeEntry as a more reliable alternative.");
+        }
+
+        private bool TryMarkWarningLogged(string key)
+        {
+            if (_loggedWarnings == null)
+            {
+                _loggedWarnings = new HashSet<string>(StringComparer.Ordinal);
+            }
+
+            return _loggedWarnings.Add(key);
+        }
+
+        private void ClearLoggedWarnings()
+        {
+            if (_loggedWarnings == null)
+            {
+                _loggedWarnings = new HashSet<string>(StringComparer.Ordinal);
+                return;
+            }
+
+            _loggedWarnings.Clear();
         }
 
         private SkinnedMeshRenderer ResolveRenderer(
@@ -709,22 +952,151 @@ namespace Hidano.FacialControl.LipSync.Adapters
             return Mathf.Clamp01((maxWeight / 100f) * Mathf.Max(0f, _maxWeightScale));
         }
 
-        private static int FindBlendShapeIndex(IReadOnlyList<string> blendShapeNames, string blendShapeName)
+        private static Dictionary<string, int> BuildNameToIndex(IReadOnlyList<string> blendShapeNames)
+        {
+            var nameToIndex = new Dictionary<string, int>(blendShapeNames.Count);
+            for (int i = 0; i < blendShapeNames.Count; i++)
+            {
+                string name = blendShapeNames[i];
+                if (!string.IsNullOrEmpty(name) && !nameToIndex.ContainsKey(name))
+                {
+                    nameToIndex.Add(name, i);
+                }
+            }
+
+            return nameToIndex;
+        }
+
+        private static int FindBlendShapeIndex(
+            IReadOnlyDictionary<string, int> nameToIndex,
+            string blendShapeName)
         {
             if (string.IsNullOrEmpty(blendShapeName))
             {
                 return -1;
             }
 
-            for (int i = 0; i < blendShapeNames.Count; i++)
+            return nameToIndex.TryGetValue(blendShapeName, out int index) ? index : -1;
+        }
+
+        private void RegisterPhonemeOverlayInputSources(in AdapterBuildContext ctx, AdapterSlug slug)
+        {
+            if (_registeredPhonemeSlots == null)
             {
-                if (string.Equals(blendShapeNames[i], blendShapeName, StringComparison.Ordinal))
+                _registeredPhonemeSlots = new List<string>(PhonemeOverlaySlots.ReservedNames.Length);
+            }
+            else
+            {
+                _registeredPhonemeSlots.Clear();
+            }
+
+            ReadOnlySpan<string> declaredSlots = ctx.Profile.Slots.Span;
+            ReadOnlySpan<string> reservedSlots = PhonemeOverlaySlots.ReservedNames;
+            for (int i = 0; i < reservedSlots.Length; i++)
+            {
+                string slot = reservedSlots[i];
+                if (!ContainsSlot(declaredSlots, slot))
                 {
-                    return i;
+                    continue;
+                }
+
+                string phonemeId = PhonemeOverlaySlots.MapReservedToPhonemeId(slot);
+                if (!_provider.TryGetPhonemeIndex(phonemeId, out _))
+                {
+                    continue;
+                }
+
+                var id = InputSourceId.Parse($"{LipSyncPhonemeOverlayInputSource.SlugPrefix}:{slot}");
+                var source = new LipSyncPhonemeOverlayInputSource(
+                    id,
+                    phonemeId,
+                    _provider,
+                    ctx.BlendShapeNames.Count);
+                ctx.InputSourceRegistry.Register(slug, slot, source);
+                _registeredPhonemeSlots.Add(slot);
+            }
+
+            if (_registeredPhonemeSlots.Count == 0)
+            {
+                Debug.LogWarning(
+                    "[ULipSyncAdapterBinding] No reserved phoneme overlay slots are declared in FacialProfile.Slots. " +
+                    "LipSync overlay input source registration was skipped.");
+            }
+        }
+
+        private static bool HasReservedSlotRegistrationConflict(
+            in AdapterBuildContext ctx,
+            AdapterSlug slug)
+        {
+            ReadOnlySpan<string> declaredSlots = ctx.Profile.Slots.Span;
+            ReadOnlySpan<string> reservedSlots = PhonemeOverlaySlots.ReservedNames;
+            for (int i = 0; i < reservedSlots.Length; i++)
+            {
+                string slot = reservedSlots[i];
+                if (!ContainsSlot(declaredSlots, slot))
+                {
+                    continue;
+                }
+
+                string id = $"{slug.Value}:{slot}";
+                if (ctx.InputSourceRegistry.TryResolve(id, out _))
+                {
+                    Debug.LogError(
+                        $"[ULipSyncAdapterBinding] Input source slug '{id}' is already registered. " +
+                        "Duplicate binding initialization was skipped.");
+                    return true;
                 }
             }
 
-            return -1;
+            return false;
+        }
+
+        internal static bool WarnIfLegacyLipSyncSourceAlsoRegistered(
+            in AdapterBuildContext ctx,
+            AdapterSlug slug)
+        {
+            if (!ctx.InputSourceRegistry.TryResolve(slug.Value, out _))
+            {
+                return false;
+            }
+
+            ReadOnlySpan<string> declaredSlots = ctx.Profile.Slots.Span;
+            ReadOnlySpan<string> reservedSlots = PhonemeOverlaySlots.ReservedNames;
+            for (int i = 0; i < reservedSlots.Length; i++)
+            {
+                string slot = reservedSlots[i];
+                if (!ContainsSlot(declaredSlots, slot))
+                {
+                    continue;
+                }
+
+                Debug.LogWarning(
+                    $"[ULipSyncAdapterBinding] Legacy LipSync input source '{slug.Value}' is already registered " +
+                    $"while phoneme overlay slot '{slot}' is declared. This can double-write the same phoneme " +
+                    "BlendShape in one frame. Remove the legacy lipsync layer/input source and migrate to " +
+                    $"'{slug.Value}:{slot}' plus overlay input sources.");
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool ContainsSlot(ReadOnlySpan<string> slots, string slot)
+        {
+            for (int i = 0; i < slots.Length; i++)
+            {
+                if (string.Equals(slots[i], slot, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string GetReservedPhonemeSlot(int index)
+        {
+            return PhonemeOverlaySlots.ReservedNames[index];
         }
 
         private readonly struct SavedBlendShapeWeights
@@ -739,6 +1111,13 @@ namespace Hidano.FacialControl.LipSync.Adapters
             }
         }
 
+        private enum ExpressionWarningCause
+        {
+            EmptyExpressionId,
+            ExpressionNotFound,
+            EmptyBlendShapeValues,
+        }
+
         private void RollbackStartedResources()
         {
             if (_provider != null)
@@ -747,15 +1126,17 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 _provider = null;
             }
 
-            if (_registeredInputSource && _inputSourceRegistry != null)
+            if (_inputSourceRegistry != null && _registeredPhonemeSlots != null)
             {
-                _inputSourceRegistry.Unregister(_registeredSlug);
+                for (int i = _registeredPhonemeSlots.Count - 1; i >= 0; i--)
+                {
+                    _inputSourceRegistry.Unregister(_registeredSlug, _registeredPhonemeSlots[i]);
+                }
             }
 
-            _registeredInputSource = false;
+            _registeredPhonemeSlots?.Clear();
             _inputSourceRegistry = null;
             _registeredSlug = default;
-            _inputSource = null;
 
             if (_eventBridge != null)
             {

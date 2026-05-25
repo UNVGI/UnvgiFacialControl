@@ -16,7 +16,7 @@ namespace Hidano.FacialControl.Osc.Tests.EditMode.Adapters.AdapterBindings
     /// <c>[Serializable]</c> + <c>[FacialAdapterBinding(displayName: "ARKit / PerfectSync")]</c>
     /// 付き sealed class で <see cref="AdapterBindingBase"/> 派生であり、
     /// 単一 <see cref="FacialCharacterProfileSO"/> に
-    /// <see cref="OscAdapterBinding"/> + <see cref="ArKitOscAdapterBinding"/> を
+    /// <see cref="OscReceiverAdapterBinding"/> + <see cref="ArKitOscAdapterBinding"/> を
     /// 同時に保持して round-trip できることを assert する。
     /// </summary>
     [TestFixture]
@@ -126,15 +126,15 @@ namespace Hidano.FacialControl.Osc.Tests.EditMode.Adapters.AdapterBindings
         }
 
         // ============================================================
-        // 単一 SO で OscAdapterBinding + ArKitOscAdapterBinding 同時 round-trip
+        // 単一 SO で OscReceiverAdapterBinding + ArKitOscAdapterBinding 同時 round-trip
         // ============================================================
 
         [Test]
         public void RoundTrip_SingleSOWithBothOscAndArKitBindings_PreservesConcreteTypesAndFields()
         {
             // task 9.3 観測可能完了条件:
-            // 単一 SO で OscAdapterBinding + ArKitOscAdapterBinding が同時に保持・round-trip できる。
-            // task 8.7: OscAdapterBinding は OscRuntimeSettingsSO sub-asset 経由で _settings を保持し
+            // 単一 SO で OscReceiverAdapterBinding + ArKitOscAdapterBinding が同時に保持・round-trip できる。
+            // task 8.7: OscReceiverAdapterBinding は OscRuntimeSettingsSO sub-asset 経由で _settings を保持し
             // round-trip させる新経路を使用する (旧 _endpoint / _port 直 SerializeField 経路は廃止済み)。
             var so = ScriptableObject.CreateInstance<OscArKitRoundTripTestProfileSO>();
 
@@ -143,7 +143,7 @@ namespace Hidano.FacialControl.Osc.Tests.EditMode.Adapters.AdapterBindings
             oscSettings.FromJson(
                 "{\"listenEndpoint\":\"127.0.0.1\",\"listenPort\":9001,\"stalenessSeconds\":0.5}");
 
-            var osc = new OscAdapterBinding { Slug = "osc-vrchat", Settings = oscSettings };
+            var osc = new OscReceiverAdapterBinding { Slug = "osc-vrchat", Settings = oscSettings };
             so.WritableAdapterBindings.Add(osc);
 
             string[] arkitNames = { "jawOpen", "eyeBlinkLeft", "eyeBlinkRight" };
@@ -167,12 +167,12 @@ namespace Hidano.FacialControl.Osc.Tests.EditMode.Adapters.AdapterBindings
             Assert.That(loaded.AdapterBindings.Count, Is.EqualTo(2),
                 "Osc + ArKit の 2 binding が round-trip するべき。");
 
-            Assert.That(loaded.AdapterBindings[0], Is.InstanceOf<OscAdapterBinding>(),
-                "Index 0 は OscAdapterBinding の concrete type を保持するべき。");
+            Assert.That(loaded.AdapterBindings[0], Is.InstanceOf<OscReceiverAdapterBinding>(),
+                "Index 0 は OscReceiverAdapterBinding の concrete type を保持するべき。");
             Assert.That(loaded.AdapterBindings[1], Is.InstanceOf<ArKitOscAdapterBinding>(),
                 "Index 1 は ArKitOscAdapterBinding の concrete type を保持するべき。");
 
-            var loadedOsc = (OscAdapterBinding)loaded.AdapterBindings[0];
+            var loadedOsc = (OscReceiverAdapterBinding)loaded.AdapterBindings[0];
             Assert.That(loadedOsc.Slug, Is.EqualTo("osc-vrchat"));
             Assert.That(loadedOsc.Settings, Is.Not.Null,
                 "OscRuntimeSettingsSO sub-asset 参照が round-trip するべき。");

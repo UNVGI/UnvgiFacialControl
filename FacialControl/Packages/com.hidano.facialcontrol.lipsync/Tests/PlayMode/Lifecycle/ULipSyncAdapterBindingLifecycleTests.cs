@@ -21,6 +21,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
     public class ULipSyncAdapterBindingLifecycleTests
     {
         private const string Slug = "ulipsync";
+        private const string OverlayASlug = "ulipsync:a";
         private const string MicDeviceName = "Unit Test Mic";
         private const string MissingDeviceName = "Missing Mic";
         private const string BlendShapeName = "Mouth_A";
@@ -111,9 +112,10 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
             Assert.That(microphone.index, Is.EqualTo(0),
                 "Fake enumerator で解決した Mic の列挙 index が uLipSyncMicrophone に反映されるべき。");
 
-            Assert.That(_registry.TryResolve(Slug, out IInputSource source), Is.True,
-                "OnStart 成功後は Slug をキーに LipSyncInputSource が登録されるべき。");
-            Assert.That(source, Is.InstanceOf<LipSyncInputSource>());
+            Assert.That(_registry.TryResolve(OverlayASlug, out IInputSource source), Is.True,
+                "OnStart 成功後は phoneme overlay source が登録されるべき。");
+            Assert.That(source, Is.InstanceOf<LipSyncPhonemeOverlayInputSource>());
+            Assert.That(_registry.TryResolve(Slug, out _), Is.False);
         }
 
         [Test]
@@ -163,7 +165,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
             Assert.That(audioSource, Is.Not.Null);
             Assert.That(analyzer, Is.Not.Null);
             Assert.That(microphone, Is.Not.Null);
-            Assert.That(_registry.TryResolve(Slug, out _), Is.True);
+            Assert.That(_registry.TryResolve(OverlayASlug, out _), Is.True);
 
             _binding.Dispose();
             _bindingStarted = false;
@@ -172,7 +174,6 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
 
             Assert.That(_binding.IsStarted, Is.False);
             Assert.That(_binding.Provider, Is.Null);
-            Assert.That(_binding.InputSource, Is.Null);
             Assert.That(_binding.Analyzer, Is.Null);
             Assert.That(audioSource == null, Is.True);
             Assert.That(analyzer == null, Is.True);
@@ -180,9 +181,9 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
             Assert.That(_hostGameObject.GetComponent<AudioSource>(), Is.Null);
             Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSync>(), Is.Null);
             Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncMicrophone>(), Is.Null);
-            Assert.That(_registry.TryResolve(Slug, out var removed), Is.False);
+            Assert.That(_registry.TryResolve(OverlayASlug, out var removed), Is.False);
             Assert.That(removed, Is.Null);
-            CollectionAssert.DoesNotContain(_registry.RegisteredIds, Slug);
+            CollectionAssert.DoesNotContain(_registry.RegisteredIds, OverlayASlug);
         }
 
         [Test]
@@ -196,7 +197,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
 
             var analyzer = _binding.Analyzer;
             var provider = _binding.Provider;
-            var inputSource = _binding.InputSource;
+            Assert.That(_registry.TryResolve(OverlayASlug, out IInputSource inputSource), Is.True);
 
             _binding.OnFixedTick(0.02f);
             _binding.OnFixedTick(0.02f);
@@ -204,8 +205,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
             Assert.That(_binding.IsStarted, Is.True);
             Assert.That(_binding.Analyzer, Is.SameAs(analyzer));
             Assert.That(_binding.Provider, Is.SameAs(provider));
-            Assert.That(_binding.InputSource, Is.SameAs(inputSource));
-            Assert.That(_registry.TryResolve(Slug, out IInputSource resolved), Is.True);
+            Assert.That(_registry.TryResolve(OverlayASlug, out IInputSource resolved), Is.True);
             Assert.That(resolved, Is.SameAs(inputSource));
         }
 
@@ -222,15 +222,14 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
 
             Assert.That(_binding.IsStarted, Is.False);
             Assert.That(_binding.Provider, Is.Null);
-            Assert.That(_binding.InputSource, Is.Null);
             Assert.That(_binding.Analyzer, Is.Null);
             Assert.That(_hostGameObject.GetComponent<AudioSource>(), Is.Null);
             Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSync>(), Is.Null);
             Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncMicrophone>(), Is.Null);
             Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncAsioInput>(), Is.Null);
-            Assert.That(_registry.TryResolve(Slug, out var source), Is.False);
+            Assert.That(_registry.TryResolve(OverlayASlug, out var source), Is.False);
             Assert.That(source, Is.Null);
-            CollectionAssert.DoesNotContain(_registry.RegisteredIds, Slug);
+            CollectionAssert.DoesNotContain(_registry.RegisteredIds, OverlayASlug);
         }
 
         [Test]
@@ -244,7 +243,6 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
 
             Assert.That(_binding.IsStarted, Is.True);
             Assert.That(_binding.Provider, Is.Not.Null);
-            Assert.That(_binding.InputSource, Is.Not.Null);
             Assert.That(_binding.Analyzer, Is.Not.Null);
             Assert.That(_binding.Analyzer.profile, Is.Not.Null);
             Assert.That(_binding.Analyzer.profile.name, Is.EqualTo("Default uLipSync Profile"));
@@ -252,8 +250,8 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
             Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSync>(), Is.Not.Null);
             Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncMicrophone>(), Is.Not.Null);
             Assert.That(_hostGameObject.GetComponent<uLipSync.uLipSyncAsioInput>(), Is.Null);
-            Assert.That(_registry.TryResolve(Slug, out IInputSource source), Is.True);
-            Assert.That(source, Is.SameAs(_binding.InputSource));
+            Assert.That(_registry.TryResolve(OverlayASlug, out IInputSource source), Is.True);
+            Assert.That(source, Is.InstanceOf<LipSyncPhonemeOverlayInputSource>());
         }
 
         [Test]
@@ -270,15 +268,14 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
 
             LogAssert.Expect(
                 LogType.Error,
-                new Regex("ULipSyncAdapterBinding.*ulipsync.*already registered"));
+                new Regex("ULipSyncAdapterBinding.*ulipsync:a.*already registered"));
             duplicate.OnStart(in ctx);
 
             Assert.That(duplicate.IsStarted, Is.False);
             Assert.That(duplicate.Provider, Is.Null);
-            Assert.That(duplicate.InputSource, Is.Null);
             Assert.That(_hostGameObject.GetComponents<uLipSync.uLipSync>().Length, Is.EqualTo(analyzerCountBefore));
-            Assert.That(_registry.TryResolve(Slug, out IInputSource source), Is.True);
-            Assert.That(source, Is.SameAs(_binding.InputSource));
+            Assert.That(_registry.TryResolve(OverlayASlug, out IInputSource source), Is.True);
+            Assert.That(source, Is.InstanceOf<LipSyncPhonemeOverlayInputSource>());
         }
 
         private ULipSyncAdapterBinding CreateBinding()
@@ -313,7 +310,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
         private AdapterBuildContext CreateContext()
         {
             return new AdapterBuildContext(
-                profile: new FacialProfile("1.0"),
+                profile: new FacialProfile("1.0", slots: new[] { PhonemeOverlaySlots.A }),
                 blendShapeNames: new List<string> { BlendShapeName },
                 inputSourceRegistry: _registry,
                 facialOutputBus: new FacialOutputBus(),

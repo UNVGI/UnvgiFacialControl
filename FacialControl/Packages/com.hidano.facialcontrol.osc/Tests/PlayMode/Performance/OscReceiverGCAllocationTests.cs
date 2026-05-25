@@ -25,7 +25,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
         private static int s_portCounter;
 
         private GameObject _host;
-        private OscAdapterBinding _binding;
+        private OscReceiverAdapterBinding _binding;
 
         [TearDown]
         public void TearDown()
@@ -110,7 +110,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
             bool includeGaze)
         {
             _host = new GameObject("OscReceiverGCAllocationTests");
-            _binding = new OscAdapterBinding
+            _binding = new OscReceiverAdapterBinding
             {
                 Slug = Slug,
                 Endpoint = Endpoint,

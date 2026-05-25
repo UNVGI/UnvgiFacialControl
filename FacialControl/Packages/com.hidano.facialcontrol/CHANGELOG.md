@@ -33,7 +33,7 @@
 - `Hidano.FacialControl.Adapters.Playable.IFacialControllerExtension` — MonoBehaviour Extension 経路の I/F。`AdapterBindingBase` 派生 + `[FacialAdapterBinding]` 属性 + per-FC VContainer LifetimeScope に置換（Req 6.8）
 - `Hidano.FacialControl.Adapters.InputSources.InputSourceFactory` — `(id, options)` ディスパッチ + JSON deserialize + reserved id チェック。slug-keyed の `Hidano.FacialControl.Adapters.InputSources.InputSourceRegistry` に置換し、責務を `Register(slug, source)` / `TryResolve("<slug>" or "<slug>:<sub>")` に縮小（Req 6.10）
 - `Hidano.FacialControl.Domain.Models.InputSourceId.ReservedIds` / `IsReservedId` / `IsReserved` — reserved id 体系。`AdapterSlug` 値オブジェクト + `[FacialAdapterBinding(displayName: ...)]` 由来の slug 命名（kebab-case）に置換（Req 12.5, 12.6, D-13）
-- `com.hidano.facialcontrol.osc` の `OscFacialControllerExtension` / `OscRegistration` — `OscAdapterBinding` / `ArKitOscAdapterBinding` に置換（Req 6.9）
+- `com.hidano.facialcontrol.osc` の `OscFacialControllerExtension` / `OscRegistration` — `OscReceiverAdapterBinding` / `ArKitOscAdapterBinding` に置換（Req 6.9）
 - `com.hidano.facialcontrol.inputsystem` の `FacialCharacterSO` (派生 SO) / `FacialCharacterInputExtension` / `InputFacialControllerExtension` / `InputRegistration` / `FacialCharacterSOInspector` / `FacialCharacterSOAutoExporter` — `FacialCharacterProfileSO` の `[SerializeReference] List<AdapterBindingBase>` + `InputSystemAdapterBinding` + `InputSystemAdapterBindingDrawer` に置換（Req 6.4, 6.8）
 
 #### 追加型一覧
@@ -67,7 +67,7 @@
 - 旧 reserved id（`controller-expr` / `keyboard-expr` / `osc` / `lipsync` / `input` 等）は **すべて廃止**
 - 新形式は `<slug>` または `<slug>:<sub>` の 2 種類
   - `<slug>`: binding 1 個が登録する primary `IInputSource`（slug は当該 binding の `Slug` field）
-  - `<slug>:<sub>`: binding が複数 `IInputSource` を register する場合の sub-id（例: `OscAdapterBinding` の `osc:secondary`）
+  - `<slug>:<sub>`: binding が複数 `IInputSource` を register する場合の sub-id（例: `OscReceiverAdapterBinding` の `osc:secondary`）
 - slug は Inspector で binding を Add した瞬間に `displayName.ToLowerInvariant()` の kebab-case 自動採番（例: `"OSC"` → `"osc"`、`"Input System"` → `"input-system"`、`"ARKit / PerfectSync"` → `"arkit-perfectsync"`）。手動編集も可能
 - 同一 SO 内の slug 重複時は Inspector が error indicator + summary banner を表示し、`AssetModificationProcessor` が save をブロックする
 - 第三者拡張は `x-` プレフィックス推奨（既存 `[a-zA-Z0-9_.-]{1,64}` ルール継続）

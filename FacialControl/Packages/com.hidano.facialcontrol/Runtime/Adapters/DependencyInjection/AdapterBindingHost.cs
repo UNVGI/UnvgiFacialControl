@@ -94,6 +94,7 @@ namespace Hidano.FacialControl.Adapters.DependencyInjection
             _started = true;
             try
             {
+                PhonemeOverlayInputSourceRegistration.RegisterDeclaredSlots(in _buildContext);
                 _binding.OnStart(in _buildContext);
             }
             catch (Exception ex)

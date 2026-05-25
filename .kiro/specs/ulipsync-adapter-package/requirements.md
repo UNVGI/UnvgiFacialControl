@@ -15,7 +15,7 @@ com.hidano.facialcontrol.lipsync (uLipSync 連携アダプタパッケージ)
 コンストラクタオーバーロード、`Hidano.FacialControl.Domain.Services.LayerInputSourceAggregator`)
 を公開しているため、本パッケージは **既存契約を再定義せず、それを実装・利用する** 立場で
 uLipSync の解析結果 (`uLipSync.LipSyncInfo.phonemeRatios`) を BlendShape 値ベクトルへ
-マッピングし、`AdapterBindingBase` パターン (`OscAdapterBinding` を参考とする) に従って
+マッピングし、`AdapterBindingBase` パターン (`OscReceiverAdapterBinding` を参考とする) に従って
 Inspector から `FacialCharacterProfileSO._adapterBindings` に inline serialized 形式で
 追加できる形で配布する。
 
@@ -67,7 +67,7 @@ uLipSync の **Analyzer Profile** (`uLipSync.Profile`) のみ任意の `[Seriali
     登録も維持する）。
   - 任意 `uLipSync.Profile` 参照（未指定時はパッケージ同梱の `Runtime/Resources/` 配下の
     既定 Profile をフォールバック）。
-  - Editor PropertyDrawer（UI Toolkit 製。`OscAdapterBinding` Drawer と整合する見た目で
+  - Editor PropertyDrawer（UI Toolkit 製。`OscReceiverAdapterBinding` Drawer と整合する見た目で
     多態的エントリリスト・デバイス記述子ポップアップ・Analyzer Profile 参照を編集可能）。
   - `Samples~/MicLipSyncDemo`（必須。Mic 入力 + BlendShape 形式の音素エントリ）と、
     任意で `Samples~/AnimationClipLipSyncDemo`（混在エントリのデモ）。
@@ -99,7 +99,7 @@ uLipSync の **Analyzer Profile** (`uLipSync.Profile`) のみ任意の `[Seriali
     snapshot[i]` を音素ごとに加算」した値を出力し、無音時に総和が閾値未満となる契約を満たす。
   - `LayerInputSourceAggregator` の毎フレーム `IInputSource.TryWriteValues(Span<float>)` を
     呼び出すホットパス契約に追従し、provider・binding 側でヒープ確保を 0 byte に維持する。
-  - `OscAdapterBinding` (`com.hidano.facialcontrol.osc`) のライフサイクル
+  - `OscReceiverAdapterBinding` (`com.hidano.facialcontrol.osc`) のライフサイクル
     （`OnStart` で `AddComponent` ヘルパーを `ctx.HostGameObject` に追加し、`IInputSource`
     を `ctx.InputSourceRegistry` に登録、`OnFixedTick` でバッファ前進、`Dispose` で
     取り外しと登録解除）に準拠する。
@@ -165,7 +165,7 @@ uLipSync の **Analyzer Profile** (`uLipSync.Profile`) のみ任意の `[Seriali
 ### Requirement 3: 設定の inline serialization (No-New-SO 契約)
 
 **Objective:** Unity エンジニアとして、新規 ScriptableObject アセット（音素マップ SO 等）の
-作成・管理コストを増やさず、`OscAdapterBinding` と同じく `FacialCharacterProfileSO` の
+作成・管理コストを増やさず、`OscReceiverAdapterBinding` と同じく `FacialCharacterProfileSO` の
 `_adapterBindings` 配列に inline serialized されたバインディング 1 つだけで設定が完結する形を
 維持したい。
 
@@ -278,7 +278,7 @@ uLipSync の **Analyzer Profile** (`uLipSync.Profile`) のみ任意の `[Seriali
 6. If `OnStart` 中に Analyzer Profile を解決できない（参照未指定かつパッケージ同梱既定も
    読み込み失敗）、then the `ULipSyncAdapterBinding` shall `Debug.LogError` で原因を記録し、
    `AddComponent` の roll back と早期 return により破壊的副作用を残さず終了する。
-7. Where `OscAdapterBinding` のライフサイクル順序（`OnStart` → 各 Tick → `Dispose`）と
+7. Where `OscReceiverAdapterBinding` のライフサイクル順序（`OnStart` → 各 Tick → `Dispose`）と
    `IInputSource` 登録 API、the `ULipSyncAdapterBinding` shall 同一の呼び出し順・契約に
    準拠する。
 
@@ -401,7 +401,7 @@ GC スパイクで配信のフレーム落ちを起こしたくない。
 ### Requirement 12: Editor PropertyDrawer
 
 **Objective:** Unity エンジニアとして、Inspector で `ULipSyncAdapterBinding` を編集する際、
-`OscAdapterBinding` Drawer と同等の見た目・操作感で扱えるようにしたい。
+`OscReceiverAdapterBinding` Drawer と同等の見た目・操作感で扱えるようにしたい。
 
 #### Acceptance Criteria
 
@@ -420,7 +420,7 @@ GC スパイクで配信のフレーム落ちを起こしたくない。
 6. If a BlendShape 形式 entry's `blendShapeName` is empty、then the PropertyDrawer shall
    HelpBox に「BlendShape 名未設定」の警告を表示し、ランタイム前に修正を促す。
 7. The PropertyDrawer shall integrate with the same Drawer style conventions as the
-   `OscAdapterBindingDrawer`（折りたたみ挙動・Validation メッセージ表示・フィールド配置
+   `OscReceiverAdapterBindingDrawer`（折りたたみ挙動・Validation メッセージ表示・フィールド配置
    と整合）。
 
 ### Requirement 13: Samples~ パッケージング
@@ -453,7 +453,7 @@ GC スパイクで配信のフレーム落ちを起こしたくない。
 
 ### Requirement 14: テスト網羅 (TDD) と ドキュメント / 規約
 
-**Objective:** プロジェクト全体の TDD 厳守方針と命名規約・言語規約を維持し、`OscAdapterBinding`
+**Objective:** プロジェクト全体の TDD 厳守方針と命名規約・言語規約を維持し、`OscReceiverAdapterBinding`
 と同等のテスト面とドキュメント面を確保したい。
 
 #### Acceptance Criteria
@@ -473,7 +473,7 @@ GC スパイクで配信のフレーム落ちを起こしたくない。
    `Dispose` で取り外される）、(b) Play 中の hot-swap（Mic ↔ ASIO 双方向、ゼロ値 settle 含む）、
    (c) デバイス断 / エラー経路（解決不能 → エラーログ + silence + ゼロ値 settle）、
    (d) 10 体マルチキャラクター分離（同時 10 個の独立バインディングと個別デバイス選択）。
-3. The PlayMode test surface shall map 1-to-1 to `OscAdapterBindingTests` の対応する検証項目
+3. The PlayMode test surface shall map 1-to-1 to `OscReceiverAdapterBindingTests` の対応する検証項目
    （少なくともライフサイクル・Registry 操作・例外時の安全停止）。
 4. While CI runs tests、the ULipSync Adapter Package shall require EditMode と PlayMode
    両方のテストが失敗ゼロで完了することを必須要件とする。

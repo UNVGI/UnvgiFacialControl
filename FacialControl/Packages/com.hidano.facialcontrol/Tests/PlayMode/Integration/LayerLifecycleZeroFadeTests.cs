@@ -73,8 +73,11 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             var tickHost = _host.AddComponent<LayerUseCaseHostBehaviour>();
             tickHost.Bind(_useCase);
 
-            // ---- Activate: 数フレームで target = 1.0 に到達することを実フレームで確認 ----
+            // ---- Activate: 実時間 + フレームで target = 1.0 に到達することを確認 ----
+            // batchmode では yield return null だけだと Time.deltaTime が安定して累積しないため、
+            // WaitForSeconds で実時間を進めたうえで、最大 maxTransitionFrames まで残りフレームで polling する。
             _expressionUseCase.Activate(profile.Expressions.Span[0]);
+            yield return new WaitForSeconds(0.1f);
             for (int i = 0; i < maxTransitionFrames; i++)
             {
                 var output = _useCase.BlendedOutputSpan;
@@ -88,11 +91,12 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             float[] activatedOutput = _useCase.GetBlendedOutput();
             Assert.AreEqual(1.0f, activatedOutput[0], 0.01f,
-                "実フレーム経過 (10 frames) で target = 1.0 に達していない。");
+                "実時間経過後も target = 1.0 に達していない (transitionDuration=0.05s)。");
             Assert.AreEqual(0.0f, activatedOutput[1], 0.01f);
 
-            // ---- Deactivate: 数フレームで rest = 0.0 へ補間されることを実フレームで確認 ----
+            // ---- Deactivate: 実時間 + フレームで rest = 0.0 へ補間されることを確認 ----
             _expressionUseCase.Deactivate(profile.Expressions.Span[0]);
+            yield return new WaitForSeconds(0.1f);
             for (int i = 0; i < maxTransitionFrames; i++)
             {
                 var output = _useCase.BlendedOutputSpan;
@@ -106,7 +110,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             float[] deactivatedOutput = _useCase.GetBlendedOutput();
             Assert.AreEqual(0.0f, deactivatedOutput[0], 0.01f,
-                "Deactivate 後、実フレーム経過でゼロに戻っていない (latched バグの再発)。");
+                "Deactivate 後、実時間経過でゼロに戻っていない (latched バグの再発)。");
             Assert.AreEqual(0.0f, deactivatedOutput[1], 0.01f);
         }
 

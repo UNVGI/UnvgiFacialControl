@@ -155,8 +155,8 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
 
         private bool EnsureDefaultLayerForBinding(IAdapterBindingDefaultLayer defaultLayer)
         {
-            string sourceId = defaultLayer.DefaultLayerInputSourceId;
-            if (string.IsNullOrEmpty(sourceId)) return false;
+            var defaultInputSources = ResolveDefaultInputSources(defaultLayer);
+            if (defaultInputSources.Count == 0) return false;
 
             var so = _listProperty.serializedObject;
             so.Update();
@@ -166,7 +166,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
             // 既に同じ入力源 ID を持つ Layer があれば何もしない (重複追加防止)。
             for (int i = 0; i < layersProperty.arraySize; i++)
             {
-                if (LayerContainsInputSourceId(layersProperty.GetArrayElementAtIndex(i), sourceId))
+                if (LayerContainsAnyInputSourceId(layersProperty.GetArrayElementAtIndex(i), defaultInputSources))
                 {
                     return false;
                 }
@@ -177,7 +177,7 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
             var layerProp = layersProperty.GetArrayElementAtIndex(newIndex);
 
             string desiredName = string.IsNullOrEmpty(defaultLayer.DefaultLayerName)
-                ? sourceId
+                ? defaultInputSources[0].id
                 : defaultLayer.DefaultLayerName;
             string uniqueName = ResolveUniqueLayerName(layersProperty, desiredName, excludeIndex: newIndex);
 
@@ -194,14 +194,17 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
             if (inputSourcesProp != null && inputSourcesProp.isArray)
             {
                 inputSourcesProp.ClearArray();
-                inputSourcesProp.InsertArrayElementAtIndex(0);
-                var declProp = inputSourcesProp.GetArrayElementAtIndex(0);
-                var idProp = declProp.FindPropertyRelative("id");
-                if (idProp != null) idProp.stringValue = sourceId;
-                var weightProp = declProp.FindPropertyRelative("weight");
-                if (weightProp != null) weightProp.floatValue = 1f;
-                var optionsProp = declProp.FindPropertyRelative("optionsJson");
-                if (optionsProp != null) optionsProp.stringValue = string.Empty;
+                for (int i = 0; i < defaultInputSources.Count; i++)
+                {
+                    inputSourcesProp.InsertArrayElementAtIndex(i);
+                    var declProp = inputSourcesProp.GetArrayElementAtIndex(i);
+                    var idProp = declProp.FindPropertyRelative("id");
+                    if (idProp != null) idProp.stringValue = defaultInputSources[i].id;
+                    var weightProp = declProp.FindPropertyRelative("weight");
+                    if (weightProp != null) weightProp.floatValue = defaultInputSources[i].weight;
+                    var optionsProp = declProp.FindPropertyRelative("optionsJson");
+                    if (optionsProp != null) optionsProp.stringValue = string.Empty;
+                }
             }
 
             // layerOverrideMask は空 (= 何も上書きしない) を初期値にする。
@@ -213,6 +216,47 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
 
             so.ApplyModifiedProperties();
             return true;
+        }
+
+        private static List<(string id, float weight)> ResolveDefaultInputSources(
+            IAdapterBindingDefaultLayer defaultLayer)
+        {
+            var result = new List<(string id, float weight)>();
+            if (defaultLayer is IAdapterBindingDefaultLayerInputs multipleInputs)
+            {
+                var sources = multipleInputs.GetDefaultLayerInputSources(defaultLayer.DefaultLayerName);
+                if (sources != null)
+                {
+                    foreach (var source in sources)
+                    {
+                        if (string.IsNullOrEmpty(source.id)) continue;
+                        result.Add((source.id, source.weight));
+                    }
+                }
+                return result;
+            }
+
+            string sourceId = defaultLayer.DefaultLayerInputSourceId;
+            if (!string.IsNullOrEmpty(sourceId))
+            {
+                result.Add((sourceId, 1f));
+            }
+            return result;
+        }
+
+        private static bool LayerContainsAnyInputSourceId(
+            SerializedProperty layerProp,
+            IReadOnlyList<(string id, float weight)> inputSources)
+        {
+            if (inputSources == null || inputSources.Count == 0) return false;
+            for (int i = 0; i < inputSources.Count; i++)
+            {
+                if (LayerContainsInputSourceId(layerProp, inputSources[i].id))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static bool LayerContainsInputSourceId(SerializedProperty layerProp, string inputSourceId)

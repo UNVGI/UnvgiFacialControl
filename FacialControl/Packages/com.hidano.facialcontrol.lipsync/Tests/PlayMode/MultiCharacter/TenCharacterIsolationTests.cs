@@ -24,6 +24,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.MultiCharacter
         private const int SwapCharacterIndex = 4;
         private const double FrameBudgetMs = 16.6;
         private const string Slug = "ulipsync";
+        private const string OverlayASlug = "ulipsync:a";
         private const string BlendShapeName = "Mouth_A";
         private const string PhonemeId = "A";
 
@@ -90,12 +91,11 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.MultiCharacter
                 Assert.That(character.Binding.IsStarted, Is.True,
                     $"Character {i} の ULipSyncAdapterBinding は起動済みであるべき。");
                 Assert.That(character.Binding.Provider, Is.Not.Null);
-                Assert.That(character.Binding.InputSource, Is.Not.Null);
                 Assert.That(character.Binding.Analyzer, Is.Not.Null);
                 Assert.That(character.HostGameObject.GetComponent<uLipSync.uLipSyncMicrophone>(), Is.Not.Null);
-                Assert.That(character.Registry.TryResolve(Slug, out IInputSource source), Is.True);
-                Assert.That(source, Is.SameAs(character.Binding.InputSource));
-                CollectionAssert.AreEqual(new[] { Slug }, character.Registry.RegisteredIds);
+                Assert.That(character.Registry.TryResolve(OverlayASlug, out IInputSource source), Is.True);
+                Assert.That(source, Is.InstanceOf<LipSyncPhonemeOverlayInputSource>());
+                CollectionAssert.AreEqual(new[] { OverlayASlug }, character.Registry.RegisteredIds);
             }
         }
 
@@ -107,7 +107,8 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.MultiCharacter
                 character.EmitPhonemeFrame();
 
                 var output = new float[] { -1f };
-                Assert.That(character.Binding.InputSource.TryWriteValues(output), Is.False,
+                IInputSource inputSource = ResolveOverlaySource(character);
+                Assert.That(inputSource.TryWriteValues(output), Is.False,
                     $"Character {i} の初回読み出しは OnStart の zero settle で無音扱いになるべき。");
                 Assert.That(output[0], Is.EqualTo(-1f),
                     $"Character {i} の無音フレームでは output が変更されないべき。");
@@ -121,10 +122,10 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.MultiCharacter
             for (int i = 0; i < _characters.Length; i++)
             {
                 CharacterRuntime character = _characters[i];
-                Assert.That(character.Registry.TryResolve(Slug, out IInputSource registrySource), Is.True);
+                Assert.That(character.Registry.TryResolve(OverlayASlug, out IInputSource registrySource), Is.True);
 
                 character.ProviderBeforeSwap = character.Binding.Provider;
-                character.InputSourceBeforeSwap = character.Binding.InputSource;
+                character.InputSourceBeforeSwap = registrySource;
                 character.RegistrySourceBeforeSwap = registrySource;
                 character.AnalyzerBeforeSwap = character.Binding.Analyzer;
             }
@@ -143,11 +144,9 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.MultiCharacter
         {
             Assert.That(target.Binding.Provider, Is.SameAs(target.ProviderBeforeSwap),
                 "SwapDevice は provider インスタンスを再生成しないべき。");
-            Assert.That(target.Binding.InputSource, Is.SameAs(target.InputSourceBeforeSwap),
-                "SwapDevice は LipSyncInputSource 登録を維持するべき。");
             Assert.That(target.Binding.Analyzer, Is.SameAs(target.AnalyzerBeforeSwap),
                 "SwapDevice は uLipSync analyzer を維持するべき。");
-            Assert.That(target.Registry.TryResolve(Slug, out IInputSource resolved), Is.True);
+            Assert.That(target.Registry.TryResolve(OverlayASlug, out IInputSource resolved), Is.True);
             Assert.That(resolved, Is.SameAs(target.RegistrySourceBeforeSwap));
 
             var microphones = target.HostGameObject.GetComponents<uLipSync.uLipSyncMicrophone>();
@@ -168,14 +167,12 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.MultiCharacter
                 CharacterRuntime character = _characters[i];
                 Assert.That(character.Binding.Provider, Is.SameAs(character.ProviderBeforeSwap),
                     $"Character {i} の Provider は他 character の swap で差し替わらないべき。");
-                Assert.That(character.Binding.InputSource, Is.SameAs(character.InputSourceBeforeSwap),
-                    $"Character {i} の LipSyncInputSource は他 character の swap で差し替わらないべき。");
                 Assert.That(character.Binding.Analyzer, Is.SameAs(character.AnalyzerBeforeSwap),
                     $"Character {i} の analyzer は他 character の swap で差し替わらないべき。");
-                Assert.That(character.Registry.TryResolve(Slug, out IInputSource resolved), Is.True);
+                Assert.That(character.Registry.TryResolve(OverlayASlug, out IInputSource resolved), Is.True);
                 Assert.That(resolved, Is.SameAs(character.RegistrySourceBeforeSwap),
                     $"Character {i} の registry 登録は他 character の swap 後も同じ source を解決するべき。");
-                CollectionAssert.AreEqual(new[] { Slug }, character.Registry.RegisteredIds);
+                CollectionAssert.AreEqual(new[] { OverlayASlug }, character.Registry.RegisteredIds);
             }
         }
 
@@ -199,10 +196,17 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.MultiCharacter
         {
             var output = new float[] { -1f };
 
-            Assert.That(character.Binding.InputSource.TryWriteValues(output), Is.True,
+            IInputSource inputSource = ResolveOverlaySource(character);
+            Assert.That(inputSource.TryWriteValues(output), Is.True,
                 $"Character {characterIndex} は {phase} 中も Provider 出力を継続するべき。");
             Assert.That(output[0], Is.EqualTo(ExpectedWeight(characterIndex)).Within(1e-6f),
                 $"Character {characterIndex} の出力値は {phase} 中も自身の phoneme entry に対応するべき。");
+        }
+
+        private static IInputSource ResolveOverlaySource(CharacterRuntime character)
+        {
+            Assert.That(character.Registry.TryResolve(OverlayASlug, out IInputSource source), Is.True);
+            return source;
         }
 
         private CharacterRuntime[] CreateCharacters(uLipSync.Profile profile)
@@ -252,7 +256,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.MultiCharacter
         private static AdapterBuildContext CreateContext(GameObject hostGameObject, InputSourceRegistry registry)
         {
             return new AdapterBuildContext(
-                profile: new FacialProfile("1.0"),
+                profile: new FacialProfile("1.0", slots: new[] { PhonemeOverlaySlots.A }),
                 blendShapeNames: new List<string> { BlendShapeName },
                 inputSourceRegistry: registry,
                 facialOutputBus: new FacialOutputBus(),
@@ -327,7 +331,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.MultiCharacter
             public string SwapDeviceName { get; }
             public bool IsStarted { get; set; }
             public ULipSyncProvider ProviderBeforeSwap { get; set; }
-            public LipSyncInputSource InputSourceBeforeSwap { get; set; }
+            public IInputSource InputSourceBeforeSwap { get; set; }
             public IInputSource RegistrySourceBeforeSwap { get; set; }
             public uLipSync.uLipSync AnalyzerBeforeSwap { get; set; }
 

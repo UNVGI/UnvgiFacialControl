@@ -120,6 +120,40 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         }
 
         [Test]
+        public void ExpressionPhonemeEntry_SerializedPropertyRoundTrip_PreservesCommonAndExpressionId()
+        {
+            var asset = ScriptableObject.CreateInstance<PhonemeEntryTestAsset>();
+            AssetDatabase.CreateAsset(asset, _assetPath);
+
+            using (var serialized = new SerializedObject(asset))
+            {
+                SetManagedReference(serialized, new ExpressionPhonemeEntry());
+
+                var entry = serialized.FindProperty(EntryFieldName);
+                entry.FindPropertyRelative(nameof(PhonemeEntryBase.PhonemeId)).stringValue = "I";
+                entry.FindPropertyRelative(nameof(PhonemeEntryBase.MaxWeight)).floatValue = 91.5f;
+                entry.FindPropertyRelative("_expressionId").stringValue = "mouth_i";
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            var loaded = SaveAndReload(asset);
+
+            Assert.That(loaded.Entry, Is.InstanceOf<ExpressionPhonemeEntry>());
+            var entryValue = (ExpressionPhonemeEntry)loaded.Entry;
+            Assert.That(entryValue.PhonemeId, Is.EqualTo("I"));
+            Assert.That(entryValue.MaxWeight, Is.EqualTo(91.5f).Within(1e-6f));
+            Assert.That(entryValue.ExpressionId, Is.EqualTo("mouth_i"));
+
+            using (var serialized = new SerializedObject(loaded))
+            {
+                var entry = serialized.FindProperty(EntryFieldName);
+                Assert.That(entry.propertyType, Is.EqualTo(SerializedPropertyType.ManagedReference));
+                Assert.That(entry.managedReferenceFullTypename,
+                    Does.Contain(typeof(ExpressionPhonemeEntry).FullName));
+            }
+        }
+
+        [Test]
         public void MaxWeight_SerializedProperty_PreservesZeroAndHundredPercentBoundaries()
         {
             var asset = ScriptableObject.CreateInstance<PhonemeEntryTestAsset>();

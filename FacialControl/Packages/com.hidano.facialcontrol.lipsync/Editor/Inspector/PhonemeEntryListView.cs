@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Editor.Common;
 using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
 using UnityEditor;
@@ -15,6 +16,7 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
         {
             BlendShape,
             AnimationClip,
+            Expression,
         }
 
         public const string RootClassName = "facial-control-lipsync-phoneme-entry-list-view";
@@ -23,19 +25,28 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
         public const string EntryTypeSelectorName = "ulipsync-phoneme-entry-type-selector";
         public const string BlendShapeWarningName = "ulipsync-phoneme-entry-blend-shape-warning";
         public const string AnimationClipWarningName = "ulipsync-phoneme-entry-animation-clip-warning";
+        public const string ExpressionDropdownName = "ulipsync-phoneme-entry-expression-dropdown";
+        public const string ExpressionTextFieldName = "ulipsync-phoneme-entry-expression-text-field";
+        public const string ExpressionWarningName = "ulipsync-phoneme-entry-expression-warning";
         public const string BlendShapeLabel = "BlendShape 形式";
         public const string AnimationClipLabel = "AnimationClip 形式";
+
+        public const string ExpressionLabel = "Expression 形式";
 
         private const string PhonemeEntriesFieldName = "_phonemeEntries";
         private const string PhonemeIdFieldName = nameof(PhonemeEntryBase.PhonemeId);
         private const string MaxWeightFieldName = nameof(PhonemeEntryBase.MaxWeight);
         private const string BlendShapeNameFieldName = nameof(BlendShapePhonemeEntry.BlendShapeName);
         private const string ClipFieldName = nameof(AnimationClipPhonemeEntry.Clip);
+        private const string ExpressionIdFieldName = "_expressionId";
+        private const string ExpressionUnassignedMessage =
+            "\u0045\u0078\u0070\u0072\u0065\u0073\u0073\u0069\u006f\u006e \u672a\u5272\u308a\u5f53\u3066\u3067\u3059\u3002\u30ea\u30c3\u30d7\u30b7\u30f3\u30af\u304c\u52d5\u4f5c\u3057\u307e\u305b\u3093";
 
         private static readonly List<string> EntryTypeChoices = new List<string>
         {
             BlendShapeLabel,
             AnimationClipLabel,
+            ExpressionLabel,
         };
 
         private static readonly List<string> PhonemeIdChoices = new List<string>
@@ -220,6 +231,10 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
                 new GUIContent(AnimationClipLabel),
                 false,
                 () => AddEntry(EntryKind.AnimationClip));
+            menu.AddItem(
+                new GUIContent(ExpressionLabel),
+                false,
+                () => AddEntry(EntryKind.Expression));
             menu.DropDown(anchor != null ? anchor.worldBound : _listView.worldBound);
         }
 
@@ -260,9 +275,13 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             {
                 AddBlendShapeFields(row, entryProperty);
             }
-            else
+            else if (kind == EntryKind.AnimationClip)
             {
                 AddAnimationClipFields(row, entryProperty);
+            }
+            else if (kind == EntryKind.Expression)
+            {
+                AddExpressionFields(row, entryProperty);
             }
         }
 
@@ -402,6 +421,136 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
         private static void ApplyAnimationClipWarningVisibility(HelpBox warning, UnityEngine.Object clip)
         {
             warning.style.display = clip == null ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        private static void AddExpressionFields(VisualElement row, SerializedProperty entryProperty)
+        {
+            SerializedProperty expressionIdProperty =
+                entryProperty.FindPropertyRelative(ExpressionIdFieldName);
+            if (expressionIdProperty == null)
+            {
+                row.Add(new Label($"<missing field: {ExpressionIdFieldName}>"));
+                return;
+            }
+
+            var warning = new HelpBox(ExpressionUnassignedMessage, HelpBoxMessageType.Warning)
+            {
+                name = ExpressionWarningName,
+            };
+            ApplyExpressionWarningVisibility(warning, expressionIdProperty.stringValue);
+
+            var choices = new List<ExpressionChoice>();
+            if (TryGetExpressionChoices(entryProperty.serializedObject, choices))
+            {
+                AddExpressionDropdown(row, expressionIdProperty, choices, warning);
+            }
+            else
+            {
+                var field = new TextField("Expression ID")
+                {
+                    name = ExpressionTextFieldName,
+                };
+                field.BindProperty(expressionIdProperty);
+                field.RegisterValueChangedCallback(evt =>
+                {
+                    ApplyExpressionWarningVisibility(warning, evt.newValue);
+                });
+                row.Add(field);
+            }
+
+            row.Add(warning);
+        }
+
+        private static void AddExpressionDropdown(
+            VisualElement row,
+            SerializedProperty expressionIdProperty,
+            List<ExpressionChoice> expressionChoices,
+            HelpBox warning)
+        {
+            string currentExpressionId = expressionIdProperty.stringValue ?? string.Empty;
+            var displayChoices = new List<string>(expressionChoices.Count + 1)
+            {
+                string.Empty,
+            };
+
+            string currentDisplay = string.Empty;
+            foreach (ExpressionChoice choice in expressionChoices)
+            {
+                displayChoices.Add(choice.DisplayName);
+                if (string.Equals(choice.Id, currentExpressionId, StringComparison.Ordinal))
+                {
+                    currentDisplay = choice.DisplayName;
+                }
+            }
+
+            var field = new DropdownField("Expression", displayChoices, currentDisplay)
+            {
+                name = ExpressionDropdownName,
+            };
+            field.RegisterValueChangedCallback(evt =>
+            {
+                SerializedObject serializedObject = expressionIdProperty.serializedObject;
+                serializedObject.Update();
+                string expressionId = FindExpressionIdByDisplayName(expressionChoices, evt.newValue);
+                expressionIdProperty.stringValue = expressionId;
+                serializedObject.ApplyModifiedProperties();
+                ApplyExpressionWarningVisibility(warning, expressionId);
+            });
+            row.Add(field);
+        }
+
+        private static bool TryGetExpressionChoices(
+            SerializedObject serializedObject,
+            List<ExpressionChoice> choices)
+        {
+            choices.Clear();
+            var profileSo = serializedObject.targetObject as FacialCharacterProfileSO;
+            if (profileSo == null || profileSo.Expressions == null || profileSo.Expressions.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (ExpressionSerializable expression in profileSo.Expressions)
+            {
+                if (expression == null || string.IsNullOrEmpty(expression.id))
+                {
+                    continue;
+                }
+
+                string displayName = string.IsNullOrEmpty(expression.name)
+                    ? expression.id
+                    : expression.name;
+                choices.Add(new ExpressionChoice(expression.id, $"{displayName} ({expression.id})"));
+            }
+
+            return choices.Count > 0;
+        }
+
+        private static string FindExpressionIdByDisplayName(
+            List<ExpressionChoice> choices,
+            string displayName)
+        {
+            if (string.IsNullOrEmpty(displayName))
+            {
+                return string.Empty;
+            }
+
+            foreach (ExpressionChoice choice in choices)
+            {
+                if (string.Equals(choice.DisplayName, displayName, StringComparison.Ordinal))
+                {
+                    return choice.Id;
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private static void ApplyExpressionWarningVisibility(HelpBox warning, string expressionIdValue)
+        {
+            warning.style.display = string.IsNullOrEmpty(expressionIdValue)
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
         }
 
         private static void AddTextField(
@@ -566,9 +715,15 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
 
         private static PhonemeEntryBase CreateEntry(EntryKind kind)
         {
-            return kind == EntryKind.AnimationClip
-                ? (PhonemeEntryBase)new AnimationClipPhonemeEntry()
-                : new BlendShapePhonemeEntry();
+            switch (kind)
+            {
+                case EntryKind.AnimationClip:
+                    return new AnimationClipPhonemeEntry();
+                case EntryKind.Expression:
+                    return new ExpressionPhonemeEntry();
+                default:
+                    return new BlendShapePhonemeEntry();
+            }
         }
 
         private static void CopyCommonFields(PhonemeEntryBase source, PhonemeEntryBase destination)
@@ -590,6 +745,11 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
                 return EntryKind.AnimationClip;
             }
 
+            if (value is ExpressionPhonemeEntry)
+            {
+                return EntryKind.Expression;
+            }
+
             if (value is BlendShapePhonemeEntry)
             {
                 return EntryKind.BlendShape;
@@ -601,16 +761,35 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
                 return EntryKind.AnimationClip;
             }
 
+            if (fullTypename.Contains(typeof(ExpressionPhonemeEntry).FullName))
+            {
+                return EntryKind.Expression;
+            }
+
             return EntryKind.BlendShape;
         }
 
         private static string ToLabel(EntryKind kind)
         {
-            return kind == EntryKind.AnimationClip ? AnimationClipLabel : BlendShapeLabel;
+            switch (kind)
+            {
+                case EntryKind.AnimationClip:
+                    return AnimationClipLabel;
+                case EntryKind.Expression:
+                    return ExpressionLabel;
+                default:
+                    return BlendShapeLabel;
+            }
         }
 
         private static bool TryParseKind(string label, out EntryKind kind)
         {
+            if (string.Equals(label, ExpressionLabel, StringComparison.Ordinal))
+            {
+                kind = EntryKind.Expression;
+                return true;
+            }
+
             if (string.Equals(label, AnimationClipLabel, StringComparison.Ordinal))
             {
                 kind = EntryKind.AnimationClip;
@@ -632,6 +811,18 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             warning.style.display = string.IsNullOrEmpty(blendShapeName)
                 ? DisplayStyle.Flex
                 : DisplayStyle.None;
+        }
+
+        private readonly struct ExpressionChoice
+        {
+            public ExpressionChoice(string id, string displayName)
+            {
+                Id = id;
+                DisplayName = displayName;
+            }
+
+            public string Id { get; }
+            public string DisplayName { get; }
         }
     }
 }

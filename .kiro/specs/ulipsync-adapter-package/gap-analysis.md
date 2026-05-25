@@ -17,17 +17,17 @@
 | Req | 区分 | 既存資産 / 必要なラッパー |
 |---|---|---|
 | 1. パッケージ構成と配布 | **完全新規** | 新パッケージ `com.hidano.facialcontrol.lipsync` を `FacialControl/Packages/` 配下に新設。既存 `com.hidano.facialcontrol.osc` / `com.hidano.facialcontrol.inputsystem` の package.json / asmdef レイアウトを雛形流用可。 |
-| 2. Prefab-Clean Contract | **部分流用** | `com.hidano.facialcontrol.inputsystem` の `InputSystemAdapterBinding` が `ctx.HostGameObject.AddComponent<ExpressionInputSourceAdapter>()` → `Dispose` で `Object.Destroy` する手順を完全踏襲可能。`com.hidano.facialcontrol.osc` の `OscAdapterBinding` も `OscReceiverHost` で同パターン (line 140 / 170)。 |
-| 3. Inline serialization (No-New-SO) | **部分流用** | `OscAdapterBinding` の `[SerializeField]` フィールド + `FacialCharacterProfileSO._adapterBindings` の inline `[SerializeReference]` パターンを踏襲。Analyzer Profile フォールバックは `Resources.Load` を新規実装。 |
+| 2. Prefab-Clean Contract | **部分流用** | `com.hidano.facialcontrol.inputsystem` の `InputSystemAdapterBinding` が `ctx.HostGameObject.AddComponent<ExpressionInputSourceAdapter>()` → `Dispose` で `Object.Destroy` する手順を完全踏襲可能。`com.hidano.facialcontrol.osc` の `OscReceiverAdapterBinding` も `OscReceiverHost` で同パターン (line 140 / 170)。 |
+| 3. Inline serialization (No-New-SO) | **部分流用** | `OscReceiverAdapterBinding` の `[SerializeField]` フィールド + `FacialCharacterProfileSO._adapterBindings` の inline `[SerializeReference]` パターンを踏襲。Analyzer Profile フォールバックは `Resources.Load` を新規実装。 |
 | 4. 多態的音素エントリ (BlendShape / AnimationClip) | **完全新規** | `[SerializeReference]` ベースの polymorphic list は `FacialCharacterProfileSO._adapterBindings` で前例があるが、**1 つのバインディング内で 2 種類の派生型を Inspector で混在編集する Drawer 例は未実装**。AnimationClip → time-0 スナップショット抽出は §3 参照。 |
 | 5. ULipSyncProvider と ILipSyncProvider 実装 | **完全新規** | コア側 `ILipSyncProvider` (`Domain/Interfaces/ILipSyncProvider.cs`) は契約のみ定義済み。`uLipSync.LipSyncInfo.phonemeRatios` (Dictionary<string,float>) を内部固定長バッファへ橋渡しする実装を新規作成する。`uLipSync.uLipSync.onLipSyncUpdate` イベント (LipSyncUpdateEvent : UnityEvent<LipSyncInfo>) を購読する。 |
-| 6. ULipSyncAdapterBinding ライフサイクル | **部分流用** | `OscAdapterBinding`（OnStart 雛形）と `InputSystemAdapterBinding`（複数 IInputSource 登録 + AddComponent + Dispose 取り外し）の両方をテンプレート化して使用可能。`AdapterSlug.TryParse` / `[FacialAdapterBinding(displayName: ...)]` 属性も既存。 |
+| 6. ULipSyncAdapterBinding ライフサイクル | **部分流用** | `OscReceiverAdapterBinding`（OnStart 雛形）と `InputSystemAdapterBinding`（複数 IInputSource 登録 + AddComponent + Dispose 取り外し）の両方をテンプレート化して使用可能。`AdapterSlug.TryParse` / `[FacialAdapterBinding(displayName: ...)]` 属性も既存。 |
 | 7. 入力デバイス自動判定 (Mic vs ASIO) | **完全新規** | `uLipSyncAsioInput.GetAsioDriverNames()` (instance method、§4 参照) と `UnityEngine.Microphone.devices` の組合せロジックは新規。disambiguatorIndex は新規概念で類似実装なし。 |
 | 8. ランタイムデバイス hot-swap | **完全新規** | コア側に類例なし。新規 public API として `ULipSyncAdapterBinding.SwapDevice(string deviceName, int disambiguatorIndex)` 等を追加。 |
 | 9. デバイス断 / 未接続時の挙動 | **部分流用** | `LipSyncInputSource` の SilenceThreshold (1e-4f) `false` 経路が「無音時 output 非変更 → Aggregator が Array.Clear で 0 化」を担保するため、provider に zero-output モードを実装するだけで成立する（§5 参照）。 |
 | 10. マルチキャラクター・複数バインディング | **完全流用** | `IInputSourceRegistry` の `AdapterSlug` キー名前空間化、`FacialCharacterProfileSO._adapterBindings` の per-instance 保持は既に分離設計。binding 内で静的状態を持たない原則を守るだけで成立。 |
 | 11. GC フリー / 性能契約 | **部分流用** | `LipSyncInputSource` 内部 `_scratch` 1 度だけ確保パターンを provider 側でも踏襲。`LayerInputSourceAggregator` の per-frame 0-alloc 設計に準拠。テスト基盤は §7 参照。**懸念**: `uLipSync.uLipSync` 本体は内部 `Dictionary<string, float> _ratios` を毎フレーム `Clear()` してから値を入れ直す（uLipSync.cs:237-247）。これは uLipSync 側の責務で本パッケージのホットパスとは独立だが、provider が `LipSyncInfo.phonemeRatios` を辞書 lookup する経路で string→float Dictionary 参照が発生するため、**インデックス化キャッシュ**を介する必要あり。 |
-| 12. Editor PropertyDrawer | **部分流用** | `OscAdapterBindingDrawer` (UI Toolkit, `CreatePropertyGUI` ベース、`PropertyField` 並べ) を style ベースで踏襲可。ただし `[SerializeReference]` 多態リスト＋型セレクタ＋追加/削除/並替の Drawer は既存になく新規実装（§6 参照）。 |
+| 12. Editor PropertyDrawer | **部分流用** | `OscReceiverAdapterBindingDrawer` (UI Toolkit, `CreatePropertyGUI` ベース、`PropertyField` 並べ) を style ベースで踏襲可。ただし `[SerializeReference]` 多態リスト＋型セレクタ＋追加/削除/並替の Drawer は既存になく新規実装（§6 参照）。 |
 | 13. Samples~ パッケージング | **完全流用** | 既存 `com.hidano.facialcontrol.inputsystem` の `MultiSourceBlendDemo` と `Assets/Samples/` 二重管理ルール（CLAUDE.md / structure.md 既定）をそのまま適用。 |
 | 14. テスト網羅 (TDD) と ドキュメント / 規約 | **部分流用** | テスト命名規約 / EditMode・PlayMode 配置・Tests/Shared フォルダ構成は project-wide 既定。`Tests/PlayMode/Performance/GCAllocationTests.cs`、`SetWeightZeroAllocationTests.cs` 等の `GC.GetTotalMemory` 差分パターンが既存（§7 参照）。命名規約 / 4 スペース / 日本語コメント は既定通り。 |
 
@@ -48,9 +48,9 @@
   - `ILipSyncProvider LipSyncProvider`（**任意（null 可）**）
 - 既存 `LipSyncProvider` field の使い方注意: 本パッケージは binding 自身が provider を構築し `IInputSourceRegistry` に `LipSyncInputSource` を登録するため、`ctx.LipSyncProvider` 経由ではなく自前で provider を抱える経路を取る（spec の Adjacent expectations と整合）。`ctx.LipSyncProvider` を上書きする経路はコンストラクタで完結しているため不可—これは binding 自身が provider を保持して `LipSyncInputSource` を構築すれば問題ない。
 
-### `OscAdapterBinding.OnStart` パターンの再現可能性
+### `OscReceiverAdapterBinding.OnStart` パターンの再現可能性
 
-`OscAdapterBinding.OnStart` (lines 111-147) は以下手順で構成され、`ULipSyncAdapterBinding` でも同一形式で再現可能（コア改変なし）:
+`OscReceiverAdapterBinding.OnStart` (lines 111-147) は以下手順で構成され、`ULipSyncAdapterBinding` でも同一形式で再現可能（コア改変なし）:
 1. `_started` ガード → 二重 OnStart 防止
 2. `ctx.HostGameObject == null` ガード → LogError + 早期 return
 3. mappings 未設定ガード → LogWarning + 早期 return
@@ -205,9 +205,9 @@ if (_zeroOutputRequested)
 
 ### 既存 OSC binding Drawer
 
-- 場所: `FacialControl/Packages/com.hidano.facialcontrol.osc/Editor/AdapterBindings/OscAdapterBindingDrawer.cs`
+- 場所: `FacialControl/Packages/com.hidano.facialcontrol.osc/Editor/AdapterBindings/OscReceiverAdapterBindingDrawer.cs`
 - 形式: **UI Toolkit**（`CreatePropertyGUI` override、`PropertyField` を `VisualElement` root へ Add）。`OnGUI` は使わない（Req 12.2 と整合）。
-- 構造: `[CustomPropertyDrawer(typeof(OscAdapterBinding))]` 属性、フィールド名 `Slug` / `_endpoint` / `_port` / `_stalenessSeconds` を `FindPropertyRelative` で取得し `PropertyField` でラップ。
+- 構造: `[CustomPropertyDrawer(typeof(OscReceiverAdapterBinding))]` 属性、フィールド名 `Slug` / `_endpoint` / `_port` / `_stalenessSeconds` を `FindPropertyRelative` で取得し `PropertyField` でラップ。
 - 同等パターンを `ULipSyncAdapterBindingDrawer` で踏襲可能（**フラットフィールド部分は完全に流用形**）。
 
 その他参考:

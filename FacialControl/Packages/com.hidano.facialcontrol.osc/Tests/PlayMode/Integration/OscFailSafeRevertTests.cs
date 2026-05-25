@@ -24,7 +24,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         private static int s_portCounter;
 
         private GameObject _host;
-        private OscAdapterBinding _binding;
+        private OscReceiverAdapterBinding _binding;
 
         [TearDown]
         public void TearDown()
@@ -88,9 +88,9 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             AssertGaze(registry, -0.12f, 0.63f);
         }
 
-        private static OscAdapterBinding CreateBlendShapeReceiver()
+        private static OscReceiverAdapterBinding CreateBlendShapeReceiver()
         {
-            var binding = new OscAdapterBinding
+            var binding = new OscReceiverAdapterBinding
             {
                 Slug = "osc-failsafe-blend",
                 Port = AllocatePort(),
@@ -111,9 +111,9 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             return binding;
         }
 
-        private static OscAdapterBinding CreateGazeReceiver()
+        private static OscReceiverAdapterBinding CreateGazeReceiver()
         {
-            return new OscAdapterBinding
+            return new OscReceiverAdapterBinding
             {
                 Slug = "osc-failsafe-gaze",
                 Port = AllocatePort(),

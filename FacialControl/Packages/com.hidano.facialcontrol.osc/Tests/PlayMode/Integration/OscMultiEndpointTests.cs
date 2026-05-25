@@ -65,8 +65,8 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             var firstRegistry = new InputSourceRegistry();
             var secondRegistry = new InputSourceRegistry();
 
-            OscAdapterBinding firstReceiver = CreateReceiver("osc-receiver-a", firstPort);
-            OscAdapterBinding secondReceiver = CreateReceiver("osc-receiver-b", secondPort);
+            OscReceiverAdapterBinding firstReceiver = CreateReceiver("osc-receiver-a", firstPort);
+            OscReceiverAdapterBinding secondReceiver = CreateReceiver("osc-receiver-b", secondPort);
             OscSenderAdapterBinding sender = CreateSender(firstPort, secondPort);
 
             StartBinding(
@@ -121,9 +121,9 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             Assert.That(bothEndpointsReached, Is.True);
         }
 
-        private static OscAdapterBinding CreateReceiver(string slug, int port)
+        private static OscReceiverAdapterBinding CreateReceiver(string slug, int port)
         {
-            return new OscAdapterBinding
+            return new OscReceiverAdapterBinding
             {
                 Slug = slug,
                 Endpoint = Endpoint,
@@ -205,7 +205,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         }
 
         private static bool TryReadReceiver(
-            OscAdapterBinding receiver,
+            OscReceiverAdapterBinding receiver,
             InputSourceRegistry registry,
             string gazeSourceId)
         {

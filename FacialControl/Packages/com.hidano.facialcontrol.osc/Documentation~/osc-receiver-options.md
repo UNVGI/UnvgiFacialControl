@@ -1,11 +1,11 @@
 # OscReceiverOptions JSON スキーマ
 
-`OscReceiverOptionsDto` は `OscAdapterBinding` の listen endpoint、mode 別 mapping、staleness、フェイルセーフ、heartbeat 整合性検査、bundle 解釈を保存する JSON DTO です。Unity の `JsonUtility` 互換 DTO として扱うため、未知キーは無視され、欠落または不正な値は DTO 側の既定値で補完されます。
+`OscReceiverOptionsDto` は `OscReceiverAdapterBinding` の listen endpoint、mode 別 mapping、staleness、フェイルセーフ、heartbeat 整合性検査、bundle 解釈を保存する JSON DTO です。Unity の `JsonUtility` 互換 DTO として扱うため、未知キーは無視され、欠落または不正な値は DTO 側の既定値で補完されます。
 
 > **環境依存項目の保存先**: `listenEndpoint` / `listenPort` / `stalenessSeconds` / `failSafeMode` /
 > `consistencyCheckWarnLog` / `bundleMode` / `bundleAccumulationTimeoutMs` の Inspector 編集および
 > 永続化は、spec [`adapter-runtime-settings`](../../../../.kiro/specs/adapter-runtime-settings/) で導入された
-> `OscRuntimeSettingsSO` (sub-asset) の Receiver セクションに移行済みです。`OscAdapterBinding._settings`
+> `OscRuntimeSettingsSO` (sub-asset) の Receiver セクションに移行済みです。`OscReceiverAdapterBinding._settings`
 > 経由でアサインしてください。本 JSON DTO は `OscRuntimeSettingsSO.ToJson()` / `FromJson()` で
 > ラウンドトリップする際の永続化フォーマットも兼ねます。詳細は
 > [`com.hidano.facialcontrol/Documentation~/adapter-runtime-settings.md`](../../com.hidano.facialcontrol/Documentation~/adapter-runtime-settings.md)

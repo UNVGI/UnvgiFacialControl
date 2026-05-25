@@ -29,8 +29,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
     /// </para>
     /// </remarks>
     [Serializable]
-    [FacialAdapterBinding(displayName: "OSC")]
-    public sealed class OscAdapterBinding : AdapterBindingBase
+    [FacialAdapterBinding(displayName: "OSC Receiver")]
+    public sealed class OscReceiverAdapterBinding : AdapterBindingBase
     {
         public const string SenderIdentityAddress = SenderIdentity.OscAddress;
         public const string BlendShapeNamesAddress = "/_facialcontrol/blendshape_names";
@@ -156,7 +156,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         /// パラメータレスコンストラクタ。Inspector の Add ドロップダウンで <c>Activator.CreateInstance</c> から
         /// 生成される必要があるため明示する。
         /// </summary>
-        public OscAdapterBinding()
+        public OscReceiverAdapterBinding()
         {
         }
 
@@ -337,7 +337,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
             if (ctx.HostGameObject == null)
             {
-                Debug.LogError("[OscAdapterBinding] HostGameObject が null のため OSC binding を起動できません。");
+                Debug.LogError("[OscReceiverAdapterBinding] HostGameObject が null のため OSC binding を起動できません。");
                 return;
             }
 
@@ -345,13 +345,13 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             if (settings == null)
             {
                 Debug.LogWarning(
-                    $"[OscAdapterBinding] _settings が未代入のため OSC Adapter は起動しません。slug='{Slug}'");
+                    $"[OscReceiverAdapterBinding] _settings が未代入のため OSC Adapter は起動しません。slug='{Slug}'");
                 return;
             }
             if (!settings.ReceiverEnabled)
             {
                 Debug.LogWarning(
-                    $"[OscAdapterBinding] _settings.ReceiverEnabled=false のため OSC Adapter は起動しません。slug='{Slug}'");
+                    $"[OscReceiverAdapterBinding] _settings.ReceiverEnabled=false のため OSC Adapter は起動しません。slug='{Slug}'");
                 return;
             }
 
@@ -366,14 +366,14 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             if (!hasBlendShapeMappings && !hasGazeMappings)
             {
                 Debug.LogWarning(
-                    $"[OscAdapterBinding] OSC mappings が未設定のため入力源を登録しません。slug='{Slug}'");
+                    $"[OscReceiverAdapterBinding] OSC mappings が未設定のため入力源を登録しません。slug='{Slug}'");
                 return;
             }
 
             if (!AdapterSlug.TryParse(Slug, out var slug))
             {
                 Debug.LogError(
-                    $"[OscAdapterBinding] Slug '{Slug}' が AdapterSlug 規約を満たしません。InputSourceRegistry に登録できません。");
+                    $"[OscReceiverAdapterBinding] Slug '{Slug}' が AdapterSlug 規約を満たしません。InputSourceRegistry に登録できません。");
                 return;
             }
 
@@ -564,7 +564,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                     (string.IsNullOrEmpty(entry.sourceIdLeft) || string.IsNullOrEmpty(entry.sourceIdRight)))
                 {
                     Debug.LogWarning(
-                        "[OscAdapterBinding] leftRightIndependent=true の Gaze entry は "
+                        "[OscReceiverAdapterBinding] leftRightIndependent=true の Gaze entry は "
                         + $"sourceIdLeft/sourceIdRight が必須です。expressionId='{entry.expressionId}' をスキップします。");
                     continue;
                 }
@@ -572,7 +572,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 if (entry.mode == OscMappingMode.Gaze_VRChat_XY && string.IsNullOrEmpty(entry.addressPattern))
                 {
                     Debug.LogWarning(
-                        $"[OscAdapterBinding] Gaze_VRChat_XY entry '{entry.expressionId}' の addressPattern が空のためスキップします。");
+                        $"[OscReceiverAdapterBinding] Gaze_VRChat_XY entry '{entry.expressionId}' の addressPattern が空のためスキップします。");
                     continue;
                 }
 
@@ -606,7 +606,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             if (!InputSourceId.TryParse(id, out InputSourceId sourceId))
             {
                 Debug.LogWarning(
-                    $"[OscAdapterBinding] Gaze source id '{id}' is not a valid InputSourceId. Skipping.");
+                    $"[OscReceiverAdapterBinding] Gaze source id '{id}' is not a valid InputSourceId. Skipping.");
                 return null;
             }
 
@@ -708,7 +708,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         {
             if (!TryParseSenderIdentity(message.values, out SenderIdentity identity))
             {
-                Debug.LogWarning("[OscAdapterBinding] sender_id message の payload を解釈できません。");
+                Debug.LogWarning("[OscReceiverAdapterBinding] sender_id message の payload を解釈できません。");
                 return;
             }
 
@@ -1094,7 +1094,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
                 mappingIndexToMeshIndex[i] = -1;
                 Debug.LogWarning(
-                    $"[OscAdapterBinding] OSC mapping '{blendShapeName}' was not found in ctx.BlendShapeNames and will be skipped.");
+                    $"[OscReceiverAdapterBinding] OSC mapping '{blendShapeName}' was not found in ctx.BlendShapeNames and will be skipped.");
             }
 
             return mappingIndexToMeshIndex;

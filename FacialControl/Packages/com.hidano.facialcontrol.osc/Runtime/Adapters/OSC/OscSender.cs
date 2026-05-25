@@ -24,7 +24,7 @@ namespace Hidano.FacialControl.Adapters.OSC
             Encoding.UTF8.GetBytes(BlendShapeNamesAddress);
 
         [SerializeField]
-        private string _address = "127.0.0.1";
+        private string _endpoint = "127.0.0.1";
 
         [SerializeField]
         private int _port = OscConfiguration.DefaultSendPort;
@@ -40,6 +40,7 @@ namespace Hidano.FacialControl.Adapters.OSC
         private OscBundleBuilder _bundleBuilder;
         private bool _initialized;
         private bool _sending;
+        private bool _configured;
 
         // マッピング情報: インデックス → OSC アドレス
         private string[] _oscAddresses;
@@ -49,12 +50,12 @@ namespace Hidano.FacialControl.Adapters.OSC
         private OscMapping[] _mappings;
 
         /// <summary>
-        /// 送信先 IP アドレス。
+        /// 送信先エンドポイント（IP アドレス / host）。
         /// </summary>
-        public string Address
+        public string Endpoint
         {
-            get => _address;
-            set => _address = value;
+            get => _endpoint;
+            set => _endpoint = value;
         }
 
         /// <summary>
@@ -78,6 +79,11 @@ namespace Hidano.FacialControl.Adapters.OSC
         /// 初期化済みかどうか。
         /// </summary>
         public bool IsInitialized => _initialized;
+
+        /// <summary>
+        /// <see cref="Configure(string, int, OscMapping[])"/> が呼ばれて送信開始済みなら true。
+        /// </summary>
+        public bool IsConfigured => _configured;
 
         /// <summary>
         /// マッピング数（送信対象の BlendShape 数）。
@@ -138,6 +144,29 @@ namespace Hidano.FacialControl.Adapters.OSC
         }
 
         /// <summary>
+        /// エンドポイント・ポート・マッピングをまとめて設定し、送信を開始する。
+        /// AdapterBinding 経路から <c>ctx.HostGameObject.AddComponent&lt;OscSender&gt;()</c> 後に呼び出す統合 API。
+        /// </summary>
+        public void Configure(string endpoint, int port, OscMapping[] mappings)
+        {
+            Configure(endpoint, port, mappings, addressUtf8: null);
+        }
+
+        /// <summary>
+        /// エンドポイント・ポート・マッピング（+ 事前構築済み UTF-8 アドレス table）をまとめて設定し、送信を開始する。
+        /// </summary>
+        public void Configure(string endpoint, int port, OscMapping[] mappings, byte[][] addressUtf8)
+        {
+            if (mappings == null) throw new ArgumentNullException(nameof(mappings));
+
+            _endpoint = endpoint;
+            _port = port;
+            Initialize(mappings, addressUtf8);
+            StartSending();
+            _configured = true;
+        }
+
+        /// <summary>
         /// 送信を開始する。uOscClient を起動する。
         /// </summary>
         public void StartSending()
@@ -153,7 +182,7 @@ namespace Hidano.FacialControl.Adapters.OSC
 
             EnsureClient();
             EnsureBundleClient();
-            _client.address = _address;
+            _client.address = _endpoint;
             _client.port = _port;
 
             // uOscClient は OnEnable で自動的に StartClient を呼ぶため、
@@ -374,9 +403,9 @@ namespace Hidano.FacialControl.Adapters.OSC
         {
             if (_bundleEndpoint == null ||
                 _bundleEndpointPort != _port ||
-                !string.Equals(_bundleEndpointAddress, _address, StringComparison.Ordinal))
+                !string.Equals(_bundleEndpointAddress, _endpoint, StringComparison.Ordinal))
             {
-                IPAddress ipAddress = ResolveIpAddress(_address);
+                IPAddress ipAddress = ResolveIpAddress(_endpoint);
                 IPEndPoint endpoint = new IPEndPoint(ipAddress, _port);
 
                 if (_bundleClient != null && _bundleClient.Client.AddressFamily != ipAddress.AddressFamily)
@@ -385,7 +414,7 @@ namespace Hidano.FacialControl.Adapters.OSC
                 }
 
                 _bundleEndpoint = endpoint;
-                _bundleEndpointAddress = _address;
+                _bundleEndpointAddress = _endpoint;
                 _bundleEndpointPort = _port;
             }
 
@@ -440,6 +469,24 @@ namespace Hidano.FacialControl.Adapters.OSC
                 _bundleBuilder.Dispose();
                 _bundleBuilder = null;
             }
+
+            // OscSenderHost 統合に伴い、本クラスが gameObject.AddComponent で生やした
+            // uOscClient のライフサイクル管理も担う。同 GameObject 上に追加した uOscClient を破棄して
+            // socket close を保証する。
+            if (_client != null)
+            {
+                if (UnityEngine.Application.isPlaying)
+                {
+                    UnityEngine.Object.Destroy(_client);
+                }
+                else
+                {
+                    UnityEngine.Object.DestroyImmediate(_client);
+                }
+                _client = null;
+            }
+
+            _configured = false;
         }
     }
 }

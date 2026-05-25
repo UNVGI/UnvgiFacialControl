@@ -8,12 +8,12 @@
 
 **Users**: VTuber 配信者向けキャラクター制御を実装する Unity エンジニア（プレリリーススコープ: Windows PC）。
 
-**Impact**: `OscAdapterBinding` と同じ「Inspector で `_adapterBindings` 配列に追加 1 つ」という体験で uLipSync 連携を導入できるようになる。コア (`com.hidano.facialcontrol`) のソースは **0 行も改変しない**。Character Prefab には `uLipSync.uLipSync` / `AudioSource` / 入力コンポーネントを **一切持たせない**（Prefab-Clean Contract）。
+**Impact**: `OscReceiverAdapterBinding` と同じ「Inspector で `_adapterBindings` 配列に追加 1 つ」という体験で uLipSync 連携を導入できるようになる。コア (`com.hidano.facialcontrol`) のソースは **0 行も改変しない**。Character Prefab には `uLipSync.uLipSync` / `AudioSource` / 入力コンポーネントを **一切持たせない**（Prefab-Clean Contract）。
 
 ### Goals
 
 - uLipSync 連携を独立 UPM パッケージとして配布し、リップシンクが不要なプロジェクトでは導入不要にする（1.1）。
-- `OscAdapterBinding` のライフサイクルとレイアウト規約を踏襲した `ULipSyncAdapterBinding` を提供（6.x）。
+- `OscReceiverAdapterBinding` のライフサイクルとレイアウト規約を踏襲した `ULipSyncAdapterBinding` を提供（6.x）。
 - BlendShape 形式 / AnimationClip 形式の音素エントリを 1 バインディング内で混在編集可（4.1）。
 - Mic / ASIO の自動判定とランタイム hot-swap（7.x, 8.x）。
 - 毎フレームのヒープ確保 0 byte をホットパスで保証（11.x）。
@@ -75,8 +75,8 @@
 - コア (`com.hidano.facialcontrol`) はクリーンアーキテクチャ（Domain → Application → Adapters）を asmdef で強制している。本パッケージは新 asmdef `Hidano.FacialControl.LipSync` (Runtime) と `Hidano.FacialControl.LipSync.Editor` (Editor) を持ち、Adapters 層相当として Engine / Unity API / uLipSync API に依存する。
 - Domain 層 (`Hidano.FacialControl.Domain`) は Engine 参照を持たない契約。本パッケージは Domain 名前空間に新規型を追加しない。
 - 既存パターン:
-  - **`AdapterBindingBase` lifecycle**: `OnStart(in AdapterBuildContext) → OnTick / OnLateTick / OnFixedTick → Dispose`。`OscAdapterBinding` (lines 111-183) を雛形とする。
-  - **Prefab-Clean Contract**: `OscAdapterBinding` の `OscReceiverHost` AddComponent / Destroy パターン、`InputSystemAdapterBinding` の `ExpressionInputSourceAdapter` AddComponent パターンを踏襲。
+  - **`AdapterBindingBase` lifecycle**: `OnStart(in AdapterBuildContext) → OnTick / OnLateTick / OnFixedTick → Dispose`。`OscReceiverAdapterBinding` (lines 111-183) を雛形とする。
+  - **Prefab-Clean Contract**: `OscReceiverAdapterBinding` の `OscReceiverHost` AddComponent / Destroy パターン、`InputSystemAdapterBinding` の `ExpressionInputSourceAdapter` AddComponent パターンを踏襲。
   - **Inline serialization**: `[Serializable]` + `[FacialAdapterBinding(displayName: ...)]` 付き sealed class を `[SerializeReference] List<AdapterBindingBase>` （`FacialCharacterProfileSO._adapterBindings`）に格納。`AdapterBindingsListView` の Add ドロップダウンが `TypeCache.GetTypesWithAttribute<FacialAdapterBindingAttribute>()` で discover する。
   - **`LayerInputSourceAggregator` の per-layer `Array.Clear`**: 毎フレーム per-layer バッファをゼロクリアしてから加算するため、`LipSyncInputSource.TryWriteValues == false`（無音時）で当該レイヤーは自動的にゼロ収束する。
 
@@ -126,7 +126,7 @@ graph TB
 
 **Architecture Integration**:
 
-- **Selected pattern**: 既存 `OscAdapterBinding` / `InputSystemAdapterBinding` の **Adapter Binding パターン**を完全踏襲。新規パターンは導入しない。
+- **Selected pattern**: 既存 `OscReceiverAdapterBinding` / `InputSystemAdapterBinding` の **Adapter Binding パターン**を完全踏襲。新規パターンは導入しない。
 - **Domain/feature boundaries**: 本パッケージは Adapters 層相当。Domain 層には触れない。`uLipSync` 名前空間と `Hidano.FacialControl.*` 名前空間の橋渡しのみ担う。
 - **Existing patterns preserved**:
   - Prefab-Clean Contract（`AddComponent` on `ctx.HostGameObject` → `Dispose` で `Destroy`）。
@@ -402,7 +402,7 @@ sequenceDiagram
 | 6.4 | `ExpressionUseCase` push/pop 経路を使用しない | （非採用） | — | — |
 | 6.5 | Dispose で 購読解除・登録解除・コンポーネント Destroy 全部 | `ULipSyncAdapterBinding` | `Dispose` | — |
 | 6.6 | Profile 解決失敗時の roll back & 早期 return | `ULipSyncAdapterBinding` | `OnStart` 失敗パス | Flow 1 |
-| 6.7 | OscAdapterBinding と同一 lifecycle 順序 | `ULipSyncAdapterBinding` | OnStart→OnFixedTick→Dispose | — |
+| 6.7 | OscReceiverAdapterBinding と同一 lifecycle 順序 | `ULipSyncAdapterBinding` | OnStart→OnFixedTick→Dispose | — |
 | 7.1 | `[SerializeField] DeviceDescriptor _deviceDescriptor` | `ULipSyncAdapterBinding` | フィールド | — |
 | 7.2 | ASIO ドライバ列挙で一致時 AsioInput | `DeviceResolver` | `Resolve` | Flow 1 |
 | 7.3 | Mic 列挙で一致時 Microphone | `DeviceResolver` | `Resolve` | Flow 1 |
@@ -434,7 +434,7 @@ sequenceDiagram
 | 12.4 | デバイス記述子 popup + 手動 override + disambiguator | `DeviceDescriptorPopup` | UI Toolkit | — |
 | 12.5 | optional `uLipSync.Profile` を ObjectField、未指定時プレースホルダ | `ULipSyncAdapterBindingDrawer` | UI Toolkit | — |
 | 12.6 | BlendShape 名空欄時 HelpBox | `PhonemeEntryListView` | per-row Validation | — |
-| 12.7 | OscAdapterBindingDrawer と style 整合 | `ULipSyncAdapterBindingDrawer` | UI Toolkit `PropertyField` | — |
+| 12.7 | OscReceiverAdapterBindingDrawer と style 整合 | `ULipSyncAdapterBindingDrawer` | UI Toolkit `PropertyField` | — |
 | 13.1 | `Samples~/MicLipSyncDemo/` を `samples` 配列に登録 | `package.json` | `samples[0]` | — |
 | 13.2 | Sample 同梱物（profile / 音素エントリ / Scene） | `Samples~/MicLipSyncDemo/` | フォルダ構成 | — |
 | 13.3 | Scene の Character GameObject に uLipSync 系コンポーネント無し | Sample Scene | `MicLipSyncDemo.unity` | — |
@@ -443,7 +443,7 @@ sequenceDiagram
 | 13.6 | `Samples~/` ↔ `Assets/Samples/` 二重管理を docs 明記 | docs | README または `Documentation~/usage.md` | — |
 | 14.1 | EditMode テストスイート (a)–(k) | テスト | `Tests/EditMode/**` | — |
 | 14.2 | PlayMode テストスイート (a)–(d) | テスト | `Tests/PlayMode/**` | — |
-| 14.3 | OscAdapterBindingTests と 1:1 対応 | テスト | Lifecycle / Registry / 例外時安全停止 | — |
+| 14.3 | OscReceiverAdapterBindingTests と 1:1 対応 | テスト | Lifecycle / Registry / 例外時安全停止 | — |
 | 14.4 | CI で EditMode + PlayMode 失敗ゼロ | CI | (既存 GitHub Actions に追加) | — |
 | 14.5 | `{Method}_{Condition}_{Expected}` 命名 | テスト | 全 `*Tests.cs` | — |
 | 14.6 | README / CHANGELOG / Documentation~ 同梱 | docs | パッケージルート + `Documentation~/` | — |
@@ -590,7 +590,7 @@ public sealed class ULipSyncAdapterBinding : AdapterBindingBase
 ```
 
 - **Preconditions**:
-  - `OnStart`: `ctx.HostGameObject != null`、`_phonemeEntries != null && _phonemeEntries.Count > 0`、`AdapterSlug.TryParse(Slug, out _) == true`。違反時 `Debug.LogError` / `LogWarning` + 早期 return（OscAdapterBinding 同等）。
+  - `OnStart`: `ctx.HostGameObject != null`、`_phonemeEntries != null && _phonemeEntries.Count > 0`、`AdapterSlug.TryParse(Slug, out _) == true`。違反時 `Debug.LogError` / `LogWarning` + 早期 return（OscReceiverAdapterBinding 同等）。
   - `SwapDevice`: `IsStarted == true`。
 - **Postconditions**:
   - `OnStart` 成功後 `IsStarted == true` で `Analyzer != null && Provider != null`。
@@ -802,7 +802,7 @@ internal sealed class ULipSyncEventBridge : IULipSyncEventSource, IDisposable
   - Analyzer profile 行（`PropertyField` で `uLipSync.Profile` 参照、未指定時に「パッケージ同梱既定」プレースホルダ）
   - Phoneme entries block（`PhonemeEntryListView` 子要素）
   - Max weight scale 行
-- 既存 `OscAdapterBindingDrawer` のスタイル（折りたたみ・余白・Validation 配置）と整合（12.7）。
+- 既存 `OscReceiverAdapterBindingDrawer` のスタイル（折りたたみ・余白・Validation 配置）と整合（12.7）。
 
 #### `PhonemeEntryListView`
 
@@ -880,7 +880,7 @@ erDiagram
 - `_phonemeEntries == null || .Count == 0`: `Debug.LogWarning` + 早期 return（OnStart）。binding は登録されず、ユーザーは Inspector で再構成。
 - `BlendShapeName` が SMR に存在しない: `Debug.LogWarning` + 当該エントリ skip（4.7）。残エントリは正常処理。
 - `_phonemeEntries[i].PhonemeId == null/empty`: ビルダーが skip + LogWarning。
-- `Slug` が `AdapterSlug` 規約違反: `Debug.LogError` + 早期 return（既存 OscAdapterBinding と同等、line 131-136）。
+- `Slug` が `AdapterSlug` 規約違反: `Debug.LogError` + 早期 return（既存 OscReceiverAdapterBinding と同等、line 131-136）。
 - 同一 `FacialCharacter` に `ULipSyncAdapterBinding` を 2 個追加: `Register` 衝突を検知し `Debug.LogError` + 2 個目以降 skip（10.3）。
 - `_targetMeshHint` が解決できない: `Debug.LogWarning` + first SMR depth-first フォールバック（DD-B）。
 
@@ -935,9 +935,9 @@ erDiagram
 
 ### Test Surface Mapping
 
-| Coverage Area | EditMode | PlayMode | Existing OscAdapterBinding 1:1 |
+| Coverage Area | EditMode | PlayMode | Existing OscReceiverAdapterBinding 1:1 |
 |--------------|----------|----------|--------------------------------|
-| ライフサイクル（OnStart 成功 / 失敗、Dispose） | — | `ULipSyncAdapterBindingLifecycleTests` | `OscAdapterBindingTests.OnStart_*` 系（14.3） |
+| ライフサイクル（OnStart 成功 / 失敗、Dispose） | — | `ULipSyncAdapterBindingLifecycleTests` | `OscReceiverAdapterBindingTests.OnStart_*` 系（14.3） |
 | Registry 登録・解除 | — | `ULipSyncAdapterBindingLifecycleTests` | 同上（14.3） |
 | 例外時安全停止 | `ULipSyncProviderTests.Constructor_*` | `ULipSyncAdapterBindingLifecycleTests.OnStart_Unresolved*` | 同上（14.3） |
 | GC 0 byte ホットパス | `ULipSyncProviderAllocationTests` | — | OSC 側にも準拠 |

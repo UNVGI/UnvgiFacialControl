@@ -34,10 +34,10 @@
   - 観測可能な完了条件: 1.4 の `OscInputSourceMaskTests` がすべて Green で通り、mapping count ≠ mesh count でも値が誤った mesh index に書かれない
   - _Requirements: 1.4, 1.5_
   - _Boundary: OscInputSource_
-- [x] 1.6 OscAdapterBinding.OnStart で mesh-index 空間整列経路を結線する
-  - `OscAdapterBinding.OnStart(in ctx)` 内で `ctx.BlendShapeNames` から `mappingIndexToMeshIndex` を 1 度だけ構築し、新規 ctor overload で `HeartbeatConsistencyChecker` と `OscInputSource` の双方を mesh-index 空間で初期化する
+- [x] 1.6 OscReceiverAdapterBinding.OnStart で mesh-index 空間整列経路を結線する
+  - `OscReceiverAdapterBinding.OnStart(in ctx)` 内で `ctx.BlendShapeNames` から `mappingIndexToMeshIndex` を 1 度だけ構築し、新規 ctor overload で `HeartbeatConsistencyChecker` と `OscInputSource` の双方を mesh-index 空間で初期化する
   - mapping name が `ctx.BlendShapeNames` に存在しない場合 `-1` を入れ、毎フレームの逆引きを避けて GC ゼロ契約を維持する
-  - 観測可能な完了条件: 1.2〜1.5 までの EditMode テストがすべて Green を維持したまま、`OscAdapterBinding` 経由で Checker / Source が mesh-index 空間で初期化される
+  - 観測可能な完了条件: 1.2〜1.5 までの EditMode テストがすべて Green を維持したまま、`OscReceiverAdapterBinding` 経由で Checker / Source が mesh-index 空間で初期化される
   - _Requirements: 1.1, 1.3_
   - _Boundary: OscAdapterBinding_
 - [x] 1.7 OscReceiverDemo + OscOutputDemo 同時起動の例外消失を EditMode で再現検証する

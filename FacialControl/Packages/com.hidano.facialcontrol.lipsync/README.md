@@ -42,6 +42,11 @@
 
 AnimationClip 形式エントリの time-0 サンプリングや内部バッファ構築は `OnStart` 時の初期化コストとして扱い、ホットパスから除外します。
 
+## Documentation
+
+- 手結線 uLipSync から `ULipSyncAdapterBinding` への移行: [`Documentation~/migration-guide.md`](Documentation~/migration-guide.md)
+- A / I / U / E / O を Expression Overlay 経由へ移す移行: [`Documentation~/phoneme-overlay-migration.md`](Documentation~/phoneme-overlay-migration.md)
+
 ## Samples 構成
 
 `Samples~/` 配下のディレクトリのみが UPM 配布の正本です。開発プロジェクトで Scene を開いて検証する場合は、Package Manager の Sample Import 機能で `Assets/Samples/FacialControl uLipSync Adapter/<version>/<sampleName>/` へ取り込んで利用します。`FacialControl/Assets/Samples/com.hidano.facialcontrol.lipsync/` への手動ミラーは行いません。

@@ -139,7 +139,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
             _binding.OnStart(CreateContext(bus, blendShapeNames));
 
             Assert.That(_binding.IsStarted, Is.True);
-            Assert.That(_binding.HelperHostCount, Is.EqualTo(1));
+            Assert.That(_binding.HelperSenderCount, Is.EqualTo(1));
         }
 
         private AdapterBuildContext CreateContext(

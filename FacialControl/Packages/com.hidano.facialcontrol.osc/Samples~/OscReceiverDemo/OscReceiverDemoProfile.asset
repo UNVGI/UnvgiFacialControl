@@ -67,7 +67,7 @@ MonoBehaviour:
     version: 2
     RefIds:
     - rid: 8100000000000000001
-      type: {class: OscAdapterBinding, ns: Hidano.FacialControl.Adapters.AdapterBindings, asm: Hidano.FacialControl.Osc}
+      type: {class: OscReceiverAdapterBinding, ns: Hidano.FacialControl.Adapters.AdapterBindings, asm: Hidano.FacialControl.Osc}
       data:
         Slug: osc
         _settings: {fileID: 2279303358686531772, guid: ad0658dffa3b456490a48e50e22a0630, type: 2}

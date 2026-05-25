@@ -1,9 +1,9 @@
 {
   "feature_name": "osc-output-binding",
   "created_at": "2026-05-14T08:55:57Z",
-  "updated_at": "2026-05-15T02:30:00Z",
+  "updated_at": "2026-05-23T00:00:00Z",
   "language": "ja",
-  "phase": "ready",
+  "phase": "implemented",
   "approvals": {
     "requirements": {
       "generated": true,

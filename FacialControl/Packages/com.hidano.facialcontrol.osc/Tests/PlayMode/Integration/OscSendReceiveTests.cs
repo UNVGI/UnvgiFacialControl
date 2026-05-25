@@ -508,7 +508,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             var senderObj = new GameObject("OscSenderTest");
             var sender = senderObj.AddComponent<OscSender>();
 
-            Assert.AreEqual("127.0.0.1", sender.Address);
+            Assert.AreEqual("127.0.0.1", sender.Endpoint);
 
             Object.DestroyImmediate(senderObj);
         }
@@ -635,7 +635,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             // Sender 側のセットアップ
             var senderObj = new GameObject("OscSenderTest");
             var sender = senderObj.AddComponent<OscSender>();
-            sender.Address = "127.0.0.1";
+            sender.Endpoint = "127.0.0.1";
             sender.Port = 19004; // Receiver と同じポート
             sender.Initialize(mappings);
             sender.StartSending();
@@ -687,7 +687,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             // Sender 側のセットアップ
             var senderObj = new GameObject("OscSenderTest");
             var sender = senderObj.AddComponent<OscSender>();
-            sender.Address = "127.0.0.1";
+            sender.Endpoint = "127.0.0.1";
             sender.Port = 19005;
             sender.Initialize(mappings);
             sender.StartSending();

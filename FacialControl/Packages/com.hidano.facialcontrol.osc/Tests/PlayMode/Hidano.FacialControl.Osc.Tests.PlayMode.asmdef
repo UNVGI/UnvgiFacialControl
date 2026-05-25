@@ -10,6 +10,7 @@
         "Hidano.FacialControl.Tests.Shared",
         "Unity.Collections",
         "Unity.InputSystem",
+        "Unity.InputSystem.TestFramework",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "uOSC.Runtime"

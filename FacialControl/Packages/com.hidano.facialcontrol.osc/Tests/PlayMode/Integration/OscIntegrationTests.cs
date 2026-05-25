@@ -207,7 +207,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             // Sender セットアップ
             _senderObj = new GameObject("OscSenderLoop");
             var sender = _senderObj.AddComponent<OscSender>();
-            sender.Address = "127.0.0.1";
+            sender.Endpoint = "127.0.0.1";
             sender.Port = 19010;
             sender.Initialize(mappings);
             sender.StartSending();

@@ -12,7 +12,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         public void FromBindings_OscReceiverWithSameEndpointAndPort_SuppressesSenderEndpoint()
         {
             int port = 19501;
-            var receiver = new OscAdapterBinding
+            var receiver = new OscReceiverAdapterBinding
             {
                 Slug = "osc-receiver",
                 Endpoint = "127.0.0.1",

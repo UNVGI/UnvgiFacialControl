@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Hidano.FacialControl.Adapters.OSC
 {
     /// <summary>
-    /// <see cref="Hidano.FacialControl.Adapters.AdapterBindings.OscAdapterBinding"/> が
+    /// <see cref="Hidano.FacialControl.Adapters.AdapterBindings.OscReceiverAdapterBinding"/> が
     /// <c>OnStart</c> 内で <c>ctx.HostGameObject.AddComponent</c> する OSC 受信用 helper
     /// MonoBehaviour。
     /// </summary>

@@ -95,14 +95,14 @@
 
 ### 受信側 binding 間の依存解決順序
 
-- **Context**: Req 12 で `OscGazeReceiverAdapterBinding` が同 child scope 内の `OscAdapterBinding` の OscDoubleBuffer / OscReceiver を参照する必要がある。binding 間の `OnStart` 順序は SO 上のリスト順依存。
+- **Context**: Req 12 で `OscGazeReceiverAdapterBinding` が同 child scope 内の `OscReceiverAdapterBinding` の OscDoubleBuffer / OscReceiver を参照する必要がある。binding 間の `OnStart` 順序は SO 上のリスト順依存。
 - **Sources Consulted**: `Packages/com.hidano.facialcontrol/Runtime/Adapters/DependencyInjection/AdapterBindingHost.cs`
 - **Findings**:
   - 現状 `AdapterBindingHost.IInitializable.Initialize` は SO リスト順で binding.OnStart を同期呼出する
   - `IInputSourceRegistry` は slug-keyed lookup を提供するが、binding インスタンスそのもののハンドルは未公開
 - **Implications**: 2 つの選択肢を併記し、実装時に決定する:
   1. **遅延 resolve**: `OscGazeReceiverAdapterBinding.OnStart` で受信元 binding が見つからない場合 `_pendingResolve=true` をセットし、初回 `OnFixedTick` で再 lookup（堅牢、SO リスト順非依存）
-  2. **明示順序**: SO 上で `OscAdapterBinding` → `OscGazeReceiverAdapterBinding` の順を強制 + 違反時警告（単純、ただしユーザー操作ミスに脆弱）
+  2. **明示順序**: SO 上で `OscReceiverAdapterBinding` → `OscGazeReceiverAdapterBinding` の順を強制 + 違反時警告（単純、ただしユーザー操作ミスに脆弱）
   - design.md 内では **(1) 遅延 resolve を採用**。`AdapterBuildContext` への binding lookup 機構追加は最小限とし、Gaze receiver 側で再試行ロジックを持つ。
 
 ### SystemTextJsonParser と JsonUtility の整合性
@@ -189,7 +189,7 @@
 - **Follow-up**: `package.json` の name を `com.hidano.uosc` のまま、version を `1.0.0-fcfork.1` とする。CHANGELOG / LICENSE に fork 明示。preview.2 リリースノートで明文化。
 
 ### Decision: 受信側 binding 間依存の遅延 resolve
-- **Context**: `OscGazeReceiverAdapterBinding` が `OscAdapterBinding` の OscDoubleBuffer / OscReceiver を参照する必要があるが、SO 上のリスト順に依存させたくない。
+- **Context**: `OscGazeReceiverAdapterBinding` が `OscReceiverAdapterBinding` の OscDoubleBuffer / OscReceiver を参照する必要があるが、SO 上のリスト順に依存させたくない。
 - **Alternatives Considered**:
   1. `AdapterBuildContext` に `IAdapterBindingLookup` を追加し、binding 間の slug 解決を提供
   2. `OscGazeReceiverAdapterBinding` 自身が `OnStart` で見つからない場合 `_pendingResolve=true` をセットし、`OnFixedTick` で再試行
@@ -207,7 +207,7 @@
 - **R5 — SystemTextJsonParser の命名 vs 実装の乖離**: design.md 内で「既存 JSON 経路と整合、新ライブラリ持ち込まない」と再表現。本 spec で命名変更は行わない（別 spec で対処、`docs/backlog.md` に追記）。
 - **R6 — GazeBindingConfig 破壊変更の波及**: preview 段階 migration 不要のため許容。`InputSystemAdapterBinding.BuildGazeProvider` / `FacialCharacterProfileConverter` / 既存 Gaze テスト一斉改修を Phase 7 で 1 PR にまとめる。
 - **R7 — Sample 二重管理**: `docs/work-procedure.md` に「Samples~ と Assets/Samples の同期手順」を明文化。CLAUDE.md の Samples 二重管理ルールに従う。
-- **R8 — 受信側 binding 依存解決順（解決済み）**: 2026-05-15 のレビューで Gaze Vector2 受信を別 binding に分割せず `OscAdapterBinding` 内の mode 別 entry として統合する判断に変更。`InputSystemAdapterBinding` の単一 binding 内 mode 集約パターン（`ExpressionBindingEntry.bindingMode`）を踏襲。これにより binding 間 cross-lookup（`AdapterBuildContext.OscBindingProvider` 案）は不要となり、フェイルセーフ時の状態伝播も同一 binding 内の内部呼出で完結する。`OscGazeReceiverAdapterBindingTests` は `OscAdapterBindingTests` の Gaze 系 mode シナリオに統合する。
+- **R8 — 受信側 binding 依存解決順（解決済み）**: 2026-05-15 のレビューで Gaze Vector2 受信を別 binding に分割せず `OscReceiverAdapterBinding` 内の mode 別 entry として統合する判断に変更。`InputSystemAdapterBinding` の単一 binding 内 mode 集約パターン（`ExpressionBindingEntry.bindingMode`）を踏襲。これにより binding 間 cross-lookup（`AdapterBuildContext.OscBindingProvider` 案）は不要となり、フェイルセーフ時の状態伝播も同一 binding 内の内部呼出で完結する。`OscGazeReceiverAdapterBindingTests` は `OscReceiverAdapterBindingTests` の Gaze 系 mode シナリオに統合する。
 - **R9 — MTU 超過時の bundle 分割**: 同一 timestamp を継承した複数 bundle に分割。受信側 accumulator は timestamp ベースで集約する既存設計でそのまま吸収可能。
 - **R10 — heartbeat 大規模 mapping (>500 BS)**: 1 メッセージで送れない場合は複数 heartbeat メッセージに分割。実装時 Phase 4 で確定。
 - **R11 — Profiler 差分テストの flakiness**: 初回 JIT / domain reload 直後の alloc を warm-up フェーズで除外。10 サンプル中下位 9 個の中央値で評価。
@@ -241,13 +241,13 @@
 - **Decision**: A 案を採用。ctx の最小拡張で完結し、既存 binding は当該フィールドを参照しないため動作影響なし。design.md の Revalidation Triggers L67 に「本 spec 内で 1 度実施済」と注記。
 - **Rationale**: Domain 純度を保ち、boxing 無し（readonly struct + in 渡し）。VContainer の child scope register 経路に lifetime = Scoped で挿せば既存 DI フローと整合。
 
-### D2: Gaze Vector2 受信を `OscAdapterBinding` に統合（OscGazeReceiverAdapterBinding 廃止）
-- **Context**: 元設計では `OscGazeReceiverAdapterBinding`（新規）が `OscAdapterBinding` の `OscDoubleBuffer` を slug で参照する構造で、gap-analysis R8（受信側 binding 依存解決順）が未確定だった。
+### D2: Gaze Vector2 受信を `OscReceiverAdapterBinding` に統合（OscGazeReceiverAdapterBinding 廃止）
+- **Context**: 元設計では `OscGazeReceiverAdapterBinding`（新規）が `OscReceiverAdapterBinding` の `OscDoubleBuffer` を slug で参照する構造で、gap-analysis R8（受信側 binding 依存解決順）が未確定だった。
 - **Options**:
   - α. ctx に OSC 専用 locator 追加し binding 実体を直接参照
   - β. `IInputSourceRegistry` 経由で受信元が 8 BS / X-Y を `IAnalogInputSource` として publish、Gaze receiver は slug で subscribe
   - γ. ctx に IBindingScope 列挙 interface を新設
-  - **δ. `OscAdapterBinding` 自体に mode 別 entry（BlendShape / Gaze_VRChat_XY / Gaze_ARKit_8BS）を導入し、Gaze 受信を 1 binding 内に統合（採用）**
+  - **δ. `OscReceiverAdapterBinding` 自体に mode 別 entry（BlendShape / Gaze_VRChat_XY / Gaze_ARKit_8BS）を導入し、Gaze 受信を 1 binding 内に統合（採用）**
 - **Decision**: δ 案を採用。`InputSystemAdapterBinding` が単一 binding 内で Trigger + Analog + Gaze（`ExpressionBindingEntry.bindingMode`）を扱う既存パターンを踏襲。R8（binding 間依存解決）自体が消滅し、フェイルセーフ時の状態伝播も内部呼出で完結する。
 - **Rationale**: 既にコードベース内に「1 binding が複数 mode の入力を統合して扱う」前例（`InputSystemAdapterBinding`）が存在し、Inspector の Add ドロップダウンも 2 binding（Sender + Receiver）に統一されてユーザー設定がシンプル。要件 12 / 6.3 / 7 / 10 の文言を整合性のため修正。
 - **Impact**: design.md / requirements.md / spec.json を更新。`OscGazeReceiverAdapterBinding.cs` / `OscGazeReceiverAdapterBindingDrawer.cs` / `OscGazeReceiverOptionsDto.cs` / `osc-gaze-receiver-options.md` の新設は不要となり、代わりに `OscMappingEntry` / `OscMappingMode` / `OscMappingEntryDto` を新規追加。
@@ -287,7 +287,7 @@
   - E3. 全 mode 統一で左右平均値（中心寄りバイアス）
 - **Decision**: E1 を採用。`Gaze_VRChat_XY` mode は VRChat 規格自体が左右共通 Vector2 なので `false` で 1 source publish が自然だが、`Gaze_ARKit_8BS` mode は 8 BS が左右両方の情報を含むため `leftRightIndependent` フラグの値に関わらず常に左右別の 2 keys で register する。
 - **Rationale**: 「自動マッチで両目駆動」のシンプル運用と「左右非対称 Gaze の忠実再現」が両立する。E2 / E3 は情報損失があり「ARKit 形式の左右独立性」という規格自体の存在意義を毀損する。
-- **Impact**: design.md OscAdapterBinding Implementation Notes（Registry register ロジック）を mode 別表に書き換え。requirements.md Req 12.5 を mode × flag のマトリクス形式に修正。Req 8.5 E2E テストに「ARKit × false 既定でも左右非対称が再現される」ケースを追加。
+- **Impact**: design.md OscReceiverAdapterBinding Implementation Notes（Registry register ロジック）を mode 別表に書き換え。requirements.md Req 12.5 を mode × flag のマトリクス形式に修正。Req 8.5 E2E テストに「ARKit × false 既定でも左右非対称が再現される」ケースを追加。
 
 ### D8: 自動マッチで複数 binding が同 expressionId を提供時の決定性ルール（2026-05-15 第 3 回レビュー）
 - **Context**: D6 で「`useDistinctLeftRight = false` 既定時は `expressionId` 自動マッチ」と決めたが、複数 binding が同じ `expressionId` を提供した場合の「先頭採用」の「先頭」が register 順 / SerializeReference 順 / dispatch 順 のどれか未確定で deterministic 性が崩れる問題が検出。
@@ -300,7 +300,7 @@
 - **Impact**: design.md Cross-binding Slug Convention に「Ordinal lexicographic 昇順」のルールを追記。requirements.md Req 13.2 に同条件を明記。Req 8.5 E2E テストに「OSC + InputSystem 同 expressionId 衝突」ケースを追加。
 
 ### D9: Phase 順序入れ替え（Phase 7 を Phase 2 より前に実施）（2026-05-15 第 3 回レビュー）
-- **Context**: 旧設計では Phase 2 (OscAdapterBinding mode 統合、`.left` / `.right` publish 開始) → Phase 7 (GazeBindingConfig 改修、`.left` / `.right` 解決対応) の順だったため、Phase 2 完了時点で OSC 受信側が新規約で publish するが GazeBindingConfig 側が旧構造で解決できない一時的な機能空白が発生する問題が検出。さらに Phase 7 自体が 6 軸（GazeBindingConfig / DTO / Converter / InputSystem / BuildGazeProvider / 既存テスト群）に及び単一 PR では巨大化する。
+- **Context**: 旧設計では Phase 2 (OscReceiverAdapterBinding mode 統合、`.left` / `.right` publish 開始) → Phase 7 (GazeBindingConfig 改修、`.left` / `.right` 解決対応) の順だったため、Phase 2 完了時点で OSC 受信側が新規約で publish するが GazeBindingConfig 側が旧構造で解決できない一時的な機能空白が発生する問題が検出。さらに Phase 7 自体が 6 軸（GazeBindingConfig / DTO / Converter / InputSystem / BuildGazeProvider / 既存テスト群）に及び単一 PR では巨大化する。
 - **Options**:
   - G1. Phase 順序入れ替え（Phase 7 を Phase 2 より前に）（採用）
   - G2. Phase 7 を 7a / 7b / 7c の 3 PR に分割

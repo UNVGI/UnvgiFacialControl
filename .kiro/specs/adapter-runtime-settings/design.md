@@ -8,7 +8,7 @@
 
 **Users**: パッケージ利用者は本機能を、(a) `OscRuntimeSettingsSO` を環境ごとに用意して切り替える、(b) マシンごとに PlayerPrefs に格納された MicDevice 設定を自然に分離する、というワークフローで利用する。
 
-**Impact**: 既存の `OscAdapterBinding._endpoint/_port/...`、`OscSenderAdapterBinding._endpoints/...`、`ULipSyncAdapterBinding._deviceDescriptor` を削除し、それらを「親 SO + Sub-asset SO 集約 (方式 3)」と PlayerPrefs に再配置する。preview 段階のため既存 Asset との後方互換は提供しない (要件 8.5)。
+**Impact**: 既存の `OscReceiverAdapterBinding._endpoint/_port/...`、`OscSenderAdapterBinding._endpoints/...`、`ULipSyncAdapterBinding._deviceDescriptor` を削除し、それらを「親 SO + Sub-asset SO 集約 (方式 3)」と PlayerPrefs に再配置する。preview 段階のため既存 Asset との後方互換は提供しない (要件 8.5)。
 
 ### Goals
 - キャラ SO から環境/運用/マシン依存項目を完全に切り離す (要件 1)
@@ -20,7 +20,7 @@
 
 ### Non-Goals
 - Adapter 種別の C# 型削除/リネーム時の自動マイグレーション (将来別 spec)
-- `OscAdapterBinding` と `OscSenderAdapterBinding` の統合 (現行 2 Binding 構造維持)
+- `OscReceiverAdapterBinding` と `OscSenderAdapterBinding` の統合 (現行 2 Binding 構造維持)
 - `enabled` フラグによる動作停止機構 (AdapterBindings リストからの除外で代替)
 - ランタイムでの動的設定変更 UI
 - 既存 SO Asset データとの後方互換 (preview 段階のため不要)
@@ -30,7 +30,7 @@
 ### This Spec Owns
 - `AdapterRuntimeSettingsBase` (abstract `ScriptableObject`) と `AdapterRuntimeSettingsCollectionSO` の新規定義、配置先、およびそれらの sub-asset 永続化規約
 - `OscRuntimeSettingsSO` (Receiver/Sender セクション統合) の新規定義およびフィールド・JSON 契約
-- `OscAdapterBinding` / `OscSenderAdapterBinding` から環境/運用依存フィールドを削除し、`OscRuntimeSettingsSO` への `[SerializeField]` 参照へ差し替える改修
+- `OscReceiverAdapterBinding` / `OscSenderAdapterBinding` から環境/運用依存フィールドを削除し、`OscRuntimeSettingsSO` への `[SerializeField]` 参照へ差し替える改修
 - `ULipSyncAdapterBinding` から `_deviceDescriptor` を削除し、PlayerPrefs ベースの `LipSyncDeviceStore` 経由に差し替える改修
 - `AdapterRuntimeSettingsCollectionSO` 用 CustomEditor (UI Toolkit、sub-asset 追加/削除 UI)
 - 既存テストの新構造への全面修正と、新 SO 用 EditMode/PlayMode テストの追加
@@ -61,7 +61,7 @@
 ### Existing Architecture Analysis
 - `FacialCharacterProfileSO` (Adapters 層) が `[SerializeReference] List<AdapterBindingBase> _adapterBindings` で binding ポリモフィズムを保持する構造
 - `AdapterBindingBase` (Domain 層) は `Slug` + lifecycle hook (`OnStart`/`OnTick`/`OnLateTick`/`OnFixedTick`/`Dispose`) を提供。Unity 依存を持たない
-- 具象 binding (`OscAdapterBinding`/`OscSenderAdapterBinding`/`ULipSyncAdapterBinding`) は `[Serializable]` + `[FacialAdapterBinding]` 属性で識別され、`PropertyDrawer` 経由で UI Toolkit Inspector が提供される
+- 具象 binding (`OscReceiverAdapterBinding`/`OscSenderAdapterBinding`/`ULipSyncAdapterBinding`) は `[Serializable]` + `[FacialAdapterBinding]` 属性で識別され、`PropertyDrawer` 経由で UI Toolkit Inspector が提供される
 - 現行は環境依存値もキャラ SO 内に inline される設計のため、git diff/環境切替が課題
 
 ### Architecture Pattern & Boundary Map
@@ -71,7 +71,7 @@ graph TB
     subgraph CoreCharacter[Character Concern]
         ProfileSO[FacialCharacterProfileSO]
         Bindings[AdapterBindings list]
-        OscBinding[OscAdapterBinding]
+        OscBinding[OscReceiverAdapterBinding]
         OscSenderBinding[OscSenderAdapterBinding]
         LipSyncBinding[ULipSyncAdapterBinding]
         ProfileSO --> Bindings
@@ -155,7 +155,7 @@ Packages/com.hidano.facialcontrol.osc/Tests/EditMode/Adapters/RuntimeSettings/
 └── OscRuntimeSettingsJsonRoundTripTests.cs            # ToJson/FromJson round-trip
 
 Packages/com.hidano.facialcontrol.osc/Tests/PlayMode/Integration/
-└── OscAdapterBindingSettingsReferenceTests.cs        # 新規: SO 参照経由で UDP 送受信が動くこと
+└── OscReceiverAdapterBindingSettingsReferenceTests.cs        # 新規: SO 参照経由で UDP 送受信が動くこと
 
 Packages/com.hidano.facialcontrol.lipsync/Tests/EditMode/Adapters/Devices/
 └── LipSyncDeviceStoreTests.cs                         # PlayerPrefs バックエンド差し替え方式テスト
@@ -165,9 +165,9 @@ Packages/com.hidano.facialcontrol.lipsync/Tests/PlayMode/Lifecycle/
 ```
 
 ### Modified Files
-- `Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/AdapterBindings/OscAdapterBinding.cs` — `_endpoint`/`_port`/`_stalenessSeconds`/`_failSafeMode`/`_bundleMode`/`_bundleAccumulationTimeoutMs` を削除し、`[SerializeField] private OscRuntimeSettingsSO _settings;` を追加。`OnStart` 時に `_settings.Receiver` セクションを読む
+- `Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/AdapterBindings/OscReceiverAdapterBinding.cs` — `_endpoint`/`_port`/`_stalenessSeconds`/`_failSafeMode`/`_bundleMode`/`_bundleAccumulationTimeoutMs` を削除し、`[SerializeField] private OscRuntimeSettingsSO _settings;` を追加。`OnStart` 時に `_settings.Receiver` セクションを読む
 - `Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/AdapterBindings/OscSenderAdapterBinding.cs` — `_endpoints`/`_heartbeatIntervalSeconds`/`_suppressLoopback` を削除し、`[SerializeField] private OscRuntimeSettingsSO _settings;` を追加。`OnStart` 時に `_settings.Sender` セクションを読む。`_blendShapeNames`/`_gazeExpressionIds` は据え置き
-- `Packages/com.hidano.facialcontrol.osc/Editor/AdapterBindings/OscAdapterBindingDrawer.cs` — 環境依存フィールドの inline 編集 UI を削除し、`OscRuntimeSettingsSO` への ObjectField (`AssignableType=OscRuntimeSettingsSO`) を追加
+- `Packages/com.hidano.facialcontrol.osc/Editor/AdapterBindings/OscReceiverAdapterBindingDrawer.cs` — 環境依存フィールドの inline 編集 UI を削除し、`OscRuntimeSettingsSO` への ObjectField (`AssignableType=OscRuntimeSettingsSO`) を追加
 - `Packages/com.hidano.facialcontrol.osc/Editor/AdapterBindings/OscSenderAdapterBindingDrawer.cs` — 同上
 - `Packages/com.hidano.facialcontrol.lipsync/Runtime/Adapters/ULipSyncAdapterBinding.cs` — `[SerializeField] private DeviceDescriptor _deviceDescriptor;` を削除し、`OnStart` 内で `LipSyncDeviceStore.Load()` を呼ぶように変更。`Configure(DeviceDescriptor ...)` API は引き続き残し、テストからは直接 descriptor を流し込めるようにする
 - `Packages/com.hidano.facialcontrol.lipsync/Editor/Inspector/ULipSyncAdapterBindingDrawer.cs` — `_deviceDescriptor` フィールド UI を削除。代わりに `LipSyncDeviceStore` を介して PlayerPrefs に保存する DeviceDescriptorPopup を結線 (PropertyDrawer ではなく Editor 専用 helper 経由)
@@ -227,7 +227,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Bootstrap as Facial Bootstrap
-    participant Binding as OscAdapterBinding
+    participant Binding as OscReceiverAdapterBinding
     participant Settings as OscRuntimeSettingsSO
     participant Host as OscReceiverHost
 
@@ -256,7 +256,7 @@ sequenceDiagram
 | 2.2 | Collection は List で sub-asset を束ねる | AdapterRuntimeSettingsCollectionSO | List sub-asset 参照 | - |
 | 2.3 | Project ビューでフォールドツリー表示 | Unity 標準 sub-asset 機構 (AddObjectToAsset) | - | Sub-asset 追加フロー |
 | 2.4 | OscRuntimeSettingsSO は Receiver/Sender 統合 | OscRuntimeSettingsSO | Receiver/Sender セクション getter | - |
-| 2.5 | OscAdapterBinding は OscRuntimeSettingsSO 1 参照 | OscAdapterBinding | SerializeField OscRuntimeSettingsSO | AdapterBinding 起動 |
+| 2.5 | OscReceiverAdapterBinding は OscRuntimeSettingsSO 1 参照 | OscReceiverAdapterBinding | SerializeField OscRuntimeSettingsSO | AdapterBinding 起動 |
 | 2.6 | OscSenderAdapterBinding も同様 | OscSenderAdapterBinding | SerializeField OscRuntimeSettingsSO | AdapterBinding 起動 |
 | 2.7 | 同一 SO 参照時 Receiver/Sender 一貫 | OscRuntimeSettingsSO 単一 SO | - | - |
 | 3.1 | Sub-asset 追加で既存値を保持 | CollectionEditor (AssetDatabase.AddObjectToAsset) | - | Sub-asset 追加フロー |
@@ -288,7 +288,7 @@ sequenceDiagram
 | 7.2 | EditMode: OscRuntimeSettingsSO serialize/deserialize 検証 | OscRuntimeSettingsSOTests | - | - |
 | 7.3 | EditMode: ToJson/FromJson ラウンドトリップ全フィールド保持 | OscRuntimeSettingsJsonRoundTripTests | - | - |
 | 7.4 | EditMode: LipSyncDeviceStore テストは実 PlayerPrefs 不使用 | LipSyncDeviceStoreTests + IPlayerPrefsBackend Fake | - | - |
-| 7.5 | PlayMode: OscBinding が SettingsSO 経由で UDP 送受信 | OscAdapterBindingSettingsReferenceTests | - | - |
+| 7.5 | PlayMode: OscBinding が SettingsSO 経由で UDP 送受信 | OscReceiverAdapterBindingSettingsReferenceTests | - | - |
 | 7.6 | PlayMode: ULipSync が DeviceStore 経由 DeviceName でマイク初期化 | ULipSyncAdapterBindingDeviceStoreTests | - | - |
 | 7.7 | 旧フィールド参照を全テストから除去 | 既存テスト群の改修 | - | - |
 | 7.8 | テスト命名規則準拠 | 全新規/改修テスト | - | - |
@@ -302,7 +302,7 @@ sequenceDiagram
 | AdapterRuntimeSettingsBase | `Hidano.FacialControl.Adapters.RuntimeSettings` | sub-asset 共通基底、_label/_schemaVersion/ToJson/FromJson 拡張点を提供 | 2.1, 5.1, 5.2, 5.6, 6.7 | UnityEngine.ScriptableObject (P0) | Service, State |
 | AdapterRuntimeSettingsCollectionSO | `Hidano.FacialControl.Adapters.RuntimeSettings` | 親 SO、List<Base> + マイグレーション拡張点予約 | 1.3, 2.2, 2.3, 3.1-3.4, 5.4, 5.5 | UnityEngine.ScriptableObject (P0), AdapterRuntimeSettingsBase (P0) | Service, State |
 | OscRuntimeSettingsSO | Adapters (osc) | Receiver/Sender セクション統合の具象 SettingsSO | 1.3, 2.4, 5.3, 7.2, 7.3 | AdapterRuntimeSettingsBase (P0), OscSenderEndpointConfig (P0), OscMappingEntry (P1) | Service, State |
-| OscAdapterBinding (改修) | Adapters (osc) | Receiver セクションを SettingsSO 経由で参照 | 1.1, 2.5, 2.7, 7.5 | OscRuntimeSettingsSO (P0) | Service |
+| OscReceiverAdapterBinding (改修) | Adapters (osc) | Receiver セクションを SettingsSO 経由で参照 | 1.1, 2.5, 2.7, 7.5 | OscRuntimeSettingsSO (P0) | Service |
 | OscSenderAdapterBinding (改修) | Adapters (osc) | Sender セクションを SettingsSO 経由で参照 | 1.1, 2.6, 2.7, 7.5 | OscRuntimeSettingsSO (P0) | Service |
 | LipSyncDeviceStore | Adapters (lipsync) | PlayerPrefs ラッパー静的 API | 1.4, 4.1-4.6, 7.4 | UnityEngine.PlayerPrefs (P0), IPlayerPrefsBackend (P1) | Service |
 | ULipSyncAdapterBinding (改修) | Adapters (lipsync) | DeviceStore 経由で DeviceDescriptor を取得 | 4.1, 4.3, 7.6 | LipSyncDeviceStore (P0) | Service |
@@ -368,7 +368,7 @@ public abstract class AdapterRuntimeSettingsBase : UnityEngine.ScriptableObject
 - `CreateAssetMenu` を付与し、Project ビューから 1 ファイル作成可能 (`menuName = "FacialControl/Adapter Runtime Settings Collection"`)
 
 **Dependencies**
-- Inbound: `OscAdapterBinding` / `OscSenderAdapterBinding` — 直接ではなく、それぞれが Collection 内の `OscRuntimeSettingsSO` sub-asset を `[SerializeField]` で参照 (P1)
+- Inbound: `OscReceiverAdapterBinding` / `OscSenderAdapterBinding` — 直接ではなく、それぞれが Collection 内の `OscRuntimeSettingsSO` sub-asset を `[SerializeField]` で参照 (P1)
 - Outbound: `AdapterRuntimeSettingsBase` (P0)
 - External: `UnityEngine.ScriptableObject` (P0)
 
@@ -409,11 +409,11 @@ public sealed class AdapterRuntimeSettingsCollectionSO : UnityEngine.ScriptableO
 **Responsibilities & Constraints**
 - Receiver セクション: `string ListenEndpoint`, `int ListenPort`, `float StalenessSeconds`, `FailSafeMode FailSafeMode`, `bool ConsistencyCheckWarnLog`, `BundleInterpretationMode BundleMode`, `float BundleAccumulationTimeoutMs`
 - Sender セクション: `List<OscSenderEndpointConfig> Endpoints`, `float HeartbeatIntervalSeconds`, `bool SuppressLoopback`
-- 両セクションは独立。`OscAdapterBinding` は Receiver のみ、`OscSenderAdapterBinding` は Sender のみを読む (要件 2.5/2.6)
+- 両セクションは独立。`OscReceiverAdapterBinding` は Receiver のみ、`OscSenderAdapterBinding` は Sender のみを読む (要件 2.5/2.6)
 - `ToJson` / `FromJson` を override し、Receiver/Sender 全フィールドをラウンドトリップする (要件 5.3, 7.3)
 
 **Dependencies**
-- Inbound: `OscAdapterBinding`, `OscSenderAdapterBinding` (P0)
+- Inbound: `OscReceiverAdapterBinding`, `OscSenderAdapterBinding` (P0)
 - Outbound: `AdapterRuntimeSettingsBase` (P0), `OscSenderEndpointConfig` (P0), `FailSafeMode`/`BundleInterpretationMode` enums (P1)
 - External: `UnityEngine.JsonUtility` (P0)
 
@@ -451,7 +451,7 @@ public sealed class OscRuntimeSettingsSO : AdapterRuntimeSettingsBase
 - Validation: `ISerializationCallbackReceiver.OnAfterDeserialize` で port 範囲・timeout 正値・enum 正規化を実施
 - Risks: Receiver/Sender を統合したことで「Receiver だけ別 SO」運用ができない。要件 6.6 で同型複数 sub-asset を許容するため、利用者は Receiver 用 SO と Sender 用 SO を 2 つ作って binding 側で別 SO を参照させることで分離可能 (Sender セクションを空のままにする SO を作る、等)
 
-#### OscAdapterBinding (改修)
+#### OscReceiverAdapterBinding (改修)
 
 | Field | Detail |
 |-------|--------|
@@ -494,7 +494,7 @@ public sealed class OscRuntimeSettingsSO : AdapterRuntimeSettingsBase
 
 **Implementation Notes**
 - Integration: `OnStart` 内の `EnsureEndpointList()` 経路を `_settings != null ? _settings.Endpoints : _legacyEndpoints` のフォールバックで二段化することは行わない (preview のため後方互換不要)。`_settings == null` は warning + skip
-- Risks: `_settings` を `OscAdapterBinding` と共有することで Receiver/Sender を同期できる (要件 2.7)。Receiver/Sender 別 SO を持ちたい利用者向けには別 SO を Inspector で割り当てる運用を案内
+- Risks: `_settings` を `OscReceiverAdapterBinding` と共有することで Receiver/Sender を同期できる (要件 2.7)。Receiver/Sender 別 SO を持ちたい利用者向けには別 SO を Inspector で割り当てる運用を案内
 
 ### Adapters (LipSync) Layer
 
@@ -678,7 +678,7 @@ MyEnvironment.asset                                   (AdapterRuntimeSettingsCol
 `FromJson(string)` は `JsonUtility.FromJsonOverwrite` でフィールドを上書きし、`OnAfterDeserialize` で defaults を適用する。enum (`FailSafeMode`/`BundleInterpretationMode`) は `int` ではなく文字列で書き出すため、既存 `OscReceiverOptionsDto.ToFailSafeModeString` 等の正規化処理を移植する。
 
 **SO 経由参照契約**:
-- `OscAdapterBinding._settings == null` のとき: warning + start skip
+- `OscReceiverAdapterBinding._settings == null` のとき: warning + start skip
 - `OscRuntimeSettingsSO` の sub-asset が外部 Asset として独立しないこと (Collection の sub-asset としてのみ存在): Editor が保証
 
 ## Error Handling
@@ -689,7 +689,7 @@ MyEnvironment.asset                                   (AdapterRuntimeSettingsCol
 ### Error Categories and Responses
 
 **設定欠落 (warning)**:
-- `OscAdapterBinding._settings == null`: `Debug.LogWarning("[OscAdapterBinding] OscRuntimeSettingsSO が未割当のため起動をスキップします。")` → `OnStart` 早期 return
+- `OscReceiverAdapterBinding._settings == null`: `Debug.LogWarning("[OscReceiverAdapterBinding] OscRuntimeSettingsSO が未割当のため起動をスキップします。")` → `OnStart` 早期 return
 - `OscSenderAdapterBinding._settings == null`: 同上
 - `OscRuntimeSettingsSO.Endpoints.Count == 0`: 既存 OSC Sender 同様 warning + skip
 
@@ -722,7 +722,7 @@ MyEnvironment.asset                                   (AdapterRuntimeSettingsCol
 - `AdapterRuntimeSettingsCollectionEditorTests.AddSameLabel_LogsWarning` — 重複 `_label` で warning が出ること (要件 6.8) — LogAssert 使用
 
 ### Integration Tests (PlayMode)
-- `OscAdapterBindingSettingsReferenceTests.OnStart_WithSettingsSo_ReceivesUdpMessages` — 実 UDP 経路で binding が SettingsSO の port を読んで受信できる (要件 7.5)
+- `OscReceiverAdapterBindingSettingsReferenceTests.OnStart_WithSettingsSo_ReceivesUdpMessages` — 実 UDP 経路で binding が SettingsSO の port を読んで受信できる (要件 7.5)
 - `OscSenderAdapterBindingSettingsReferenceTests.OnLateTick_WithSettingsSo_SendsUdpBundle` — Sender が SettingsSO の endpoints を読んで送信できる (要件 7.5)
 - `ULipSyncAdapterBindingDeviceStoreTests.OnStart_LoadsDeviceFromStore_InitializesMicInput` — DeviceStore に保存した DeviceName で `uLipSyncMicrophone` が初期化されること (要件 7.6)
 - `OscBindingsSharedSettingsTests.OnStart_BothBindings_ReadConsistentSettings` — Receiver/Sender 両方が同一 SO を参照したときの整合性 (要件 2.7)
@@ -749,7 +749,7 @@ flowchart LR
     A[既存 *Profile.asset] --> B[Adapter Runtime Settings Collection.asset 新規作成]
     B --> C[OscRuntimeSettingsSO sub-asset を Add]
     C --> D[既存 binding の _endpoint/_port 等を新 SO に転記]
-    D --> E[キャラ SO の OscAdapterBinding._settings に新 SO をアサイン]
+    D --> E[キャラ SO の OscReceiverAdapterBinding._settings に新 SO をアサイン]
     E --> F[ULipSyncAdapterBinding._deviceDescriptor の値を PlayerPrefs に手動投入]
     F --> G[既存 binding 上の旧 SerializeField を削除]
     G --> H[Run tests]

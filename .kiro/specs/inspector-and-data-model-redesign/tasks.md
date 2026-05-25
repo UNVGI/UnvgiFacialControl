@@ -1,4 +1,4 @@
-# Implementation Plan: inspector-and-data-model-redesign
+﻿# Implementation Plan: inspector-and-data-model-redesign
 
 > **Mode**: 6-Phase Incremental Implementation (Hybrid Option C, design.md 採用)
 > **TDD**: 各タスクで Red → Green → Refactor を完結。Red 段階のテスト一覧と Green 段階の実装変更概要を必ず明示。
@@ -11,8 +11,8 @@
 
 ## Phase 1: Domain 新型追加（bridge 期間維持）
 
-- [ ] 1. Phase 1 Foundation — Domain 新型 + 既存 Domain Tests 緑維持
-- [ ] 1.1 Domain 値型 LayerOverrideMask を追加し、bit 演算と layer 名配列との往復を確立する
+- [x] 1. Phase 1 Foundation — Domain 新型 + 既存 Domain Tests 緑維持
+- [x] 1.1 Domain 値型 LayerOverrideMask を追加し、bit 演算と layer 名配列との往復を確立する
   - `[Flags] enum : int`（32 bit）として宣言、`None / Bit0 .. Bit31` を定義
   - bit position と layer 名の対応表は Adapters 側のヘルパーが持つこと（Domain は関知しない）を README コメントで明示
   - **Red**: `LayerOverrideMaskTests`（`Combine_TwoFlags_HasBoth`, `HasFlag_AbsentBit_ReturnsFalse`, `None_HasNoBits_ReturnsTrue`, `BitPositionCount_Equals32`）を新規追加
@@ -22,7 +22,7 @@
   - _Requirements: 3.1, 3.4, 13.1, 13.4_
   - _Boundary: Domain.Models.LayerOverrideMask_
 
-- [ ] 1.2 (P) Domain 値型 BlendShapeSnapshot / BoneSnapshot を追加し、防御コピーと不変性を保証する
+- [x] 1.2 (P) Domain 値型 BlendShapeSnapshot / BoneSnapshot を追加し、防御コピーと不変性を保証する
   - `BlendShapeSnapshot`: `RendererPath / Name / Value` の `readonly struct`
   - `BoneSnapshot`: `BonePath / Position(X,Y,Z) / Euler(X,Y,Z) / Scale(X,Y,Z)` の `readonly struct`
   - **Red**: `BlendShapeSnapshotTests`（`Ctor_Stores_AllFields`, `Equality_SameValues_AreEqual`）と `BoneSnapshotTests`（`Ctor_Stores_AllNineFloats`）を追加
@@ -32,7 +32,7 @@
   - _Requirements: 1.5, 2.1, 2.2, 9.2, 13.1_
   - _Boundary: Domain.Models.BlendShapeSnapshot, Domain.Models.BoneSnapshot_
 
-- [ ] 1.3 (P) Domain 値型 ExpressionSnapshot を追加し、AnimationClip 由来 snapshot の Domain 受け皿を成立させる
+- [x] 1.3 (P) Domain 値型 ExpressionSnapshot を追加し、AnimationClip 由来 snapshot の Domain 受け皿を成立させる
   - `ExpressionSnapshot`: `Id / TransitionDuration / TransitionCurvePreset / ReadOnlyMemory<BlendShapeSnapshot> / ReadOnlyMemory<BoneSnapshot> / ReadOnlyMemory<string> RendererPaths`
   - `TransitionCurvePreset` enum を新規定義（`Linear=0, EaseIn=1, EaseOut=2, EaseInOut=3`）
   - **Red**: `ExpressionSnapshotTests`（`Ctor_Defensive_Copies_BlendShapes`, `Ctor_NullArrays_ProducesEmptyMemory`, `TransitionCurvePreset_DefaultsTo_Linear`, `TransitionDuration_Default_Is_PointTwoFive`）を追加
@@ -43,7 +43,7 @@
   - _Boundary: Domain.Models.ExpressionSnapshot, Domain.Models.TransitionCurvePreset_
   - _Depends: 1.2_
 
-- [ ] 1.4 Phase 1 完了レビュー — Domain 新型 4 種の API surface 確認と asmdef 静的検査
+- [x] 1.4 Phase 1 完了レビュー — Domain 新型 4 種の API surface 確認と asmdef 静的検査
   - `Hidano.FacialControl.Domain.asmdef` の `references` に `UnityEngine.AnimationClip` 等が混入していないことを確認
   - 既存 `Expression` / `LayerSlot` / `BonePose` は本 Phase では変更しないこと（bridge 期間）を CI で確認
   - 完了基準: Unity Test Runner の Domain test category 全緑、`grep` で Domain 配下に `UnityEngine.AnimationClip` 参照ゼロ
@@ -55,9 +55,9 @@
 
 ## Phase 2: AnimationClip サンプラ実装（Editor 専用）
 
-- [ ] 2. Phase 2 — AnimationClip → ExpressionSnapshot サンプラと中間 JSON v2.0 schema を成立させる
+- [x] 2. Phase 2 — AnimationClip → ExpressionSnapshot サンプラと中間 JSON v2.0 schema を成立させる
 
-- [ ] 2.1 Editor 専用サンプラの interface と stateless 実装を導入し、AnimationUtility 経由で時刻 0 値を取得する
+- [x] 2.1 Editor 専用サンプラの interface と stateless 実装を導入し、AnimationUtility 経由で時刻 0 値を取得する
   - `IExpressionAnimationClipSampler` interface（`SampleSnapshot(snapshotId, clip)` と `SampleSummary(clip)` の 2 メソッド）を Editor asmdef 配下に新規定義
   - `AnimationClipExpressionSampler` 実装: `AnimationUtility.GetCurveBindings(clip)` で binding 列挙、`AnimationUtility.GetEditorCurve(clip, binding).Evaluate(0f)` で時刻 0 値取得
   - BlendShape binding は `binding.propertyName.StartsWith("blendShape.")` で判別、Transform binding は `m_LocalPosition.{x,y,z}` / `m_LocalRotation` 系 / `m_LocalScale.{x,y,z}` で判別
@@ -75,7 +75,7 @@
   - _Boundary: Editor.Sampling_
   - _Depends: 1.3_
 
-- [ ] 2.2 (P) AnimationEvent 経由の TransitionDuration / TransitionCurvePreset メタデータを抽出する
+- [x] 2.2 (P) AnimationEvent 経由の TransitionDuration / TransitionCurvePreset メタデータを抽出する
   - 予約 AnimationEvent: `functionName == "FacialControlMeta_Set"`, `stringParameter` でキー識別（`"transitionDuration"` / `"transitionCurvePreset"`）, `floatParameter` で値運搬
   - 同名 key が複数あれば最初の 1 個のみ採用、警告 1 回
   - 不在時 fallback: `TransitionDuration = 0.25f`, `TransitionCurve = Linear`（Req 2.5, 2.6）
@@ -91,7 +91,7 @@
   - _Boundary: Editor.Sampling_
   - _Depends: 2.1_
 
-- [ ] 2.3 中間 JSON schema v2.0 の DTO を新設し、snapshot table 形式の round-trip を確立する
+- [x] 2.3 中間 JSON schema v2.0 の DTO を新設し、snapshot table 形式の round-trip を確立する
   - 新設 DTO: `ExpressionSnapshotDto` / `BlendShapeSnapshotDto` / `BoneSnapshotDto`
   - 改修 DTO: `ExpressionDto` を `id / name / layer / layerOverrideMask: List<string> / snapshot: ExpressionSnapshotDto` に再構成。旧 `transitionDuration / transitionCurve / blendShapeValues / layerSlots` field は撤去
   - JSON 例（design.md "Logical Data Model" セクション準拠）:
@@ -108,7 +108,7 @@
   - _Boundary: Adapters.Json.Dto, Adapters.Json.SystemTextJsonParser_
   - _Depends: 1.3_
 
-- [ ] 2.4 サンプラの Editor 専用境界とパフォーマンスを CI で保証する
+- [x] 2.4 サンプラの Editor 専用境界とパフォーマンスを CI で保証する
   - asmdef 静的検査: `Hidano.FacialControl.Editor.asmdef` の `includePlatforms: ["Editor"]` を確認
   - 1 Expression あたり 50ms 以内（典型 ~10 BlendShapes）の EditMode benchmark を `AnimationClipExpressionSamplerBenchmarkTests` で計測（`UnityEngine.TestTools.Performance` または `Stopwatch` 比較）
   - サンプラを Runtime asmdef から参照しようとする コードが書けないことを Test asmdef で確認（コンパイルエラーになる経路を意図的に test fixture に残さない）
@@ -124,9 +124,9 @@
 
 ## Phase 3: Domain Expression / LayerSlot / FacialProfile 破壊書換
 
-- [ ] 3. Phase 3 — Domain 中核モデル置換と Tests 大量書換（Phase 1〜2 で bridge した上で破壊実行）
+- [x] 3. Phase 3 — Domain 中核モデル置換と Tests 大量書換（Phase 1〜2 で bridge した上で破壊実行）
 
-- [ ] 3.1 Expression struct を SnapshotId 参照型へ破壊置換し、派生 5 値の field を撤去する
+- [x] 3.1 Expression struct を SnapshotId 参照型へ破壊置換し、派生 5 値の field を撤去する
   - 旧 field 撤去: `TransitionDuration / TransitionCurve / BlendShapeValues / LayerSlots`（Req 1.5）
   - 新 field: `Id / Name / Layer / OverrideMask: LayerOverrideMask / SnapshotId: string`
   - **Red**: 既存 `ExpressionTests` を全面書き換え。新規追加: `Ctor_StoresAllFields`, `OverrideMask_DefaultsToNone_AllowedByDomain`, `SnapshotId_NonEmpty`
@@ -137,7 +137,7 @@
   - _Boundary: Domain.Models.Expression_
   - _Depends: 1.4, 2.4_
 
-- [ ] 3.2 LayerSlot struct を撤去し、LayerOverrideMask への置換を完了する
+- [x] 3.2 LayerSlot struct を撤去し、LayerOverrideMask への置換を完了する
   - `Runtime/Domain/Models/LayerSlot.cs` を物理削除
   - 旧 `LayerSlot` を参照していた箇所（Adapters Serializable / Json DTO / Tests）を全て `LayerOverrideMask` 経由に置換
   - **Red**: 既存 `LayerSlotTests.cs` を物理削除し、内容を `LayerOverrideMaskTests` 側へ移行確認（既に Phase 1 で網羅済）
@@ -148,7 +148,7 @@
   - _Boundary: Domain.Models.LayerSlot, Adapters.ScriptableObject.Serializable.LayerSlotSerializable_
   - _Depends: 3.1_
 
-- [ ] 3.3 FacialProfile から BonePoses 配列を撤去し、Expression snapshot 経路に一元化する
+- [x] 3.3 FacialProfile から BonePoses 配列を撤去し、Expression snapshot 経路に一元化する
   - `FacialProfile.BonePoses` プロパティを撤去（Req 5.1）
   - `BonePose.cs` / `BonePoseEntry.cs` を物理削除（snapshot 系へ完全移行）
   - 既存 `BonePoseComposer` は Adapters Bone 層から呼ばれるため保持。但し input は `BoneSnapshot` 経由に変更
@@ -160,7 +160,7 @@
   - _Boundary: Domain.Models.FacialProfile, Domain.Models.BonePose, Adapters.Bone_
   - _Depends: 3.1, 1.2_
 
-- [ ] 3.4 ExpressionResolver サービスを新設し、SnapshotId → BlendShape / Bone 値の preallocated 解決を提供する
+- [x] 3.4 ExpressionResolver サービスを新設し、SnapshotId → BlendShape / Bone 値の preallocated 解決を提供する
   - `ExpressionResolver` 構築時に `IReadOnlyDictionary<string, ExpressionSnapshot>` を受け取り内部に preallocate
   - `TryResolve(snapshotId, Span<float> blendShapeOutput, Span<BoneSnapshot> boneOutput)` を提供
   - 0-alloc 維持（Req 11.1, 11.4）
@@ -175,7 +175,7 @@
   - _Boundary: Domain.Services.ExpressionResolver_
   - _Depends: 3.1, 3.3_
 
-- [ ] 3.5 Domain AnalogBindingEntry から Mapping field を撤去し、AnalogMappingFunction を物理削除する
+- [x] 3.5 Domain AnalogBindingEntry から Mapping field を撤去し、AnalogMappingFunction を物理削除する
   - `Domain.Models.AnalogBindingEntry` の `Mapping` field 撤去（Req 6.3）
   - `Domain.Models.AnalogMappingFunction.cs` 物理削除
   - Domain 側は `SourceId / SourceAxis / TargetKind / TargetIdentifier / TargetAxis` のみ保持（Adapters 側で `InputActionReference` を保持: Req 13.3 / Decision 4）
@@ -187,7 +187,7 @@
   - _Boundary: Domain.Models.AnalogBindingEntry, Domain.Models.AnalogMappingFunction, Domain.Services.AnalogMappingEvaluator_
   - _Depends: 3.4_
 
-- [ ] 3.6 SystemTextJsonParser と FacialCharacterProfileConverter を schema v2.0 専用に書換える
+- [x] 3.6 SystemTextJsonParser と FacialCharacterProfileConverter を schema v2.0 専用に書換える
   - JSON parser: `schemaVersion: "2.0"` 以外を `Debug.LogError` + `InvalidOperationException` で拒否（Req 10.1）
   - Converter: SO Serializable → Domain `FacialProfile` 変換で snapshot 展開
   - 旧 `BonePoseDto` / `BonePoseEntryDto` / `LayerSlotDto` を物理削除
@@ -203,7 +203,7 @@
   - _Boundary: Adapters.Json, Adapters.ScriptableObject.Serializable_
   - _Depends: 3.4, 3.5, 2.3_
 
-- [ ] 3.7 Phase 3 完了レビュー — Domain 全層の破壊書換が CI 緑であることを確認
+- [x] 3.7 Phase 3 完了レビュー — Domain 全層の破壊書換が CI 緑であることを確認
   - `grep` で `LayerSlot` / `BonePose` / `BonePoseEntry` / `AnalogMappingFunction` / `AnalogMappingEvaluator` 参照ゼロ
   - Application 層の `ExpressionUseCase.Activate(Expression)` API 維持を Application Tests で確認
   - 完了基準: Unity Test Runner EditMode 全緑
@@ -215,9 +215,9 @@
 
 ## Phase 4: InputProcessor 6 種 + ExpressionInputSourceAdapter + Category 自動推定
 
-- [ ] 4. Phase 4 — InputSystem 連携の Processor 化と Adapter 統合
+- [x] 4. Phase 4 — InputSystem 連携の Processor 化と Adapter 統合
 
-- [ ] 4.1 (P) Analog deadzone / scale / offset / clamp の 4 種 InputProcessor を stateless で実装する
+- [x] 4.1 (P) Analog deadzone / scale / offset / clamp の 4 種 InputProcessor を stateless で実装する
   - `AnalogDeadZoneProcessor`: `min / max` の `float` field、`Process(value, control)` で abs ≤ min は 0、ノーマライズして `Sign(value) * Clamp01(normalized)`
   - `AnalogScaleProcessor`: `factor: float`、`value * factor`
   - `AnalogOffsetProcessor`: `offset: float`、`value + offset`
@@ -231,7 +231,7 @@
   - _Boundary: Adapters.Processors.AnalogDeadZone, Adapters.Processors.AnalogScale, Adapters.Processors.AnalogOffset, Adapters.Processors.AnalogClamp_
   - _Depends: 3.7_
 
-- [ ] 4.2 (P) Analog curve / invert の 2 種 InputProcessor を stateless で実装する
+- [x] 4.2 (P) Analog curve / invert の 2 種 InputProcessor を stateless で実装する
   - `AnalogInvertProcessor`: `-value`
   - `AnalogCurveProcessor`: `preset: int`（0=Linear, 1=EaseIn `v*v`, 2=EaseOut `1-(1-v)*(1-v)`, 3=EaseInOut）。Custom Hermite は v2.1 以降（Decision 3）
   - **Red**: `AnalogProcessorTests` に追加（invert 3 ケース + curve 4 preset × 3 ケース = 15 本）
@@ -242,7 +242,7 @@
   - _Boundary: Adapters.Processors.AnalogInvert, Adapters.Processors.AnalogCurve_
   - _Depends: 3.7_
 
-- [ ] 4.3 InputProcessor 6 種を Editor / Runtime 両方で一括登録する初期化フックを設置する
+- [x] 4.3 InputProcessor 6 種を Editor / Runtime 両方で一括登録する初期化フックを設置する
   - `AnalogProcessorRegistration` 静的クラス: `[InitializeOnLoad]` + `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]` で 6 processor を `InputSystem.RegisterProcessor` 一括登録
   - **Red**: `AnalogProcessorRegistrationTests`（PlayMode）に「`InputSystem.TryGetProcessor("deadZone")` 等で全 6 種が解決できる」テストを追加
   - **Green**: `Runtime/Adapters/Processors/AnalogProcessorRegistration.cs` を新規作成
@@ -252,7 +252,7 @@
   - _Boundary: Adapters.Processors.AnalogProcessorRegistration_
   - _Depends: 4.1, 4.2_
 
-- [ ] 4.4 InputDeviceCategorizer を新設し、InputBinding.path から DeviceCategory を 0-alloc で推定する
+- [x] 4.4 InputDeviceCategorizer を新設し、InputBinding.path から DeviceCategory を 0-alloc で推定する
   - `enum DeviceCategory { Keyboard, Controller }`
   - `static Categorize(string bindingPath, out bool wasFallback)`: prefix 判別（`<Keyboard>` → Keyboard、`<Gamepad>` / `<Joystick>` / `<XRController>` / `<Pen>` / `<Touchscreen>` → Controller、未認識は Controller fallback + `wasFallback = true`）
   - 0-alloc: `string.StartsWith(prefix, StringComparison.Ordinal)`
@@ -269,7 +269,7 @@
   - _Boundary: Adapters.Input.InputDeviceCategorizer_
   - _Depends: 4.3_
 
-- [ ] 4.5 ExpressionInputSourceAdapter を新設し、Keyboard/Controller を統合した MonoBehaviour として動作させる
+- [x] 4.5 ExpressionInputSourceAdapter を新設し、Keyboard/Controller を統合した MonoBehaviour として動作させる
   - `[DisallowMultipleComponent]` の MonoBehaviour 1 個
   - 内部に keyboard 用 / controller 用の 2 つの `ExpressionTriggerInputSourceBase` インスタンスを composition で保持（D-12 既存挙動）
   - InputAction の `bindings[0].path` を `InputDeviceCategorizer` で分類して dispatch
@@ -288,7 +288,7 @@
   - _Boundary: Adapters.InputSources.ExpressionInputSourceAdapter_
   - _Depends: 4.4_
 
-- [ ] 4.6 Keyboard/Controller 個別 InputSource を物理削除し、ExpressionBindingEntry.Category を撤去する
+- [x] 4.6 Keyboard/Controller 個別 InputSource を物理削除し、ExpressionBindingEntry.Category を撤去する
   - `KeyboardExpressionInputSource.cs` / `ControllerExpressionInputSource.cs` 物理削除（Req 8.2）
   - `KeyboardExpressionInputSourceTests.cs` / `ControllerExpressionInputSourceTests.cs` 物理削除
   - `ExpressionBindingEntry.Category` field 撤去（Req 7.1）
@@ -303,7 +303,7 @@
   - _Boundary: Adapters.InputSources, Adapters.ScriptableObject.ExpressionBindingEntry, Adapters.ScriptableObject.FacialCharacterSO, Adapters.Input.FacialCharacterInputExtension_
   - _Depends: 4.5_
 
-- [ ] 4.7 InputSystemAdapter に device 推定経路を追加し、AnalogBindingEntrySerializable を簡素化する
+- [x] 4.7 InputSystemAdapter に device 推定経路を追加し、AnalogBindingEntrySerializable を簡素化する
   - `InputSystemAdapter.BindExpression(action, expression)` の入口で `InputDeviceCategorizer.Categorize(action.bindings[0].path)` を呼んで分岐
   - `AnalogBindingEntrySerializable`: `inputActionRef + targetIdentifier + targetAxis` のみに縮退（Req 6.2）
   - 旧 `mapping` field 撤去
@@ -315,7 +315,7 @@
   - _Boundary: Adapters.Input.InputSystemAdapter, Adapters.ScriptableObject.Serializable.AnalogBindingEntrySerializable_
   - _Depends: 4.5, 4.6_
 
-- [ ] 4.8 0-alloc 検証 PlayMode/Performance テストを整備する
+- [x] 4.8 0-alloc 検証 PlayMode/Performance テストを整備する
   - `ExpressionResolverAllocationTests`: 100 frames で `GC.GetTotalMemory(false)` delta = 0
   - `ExpressionInputSourceAdapterAllocationTests`: InputAction.performed を 100 回 dispatch して 0-alloc
   - `AnalogProcessorAllocationTests`: 6 種 processor 連結で per-Process 0-alloc
@@ -331,9 +331,9 @@
 
 ## Phase 5: Editor Inspector / ExpressionCreatorWindow / AutoExporter 全面改修
 
-- [ ] 5. Phase 5 — Editor UX 全面改修
+- [x] 5. Phase 5 — Editor UX 全面改修
 
-- [ ] 5.1 FacialCharacterSOInspector を UI Toolkit で全面改修し、新 UX を提供する
+- [x] 5.1 FacialCharacterSOInspector を UI Toolkit で全面改修し、新 UX を提供する
   - 旧 BonePose / RendererPath 手入力 UI を物理削除（Req 4.1, 5.1）
   - 旧 ExpressionBindingEntry.Category UI を物理削除（Req 7.1）
   - 新 UI 要素:
@@ -363,7 +363,7 @@
   - _Boundary: Editor.Inspector.FacialCharacterSOInspector_
   - _Depends: 4.6, 4.7, 2.4_
 
-- [ ] 5.2 (P) ExpressionCreatorWindow を AnimationClip ベイク経路に改修する
+- [x] 5.2 (P) ExpressionCreatorWindow を AnimationClip ベイク経路に改修する
   - 既存の PreviewRenderWrapper / BlendShapeNameProvider / BoneNameProvider は再利用
   - 出力先を「Domain Expression として保存」から「AnimationClip にベイク」に変更:
     - `AnimationUtility.SetEditorCurve(clip, binding, AnimationCurve.Constant(0f, 0f, value))`
@@ -381,7 +381,7 @@
   - _Boundary: Editor.Tools.ExpressionCreatorWindow_
   - _Depends: 2.2_
 
-- [ ] 5.3 FacialCharacterSOAutoExporter を AnimationClip サンプラ経路に改修し、進捗 + abort を提供する
+- [x] 5.3 FacialCharacterSOAutoExporter を AnimationClip サンプラ経路に改修し、進捗 + abort を提供する
   - `OnWillSaveAssets(string[] paths)` で FacialCharacterSO 由来 .asset を対象に各 Expression をサンプリング（Req 9.1）
   - 出力先: `Application.streamingAssetsPath/FacialControl/{soName}/profile.json`（schema v2.0）
   - 200ms 超で `EditorUtility.DisplayProgressBar` 発火、try/finally で `ClearProgressBar` 保証（Req 9.5）
@@ -399,7 +399,7 @@
   - _Boundary: Editor.AutoExport.FacialCharacterSOAutoExporter_
   - _Depends: 5.1, 2.4_
 
-- [ ] 5.4 (P) FacialControllerEditor の概要表示を新モデルに合わせて小修正する
+- [x] 5.4 (P) FacialControllerEditor の概要表示を新モデルに合わせて小修正する
   - BonePose カウント表示等の文字列を撤去（BonePose 概念が消えるため）
   - Expression 数 / Layer 数 / Snapshot 数の概要表示に置換
   - **Red**: `FacialControllerEditorTests`（EditMode）に「概要表示に BonePose 文字列が含まれない」テストを追加
@@ -414,9 +414,9 @@
 
 ## Phase 6: Sample 再生成 + Migration Guide + CHANGELOG
 
-- [ ] 6. Phase 6 — preview ユーザー向け配布物の整備（Documentation 系を除く実装作業のみ含める）
+- [x] 6. Phase 6 — preview ユーザー向け配布物の整備（Documentation 系を除く実装作業のみ含める）
 
-- [ ] 6.1 MultiSourceBlendDemo サンプルを schema v2.0 で再生成する
+- [x] 6.1 MultiSourceBlendDemo サンプルを schema v2.0 で再生成する
   - `Samples~/MultiSourceBlendDemo/` 配下に AnimationClip 4 種（Smile / Anger / Surprise / Lipsync_A）を新規生成
   - 各 AnimationClip に `FacialControlMeta_Set` AnimationEvent でメタデータを埋め込む（transitionDuration / transitionCurvePreset）
   - `MultiSourceBlendDemoCharacter.asset` を新 schema（schemaVersion=2.0、AnimationClip 参照ベース、LayerOverrideMask flags）で再構成
@@ -427,7 +427,7 @@
   - _Boundary: Samples~/MultiSourceBlendDemo, Assets/Samples_
   - _Depends: 5.1, 5.2, 5.3_
 
-- [ ] 6.2 (P) AnalogBindingDemo サンプルを mapping field 不在 + processors 埋込 で再生成する
+- [x] 6.2 (P) AnalogBindingDemo サンプルを mapping field 不在 + processors 埋込 で再生成する
   - `Samples~/AnalogBindingDemo/*.inputactions` に deadzone / scale / clamp processor を埋め込む（processors 文字列例: `"deadZone(min=0.1),scale(factor=2),clamp(min=0,max=1)"`）
   - `AnalogBindingDemoCharacter.asset` を mapping field 不在で再構成
   - `analog_bindings.json` を `inputActionRef + targetIdentifier + targetAxis` のみの schema で再生成
@@ -437,7 +437,7 @@
   - _Boundary: Samples~/AnalogBindingDemo, Assets/Samples_
   - _Depends: 4.7, 5.1_
 
-- [ ] 6.3 Migration Guide ドキュメントを Documentation~ に新規作成する
+- [x] 6.3 Migration Guide ドキュメントを Documentation~ に新規作成する
   - 配置: `Packages/com.hidano.facialcontrol.inputsystem/Documentation~/MIGRATION-v0.x-to-v1.0.md`
   - 構成（design.md "Migration Guide 構造" セクション準拠）:
     1. Schema 差分一覧表
@@ -451,7 +451,7 @@
   - _Boundary: Documentation~_
   - _Depends: 6.1, 6.2_
 
-- [ ] 6.4 CHANGELOG.md と package.json バージョンを Breaking Change 表記で更新する
+- [x] 6.4 CHANGELOG.md と package.json バージョンを Breaking Change 表記で更新する
   - `Packages/com.hidano.facialcontrol/CHANGELOG.md` と `Packages/com.hidano.facialcontrol.inputsystem/CHANGELOG.md` の両方を更新
   - 新 entry: `## [1.0.0-preview.X] - YYYY-MM-DD` の冒頭に **BREAKING CHANGES** ラベル + Migration Guide へのリンク（Req 10.6）
   - 撤去 API 一覧: `LayerSlot`, `BonePose`, `BonePoseEntry`, `AnalogMappingFunction`, `AnalogMappingEvaluator`, `KeyboardExpressionInputSource`, `ControllerExpressionInputSource`, `ExpressionBindingEntry.Category`
@@ -463,7 +463,7 @@
   - _Boundary: Packages/{core, inputsystem}/CHANGELOG.md, package.json_
   - _Depends: 6.3_
 
-- [ ] 6.5 Phase 6 完了レビュー — Sample 結線確認と CI 全 Phase 緑
+- [x] 6.5 Phase 6 完了レビュー — Sample 結線確認と CI 全 Phase 緑
   - Unity Editor で `Multi Source Blend Demo` / `Analog Binding Demo` の両 Scene を開いて Play、表情遷移と analog 入力が正常動作することを手動確認
   - UPM Package Manager の `Import Sample` 経由で空プロジェクトに Sample を import し、同等動作することを手動確認
   - Unity Test Runner で EditMode + PlayMode + Performance の全 categories が緑

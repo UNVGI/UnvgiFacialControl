@@ -22,7 +22,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
     /// task 12.4: Phase 2 完了後の実 binding 構成（OSC + InputSystem + ARKit）で
     /// AdapterBindingHost の 3 シナリオ 0-alloc 契約を再検証する。
     /// task 7.2 (<see cref="AdapterBindingHostAllocationTests"/>) が <c>TrackingAdapterBinding</c>
-    /// のような Mock 派生で確立した契約を、Phase 2 移行後の実具象（<see cref="OscAdapterBinding"/>,
+    /// のような Mock 派生で確立した契約を、Phase 2 移行後の実具象（<see cref="OscReceiverAdapterBinding"/>,
     /// <see cref="InputSystemAdapterBinding"/>, <see cref="ArKitOscAdapterBinding"/>）でも維持されて
     /// いることを 3 binding × 10 体構成で確認する。
     /// </summary>
@@ -181,7 +181,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
             switch (slot)
             {
                 case 0:
-                    return new OscAdapterBinding
+                    return new OscReceiverAdapterBinding
                     {
                         Slug = "phase2-osc-" + characterIndex,
                     };

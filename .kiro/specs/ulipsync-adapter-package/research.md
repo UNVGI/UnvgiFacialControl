@@ -52,7 +52,7 @@
 - **Findings**:
   - 同期 swap（API 呼出と同時に Destroy + AddComponent）の場合、当該フレームで Aggregator が既に旧 source を呼んだ後ならば古い値が layer に残るリスクがある。
   - Deferred（API 呼出時はフラグだけ立て、次の `OnFixedTick` で実 swap）にすると、1 サイクル目で provider が 0 出力 → layer が `Array.Clear` 済みのままで終わり、2 サイクル目で実 swap → 3 サイクル目以降で新デバイスの値が反映されるシーケンスが安定。
-  - `OnFixedTick` ではなく `OnTick` でも可だが、`OscAdapterBinding.OnFixedTick` (line 150) パターンとの整合のため `OnFixedTick` を採用。
+  - `OnFixedTick` ではなく `OnTick` でも可だが、`OscReceiverAdapterBinding.OnFixedTick` (line 150) パターンとの整合のため `OnFixedTick` を採用。
 - **Implications**:
   - DD-C: `SwapDevice` は **deferred**。`RequestZeroOutputForNextFrame` + `_swapPending = true` だけ実施し、次の `OnFixedTick` で実 swap を行う。
   - 配信用途のフレームレート（60-90 fps）で 1 サイクル分の遅延（〜16 ms）は感覚的に許容範囲。
@@ -62,7 +62,7 @@
 - **Context**: `AdapterSlug` は `^[a-zA-Z0-9_.-]{1,64}$` 規約。displayName から自動正規化する `FromDisplayName("uLipSync") = "u-lip-sync"` か、手動指定の `"ulipsync"` か。
 - **Sources Consulted**:
   - `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Models/AdapterSlug.cs` (gap-analysis §2)
-  - 既存 OscAdapterBinding の slug 既定 = `"osc"`（lowercase, no separator）
+  - 既存 OscReceiverAdapterBinding の slug 既定 = `"osc"`（lowercase, no separator）
 - **Findings**:
   - 既存 `osc` は単純 lowercase。`u-lip-sync` の方が長く、ユーザーが手で書く頻度（ScriptableObject 内の slug 重複検知ログ等）を考えると短い方が扱いやすい。
   - displayName を `"uLipSync"` のまま保ち、Slug 既定値は `"ulipsync"` とする方針が他パッケージと整合する（OSC が `"OSC"` displayName / `"osc"` slug の前例）。
@@ -183,7 +183,7 @@
 - **Risk-1 (UnityEvent micro-alloc)**: `uLipSync.LipSyncUpdateEvent (UnityEvent<LipSyncInfo>)` の Invoke が内部で `List<UnityAction>` 列挙を行うため、購読者数次第で micro-alloc 発生の可能性。
   - **Mitigation**: 1 binding = 1 listener 構成のため実質影響なし。実機計測で 0 byte 確認。
 - **Risk-2 (Drawer 工数)**: `[SerializeReference]` 多態リスト Drawer の新規実装は既存パッケージにテンプレートなし、1〜2 日のスパイク必要。
-  - **Mitigation**: Editor タスクを独立 task 化し、Runtime + Tests の TDD サイクルを Drawer 完成前から進められるよう `Configure(...)` プログラム API を併設（既存 `OscAdapterBinding.Configure` パターンと同じ）。
+  - **Mitigation**: Editor タスクを独立 task 化し、Runtime + Tests の TDD サイクルを Drawer 完成前から進められるよう `Configure(...)` プログラム API を併設（既存 `OscReceiverAdapterBinding.Configure` パターンと同じ）。
 - **Risk-3 (uLipSync API 変更)**: `phonemeRatios` 公開型が `IReadOnlyDictionary` 等に変わると enumerator が boxing 化する懸念。
   - **Mitigation**: `_phonemeKeys[]` + `TryGetValue` ループパターンで型変更耐性を確保。
 - **Risk-4 (uLipSync.profile 注入)**: AddComponent 直後の Awake/OnEnable で profile が null のまま AllocateBuffers が走る。
@@ -199,7 +199,7 @@
 - `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Adapters/InputSources/LipSyncInputSource.cs` — `SilenceThreshold = 1e-4f`、`TryWriteValues` 経路
 - `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Adapters/AdapterBuildContext.cs` — `HostGameObject` / `InputSourceRegistry` / `LipSyncProvider` field
 - `FacialControl/Packages/com.hidano.facialcontrol/Runtime/Domain/Adapters/AdapterBindingBase.cs` — lifecycle hook 契約
-- `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/AdapterBindings/OscAdapterBinding.cs` — `OnStart` (lines 111-147), `Dispose` (lines 166-183) パターン
+- `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/AdapterBindings/OscReceiverAdapterBinding.cs` — `OnStart` (lines 111-147), `Dispose` (lines 166-183) パターン
 - `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/AdapterBindings/InputSystemAdapterBinding.cs` — 複数 helper / 複数 IInputSource 登録の先行例
 - `FacialControl/Packages/com.hidano.facialcontrol/Editor/Inspector/AdapterBindings/AdapterBindingsListView.cs` — `[FacialAdapterBinding]` discovery + Add ドロップダウンパターン
 - `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Hidano.FacialControl.Osc.asmdef` — 姉妹パッケージ asmdef 雛形

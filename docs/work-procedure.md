@@ -1516,7 +1516,7 @@ spec `osc-output-binding` に基づき、OSC 送信 binding、受信 binding の
 - `GazeBindingConfig` は `expressionId` 必須、`useDistinctLeftRight`、条件付き `sourceIdLeft` / `sourceIdRight` の構造に統一する。
 - OSC / InputSystem の Gaze source は `<slug>:<expressionId>` または `<slug>:<expressionId>.left/right` で解決する。
 
-#### OOB-03: 受信側 `OscAdapterBinding` 拡張
+#### OOB-03: 受信側 `OscReceiverAdapterBinding` 拡張
 - `OscMappingEntry` に `Normal_BlendShape` / `Gaze_VRChat_XY` / `Gaze_ARKit_8BS` の mode を持たせ、旧 BlendShape 専用 mapping から破壊的に移行する。
 - bundle atomic swap、staleness fail-safe、sender identity によるゾンビ排除、heartbeat 整合性検査を同一 binding 内に集約する。
 
@@ -1526,9 +1526,9 @@ spec `osc-output-binding` に基づき、OSC 送信 binding、受信 binding の
 
 #### OOB-05: JSON / Drawer / Samples / 配布メタデータ
 - `Documentation~/osc-sender-options.md` / `osc-receiver-options.md` に DTO スキーマとサンプル JSON を記載する。
-- `OscSenderAdapterBindingDrawer` / `OscAdapterBindingDrawer` は UI Toolkit で実装し、mode 別 foldout と Gaze source 検証 HelpBox を持つ。
+- `OscSenderAdapterBindingDrawer` / `OscReceiverAdapterBindingDrawer` は UI Toolkit で実装し、mode 別 foldout と Gaze source 検証 HelpBox を持つ。
 - `com.hidano.facialcontrol.osc/package.json` の `samples` 配列に `OscOutputDemo` / `OscReceiverDemo` を登録する。
-- `CHANGELOG.md` と `README.md` は OSC 送信、受信拡張、Gaze Vector2 受信、`OscAdapterBinding` の破壊的変更を必ず記載する。
+- `CHANGELOG.md` と `README.md` は OSC 送信、受信拡張、Gaze Vector2 受信、`OscReceiverAdapterBinding` の破壊的変更を必ず記載する。
 
 ### Samples~ / Assets/Samples 同期手順
 

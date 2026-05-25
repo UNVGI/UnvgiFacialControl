@@ -179,11 +179,11 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             set => EnsureRuntimeSettings().SetSuppressLoopback(value);
         }
 
-        public OscSenderHost HelperHost => _sendSlots != null && _sendSlots.Count > 0
-            ? _sendSlots[0].Host
+        public OscSender HelperSender => _sendSlots != null && _sendSlots.Count > 0
+            ? _sendSlots[0].Sender
             : null;
 
-        public int HelperHostCount => _sendSlots != null ? _sendSlots.Count : 0;
+        public int HelperSenderCount => _sendSlots != null ? _sendSlots.Count : 0;
 
         public SenderIdentity Identity => _identity;
 
@@ -191,14 +191,14 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         public bool IsStarted => _started;
 
-        public OscSenderHost GetHelperHost(int index)
+        public OscSender GetHelperSender(int index)
         {
             if (_sendSlots == null)
             {
                 throw new ArgumentOutOfRangeException(nameof(index));
             }
 
-            return _sendSlots[index].Host;
+            return _sendSlots[index].Sender;
         }
 
         public void Configure(string endpoint, int port)
@@ -314,13 +314,13 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                     continue;
                 }
 
-                OscSenderHost host = null;
+                OscSender sender = null;
                 try
                 {
-                    host = ctx.HostGameObject.AddComponent<OscSenderHost>();
-                    host.Configure(endpoint.endpoint, endpoint.port, mappings, addressUtf8);
+                    sender = ctx.HostGameObject.AddComponent<OscSender>();
+                    sender.Configure(endpoint.endpoint, endpoint.port, mappings, addressUtf8);
                     sendSlots.Add(new SendSlot(
-                        host,
+                        sender,
                         endpoint.preset,
                         addressUtf8,
                         sourceBlendShapeIndices,
@@ -329,15 +329,15 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 }
                 catch (Exception ex)
                 {
-                    if (host != null)
+                    if (sender != null)
                     {
                         if (UnityEngine.Application.isPlaying)
                         {
-                            UnityEngine.Object.Destroy(host);
+                            UnityEngine.Object.Destroy(sender);
                         }
                         else
                         {
-                            UnityEngine.Object.DestroyImmediate(host);
+                            UnityEngine.Object.DestroyImmediate(sender);
                         }
                     }
 
@@ -386,14 +386,14 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             for (int i = 0; i < _sendSlots.Count; i++)
             {
                 SendSlot slot = _sendSlots[i];
-                if (slot.Host == null)
+                if (slot.Sender == null)
                 {
                     continue;
                 }
 
                 if (sendHeartbeat)
                 {
-                    slot.Host.SendBundle(
+                    slot.Sender.SendBundle(
                         _identityUuidBytes,
                         _identityStartedAtUnixMs,
                         slot.ScratchAddressUtf8,
@@ -404,7 +404,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 }
                 else
                 {
-                    slot.Host.SendBundle(
+                    slot.Sender.SendBundle(
                         _identityUuidBytes,
                         _identityStartedAtUnixMs,
                         slot.ScratchAddressUtf8,
@@ -436,16 +436,16 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             {
                 for (int i = 0; i < _sendSlots.Count; i++)
                 {
-                    OscSenderHost host = _sendSlots[i].Host;
-                    if (host != null)
+                    OscSender sender = _sendSlots[i].Sender;
+                    if (sender != null)
                     {
                         if (UnityEngine.Application.isPlaying)
                         {
-                            UnityEngine.Object.Destroy(host);
+                            UnityEngine.Object.Destroy(sender);
                         }
                         else
                         {
-                            UnityEngine.Object.DestroyImmediate(host);
+                            UnityEngine.Object.DestroyImmediate(sender);
                         }
                     }
                 }
@@ -1024,7 +1024,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         private sealed class SendSlot
         {
-            public readonly OscSenderHost Host;
+            public readonly OscSender Sender;
             public readonly AddressPresetKind Preset;
             public readonly byte[][] ConfiguredAddressUtf8;
             public readonly int[] SourceBlendShapeIndices;
@@ -1036,14 +1036,14 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             public int ScratchFloatCount;
 
             public SendSlot(
-                OscSenderHost host,
+                OscSender sender,
                 AddressPresetKind preset,
                 byte[][] configuredAddressUtf8,
                 int[] sourceBlendShapeIndices,
                 string[] heartbeatBlendShapeNames,
                 string[] gazeExpressionIds)
             {
-                Host = host;
+                Sender = sender;
                 Preset = preset;
                 ConfiguredAddressUtf8 = configuredAddressUtf8 ?? Array.Empty<byte[]>();
                 SourceBlendShapeIndices = sourceBlendShapeIndices ?? Array.Empty<int>();

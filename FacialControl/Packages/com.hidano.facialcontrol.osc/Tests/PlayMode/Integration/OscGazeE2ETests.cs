@@ -21,7 +21,7 @@ using UnityEngine.TestTools;
 namespace Hidano.FacialControl.Tests.PlayMode.Integration
 {
     [TestFixture]
-    public class OscGazeE2ETests
+    public class OscGazeE2ETests : InputTestFixture
     {
         private const string Endpoint = "127.0.0.1";
         private const int LoopbackPortBase = 19340;
@@ -38,15 +38,14 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         private FacialOutputBus _outputBus;
         private Gamepad _gamepad;
 
-        [SetUp]
-        public void SetUp()
+        public override void Setup()
         {
+            base.Setup();
             _registry = new InputSourceRegistry();
             _outputBus = new FacialOutputBus();
         }
 
-        [TearDown]
-        public void TearDown()
+        public override void TearDown()
         {
             for (int i = _startedBindings.Count - 1; i >= 0; i--)
             {
@@ -92,6 +91,8 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             _registry = null;
             _outputBus = null;
+
+            base.TearDown();
         }
 
         [UnityTest]
@@ -100,7 +101,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             int port = AllocatePort();
             var expected = new Vector2(0.64f, -0.37f);
 
-            OscAdapterBinding receiver = CreateReceiver(
+            OscReceiverAdapterBinding receiver = CreateReceiver(
                 "vrchat-gaze-receiver",
                 port,
                 new OscMappingEntry
@@ -140,7 +141,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             int port = AllocatePort();
             var expected = new Vector2(-0.42f, 0.58f);
 
-            OscAdapterBinding receiver = CreateReceiver(
+            OscReceiverAdapterBinding receiver = CreateReceiver(
                 "arkit-gaze-receiver",
                 port,
                 new OscMappingEntry
@@ -182,7 +183,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             float[] values = new float[PerfectSyncEyeLook.Count];
             PerfectSyncEyeLook.Compose(expectedLeft, expectedRight, values);
 
-            OscAdapterBinding receiver = CreateReceiver(
+            OscReceiverAdapterBinding receiver = CreateReceiver(
                 "arkit-asymmetric-receiver",
                 port,
                 new OscMappingEntry
@@ -215,7 +216,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             var inputValue = new Vector2(-0.55f, 0.25f);
             var oscValue = new Vector2(0.91f, -0.87f);
 
-            OscAdapterBinding receiver = CreateReceiver(
+            OscReceiverAdapterBinding receiver = CreateReceiver(
                 "z-osc-gaze",
                 port,
                 new OscMappingEntry
@@ -239,7 +240,11 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             yield return new WaitForSecondsRealtime(0.2f);
 
-            UnityEngine.InputSystem.LowLevel.InputState.Change(_gamepad.leftStick, inputValue);
+            using (UnityEngine.InputSystem.LowLevel.StateEvent.From(_gamepad, out var eventPtr))
+            {
+                _gamepad.leftStick.WriteValueIntoEvent(inputValue, eventPtr);
+                UnityEngine.InputSystem.InputSystem.QueueEvent(eventPtr);
+            }
             UnityEngine.InputSystem.InputSystem.Update();
             inputBinding.OnLateTick(0.016f);
 
@@ -263,7 +268,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         }
 
         private IEnumerator WaitUntilGazeVectorArrives(
-            OscAdapterBinding receiver,
+            OscReceiverAdapterBinding receiver,
             string sourceId,
             Vector2 expected,
             Action send)
@@ -286,7 +291,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         }
 
         private IEnumerator WaitUntilResolvedGazeArrives(
-            OscAdapterBinding receiver,
+            OscReceiverAdapterBinding receiver,
             Vector2 expectedLeft,
             Vector2 expectedRight,
             Action send)
@@ -321,12 +326,12 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             Assert.Fail("GazeBindingConfig 既定解決経路で左右 Gaze source を読み取れませんでした。");
         }
 
-        private OscAdapterBinding CreateReceiver(
+        private OscReceiverAdapterBinding CreateReceiver(
             string slug,
             int port,
             OscMappingEntry entry)
         {
-            return new OscAdapterBinding
+            return new OscReceiverAdapterBinding
             {
                 Slug = slug,
                 Endpoint = Endpoint,
@@ -396,7 +401,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         {
             GameObject go = CreateGameObject(name);
             OscSender sender = go.AddComponent<OscSender>();
-            sender.Address = Endpoint;
+            sender.Endpoint = Endpoint;
             sender.Port = port;
             sender.Initialize(mappings);
             sender.StartSending();

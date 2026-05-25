@@ -17,7 +17,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 {
     /// <summary>
     /// PlayMode E2E: FacialController の post-blend 出力を OSC loopback で送信し、
-    /// 受信側 LayerUseCase が OscAdapterBinding 経由で消費することを検証する。
+    /// 受信側 LayerUseCase が OscReceiverAdapterBinding 経由で消費することを検証する。
     /// </summary>
     [TestFixture]
     public class OscSendReceiveE2ETests
@@ -89,7 +89,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             };
             senderBinding.Configure(Endpoint, port, new[] { BlendShapeName });
 
-            var receiverBinding = new OscAdapterBinding
+            var receiverBinding = new OscReceiverAdapterBinding
             {
                 Slug = ReceiverSlug,
                 BundleMode = BundleInterpretationMode.AtomicSwap
@@ -128,7 +128,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             Assert.That(sourceController.IsInitialized, Is.True, "送信側 FacialController の初期化が成功すること。");
             Assert.That(receiverController.IsInitialized, Is.True, "受信側 FacialController の初期化が成功すること。");
             Assert.That(senderBinding.IsStarted, Is.True, "OscSenderAdapterBinding が child scope で起動していること。");
-            Assert.That(receiverBinding.IsStarted, Is.True, "OscAdapterBinding が child scope で起動していること。");
+            Assert.That(receiverBinding.IsStarted, Is.True, "OscReceiverAdapterBinding が child scope で起動していること。");
 
             sourceController.Activate(CreateSourceExpression());
 
@@ -162,7 +162,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             }
 
             Assert.That(reached, Is.True,
-                "FacialController → FacialOutputBus → OscSenderAdapterBinding → 実 UDP loopback → OscAdapterBinding → LayerUseCase の BlendShape 経路で値が到達すること。");
+                "FacialController → FacialOutputBus → OscSenderAdapterBinding → 実 UDP loopback → OscReceiverAdapterBinding → LayerUseCase の BlendShape 経路で値が到達すること。");
         }
 
         private static TestOscE2EProfileSO CreateProfileSo(

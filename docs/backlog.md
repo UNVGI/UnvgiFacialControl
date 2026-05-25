@@ -22,45 +22,12 @@
 
 ## 短期（別 PR / preview.1 内に拾う候補）
 
-### S-19: `OscGazeE2ETests.GazeResolver_OscAndInputSystemSameExpressionId_SelectsLexicographicallyFirstSlug` の InputSystem 側 Gaze 値が 0 になる
-- **出典**: 2026-05-20 `/kiro:validate-impl adapter-runtime-settings` 検証直後の Unity Test Runner 実行で観測（PlayMode）
-- **内容**: 同 expressionId (`eye-look`) を OSC binding (slug `z-osc-gaze`) と InputSystem binding (slug `a-input-system-gaze`) の両方が提供する状況で、`GazeBindingConfigResolver.TryResolve` が Ordinal 順で `a-input-system-gaze` を選択するまでは正常（ログ `selected 'a-input-system-gaze'` 出力済み・LogAssert PASS）。しかしその後の `AssertVector(sources.LeftSource, inputValue, ...)` で `Expected: -0.55 ±0.06, But was: 0.0` で失敗する。`OscGazeE2ETests.cs:466` の Vector2 比較地点で、InputSystem 経由の Gaze source（`AnalogInputSourceWrapper` → `InputActionAnalogSource`）が cache されているはずの `-0.55` を返さず 0 を返している。
-  - 初見の見立て: (a) `InputState.Change(_gamepad.leftStick, inputValue)` + `InputSystem.Update()` 直後の `inputBinding.OnLateTick(0.016f)` で `InputActionAnalogSource.Tick` が走る経路は正しく見える。`_action.controls[0]` が `StickControl`（InputControl<Vector2>）として解決されている前提が崩れている可能性。Instantiate 後の `InputActionAsset` で controls の Gamepad 解決が `0.2s WaitForSecondsRealtime` 後に reset / loss されているか、Tick 時点で `controls.Count == 0` だった場合 `_isValid = false` のまま 0 が返り得る。ただしエラー形式は値比較失敗（IsValid==true で _cachedX==0）なので、controls 解決後に `v2.ReadValue()` が 0 を返した可能性が高い。(b) `StickDeadzoneProcessor` のデフォルト deadzone(0.125) は `-0.55` でも通過するはずで、Tolerance(0.06) 内で `-0.53` 程度に縮減されても PASS する想定。
-  - 検証方針: (1) `OnLateTick` 内で `InputActionAnalogSource._action.controls.Count` と `_action.controls[0]?.device?.name` をログ出力し、Tick 時点で Gamepad が解決されているかを切り分け、(2) `WaitForSecondsRealtime` を `yield return null` × n に置換して InputSystem.Update のタイミング揺らぎを除去、(3) `inputBinding.OnLateTick` を `receiver.OnFixedTick` の直前に再度呼んで「最終 Tick から cache を読むまでの間に control 値が reset されていないか」を切り分け。
-- **トリガ**: preview.1 リリース前のテストグリーン化、または adapter-runtime-settings PR の CI 通過要件として
-- **影響範囲**: `FacialControl/Packages/com.hidano.facialcontrol.osc/Tests/PlayMode/Integration/OscGazeE2ETests.cs:212-263`, `FacialControl/Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/InputSources/InputActionAnalogSource.cs`（Tick 時の controls 解決診断ログ追加検討）, `Packages/com.hidano.facialcontrol.inputsystem/Runtime/Adapters/AdapterBindings/InputSystemAdapterBinding.cs`（OnLateTick の Tick 経路）
-- **関連**: M-13（複数 Vector2 入力源での gaze 同時駆動。本テストは「重複 slug 時の deterministic 選択」を検証するもので、multi-source blending とは別概念だが Gaze resolver の挙動共通）
-
-### S-18: `DeviceHotSwapTests.SwapDevice_MicToMicSecondDevice_ZeroSettlesThenRebinds` の新規 mic index が 0 に戻る
-- **出典**: 2026-05-20 `/kiro:validate-impl adapter-runtime-settings` 検証直後の Unity Test Runner 実行で観測（PlayMode）
-- **内容**: `ULipSyncAdapterBinding.SwapDevice("Unit Test Mic", 1)` → `OnFixedTick(0.02f)` で旧 mic Destroy + 新 mic AddComponent するフローで、`DeviceHotSwapTests.cs:112` の `Assert.That(microphones[0].index, Is.EqualTo(2))` が `But was: 0` で失敗する。Fake enumerator は `["Unit Test Mic", "Other Mic", "Unit Test Mic"]` を返し、`DeviceResolver.TryResolve` の matchOrdinal ロジックは DisambiguatorIndex=1 → ResolvedIndex=2 を返すのが正しい挙動（ロジックは検証済み）。`ULipSyncAdapterBinding.AddInputComponent` も `_microphoneInput.index = resolution.ResolvedIndex;` を実行している。
-  - 初見の見立て: (a) `_hostGameObject.SetActive(false)` のまま AddComponent するため Awake/OnEnable は走らないはず → デフォルト `index = 0` から `index = 2` セットへの上書きは成立するはず。(b) しかし結果として 0 になっているということは、`uLipSyncMicrophone.OnEnable` が遅延キューイングで後から走り `_preIndex = index;` の時点で index=0 のまま保存、その後 `UpdateMicInfo` が `mics.Count <= 0`（batchmode 環境）で早期 return → index は変更されない経路で 0 を維持している可能性。あるいは Unity の `AddComponent` でフィールド初期化子の評価タイミングと外部書き込みの順序競合がある可能性。(c) 別仮説として「`UnityEngine.Object.Destroy(_microphoneInput)` 後にも `microphones[0]` で取れているのが古い firstMicrophone であり、`Is.Not.SameAs(firstMicrophone)` は false 化済み MonoBehaviour と新 instance の参照比較で PASS してしまっている」可能性は薄いが要検証。
-  - 検証方針: (1) `AddInputComponent` 内で `_microphoneInput.index = ...` の前後で `Debug.Log` を入れ、セット直後の index 値と `yield return null` 後の値を比較、(2) `_hostGameObject.SetActive(true)` を SetUp に追加してアクティブ GameObject 上での AddComponent + Destroy 経路に揃え、再現性が消えるか確認、(3) 新 mic の OnEnable が走るタイミングを `yield return null` を 2 回回して確認、(4) batchmode で `Microphone.devices` が空の場合に `UpdateMicInfo` が index を意図せず巻き戻していないか追跡。
-- **トリガ**: preview.1 リリース前のテストグリーン化、または adapter-runtime-settings PR の CI 通過要件として
-- **影響範囲**: `FacialControl/Packages/com.hidano.facialcontrol.lipsync/Tests/PlayMode/HotSwap/DeviceHotSwapTests.cs:82-113`, `FacialControl/Packages/com.hidano.facialcontrol.lipsync/Runtime/Adapters/ULipSyncAdapterBinding.cs:271-316`（SwapDevice / OnFixedTick / AddInputComponent）, `Library/PackageCache/com.hidano.ulipsync-asio@*/Runtime/uLipSyncMicrophone.cs`（OnEnable / UpdateMicInfo 挙動の確認）
-- **関連**: なし（adapter-runtime-settings spec の 5.3 で `_deviceDescriptor` SerializeField を削除し DeviceStore 経由読み込みに切り替えたが、本テストは `Configure(descriptor, ...)` で直接 DeviceDescriptor を注入するため `_hasConfiguredDescriptor = true` 経路を通り、DeviceStore.Load は呼ばれない。adapter-runtime-settings の修正影響外と判断）
-
-### S-17: Expression の Phoneme Overlay スロット拡張（A/I/U/E/O の口形上書き）
-- **出典**: ユーザー報告（2026-05-19）「Lipsync のあいうえおの Overlay も設定できるようにする」
-- **内容**: ユーザー要望は「既存の Expression (Smile, Angry 等) に A/I/U/E/O 5 種の Overlay スロットを持たせる。何も設定されていなければ Lipsync 側で設定した AnimationClip/BlendShape がそのまま出る。Overlay が設定されている場合はそちらを使用する」。既存の blink overlay と同じ枠組みを a/i/u/e/o 5 phoneme へ広げる。
-  - 方針: (a) `FacialCharacterProfileSO.Slots` に `a` / `i` / `u` / `e` / `o` を予約 slot 名として導入。(b) Expression 毎の `OverlaySlotBinding` で各 phoneme slot に snapshot を上書き宣言可能にする（既存 `Expression.Overlays` の枠組みをそのまま使う）。(c) `ULipSyncAdapterBinding` の出力経路を「Overlay レイヤー経由で発火」させ、`OverlayInputSource` 解決で Expression の slot 宣言が優先、未宣言時は `ULipSyncAdapterBinding` の `BlendShape/AnimationClipPhonemeEntry` がデフォルトとして残るようにする。
-  - 要設計判断: Overlay snapshot を Inspector の Expression Row で編集する UI（slot×5 だと縦に伸びる → Foldout / Tab で畳む）、Profile 既定 Slots 配列に a/i/u/e/o を初期登録するか / オプトインか、`ULipSyncAdapterBinding` の出力先 Layer 切替（既存の mouth layer 直書きから Overlay 経由へ）の互換戦略
-- **トリガ**: preview.1 のリップシンク表現拡張、または preview.2 着手時
-- **影響範囲**: `Runtime/Domain/Models/Expression.cs`（既存 Overlays フィールド活用）, `Runtime/Adapters/ScriptableObject/Serializable/ExpressionSerializable.cs`, `Runtime/Adapters/ScriptableObject/FacialCharacterProfileSO.cs`（Slots 規約）, `Packages/com.hidano.facialcontrol.lipsync/Runtime/Adapters/ULipSyncAdapterBinding.cs`, `Editor/Inspector/FacialCharacterProfileSOInspector.cs`（Expression Row の phoneme overlay 編集 UI）, 対応 EditMode / PlayMode テスト
-
-### S-9: LipSync の AnimationClip 形式が動かない件の根本対応
-- **出典**: ユーザー報告（2026-05-10）「LipsyncをAnimationClipで設定できない」/ HANDOVER.md タスク 8 の積み残し
-- **内容**: `ULipSyncAdapterBinding.TryFillAnimationClipSnapshot` は `entry.Clip.SampleAnimation(ctx.HostGameObject, sampleTime)` 経由で口形状クリップを採取するが、ユーザー作成 AnimationClip の rendererPath とキャラ階層が一致しない / クリップが BlendShape カーブを持たない等で snapshot が空になり結果として ContributeMask が空になる → BlendShape 直指定形式（`BlendShapePhonemeEntry`）では動くが AnimationClip 形式（`AnimationClipPhonemeEntry`）では動かない、という挙動になる。
-  - 直近 PR で「sample 結果が全 0 のとき LogWarning」「Inspector に AnimationClip 未割り当て HelpBox」を追加して原因切り分けはできるようにしたが、ユーザー視点の体験としては依然「動かない」。
-  - 候補根本対応: (a) 「FacialProfile 内 Expression（既登録の表情）を音素として直接指定する `ExpressionPhonemeEntry` を新設」して AnimationClip 採取を AdapterBinding 内では行わず profile 既存値を流用、(b) AnimationClip の path を `AnimationUtility.GetCurveBindings`（Editor only）で事前検証し runtime で path 自動補正する、(c) sample 失敗時に `BlendShapePhonemeEntry` 風の暗黙 fallback を提供。
-- **トリガ**: ユーザーが本格的に AnimationClip 形式を必要とするタイミング（口の組み合わせ表現が複数 BS 必要になったとき） / preview.2 のリップシンク機能拡張時
-- **影響範囲**: `Packages/com.hidano.facialcontrol.lipsync/Runtime/Adapters/ULipSyncAdapterBinding.cs`、`PhonemeEntries/`（新 `ExpressionPhonemeEntry` 追加）、`Editor/Inspector/PhonemeEntryListView.cs`（形式 dropdown に追加）
-
-### S-7: アナログ入力 Weight 値による Expression Lerp 駆動
-- **出典**: ユーザー報告（2026-05-09）「目線操作以外のアナログ操作のExpressionが意図した動作になっていない」
-- **内容**: 現状、`ExpressionInputSourceAdapter` は Hold/Toggle 二値で Expression を on/off するため、controller のアナログトリガー（0.0〜1.0）を握っても expression weight は遷移時間ベースで一定速度進行してしまう。ユーザー要求は「InputAction の analog value がそのまま無入力↔押し切りの Lerp 値になる」挙動。実装には (1) `ExpressionTriggerInputSource` への continuous-weight API 追加、(2) `InputSystemAdapterBinding` に gaze 用とは別の "analog expression bindings" リスト追加、(3) `InputSystemAdapterBindingDrawer` の対応 UI、(4) `OnLateTick` での毎フレーム value→weight 反映、が必要で 1 PR の規模を超える。
-- **トリガ**: コントローラー操作のテストでアナログ表情を扱うシナリオが必須になったとき / preview.1 リリース前の機能完成度レビュー
-- **影響範囲**: `Runtime/Adapters/InputSources/ExpressionInputSourceAdapter.cs`, `ExpressionTriggerInputSource.cs`, `InputSystemAdapterBinding.cs`, `Editor/AdapterBindings/InputSystemAdapterBindingDrawer.cs`, 対応 EditMode/PlayMode テスト
+### S-20: OscOutputDemo の動作確認完了後、`OscOutputDemoSignalBinding` を削除
+- **出典**: 2026-05-25 セッション「`OscOutputDemoSignalBinding` と `OscSenderAdapterBinding` の役割確認」
+- **背景**: `OscOutputDemoSignalBinding`（[`Packages/com.hidano.facialcontrol.osc/Samples~/OscOutputDemo/OscOutputDemoBootstrap.cs:28`](../FacialControl/Packages/com.hidano.facialcontrol.osc/Samples~/OscOutputDemo/OscOutputDemoBootstrap.cs)）は demo 専用に sin 波で BlendShape / Gaze を生成する `IInputSource` を登録する AdapterBinding。`OscSenderAdapterBinding` の OSC 送信動作を demo Scene 内で検証するためだけに存在するため、実機で OSC 出力が想定通り動くことを確認できた時点で sample 側からは撤去する。
+- **削除時の影響**: `OscOutputDemoProfile.asset` の `RefIds` 内 `OscOutputDemoSignalBinding` エントリも併せて除去が必要。撤去後の demo 入力源の扱い（別の入力源 sample に差し替え / `OscOutputDemo` Scene 自体を撤去 / README で「ユーザー持ち込みの入力源を結線する」誘導に変更）を併せて決定する。
+- **トリガ**: `OscOutputDemo` Scene の OSC 出力動作確認が完了したタイミング
+- **影響範囲**: `Packages/com.hidano.facialcontrol.osc/Samples~/OscOutputDemo/OscOutputDemoBootstrap.cs`（`OscOutputDemoSignalBinding` / `DemoSignalState` / `DemoBlendShapeSource` / `DemoGazeSource` の削除）, 同 `OscOutputDemoProfile.asset`, 同 `README.md`, 関連 `.meta`
 
 ---
 
@@ -175,10 +142,10 @@
 
 ### M-20: Sub-asset 削除時の AdapterBinding 逆引き確認ダイアログ
 - **出典**: `.kiro/specs/adapter-runtime-settings/tasks.md` 0.2 / validate-design Critical Issue #2（Sub-asset 削除時の binding 参照欠落）
-- **内容**: `AdapterRuntimeSettingsCollectionSO` の sub-asset を削除すると、`OscAdapterBinding._settings` / `OscSenderAdapterBinding._settings` など外部の serialized field 参照が null になる可能性がある。本 spec では Project 内の `AdapterBindingBase` 派生を削除前に逆引き検索して一覧表示する確認ダイアログは実装せず、暫定対応として各 Drawer の `_settings == null` HelpBox に「sub-asset 削除で参照欠落した可能性」「再アサインが必要」「未設定時は OSC Adapter が起動しない」ことを表示する。
+- **内容**: `AdapterRuntimeSettingsCollectionSO` の sub-asset を削除すると、`OscReceiverAdapterBinding._settings` / `OscSenderAdapterBinding._settings` など外部の serialized field 参照が null になる可能性がある。本 spec では Project 内の `AdapterBindingBase` 派生を削除前に逆引き検索して一覧表示する確認ダイアログは実装せず、暫定対応として各 Drawer の `_settings == null` HelpBox に「sub-asset 削除で参照欠落した可能性」「再アサインが必要」「未設定時は OSC Adapter が起動しない」ことを表示する。
   - 後続対応案: (a) `AssetDatabase.FindAssets` / `SerializedObject` 走査で削除対象 sub-asset を参照する Profile/Prefab/Scene を列挙、(b) 削除確認ダイアログに参照元一覧と影響範囲を表示、(c) 可能なら対象 binding への ping / selection を提供、(d) 大規模 Project で重くならないよう検索範囲とキャッシュ戦略を設計する。
 - **トリガ**: adapter-runtime-settings 実装後に sub-asset 削除 UI を実運用で使い始めるタイミング / preview.1 リリース前の UX リスクレビュー
-- **影響範囲**: `AdapterRuntimeSettingsCollectionEditor`、`OscAdapterBindingDrawer`、`OscSenderAdapterBindingDrawer`、Profile/Prefab/Scene の serialized reference 走査 helper、対応 EditMode (Editor) テスト
+- **影響範囲**: `AdapterRuntimeSettingsCollectionEditor`、`OscReceiverAdapterBindingDrawer`、`OscSenderAdapterBindingDrawer`、Profile/Prefab/Scene の serialized reference 走査 helper、対応 EditMode (Editor) テスト
 
 ### M-21: Adapter 種別の C# 型削除/リネーム時の自動マイグレーション（対応レベル c）
 - **出典**: [`.kiro/specs/adapter-runtime-settings/requirements.md`](../.kiro/specs/adapter-runtime-settings/requirements.md) 要件 3.5 / 8.1（スコープ外明示）
@@ -198,15 +165,22 @@
 - **影響範囲**: `AdapterRuntimeSettingsBase`, `AdapterRuntimeSettingsCollectionSO.MigrateOnLoad`, 各派生 SettingsSO の `FromJson` 実装、`Documentation~/adapter-runtime-settings/migration-guide.md`（新設）、`Tests/Shared/Fixtures/` 配下の JSON fixture、EditMode マイグレーションテスト
 - **関連**: M-21（型削除/リネーム時の自動マイグレーション — `MigrateOnLoad` は両者の共通基盤）、M-11（analog binding 側の schema migration パス）
 
-### M-23: OscAdapterBinding と OscSenderAdapterBinding の統合解消（Receiver/Sender Binding 一本化）の再検討
+### M-23: OscReceiverAdapterBinding と OscSenderAdapterBinding の統合解消（Receiver/Sender Binding 一本化）の再検討
 - **出典**: [`.kiro/specs/adapter-runtime-settings/requirements.md`](../.kiro/specs/adapter-runtime-settings/requirements.md) 要件 8.2（スコープ外明示） / `.kiro/specs/adapter-runtime-settings/design.md` Boundary Context
-- **内容**: 本 spec では Receiver/Sender セクションを **1 つの `OscRuntimeSettingsSO`** に統合しつつ、`OscAdapterBinding` (Receiver) と `OscSenderAdapterBinding` (Sender) の 2 MonoBehaviour 構造は維持する（要件 8.2）。両 Binding が同一 SettingsSO の異なるセクションを参照する形のため、運用上は「片方だけ起動したい」「片方だけ別 SettingsSO を参照したい」というケースで `_receiverEnabled` / `_senderEnabled` トグル + 同一 SO 参照の組み合わせで対応している。preview.2 以降で以下のいずれかを検討する:
-  - (a) **統合**: `OscAdapterBinding` と `OscSenderAdapterBinding` を 1 MonoBehaviour に統合し、Receiver/Sender セクションを単一 binding が両方扱う。MonoBehaviour ライフサイクル管理が単純化される一方、片方だけ disable する operational UX を別途用意する必要あり。
+- **内容**: 本 spec では Receiver/Sender セクションを **1 つの `OscRuntimeSettingsSO`** に統合しつつ、`OscReceiverAdapterBinding` (Receiver) と `OscSenderAdapterBinding` (Sender) の 2 MonoBehaviour 構造は維持する（要件 8.2）。両 Binding が同一 SettingsSO の異なるセクションを参照する形のため、運用上は「片方だけ起動したい」「片方だけ別 SettingsSO を参照したい」というケースで `_receiverEnabled` / `_senderEnabled` トグル + 同一 SO 参照の組み合わせで対応している。preview.2 以降で以下のいずれかを検討する:
+  - (a) **統合**: `OscReceiverAdapterBinding` と `OscSenderAdapterBinding` を 1 MonoBehaviour に統合し、Receiver/Sender セクションを単一 binding が両方扱う。MonoBehaviour ライフサイクル管理が単純化される一方、片方だけ disable する operational UX を別途用意する必要あり。
   - (b) **SettingsSO 分割**: `OscRuntimeSettingsSO` を `OscReceiverRuntimeSettingsSO` / `OscSenderRuntimeSettingsSO` の 2 SO に分割し、現行 2 Binding 構造はそのまま維持。SettingsSO 側の責務が明確化される一方、Receiver/Sender 設定の一貫性を担保していた要件 2.7 を別途満たす仕組み（命名規則 / Inspector ヘルパー）が必要。
   - (c) **現状維持**: 2 Binding + 統合 SO + `_receiverEnabled` / `_senderEnabled` トグルの組み合わせで運用を続け、混乱が出たら (a) または (b) に切り替える。
 - **トリガ**: Receiver/Sender 別個運用の UX 不満が顕在化したとき / 1.0 リリース前の AdapterBinding API 凍結タイミング / `_receiverEnabled` / `_senderEnabled` トグルの運用負荷が想定以上に高まったとき
-- **影響範囲**: `OscAdapterBinding`, `OscSenderAdapterBinding`, `OscRuntimeSettingsSO`, 各 Drawer、Profile 内 AdapterBindings リスト、対応 EditMode/PlayMode テスト、`Documentation~/adapter-runtime-settings/`
+- **影響範囲**: `OscReceiverAdapterBinding`, `OscSenderAdapterBinding`, `OscRuntimeSettingsSO`, 各 Drawer、Profile 内 AdapterBindings リスト、対応 EditMode/PlayMode テスト、`Documentation~/adapter-runtime-settings/`
 - **関連**: M-20（Sub-asset 削除時の逆引き確認ダイアログ — 統合/分割いずれを採るかで参照関係の管理粒度が変わる）
+
+### M-24: LipSync AnimationClip の Editor 事前検証 / runtime path 補正
+- **出典**: S-9（LipSync の AnimationClip 形式が動かない件の根本対応） / [`.kiro/specs/lipsync-animationclip-rework/requirements.md`](../.kiro/specs/lipsync-animationclip-rework/requirements.md) 要件 1.3 / [`.kiro/specs/lipsync-animationclip-rework/design.md`](../.kiro/specs/lipsync-animationclip-rework/design.md) Non-Goals
+- **内容**: S-9 の主要対応は `lipsync-animationclip-rework` spec で対応済み。`ExpressionPhonemeEntry` の追加と `AnimationClipPhonemeEntry` sample 失敗時 fallback により、「AnimationClip 形式が rendererPath 不一致などで動かない」体験は本 spec で解消した。一方、候補 (b)「`AnimationUtility.GetCurveBindings` による Editor 事前検証 + runtime path 補正」は本 spec のスコープ外とし、将来課題として残置する。
+- **トリガ**: AnimationClip 形式を引き続き主経路として使いたいユーザー要望が増えたとき / rendererPath 不一致を Inspector 上で自動診断・補正したい需要が顕在化したとき / AnimationClip 作成支援ツールの spec を切るとき
+- **影響範囲**: `com.hidano.facialcontrol.lipsync` の Editor 検証 UI、`AnimationClipPhonemeEntry` の Inspector 表示、AnimationClip path 解決 helper、対応 EditMode テスト
+- **関連**: `lipsync-animationclip-rework` spec（S-9 本体対応済み）、将来の AnimationClip 作成支援ツール
 
 ---
 
@@ -245,5 +219,10 @@
 - 2026-05-19: ユーザー集中 FB セッションで S-17（A/I/U/E/O Overlay スロット拡張）を追加。中期: M-18（ベース表情の Layer / OverrideMask 保持）, M-19（Layer / InputSource / Adapter 関係視認性改善）。
 - 2026-05-19: preview1-polish-pack 完了後の `/kiro:validate-impl` で EditMode 7 件 fail を再検出。同件である M-17 を本ファイルから削除し、`.kiro/specs/overlay-clip-redesign/tasks.md` の Phase 10（10.1〜10.3）として吸収・移動。
 - 2026-05-19: adapter-runtime-settings spec の validate-design Critical Issue #2 を受け、M-20（Sub-asset 削除時の AdapterBinding 逆引き確認ダイアログ）を追加。本 spec 内では Drawer HelpBox 警告で暫定対応する方針に整理。
-- 2026-05-20: adapter-runtime-settings spec の Phase 9.2（スコープ外項目・将来マイグレーションの集約）を消化し、以下 3 件を追加。M-21（対応レベル c: 型削除/リネーム時の自動マイグレーション）、M-22（`MigrateOnLoad` 本実装と `_schemaVersion` 増分規約策定）、M-23（OscAdapterBinding / OscSenderAdapterBinding 統合解消の再検討）。
+- 2026-05-20: adapter-runtime-settings spec の Phase 9.2（スコープ外項目・将来マイグレーションの集約）を消化し、以下 3 件を追加。M-21（対応レベル c: 型削除/リネーム時の自動マイグレーション）、M-22（`MigrateOnLoad` 本実装と `_schemaVersion` 増分規約策定）、M-23（OscReceiverAdapterBinding / OscSenderAdapterBinding 統合解消の再検討）。
 - 2026-05-20: `/kiro:validate-impl adapter-runtime-settings` 検証後の Unity Test Runner で別 spec 由来の PlayMode テスト 2 件 fail を確認。adapter-runtime-settings spec 本体の判定は GO のまま維持し、別ブランチで対処するため S-18（`DeviceHotSwapTests.SwapDevice_MicToMicSecondDevice_ZeroSettlesThenRebinds` の新規 mic index 0 巻き戻り）と S-19（`OscGazeE2ETests.GazeResolver_OscAndInputSystemSameExpressionId_SelectsLexicographicallyFirstSlug` の InputSystem 側 Gaze 値 0）を追加。
+- 2026-05-23: S-19 を `OscGazeE2ETests` の `InputTestFixture` 継承で input system 分離して解消。S-18 を `ULipSyncAdapterBinding.AddInputComponent` の `UpdateMicInfo` 後 index 巻き戻り対策 + `ULipSyncProvider` zero-flush 後の初回 target snap ロジックで解消。両 backlog エントリを削除。
+- 2026-05-23: S-7 が `analog-input-binding` spec の `AnalogExpressionInputSource` で既に実装済みであることを確認（`BindingMode.Analog` 経路）。backlog から S-7 を削除し、誤って初期化した `.kiro/specs/analog-expression-weight/` ディレクトリも撤去。
+- 2026-05-23: S-17 を spec `phoneme-overlay-slots`、S-9 を spec `lipsync-animationclip-rework` として独立化。それぞれ requirements / design / tasks 生成済み (tasks-generated)。本 backlog からは削除し、以降は spec 内で進行管理。
+- 2026-05-23: S-9 は `lipsync-animationclip-rework` spec で対応済みとして完了反映。候補 (b)「`AnimationUtility.GetCurveBindings` による Editor 事前検証 + runtime path 補正」は将来課題として M-24 に残置。
+- 2026-05-25: `OscOutputDemoSignalBinding` と `OscSenderAdapterBinding` の役割確認セッションで S-20（OscOutputDemo の動作確認完了後の `OscOutputDemoSignalBinding` 撤去）を追加。

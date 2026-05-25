@@ -101,7 +101,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Domain
 
             Assert.That(sourceBindings[0].source.Type, Is.EqualTo(InputSourceType.ExpressionTrigger));
             Assert.That(sourceBindings[1].source.Type, Is.EqualTo(InputSourceType.ValueProvider));
-            Assert.That(sourceBindings[2].source, Is.TypeOf<LipSyncInputSource>());
+            Assert.That(sourceBindings[2].source.Type, Is.EqualTo(InputSourceType.ValueProvider));
         }
 
         private static FacialProfile CreateProfile()
@@ -194,7 +194,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Domain
                 var slug = AdapterSlug.Parse(Slug);
                 ctx.InputSourceRegistry.Register(
                     slug,
-                    new LipSyncInputSource(ctx.LipSyncProvider, ctx.BlendShapeNames.Count));
+                    new FixedValuesInputSource(Slug, InputSourceType.ValueProvider, new[] { 0.4f, 0.8f, 1.0f, 0.6f }));
             }
         }
 

@@ -182,7 +182,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.ARKit
                 return;
             }
 
-            // OSC receiver の write/read バッファ swap を進める（OscAdapterBinding と同様の自前 tick 化）。
+            // OSC receiver の write/read バッファ swap を進める（OscReceiverAdapterBinding と同様の自前 tick 化）。
             if (_helperHost != null)
             {
                 _helperHost.Tick();

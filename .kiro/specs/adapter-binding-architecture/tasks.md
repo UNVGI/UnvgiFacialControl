@@ -257,18 +257,18 @@
 ## Phase 2: Adapter 移行と旧資産削除
 
 - [x] 9. OSC adapter package を新アーキテクチャに移行する
-- [x] 9.1 `OscAdapterBinding` の EditMode / PlayMode テストを書く（Red）
+- [x] 9.1 `OscReceiverAdapterBinding` の EditMode / PlayMode テストを書く（Red）
   - EditMode: `[Serializable]` + `[FacialAdapterBinding(displayName: "OSC")]` 付きであり TypeCache discovery で列挙されることを assert する
   - PlayMode 統合: 実 UDP loopback で `OnStart` 内 `AddComponent<OscReceiverHost>` + `Configure` が走り、`InputSourceRegistry.Register(slug, source)` で primary IInputSource が解決可能になることを assert する
   - PlayMode 統合: `Dispose` 時に `Object.Destroy(_helperHost)` で helper MonoBehaviour が破棄され、socket がクローズされることを assert する
   - HelperHost の `HideFlags` が `HideInInspector` を含まず Inspector で見えることを assert する（Req 13.6）
-  - 観測可能完了条件: テストが Red、`OscAdapterBinding` 未実装
+  - 観測可能完了条件: テストが Red、`OscReceiverAdapterBinding` 未実装
   - _Requirements: 6.2, 6.5, 6.9, 7.4, 7.5, 13.6, 13.7, 10.3, 10.5_
   - _Boundary: com.hidano.facialcontrol.osc, Tests/PlayMode/Integration_
 
-- [x] 9.2 `OscReceiverHost` / `OscSenderHost` helper MonoBehaviour と `OscAdapterBinding` を実装する
+- [x] 9.2 `OscReceiverHost` / `OscSender` helper MonoBehaviour と `OscReceiverAdapterBinding` を実装する
   - `OscReceiverHost` を public `Configure(endpoint, port, buffer)` 付きの helper MonoBehaviour として実装し、既存 `OscReceiver` のロジックを呼び出すラッパーにする（または内部リファクタする）
-  - `OscAdapterBinding` を `[Serializable]` + `[FacialAdapterBinding(displayName: "OSC")]` で実装し、`_endpoint` / `_port` / `_blendShapeMappings` を inline `[SerializeField]` で保持する
+  - `OscReceiverAdapterBinding` を `[Serializable]` + `[FacialAdapterBinding(displayName: "OSC")]` で実装し、`_endpoint` / `_port` / `_blendShapeMappings` を inline `[SerializeField]` で保持する
   - `OnStart(in ctx)` で helper を `AddComponent`、`Configure` 呼び出し、`OscInputSource` 構築、`ctx.InputSourceRegistry.Register(AdapterSlug.Parse(Slug), _inputSource)` を実行する
   - `OnFixedTick` で受信 buffer swap 等を実行する（既存 `OscReceiver` の Update 経路に依存しないよう自前 tick 化）
   - `Dispose()` で `Object.Destroy(_helperHost)` → `_inputSource.Dispose()` の順で解放する
@@ -279,11 +279,11 @@
   - `[FacialAdapterBinding(displayName: "ARKit / PerfectSync")]` 付き具象を実装する
   - 既存 `ArKitOscAnalogSource` を helper として再構成し、binding が `OnStart` で OSC receiver に subscribe する
   - ARKit 自動検出 (`ARKitDetector`) は Editor only のため binding には含めない
-  - 観測可能完了条件: 単一 SO で `OscAdapterBinding` + `ArKitOscAdapterBinding` が同時に保持・round-trip できる EditMode テストが green
+  - 観測可能完了条件: 単一 SO で `OscReceiverAdapterBinding` + `ArKitOscAdapterBinding` が同時に保持・round-trip できる EditMode テストが green
   - _Requirements: 6.3, 6.6_
   - _Boundary: com.hidano.facialcontrol.osc/Adapters/ARKit_
 
-- [x] 9.4 (P) `OscAdapterBindingDrawer` / `ArKitOscAdapterBindingDrawer` を提供する
+- [x] 9.4 (P) `OscReceiverAdapterBindingDrawer` / `ArKitOscAdapterBindingDrawer` を提供する
   - 各 binding の inline UI（endpoint / port / blendshape マッピング 等）を UI Toolkit で実装する
   - `[CustomPropertyDrawer(typeof(<ConcreteAdapterBinding>))]` を付与し、core の `PropertyField` から自動解決される配置にする
   - **core では `[CustomPropertyDrawer]` を登録しないこと（Req 3.1）**
@@ -362,7 +362,7 @@
   - _Requirements: 6.10, 12.5, 12.6_
 
 - [x] 12. Phase 2 検証 Checkpoints と Documentation を整備する
-- [x] 12.1 (P) `OscAdapterBindingIntegrationTests` を Phase 2 完了後の構成で実行する
+- [x] 12.1 (P) `OscReceiverAdapterBindingIntegrationTests` を Phase 2 完了後の構成で実行する
   - 実 UDP loopback + `OscReceiverHost` AddComponent + binding `Dispose` 時の helper destroy が完了することを assert する
   - 旧 `OscFacialControllerExtension` 経由のテストが repository に残っていないことを確認する
   - 観測可能完了条件: PlayMode テストが green、旧経路依存が 0 件
@@ -377,7 +377,7 @@
   - _Boundary: Tests/PlayMode/Integration_
 
 - [x] 12.3 (P) 単一 SO に Input + OSC + ARKit 同時保持の round-trip 統合テストを追加する
-  - 1 個の `FacialCharacterProfileSO` に `InputSystemAdapterBinding` + `OscAdapterBinding` + `ArKitOscAdapterBinding` を同時に保持する EditMode テストを書く
+  - 1 個の `FacialCharacterProfileSO` に `InputSystemAdapterBinding` + `OscReceiverAdapterBinding` + `ArKitOscAdapterBinding` を同時に保持する EditMode テストを書く
   - `AssetDatabase.CreateAsset` → `LoadAssetAtPath` の round-trip で 3 種の concrete type identity が維持されることを assert する（Req 6.6）
   - 観測可能完了条件: テストが green、3 種 binding が `[SerializeReference]` 経由で全て round-trip 可能
   - _Requirements: 2.3, 6.6_

@@ -22,6 +22,10 @@ namespace Hidano.FacialControl.Domain.Adapters
         /// 新規 Layer の入力源 ID。<see cref="InputSourceId"/> 規約に合致する文字列でなければならない。
         /// 通常は binding の Slug と同値。
         /// </summary>
+        /// <remarks>
+        /// Deprecated for adapters that need multiple default input sources.
+        /// Implement <see cref="IAdapterBindingDefaultLayerInputs"/> for the multi-source path.
+        /// </remarks>
         string DefaultLayerInputSourceId { get; }
 
         /// <summary>新規 Layer の排他モード。</summary>

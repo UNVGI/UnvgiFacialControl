@@ -8,6 +8,7 @@ using Hidano.FacialControl.LipSync.Adapters.PhonemeEntries;
 using Hidano.FacialControl.LipSync.Tests.Shared;
 using Hidano.FacialControl.Tests.Shared;
 using NUnit.Framework;
+using UnityEngine;
 using UnityEngine.TestTools;
 
 namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
@@ -22,6 +23,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
 
         // SmoothDamp 後の収束値の許容誤差。1e-4 で母音 sum 正規化挙動を十分検証できる。
         private const float ConvergenceTolerance = 1e-4f;
+        private const float SilenceThreshold = 1e-4f;
 
         [Test]
         public void Constructor_NullSource_ThrowsArgumentNullException()
@@ -107,7 +109,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
 
             // volume=0 で SmoothDamp 収束後 _smoothedVolume ≒ 0 → output 全要素 ≒ 0
             // → sum < SilenceThreshold (1e-4)
-            Assert.That(Sum(output), Is.LessThan(LipSyncInputSource.SilenceThreshold));
+            Assert.That(Sum(output), Is.LessThan(SilenceThreshold));
         }
 
         [Test]
@@ -186,6 +188,91 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         }
 
         [Test]
+        public void TryGetPhonemeIndex_KnownPhonemeId_ReturnsTrueWithIndex()
+        {
+            var source = new FakeULipSyncEventSource();
+            using var provider = CreateProvider(
+                source,
+                new ManualTimeProvider(),
+                2,
+                Snapshot("A", 1f, 0f),
+                Snapshot("I", 0f, 1f));
+
+            bool found = provider.TryGetPhonemeIndex("I", out int index);
+
+            Assert.That(found, Is.True);
+            Assert.That(index, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TryGetPhonemeIndex_UnknownPhonemeId_ReturnsFalse()
+        {
+            var source = new FakeULipSyncEventSource();
+            using var provider = CreateProvider(source, new ManualTimeProvider(), 1, Snapshot("A", 1f));
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("Phoneme 'Unknown' is not registered"));
+            bool found = provider.TryGetPhonemeIndex("Unknown", out int index);
+
+            Assert.That(found, Is.False);
+            Assert.That(index, Is.EqualTo(-1));
+        }
+
+        [Test]
+        public void TryComposePhonemeWeights_KnownPhonemeId_WritesExpectedWeights()
+        {
+            var source = new FakeULipSyncEventSource();
+            var time = new ManualTimeProvider();
+            using var provider = CreateProvider(
+                source,
+                time,
+                3,
+                Snapshot("A", 0.5f, 0.25f, 0f),
+                Snapshot("I", 0f, 0.4f, 0.8f));
+            var output = new float[3];
+
+            source.Invoke(Info(0.5f, ("A", 0.75f), ("I", 0.25f)));
+            bool composed = provider.TryComposePhonemeWeights("A", output);
+
+            Assert.That(composed, Is.True);
+            AssertValuesClose(output, 0.5f * 0.75f * 0.5f, 0.5f * 0.75f * 0.25f, 0f);
+        }
+
+        [Test]
+        public void TryComposePhonemeWeights_UnknownPhonemeId_ReturnsFalse()
+        {
+            var source = new FakeULipSyncEventSource();
+            using var provider = CreateProvider(source, new ManualTimeProvider(), 2, Snapshot("A", 1f, 0f));
+            var output = new[] { 0.25f, 0.5f };
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("Phoneme 'Unknown' is not registered"));
+            bool composed = provider.TryComposePhonemeWeights("Unknown", output);
+
+            Assert.That(composed, Is.False);
+            AssertValuesClose(output, 0.25f, 0.5f);
+        }
+
+        [Test]
+        public void GetPhonemeContributeMask_KnownPhonemeId_ReturnsNonNullBitArray()
+        {
+            var source = new FakeULipSyncEventSource();
+            using var provider = CreateProvider(
+                source,
+                new ManualTimeProvider(),
+                4,
+                Snapshot("A", 1f, 0f, 0.5f, 0f),
+                Snapshot("I", 0f, 0.25f, 0f, 0f));
+
+            BitArray mask = provider.GetPhonemeContributeMask("A");
+
+            Assert.That(mask, Is.Not.Null);
+            Assert.That(mask.Length, Is.EqualTo(4));
+            Assert.That(mask[0], Is.True);
+            Assert.That(mask[1], Is.False);
+            Assert.That(mask[2], Is.True);
+            Assert.That(mask[3], Is.False);
+        }
+
+        [Test]
         public void Dispose_AfterCall_NoLongerReceivesEvents()
         {
             var source = new FakeULipSyncEventSource();
@@ -240,7 +327,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         {
             // 本対応の本丸: ロングトーン中に volume が瞬間的に 0 へディップしても、
             // SmoothDamp で smoothedVolume が緩やかに減衰するため sum < SilenceThreshold には
-            // 即座には落ちず、LipSyncInputSource が IsValid=true を維持する。
+            // 即座には落ちず、overlay source が valid output を維持する。
             var source = new FakeULipSyncEventSource();
             var time = new ManualTimeProvider();
             using var provider = CreateProvider(source, time, 3, Snapshot("A", 1f, 0.5f, 0.25f));
@@ -249,7 +336,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
             // 発声中: volume=1.0 で収束させる。
             source.Invoke(Info(1f, ("A", 1f)));
             AdvanceUntilConverged(time, provider, output);
-            Assert.That(Sum(output), Is.GreaterThan(LipSyncInputSource.SilenceThreshold));
+            Assert.That(Sum(output), Is.GreaterThan(SilenceThreshold));
 
             // 1 フレーム (16ms) だけ volume=0 のディップが来る。
             source.Invoke(Info(0f, ("A", 1f)));
@@ -257,7 +344,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
 
             // SmoothDamp により smoothedVolume は 1 フレームでゼロまで落ちないので
             // output sum は SilenceThreshold を割らない (= LipSync 層が降りない)。
-            Assert.That(Sum(output), Is.GreaterThan(LipSyncInputSource.SilenceThreshold));
+            Assert.That(Sum(output), Is.GreaterThan(SilenceThreshold));
         }
 
         [Test]
@@ -342,6 +429,58 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
             Assert.That(output2[0], Is.EqualTo(firstRunFrame1Value).Within(ConvergenceTolerance));
         }
 
+        [Test]
+        public void EnsureCurrentFrameComposed_CalledFiveTimesPerFrame_DoesNotAdvanceDtTwice()
+        {
+            var source = new FakeULipSyncEventSource();
+            var time = new ManualTimeProvider();
+            using var provider = CreateProvider(source, time, 1, Snapshot("A", 1f));
+
+            source.Invoke(Info(1f, ("A", 1f)));
+            InvokeEnsureCurrentFrameComposed(provider);
+
+            time.UnscaledTimeSeconds += DefaultFrameDt;
+            InvokeEnsureCurrentFrameComposed(provider);
+            double lastTime = GetPrivateDouble(provider, "_lastTimeSeconds");
+            double frameStamp = GetPrivateDouble(provider, "_currentFrameStamp");
+            float volume = GetPrivateFloat(provider, "_smoothedVolume");
+
+            for (int i = 0; i < 4; i++)
+            {
+                InvokeEnsureCurrentFrameComposed(provider);
+            }
+
+            Assert.That(GetPrivateDouble(provider, "_lastTimeSeconds"), Is.EqualTo(lastTime));
+            Assert.That(GetPrivateDouble(provider, "_currentFrameStamp"), Is.EqualTo(frameStamp));
+            Assert.That(GetPrivateFloat(provider, "_smoothedVolume"), Is.EqualTo(volume));
+        }
+
+        [Test]
+        public void EnsureCurrentFrameComposed_AfterFrameTick_RecomposesOnce()
+        {
+            var source = new FakeULipSyncEventSource();
+            var time = new ManualTimeProvider();
+            using var provider = CreateProvider(source, time, 1, Snapshot("A", 1f));
+
+            source.Invoke(Info(0f, ("A", 1f)));
+            InvokeEnsureCurrentFrameComposed(provider);
+            Assert.That(GetPrivateFloat(provider, "_smoothedVolume"), Is.EqualTo(0f));
+
+            source.Invoke(Info(1f, ("A", 1f)));
+            time.UnscaledTimeSeconds += DefaultFrameDt;
+            InvokeEnsureCurrentFrameComposed(provider);
+            float firstFrameVolume = GetPrivateFloat(provider, "_smoothedVolume");
+
+            InvokeEnsureCurrentFrameComposed(provider);
+            Assert.That(GetPrivateFloat(provider, "_smoothedVolume"), Is.EqualTo(firstFrameVolume));
+
+            time.UnscaledTimeSeconds += DefaultFrameDt;
+            InvokeEnsureCurrentFrameComposed(provider);
+
+            Assert.That(firstFrameVolume, Is.GreaterThan(0f));
+            Assert.That(GetPrivateFloat(provider, "_smoothedVolume"), Is.GreaterThan(firstFrameVolume));
+        }
+
         // ---- ヘルパ ---------------------------------
 
         private static ULipSyncProvider CreateProvider(
@@ -379,6 +518,37 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         private static PhonemeSnapshot Snapshot(string phonemeId, params float[] weights)
         {
             return new PhonemeSnapshot(phonemeId, weights);
+        }
+
+        private static void InvokeEnsureCurrentFrameComposed(ULipSyncProvider provider)
+        {
+            MethodInfo method = typeof(ULipSyncProvider).GetMethod(
+                "EnsureCurrentFrameComposed",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.That(method, Is.Not.Null,
+                "ULipSyncProvider は EnsureCurrentFrameComposed private method を持つ必要があります。");
+
+            method.Invoke(provider, null);
+        }
+
+        private static double GetPrivateDouble(ULipSyncProvider provider, string fieldName)
+        {
+            FieldInfo field = typeof(ULipSyncProvider).GetField(
+                fieldName,
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.That(field, Is.Not.Null, fieldName + " field is required.");
+
+            return (double)field.GetValue(provider);
+        }
+
+        private static float GetPrivateFloat(ULipSyncProvider provider, string fieldName)
+        {
+            FieldInfo field = typeof(ULipSyncProvider).GetField(
+                fieldName,
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.That(field, Is.Not.Null, fieldName + " field is required.");
+
+            return (float)field.GetValue(provider);
         }
 
         private static BitArray GetContributeMask(ULipSyncProvider provider)

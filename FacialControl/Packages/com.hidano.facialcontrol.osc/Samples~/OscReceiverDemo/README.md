@@ -1,13 +1,13 @@
 # OscReceiverDemo
 
-`OscAdapterBinding` の受信専用サンプルです。`OscReceiverDemo.unity` を開き、お手持ちのキャラモデルを Scene に置いた状態で Play すると、`127.0.0.1:9000` で受信した `/avatar/parameters/{BlendShape 名}` 系 OSC メッセージをモデルの BlendShape に反映します。
+`OscReceiverAdapterBinding` の受信専用サンプルです。`OscReceiverDemo.unity` を開き、お手持ちのキャラモデルを Scene に置いた状態で Play すると、`127.0.0.1:9000` で受信した `/avatar/parameters/{BlendShape 名}` 系 OSC メッセージをモデルの BlendShape に反映します。
 
 ## 同梱されているもの
 
 | ファイル | 役割 |
 |---|---|
 | `OscReceiverDemo.unity` | `FacialController` と `OscReceiverDemoProfile` を結線済みの最小 Scene |
-| `OscReceiverDemoProfile.asset` | `OscAdapterBinding`（OSC 受信）を結線済みの `FacialCharacterProfileSO`。Layer は 1 つだけ（OSC 入力を素通し） |
+| `OscReceiverDemoProfile.asset` | `OscReceiverAdapterBinding`（OSC 受信）を結線済みの `FacialCharacterProfileSO`。Layer は 1 つだけ（OSC 入力を素通し） |
 | `OscReceiverDemoBootstrap.cs` | `Application.runInBackground = true` を有効化する最小 helper |
 | `OscReceiverOptions.json` | Scene 内設定と同等の `OscReceiverOptionsDto` サンプル（参考用） |
 

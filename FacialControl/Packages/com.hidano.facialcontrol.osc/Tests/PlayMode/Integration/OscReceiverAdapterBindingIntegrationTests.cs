@@ -16,7 +16,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 {
     /// <summary>
     /// task 9.1 PlayMode 観測可能完了条件:
-    /// 実 UDP loopback で <see cref="OscAdapterBinding"/> の <c>OnStart</c> が
+    /// 実 UDP loopback で <see cref="OscReceiverAdapterBinding"/> の <c>OnStart</c> が
     /// <c>ctx.HostGameObject.AddComponent&lt;OscReceiverHost&gt;()</c> + <c>Configure(...)</c>
     /// を実行し、<c>InputSourceRegistry.Register(slug, source)</c> で primary
     /// <see cref="IInputSource"/> が解決可能になることを assert する。
@@ -25,12 +25,12 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
     /// </summary>
     /// <remarks>
     /// 本ファイルは Red 段階のテストであり、
-    /// <c>Hidano.FacialControl.Adapters.AdapterBindings.OscAdapterBinding</c> および
+    /// <c>Hidano.FacialControl.Adapters.AdapterBindings.OscReceiverAdapterBinding</c> および
     /// <c>Hidano.FacialControl.Adapters.OSC.OscReceiverHost</c> が未実装のため
     /// コンパイル時に CS0246 / CS0234 が発生して Red 状態となる（task 9.2 の Green 化対象）。
     /// </remarks>
     [TestFixture]
-    public class OscAdapterBindingIntegrationTests
+    public class OscReceiverAdapterBindingIntegrationTests
     {
         private const string TestEndpoint = "127.0.0.1";
         private const int LoopbackPortBase = 19130;
@@ -38,7 +38,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         private GameObject _hostGameObject;
         private GameObject _senderGameObject;
         private InputSourceRegistry _registry;
-        private OscAdapterBinding _binding;
+        private OscReceiverAdapterBinding _binding;
         private bool _bindingStarted;
         private static int s_portCounter;
 
@@ -46,7 +46,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         public void SetUp()
         {
             _registry = new InputSourceRegistry();
-            _hostGameObject = new GameObject("OscAdapterBindingIntegrationTestsHost");
+            _hostGameObject = new GameObject("OscReceiverAdapterBindingIntegrationTestsHost");
             _bindingStarted = false;
         }
 
@@ -164,7 +164,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
 
             _senderGameObject = new GameObject("OscAdapterBindingIntegrationSender");
             OscSender sender = _senderGameObject.AddComponent<OscSender>();
-            sender.Address = TestEndpoint;
+            sender.Endpoint = TestEndpoint;
             sender.Port = port;
             sender.Initialize(mappings);
             sender.StartSending();
@@ -270,9 +270,9 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         // Helpers
         // ---------------------------------------------------------------
 
-        private OscAdapterBinding CreateBinding(string slug, string endpoint, int port, OscMapping[] mappings)
+        private OscReceiverAdapterBinding CreateBinding(string slug, string endpoint, int port, OscMapping[] mappings)
         {
-            var binding = new OscAdapterBinding();
+            var binding = new OscReceiverAdapterBinding();
             binding.Slug = slug;
             binding.Configure(endpoint, port, mappings);
             return binding;
