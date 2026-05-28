@@ -41,6 +41,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         public const string SenderIdentityAddress = SenderIdentity.OscAddress;
         public const string BlendShapeNamesAddress = "/_facialcontrol/blendshape_names";
+        public const string PresetAddress = "/_facialcontrol/preset";
 
         private const int MaxCachedBundleSenderDecisions = 32;
 
@@ -140,6 +141,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         [NonSerialized]
         private SenderIdentity _currentSenderId;
+
+        [NonSerialized]
+        private string _currentPresetName;
+
+        [NonSerialized]
+        private string _currentCustomPrefix;
 
         [NonSerialized]
         private double _lastAcceptedPacketTime;
@@ -282,6 +289,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         public SenderIdentity? CurrentSenderId =>
             _hasCurrentSenderId ? _currentSenderId : (SenderIdentity?)null;
+
+        public string CurrentPresetName => _currentPresetName;
+
+        public string CurrentCustomPrefix => _currentCustomPrefix;
 
         public IReadOnlyList<GazeVector2InputSource> GazeSources =>
             _gazeSources ?? (IReadOnlyList<GazeVector2InputSource>)Array.Empty<GazeVector2InputSource>();
@@ -449,6 +460,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _heartbeatScratch = null;
             _timeProvider = null;
             _currentSenderId = default;
+            _currentPresetName = null;
+            _currentCustomPrefix = null;
             _hasCurrentSenderId = false;
             _hasBareSenderDecision = false;
             _bareSenderAccepted = false;
@@ -702,6 +715,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return false;
             }
 
+            if (message.address == PresetAddress)
+            {
+                HandlePresetMessage(message);
+                return false;
+            }
+
             bool handledGaze = TryHandleGazeMessage(message);
             if (handledGaze || IsKnownNormalBlendShapeMessage(message.address))
             {
@@ -709,6 +728,22 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             return true;
+        }
+
+        private void HandlePresetMessage(uOSC.Message message)
+        {
+            if (message.values == null ||
+                message.values.Length == 0 ||
+                !(message.values[0] is string presetName) ||
+                string.IsNullOrEmpty(presetName))
+            {
+                return;
+            }
+
+            _currentPresetName = presetName;
+            _currentCustomPrefix = message.values.Length > 1 && message.values[1] is string customPrefix
+                ? customPrefix
+                : null;
         }
 
         private void HandleSenderIdentityMessage(uOSC.Message message)

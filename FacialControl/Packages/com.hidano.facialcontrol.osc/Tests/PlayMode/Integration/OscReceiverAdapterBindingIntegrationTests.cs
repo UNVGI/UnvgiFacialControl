@@ -171,6 +171,57 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         // OnStart: 実 UDP loopback でメッセージが registered InputSource に到達する
         // ---------------------------------------------------------------
 
+        [Test]
+        public void PresetAddress_UpdatesRuntimeStateWithoutRecreatingInputSource()
+        {
+            const string slug = "osc-preset-runtime-state";
+            int port = AllocatePort();
+            _binding = CreateBinding(slug: slug, endpoint: TestEndpoint, port: port,
+                mappings: CreateDefaultMappings());
+            AdapterBuildContext ctx = CreateContext();
+
+            _binding.OnStart(in ctx);
+            _bindingStarted = true;
+
+            OscInputSource originalInputSource = _binding.InputSource;
+            HeartbeatConsistencyChecker originalHeartbeatChecker = _binding.HeartbeatChecker;
+
+            _binding.HelperHost.Receiver.HandleOscMessage(
+                new uOSC.Message(OscReceiverAdapterBinding.PresetAddress, "custom", "/custom/"));
+
+            Assert.That(_binding.CurrentPresetName, Is.EqualTo("custom"));
+            Assert.That(_binding.CurrentCustomPrefix, Is.EqualTo("/custom/"));
+            Assert.That(_binding.InputSource, Is.SameAs(originalInputSource));
+            Assert.That(_binding.HeartbeatChecker, Is.SameAs(originalHeartbeatChecker));
+        }
+
+        [Test]
+        public void PresetAddress_StateSurvivesHeartbeatOrderAndUsesLatestPreset()
+        {
+            const string slug = "osc-preset-heartbeat-order";
+            int port = AllocatePort();
+            _binding = CreateBinding(slug: slug, endpoint: TestEndpoint, port: port,
+                mappings: CreateDefaultMappings());
+            AdapterBuildContext ctx = CreateContext();
+
+            _binding.OnStart(in ctx);
+            _bindingStarted = true;
+
+            _binding.HelperHost.Receiver.HandleOscMessage(
+                new uOSC.Message(OscReceiverAdapterBinding.PresetAddress, "arkit"));
+            _binding.HelperHost.Receiver.HandleOscMessage(
+                new uOSC.Message(OscReceiverAdapterBinding.BlendShapeNamesAddress, "smile", "frown"));
+
+            Assert.That(_binding.CurrentPresetName, Is.EqualTo("arkit"));
+            Assert.That(_binding.CurrentCustomPrefix, Is.Null);
+
+            _binding.HelperHost.Receiver.HandleOscMessage(
+                new uOSC.Message(OscReceiverAdapterBinding.PresetAddress, "custom", "/avatar/custom/"));
+
+            Assert.That(_binding.CurrentPresetName, Is.EqualTo("custom"));
+            Assert.That(_binding.CurrentCustomPrefix, Is.EqualTo("/avatar/custom/"));
+        }
+
         [UnityTest]
         public IEnumerator OnStart_UdpLoopback_RegisteredInputSourceReceivesValue()
         {
