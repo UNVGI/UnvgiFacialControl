@@ -43,7 +43,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         }
 
         [Test]
-        public void OnFixedTick_HeartbeatMissingReceiverBlendShape_SkipsOnlyMismatchedBlendShapeAndLogsWarning()
+        public void OnFixedTick_HeartbeatMissingReceiverBlendShape_LogsMismatchWarning()
         {
             var registry = new InputSourceRegistry();
             var time = new ManualTimeProvider { UnscaledTimeSeconds = 0d };
@@ -59,9 +59,10 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             _binding.OnFixedTick(0.02f);
 
             Assert.That(_binding.HeartbeatChecker.HasMismatch, Is.True);
-            AssertMask(_binding.HeartbeatChecker.SkipMask, false, true);
-            AssertMask(_binding.InputSource.ContributeMask, true, false);
-            AssertBlendShapes(0.65f, 0f);
+            CollectionAssert.AreEqual(new[] { SenderOnly }, _binding.HeartbeatChecker.SenderOnlyNames);
+            CollectionAssert.AreEqual(new[] { Blink }, _binding.HeartbeatChecker.ReceiverOnlyNames);
+            AssertMask(_binding.InputSource.ContributeMask, true, true);
+            AssertBlendShapes(0.65f, 0.95f);
         }
 
         private static OscReceiverAdapterBinding CreateReceiver()

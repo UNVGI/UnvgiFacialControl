@@ -523,7 +523,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         }
 
         [Test]
-        public void HeartbeatMismatch_SkipsOnlyMissingBlendShape()
+        public void HeartbeatMismatch_LogsWarningWithoutChangingContributeMask()
         {
             var registry = new InputSourceRegistry();
             var binding = new OscReceiverAdapterBinding
@@ -557,9 +557,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 var output = new float[2];
                 Assert.That(source.TryWriteValues(output), Is.True);
                 Assert.That(output[0], Is.EqualTo(0.25f).Within(1e-6f));
-                Assert.That(output[1], Is.EqualTo(0f).Within(1e-6f));
+                Assert.That(output[1], Is.EqualTo(0.9f).Within(1e-6f));
                 Assert.That(source.ContributeMask[0], Is.True);
-                Assert.That(source.ContributeMask[1], Is.False);
+                Assert.That(source.ContributeMask[1], Is.True);
             }
             finally
             {
@@ -593,9 +593,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                     host,
                     blendShapeNames: new[] { "smile", "blink", "frown" }));
 
-                Assert.That(binding.HeartbeatChecker.BlendShapeCount, Is.EqualTo(3));
-                AssertMask(binding.HeartbeatChecker.SkipMask, false, false, false);
-                AssertMask(binding.HeartbeatChecker.ContributeMask, true, false, true);
+                Assert.That(binding.HeartbeatChecker.BlendShapeCount, Is.EqualTo(2));
 
                 binding.HelperHost.Receiver.HandleOscMessage(
                     new uOSC.Message("/avatar/parameters/frown", 0.75f));

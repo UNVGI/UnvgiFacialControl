@@ -432,8 +432,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                     settings.StalenessSeconds,
                     ctx.TimeProvider,
                     settings.FailSafeMode,
-                    _heartbeatChecker?.SkipMask,
-                    _heartbeatChecker?.ContributeMask,
+                    null,
+                    null,
                     mappingIndexToMeshIndex);
                 ctx.InputSourceRegistry.Register(slug, _inputSource);
             }

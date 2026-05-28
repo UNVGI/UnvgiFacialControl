@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using Hidano.FacialControl.Domain.Models;
 using UnityEngine;
@@ -15,9 +14,6 @@ namespace Hidano.FacialControl.Adapters.OSC
         private readonly List<string> _receiverOnlyNames;
         private readonly HashSet<int> _loggedMismatchHashes;
         private readonly bool _warnLogEnabled;
-        private readonly BitArray _skipMask;
-        private readonly BitArray _contributeMask;
-        private readonly bool[] _mappedMeshBlendShapeMask;
 
         private bool _hasMismatch;
 
@@ -31,57 +27,24 @@ namespace Hidano.FacialControl.Adapters.OSC
         public HeartbeatConsistencyChecker(
             IReadOnlyList<string> receiverBlendShapeNames,
             bool warnLogEnabled = true)
-            : this(receiverBlendShapeNames, receiverBlendShapeNames, warnLogEnabled)
         {
-        }
-
-        public HeartbeatConsistencyChecker(
-            IReadOnlyList<string> meshBlendShapeNames,
-            IReadOnlyList<OscMapping> receiverMappings,
-            bool warnLogEnabled)
-            : this(meshBlendShapeNames, ExtractBlendShapeNames(receiverMappings), warnLogEnabled)
-        {
-        }
-
-        private HeartbeatConsistencyChecker(
-            IReadOnlyList<string> meshBlendShapeNames,
-            IReadOnlyList<string> receiverBlendShapeNames,
-            bool warnLogEnabled)
-        {
-            if (meshBlendShapeNames == null)
-            {
-                throw new ArgumentNullException(nameof(meshBlendShapeNames));
-            }
-
             if (receiverBlendShapeNames == null)
             {
                 throw new ArgumentNullException(nameof(receiverBlendShapeNames));
             }
 
-            _receiverBlendShapeNames = new string[meshBlendShapeNames.Count];
+            _receiverBlendShapeNames = new string[receiverBlendShapeNames.Count];
             _receiverNameSet = new HashSet<string>(StringComparer.Ordinal);
-            var meshNameToIndex = new Dictionary<string, int>(meshBlendShapeNames.Count, StringComparer.Ordinal);
-            for (int i = 0; i < meshBlendShapeNames.Count; i++)
-            {
-                string name = meshBlendShapeNames[i] ?? string.Empty;
-                _receiverBlendShapeNames[i] = name;
-                if (name.Length > 0)
-                {
-                    meshNameToIndex[name] = i;
-                }
-            }
-
-            _mappedMeshBlendShapeMask = new bool[_receiverBlendShapeNames.Length];
             for (int i = 0; i < receiverBlendShapeNames.Count; i++)
             {
                 string name = receiverBlendShapeNames[i] ?? string.Empty;
-                if (name.Length == 0 || !meshNameToIndex.TryGetValue(name, out int meshIndex))
+                _receiverBlendShapeNames[i] = name;
+                if (name.Length == 0)
                 {
                     continue;
                 }
 
                 _receiverNameSet.Add(name);
-                _mappedMeshBlendShapeMask[meshIndex] = true;
             }
 
             _warnLogEnabled = warnLogEnabled;
@@ -89,11 +52,17 @@ namespace Hidano.FacialControl.Adapters.OSC
             _senderOnlyNames = new List<string>();
             _receiverOnlyNames = new List<string>();
             _loggedMismatchHashes = new HashSet<int>();
-            _skipMask = new BitArray(_receiverBlendShapeNames.Length, false);
-            _contributeMask = new BitArray(_receiverBlendShapeNames.Length, false);
-            for (int i = 0; i < _mappedMeshBlendShapeMask.Length; i++)
+        }
+
+        public HeartbeatConsistencyChecker(
+            IReadOnlyList<string> meshBlendShapeNames,
+            IReadOnlyList<OscMapping> receiverMappings,
+            bool warnLogEnabled)
+            : this(ExtractBlendShapeNames(receiverMappings), warnLogEnabled)
+        {
+            if (meshBlendShapeNames == null)
             {
-                _contributeMask[i] = _mappedMeshBlendShapeMask[i];
+                throw new ArgumentNullException(nameof(meshBlendShapeNames));
             }
         }
 
@@ -101,9 +70,9 @@ namespace Hidano.FacialControl.Adapters.OSC
 
         public bool HasMismatch => _hasMismatch;
 
-        public BitArray SkipMask => _skipMask;
+        public IReadOnlyList<string> SenderOnlyNames => _senderOnlyNames;
 
-        public BitArray ContributeMask => _contributeMask;
+        public IReadOnlyList<string> ReceiverOnlyNames => _receiverOnlyNames;
 
         public void UpdateFromHeartbeat(IReadOnlyList<string> senderBlendShapeNames)
         {
@@ -133,12 +102,9 @@ namespace Hidano.FacialControl.Adapters.OSC
             for (int i = 0; i < _receiverBlendShapeNames.Length; i++)
             {
                 string receiverName = _receiverBlendShapeNames[i];
-                bool hasMapping = _mappedMeshBlendShapeMask[i];
-                bool shouldSkip = hasMapping && (receiverName.Length == 0 || !_senderNameSet.Contains(receiverName));
-                _skipMask[i] = shouldSkip;
-                _contributeMask[i] = hasMapping && !shouldSkip;
-
-                if (hasMapping && shouldSkip && receiverName.Length > 0 && !_receiverOnlyNames.Contains(receiverName))
+                if (receiverName.Length > 0 &&
+                    !_senderNameSet.Contains(receiverName) &&
+                    !_receiverOnlyNames.Contains(receiverName))
                 {
                     _receiverOnlyNames.Add(receiverName);
                 }
@@ -158,12 +124,6 @@ namespace Hidano.FacialControl.Adapters.OSC
             _receiverOnlyNames.Clear();
             _loggedMismatchHashes.Clear();
             _hasMismatch = false;
-
-            for (int i = 0; i < _skipMask.Length; i++)
-            {
-                _skipMask[i] = false;
-                _contributeMask[i] = _mappedMeshBlendShapeMask[i];
-            }
         }
 
         private void LogMismatchOnce()
