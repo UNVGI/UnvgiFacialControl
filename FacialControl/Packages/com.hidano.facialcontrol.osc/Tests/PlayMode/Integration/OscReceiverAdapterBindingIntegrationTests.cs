@@ -108,6 +108,81 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             Assert.That(_registry.TryResolve(slug, out _), Is.False);
         }
 
+        [Test]
+        public void OnFixedTick_EmptyMappingsHeartbeat_GeneratesAutoMappingsAndRegistersInputSource()
+        {
+            const string slug = "osc-auto-heartbeat";
+            int port = AllocatePort();
+            _binding = new OscReceiverAdapterBinding
+            {
+                Slug = slug,
+                Port = port,
+                Mappings = new List<OscMappingEntry>(),
+                BundleMode = BundleInterpretationMode.IndividualMessage
+            };
+            AdapterBuildContext ctx = CreateContext(blendShapeNames: new List<string> { "smile", "frown" });
+
+            _binding.OnStart(in ctx);
+            _bindingStarted = true;
+
+            HandleHeartbeat("smile", "frown");
+            Assert.That(_binding.InputSource, Is.Null);
+
+            _binding.OnFixedTick(0.02f);
+
+            Assert.That(_binding.InputSource, Is.Not.Null);
+            Assert.That(_binding.Buffer.Size, Is.EqualTo(2));
+            Assert.That(_binding.RuntimeMappings.Count, Is.EqualTo(2));
+            Assert.That(_binding.MappingOrigins[0], Is.EqualTo(OscReceiverAdapterBinding.MappingOrigin.HeartbeatAuto));
+            Assert.That(_binding.MappingOrigins[1], Is.EqualTo(OscReceiverAdapterBinding.MappingOrigin.HeartbeatAuto));
+            Assert.That(_registry.TryResolve(slug, out IInputSource source), Is.True);
+            Assert.That(source, Is.SameAs(_binding.InputSource));
+
+            _binding.HelperHost.Receiver.HandleOscMessage(
+                new uOSC.Message(OscAddressFormatter.VRChatParameterPrefix + "smile", 0.7f));
+            _binding.HelperHost.Receiver.HandleOscMessage(
+                new uOSC.Message(OscAddressFormatter.VRChatParameterPrefix + "frown", 0.3f));
+            _binding.OnFixedTick(0.02f);
+
+            var values = new float[2];
+            Assert.That(source.TryWriteValues(values), Is.True);
+            Assert.That(values[0], Is.EqualTo(0.7f).Within(1e-6f));
+            Assert.That(values[1], Is.EqualTo(0.3f).Within(1e-6f));
+        }
+
+        [Test]
+        public void OnFixedTick_UnchangedHeartbeatHash_ReusesRuntimeInstances()
+        {
+            const string slug = "osc-auto-heartbeat-hash";
+            int port = AllocatePort();
+            _binding = new OscReceiverAdapterBinding
+            {
+                Slug = slug,
+                Port = port,
+                Mappings = new List<OscMappingEntry>(),
+                BundleMode = BundleInterpretationMode.IndividualMessage
+            };
+            AdapterBuildContext ctx = CreateContext(blendShapeNames: new List<string> { "smile", "frown" });
+
+            _binding.OnStart(in ctx);
+            _bindingStarted = true;
+
+            HandleHeartbeat("smile", "frown");
+            _binding.OnFixedTick(0.02f);
+
+            OscInputSource originalSource = _binding.InputSource;
+            OscDoubleBuffer originalBuffer = _binding.Buffer;
+            HeartbeatConsistencyChecker originalChecker = _binding.HeartbeatChecker;
+
+            HandleHeartbeat("smile", "frown");
+            _binding.OnFixedTick(0.02f);
+
+            Assert.That(_binding.InputSource, Is.SameAs(originalSource));
+            Assert.That(_binding.Buffer, Is.SameAs(originalBuffer));
+            Assert.That(_binding.HeartbeatChecker, Is.SameAs(originalChecker));
+            Assert.That(_binding.RuntimeMappings.Count, Is.EqualTo(2));
+        }
+
         // ---------------------------------------------------------------
         // OnStart: helper AddComponent + InputSourceRegistry 登録
         // ---------------------------------------------------------------
@@ -368,6 +443,18 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
                 timeProvider: new UnityTimeProvider(),
                 hostGameObject: _hostGameObject,
                 lipSyncProvider: null);
+        }
+
+        private void HandleHeartbeat(params string[] names)
+        {
+            var values = new object[names.Length];
+            for (int i = 0; i < names.Length; i++)
+            {
+                values[i] = names[i];
+            }
+
+            _binding.HelperHost.Receiver.HandleOscMessage(
+                new uOSC.Message(OscReceiverAdapterBinding.BlendShapeNamesAddress, values));
         }
 
         private static OscMapping[] CreateDefaultMappings()
