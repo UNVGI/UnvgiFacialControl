@@ -43,6 +43,8 @@ namespace Hidano.FacialControl.Adapters.OSC
         private const int DefaultPacketCapacity = 64;
         private const int FloatMessageTypeCount = 1;
         private const int SenderIdentityMessageTypeCount = 2;
+        private const int PresetBaseMessageTypeCount = 1;
+        private const int PresetCustomMessageTypeCount = 2;
         private const byte TypeBlob = (byte)'b';
         private const byte TypeFloat = (byte)'f';
         private const byte TypeString = (byte)'s';
@@ -216,7 +218,69 @@ namespace Hidano.FacialControl.Adapters.OSC
             int floatCount,
             byte[] heartbeatAddressUtf8,
             string[] heartbeatNames,
+            int heartbeatNameCount,
+            byte[] presetAddressUtf8,
+            string presetName,
+            string customPrefix)
+        {
+            return BuildFrameBundleCore(
+                timestamp,
+                senderIdentityAddressUtf8,
+                senderUuidBytes,
+                startedAtUnixMs,
+                floatAddressUtf8,
+                floatValues,
+                floatCount,
+                heartbeatAddressUtf8,
+                heartbeatNames,
+                heartbeatNameCount,
+                presetAddressUtf8,
+                presetName,
+                customPrefix);
+        }
+
+        public int BuildFrameBundle(
+            ulong timestamp,
+            byte[] senderIdentityAddressUtf8,
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            byte[][] floatAddressUtf8,
+            float[] floatValues,
+            int floatCount,
+            byte[] heartbeatAddressUtf8,
+            string[] heartbeatNames,
             int heartbeatNameCount)
+        {
+            return BuildFrameBundleCore(
+                timestamp,
+                senderIdentityAddressUtf8,
+                senderUuidBytes,
+                startedAtUnixMs,
+                floatAddressUtf8,
+                floatValues,
+                floatCount,
+                heartbeatAddressUtf8,
+                heartbeatNames,
+                heartbeatNameCount,
+                presetAddressUtf8: null,
+                presetName: null,
+                customPrefix: null);
+        }
+
+        private int BuildFrameBundleCore(
+            ulong timestamp,
+            byte[] senderIdentityAddressUtf8,
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            byte[][] floatAddressUtf8,
+            float[] floatValues,
+            int floatCount,
+            byte[] heartbeatAddressUtf8,
+            string[] heartbeatNames,
+            int heartbeatNameCount,
+            byte[] presetAddressUtf8,
+            string presetName,
+            string customPrefix)
         {
             ThrowIfDisposed();
             ValidateAddress(senderIdentityAddressUtf8, nameof(senderIdentityAddressUtf8));
@@ -268,6 +332,19 @@ namespace Hidano.FacialControl.Adapters.OSC
                     nameof(heartbeatAddressUtf8));
             }
 
+            bool includePreset = presetAddressUtf8 != null;
+            if (includePreset)
+            {
+                ValidateAddress(presetAddressUtf8, nameof(presetAddressUtf8));
+                ValidatePresetName(presetName, nameof(presetName));
+            }
+            else if (presetName != null || customPrefix != null)
+            {
+                throw new ArgumentException(
+                    "Preset address must be provided when preset payload is provided.",
+                    nameof(presetAddressUtf8));
+            }
+
             ResetBuildState();
             SetFrameSplitSenderIdentity(senderIdentityAddressUtf8, senderUuidBytes, startedAtUnixMs);
             try
@@ -287,6 +364,11 @@ namespace Hidano.FacialControl.Adapters.OSC
                     AddHeartbeatMessages(timestamp, heartbeatAddressUtf8, heartbeatNames, heartbeatNameCount);
                 }
 
+                if (includePreset)
+                {
+                    AddPresetMessage(timestamp, presetAddressUtf8, presetName, customPrefix);
+                }
+
                 LogMtuSplitIfNeeded();
                 return _packetCount;
             }
@@ -301,14 +383,50 @@ namespace Hidano.FacialControl.Adapters.OSC
             byte[] addressUtf8,
             ReadOnlySpan<string> names)
         {
+            return BuildHeartbeatBundle(
+                timestamp,
+                addressUtf8,
+                names,
+                presetAddressUtf8: null,
+                presetName: null,
+                customPrefix: null);
+        }
+
+        public int BuildHeartbeatBundle(
+            ulong timestamp,
+            byte[] addressUtf8,
+            ReadOnlySpan<string> names,
+            byte[] presetAddressUtf8,
+            string presetName,
+            string customPrefix)
+        {
             ThrowIfDisposed();
             ValidateAddress(addressUtf8, nameof(addressUtf8));
+            bool includePreset = presetAddressUtf8 != null;
+            if (includePreset)
+            {
+                ValidateAddress(presetAddressUtf8, nameof(presetAddressUtf8));
+                ValidatePresetName(presetName, nameof(presetName));
+            }
+            else if (presetName != null || customPrefix != null)
+            {
+                throw new ArgumentException(
+                    "Preset address must be provided when preset payload is provided.",
+                    nameof(presetAddressUtf8));
+            }
+
             ResetBuildState();
             BeginPacket(timestamp);
 
             if (names.Length == 0)
             {
                 AddStringMessage(timestamp, addressUtf8, ReadOnlySpan<string>.Empty);
+                if (includePreset)
+                {
+                    AddPresetMessage(timestamp, presetAddressUtf8, presetName, customPrefix);
+                }
+
+                LogMtuSplitIfNeeded();
                 return _packetCount;
             }
 
@@ -325,6 +443,11 @@ namespace Hidano.FacialControl.Adapters.OSC
                 ReadOnlySpan<string> chunk = names.Slice(index, chunkCount);
                 AddStringMessage(timestamp, addressUtf8, chunk);
                 index += chunkCount;
+            }
+
+            if (includePreset)
+            {
+                AddPresetMessage(timestamp, presetAddressUtf8, presetName, customPrefix);
             }
 
             LogMtuSplitIfNeeded();
@@ -348,6 +471,50 @@ namespace Hidano.FacialControl.Adapters.OSC
             }
 
             return BuildHeartbeatBundle(timestamp, addressUtf8, new ReadOnlySpan<string>(names, 0, count));
+        }
+
+        public int BuildHeartbeatBundle(
+            ulong timestamp,
+            byte[] addressUtf8,
+            string[] names,
+            int count,
+            byte[] presetAddressUtf8,
+            string presetName,
+            string customPrefix)
+        {
+            if (names == null)
+            {
+                throw new ArgumentNullException(nameof(names));
+            }
+
+            if (count < 0 || count > names.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(count));
+            }
+
+            return BuildHeartbeatBundle(
+                timestamp,
+                addressUtf8,
+                new ReadOnlySpan<string>(names, 0, count),
+                presetAddressUtf8,
+                presetName,
+                customPrefix);
+        }
+
+        public int BuildPresetBundle(
+            ulong timestamp,
+            byte[] presetAddressUtf8,
+            string presetName,
+            string customPrefix)
+        {
+            ThrowIfDisposed();
+            ValidateAddress(presetAddressUtf8, nameof(presetAddressUtf8));
+            ValidatePresetName(presetName, nameof(presetName));
+
+            ResetBuildState();
+            BeginPacket(timestamp);
+            AddPresetMessage(timestamp, presetAddressUtf8, presetName, customPrefix);
+            return _packetCount;
         }
 
         private void AddHeartbeatMessages(
@@ -450,6 +617,19 @@ namespace Hidano.FacialControl.Adapters.OSC
             CompleteMessage(packetIndex, messageStart, messageSize);
         }
 
+        private void AddPresetMessage(
+            ulong timestamp,
+            byte[] presetAddressUtf8,
+            string presetName,
+            string customPrefix)
+        {
+            bool includeCustomPrefix = ShouldIncludeCustomPrefix(presetName, customPrefix);
+            int messageSize = GetPresetMessageSize(presetAddressUtf8.Length, presetName, includeCustomPrefix, customPrefix);
+            BeginMessage(timestamp, messageSize, out int packetIndex, out int messageStart);
+            WritePresetMessage(packetIndex, presetAddressUtf8, presetName, includeCustomPrefix, customPrefix);
+            CompleteMessage(packetIndex, messageStart, messageSize);
+        }
+
         private void BeginMessage(ulong timestamp, int messageSize, out int packetIndex, out int messageStart)
         {
             int elementSize = 4 + messageSize;
@@ -545,6 +725,31 @@ namespace Hidano.FacialControl.Adapters.OSC
             for (int i = 0; i < values.Length; i++)
             {
                 WriteOscString(buffer, ref offset, values[i]);
+            }
+
+            _lengths[packetIndex] = offset;
+        }
+
+        private void WritePresetMessage(
+            int packetIndex,
+            byte[] presetAddressUtf8,
+            string presetName,
+            bool includeCustomPrefix,
+            string customPrefix)
+        {
+            byte[] buffer = _buffers[packetIndex];
+            int offset = _lengths[packetIndex];
+
+            WriteOscString(buffer, ref offset, presetAddressUtf8);
+            WriteTypeTags(
+                buffer,
+                ref offset,
+                TypeString,
+                includeCustomPrefix ? PresetCustomMessageTypeCount : PresetBaseMessageTypeCount);
+            WriteOscString(buffer, ref offset, presetName);
+            if (includeCustomPrefix)
+            {
+                WriteOscString(buffer, ref offset, customPrefix);
             }
 
             _lengths[packetIndex] = offset;
@@ -656,6 +861,31 @@ namespace Hidano.FacialControl.Adapters.OSC
             }
 
             return size;
+        }
+
+        private int GetPresetMessageSize(
+            int addressByteCount,
+            string presetName,
+            bool includeCustomPrefix,
+            string customPrefix)
+        {
+            int typeCount = includeCustomPrefix ? PresetCustomMessageTypeCount : PresetBaseMessageTypeCount;
+            int size = GetOscStringSize(addressByteCount)
+                + GetOscStringSize(1 + typeCount)
+                + GetOscStringSize(GetUtf8ByteCount(presetName));
+
+            if (includeCustomPrefix)
+            {
+                size += GetOscStringSize(GetUtf8ByteCount(customPrefix));
+            }
+
+            return size;
+        }
+
+        private static bool ShouldIncludeCustomPrefix(string presetName, string customPrefix)
+        {
+            return customPrefix != null &&
+                string.Equals(presetName, AddressPresetEstimator.PresetCustom, StringComparison.OrdinalIgnoreCase);
         }
 
         private static int GetOscStringSize(int utf8ByteCount)
@@ -811,6 +1041,19 @@ namespace Hidano.FacialControl.Adapters.OSC
             if (addressUtf8.Length == 0 || addressUtf8[0] != (byte)'/')
             {
                 throw new ArgumentException("OSC address must be a non-empty UTF-8 byte array starting with '/'.", paramName);
+            }
+        }
+
+        private static void ValidatePresetName(string presetName, string paramName)
+        {
+            if (presetName == null)
+            {
+                throw new ArgumentNullException(paramName);
+            }
+
+            if (presetName.Length == 0)
+            {
+                throw new ArgumentException("Preset name must be a non-empty string.", paramName);
             }
         }
 
