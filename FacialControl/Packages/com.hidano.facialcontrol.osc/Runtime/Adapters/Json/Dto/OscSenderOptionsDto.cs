@@ -15,6 +15,7 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
 
         public string[] blendShapeMapping = new string[0];
         public string[] gazeExpressionIds = new string[0];
+        public bool sendPreset = true;
         public bool suppressLoopback = true;
         public float heartbeatIntervalSeconds = DefaultHeartbeatIntervalSeconds;
 
@@ -25,11 +26,17 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
                 return new OscSenderOptionsDto();
             }
 
+            bool hasSendPreset = ContainsJsonKey(json, nameof(sendPreset));
             bool hasSuppressLoopback = ContainsJsonKey(json, nameof(suppressLoopback));
             OscSenderOptionsDto dto = JsonUtility.FromJson<OscSenderOptionsDto>(json);
             if (dto == null)
             {
                 dto = new OscSenderOptionsDto();
+            }
+
+            if (!hasSendPreset)
+            {
+                dto.sendPreset = true;
             }
 
             if (!hasSuppressLoopback)

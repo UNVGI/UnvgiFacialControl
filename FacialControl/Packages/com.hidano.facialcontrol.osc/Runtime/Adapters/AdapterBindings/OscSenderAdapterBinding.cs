@@ -38,6 +38,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         [SerializeField]
         private List<string> _gazeExpressionIds = new List<string>();
 
+        [SerializeField]
+        private bool _sendPreset = true;
+
         /// <summary>
         /// 診断/テスト経路。Inspector で <see cref="_settings"/> を割り当てない代わりに
         /// プロパティ setter や <see cref="Configure(string, int)"/> から値を流し込むと on-demand で生成され、
@@ -177,6 +180,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return settings != null ? settings.SuppressLoopback : true;
             }
             set => EnsureRuntimeSettings().SetSuppressLoopback(value);
+        }
+
+        public bool SendPreset
+        {
+            get => _sendPreset;
+            set => _sendPreset = value;
         }
 
         public OscSender HelperSender => _sendSlots != null && _sendSlots.Count > 0
@@ -393,14 +402,30 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
                 if (sendHeartbeat)
                 {
-                    slot.Sender.SendBundle(
-                        _identityUuidBytes,
-                        _identityStartedAtUnixMs,
-                        slot.ScratchAddressUtf8,
-                        slot.ScratchFloatValues,
-                        _hasPublishedFrame ? slot.ScratchFloatCount : 0,
-                        slot.HeartbeatBlendShapeNames,
-                        slot.HeartbeatBlendShapeNames.Length);
+                    if (_sendPreset)
+                    {
+                        slot.Sender.SendBundle(
+                            _identityUuidBytes,
+                            _identityStartedAtUnixMs,
+                            slot.ScratchAddressUtf8,
+                            slot.ScratchFloatValues,
+                            _hasPublishedFrame ? slot.ScratchFloatCount : 0,
+                            slot.HeartbeatBlendShapeNames,
+                            slot.HeartbeatBlendShapeNames.Length,
+                            ToPresetName(slot.Preset),
+                            customPrefix: null);
+                    }
+                    else
+                    {
+                        slot.Sender.SendBundle(
+                            _identityUuidBytes,
+                            _identityStartedAtUnixMs,
+                            slot.ScratchAddressUtf8,
+                            slot.ScratchFloatValues,
+                            _hasPublishedFrame ? slot.ScratchFloatCount : 0,
+                            slot.HeartbeatBlendShapeNames,
+                            slot.HeartbeatBlendShapeNames.Length);
+                    }
                 }
                 else
                 {
@@ -1020,6 +1045,20 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             return preset == AddressPresetKind.ARKit
                 ? PerfectSyncEyeLook.Count
                 : VrChatGazeMessageCount;
+        }
+
+        private static string ToPresetName(AddressPresetKind preset)
+        {
+            switch (preset)
+            {
+                case AddressPresetKind.ARKit:
+                    return AddressPresetEstimator.PresetArKit;
+                case AddressPresetKind.Custom:
+                    return AddressPresetEstimator.PresetCustom;
+                case AddressPresetKind.VRChat:
+                default:
+                    return AddressPresetEstimator.PresetVrChat;
+            }
         }
 
         private sealed class SendSlot

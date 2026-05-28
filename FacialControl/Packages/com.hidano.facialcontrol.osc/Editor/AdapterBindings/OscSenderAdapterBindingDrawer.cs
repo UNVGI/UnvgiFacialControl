@@ -17,12 +17,14 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
         private const string SettingsFieldName = "_settings";
         private const string BlendShapeNamesFieldName = "_blendShapeNames";
         private const string GazeExpressionIdsFieldName = "_gazeExpressionIds";
+        private const string SendPresetFieldName = "_sendPreset";
 
         public const string RootClassName = "facial-control-osc-sender-adapter-binding";
         public const string SettingsFieldElementName = "osc-sender-adapter-binding-settings";
         public const string SettingsMissingHelpBoxName = "osc-sender-adapter-binding-settings-missing";
         public const string BlendShapeNamesFieldElementName = "osc-sender-blend-shape-names";
         public const string GazeExpressionIdsFieldElementName = "osc-sender-gaze-expression-ids";
+        public const string SendPresetFieldElementName = "osc-sender-send-preset";
         public const string IdentityContainerName = "osc-sender-identity";
         public const string IdentityUuidFieldName = "osc-sender-identity-uuid";
         public const string IdentityStartedAtFieldName = "osc-sender-identity-started-at";
@@ -34,6 +36,7 @@ namespace Hidano.FacialControl.Osc.Editor.AdapterBindings
 
             AddSlugField(root, property);
             AddSettingsField(root, property);
+            AddBoundField(root, property, SendPresetFieldName, "Send Preset Address", SendPresetFieldElementName);
             AddBoundField(root, property, BlendShapeNamesFieldName, "BlendShape Names (Optional Filter)", BlendShapeNamesFieldElementName);
             root.Add(new HelpBox(
                 "空のままにすると、対象キャラの全 BlendShape を自動送信します。subset 配信したい場合のみ名前を列挙してください。",

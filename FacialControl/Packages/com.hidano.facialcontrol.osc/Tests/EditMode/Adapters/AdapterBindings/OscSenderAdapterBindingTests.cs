@@ -64,6 +64,14 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         }
 
         [Test]
+        public void Ctor_SendPreset_DefaultsToTrue()
+        {
+            var binding = new OscSenderAdapterBinding();
+
+            Assert.That(binding.SendPreset, Is.True);
+        }
+
+        [Test]
         public void Type_GazeExpressionIds_IsSerializableListField()
         {
             FieldInfo field = typeof(OscSenderAdapterBinding).GetField(
@@ -72,6 +80,18 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
 
             Assert.That(field, Is.Not.Null);
             Assert.That(field.FieldType, Is.EqualTo(typeof(List<string>)));
+            Assert.That(field.GetCustomAttribute<SerializeField>(), Is.Not.Null);
+        }
+
+        [Test]
+        public void Type_SendPreset_IsSerializableBooleanField()
+        {
+            FieldInfo field = typeof(OscSenderAdapterBinding).GetField(
+                "_sendPreset",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            Assert.That(field, Is.Not.Null);
+            Assert.That(field.FieldType, Is.EqualTo(typeof(bool)));
             Assert.That(field.GetCustomAttribute<SerializeField>(), Is.Not.Null);
         }
 
