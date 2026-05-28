@@ -38,7 +38,6 @@ namespace Hidano.FacialControl.Adapters.InputSources
         private readonly ITimeProvider _timeProvider;
         private readonly float _stalenessSeconds;
         private readonly FailSafeMode _failSafeMode;
-        private readonly BitArray _skipMask;
         private readonly BitArray _contributeMask;
         private readonly int[] _mappingIndexToMeshIndex;
 
@@ -61,14 +60,12 @@ namespace Hidano.FacialControl.Adapters.InputSources
             float stalenessSeconds,
             ITimeProvider timeProvider,
             FailSafeMode failSafeMode = FailSafeMode.HoldLastValue,
-            BitArray skipMask = null,
             BitArray contributeMask = null)
             : this(
                 buffer,
                 stalenessSeconds,
                 timeProvider,
                 failSafeMode,
-                skipMask,
                 contributeMask,
                 mappingIndexToMeshIndex: null)
         {
@@ -89,12 +86,11 @@ namespace Hidano.FacialControl.Adapters.InputSources
             float stalenessSeconds,
             ITimeProvider timeProvider,
             FailSafeMode failSafeMode,
-            BitArray skipMask,
             BitArray contributeMask,
             int[] mappingIndexToMeshIndex)
             : base(
                 InputSourceId.Parse(ReservedId),
-                GetBlendShapeCount(buffer, skipMask, contributeMask, mappingIndexToMeshIndex))
+                GetBlendShapeCount(buffer, contributeMask, mappingIndexToMeshIndex))
         {
             if (buffer == null)
             {
@@ -114,7 +110,6 @@ namespace Hidano.FacialControl.Adapters.InputSources
             _timeProvider = timeProvider;
             _stalenessSeconds = stalenessSeconds;
             _failSafeMode = failSafeMode;
-            _skipMask = skipMask;
             _mappingIndexToMeshIndex = CreateMappingIndexToMeshIndex(buffer.Size, mappingIndexToMeshIndex);
             _contributeMask = contributeMask ?? CreateContributeMask(BlendShapeCount, _mappingIndexToMeshIndex);
             _lastObservedTick = 0;
@@ -168,9 +163,7 @@ namespace Hidano.FacialControl.Adapters.InputSources
                     continue;
                 }
 
-                output[meshIndex] = _skipMask != null && meshIndex < _skipMask.Length && _skipMask[meshIndex]
-                    ? 0f
-                    : readBuffer[mappingIndex];
+                output[meshIndex] = readBuffer[mappingIndex];
             }
 
             return true;
@@ -178,18 +171,12 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
         private static int GetBlendShapeCount(
             OscDoubleBuffer buffer,
-            BitArray skipMask,
             BitArray contributeMask,
             int[] mappingIndexToMeshIndex)
         {
             if (contributeMask != null)
             {
                 return contributeMask.Length;
-            }
-
-            if (skipMask != null)
-            {
-                return skipMask.Length;
             }
 
             int maxMeshIndex = -1;

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.OSC;
@@ -427,13 +428,13 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
             if (hasBlendShapeMappings)
             {
+                BitArray contributeMask = CreateContributeMask(meshBlendShapeNames.Count, mappingIndexToMeshIndex);
                 _inputSource = new OscInputSource(
                     _buffer,
                     settings.StalenessSeconds,
                     ctx.TimeProvider,
                     settings.FailSafeMode,
-                    null,
-                    null,
+                    contributeMask,
                     mappingIndexToMeshIndex);
                 ctx.InputSourceRegistry.Register(slug, _inputSource);
             }
@@ -1104,6 +1105,26 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             return mappingIndexToMeshIndex;
+        }
+
+        private static BitArray CreateContributeMask(int meshBlendShapeCount, int[] mappingIndexToMeshIndex)
+        {
+            var mask = new BitArray(meshBlendShapeCount, false);
+            if (mappingIndexToMeshIndex == null)
+            {
+                return mask;
+            }
+
+            for (int i = 0; i < mappingIndexToMeshIndex.Length; i++)
+            {
+                int meshIndex = mappingIndexToMeshIndex[i];
+                if (meshIndex >= 0 && meshIndex < mask.Length)
+                {
+                    mask[meshIndex] = true;
+                }
+            }
+
+            return mask;
         }
 
         private void MarkAcceptedPacket()
