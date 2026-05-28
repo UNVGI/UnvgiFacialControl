@@ -183,6 +183,53 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             Assert.That(_binding.RuntimeMappings.Count, Is.EqualTo(2));
         }
 
+        [Test]
+        public void DiagnosticApis_ExposeOriginsPresetAndHeartbeatHashThenDisposeClearsRuntimeState()
+        {
+            const string slug = "osc-diagnostic-runtime-state";
+            int port = AllocatePort();
+            _binding = new OscReceiverAdapterBinding
+            {
+                Slug = slug,
+                Port = port,
+                Mappings = new List<OscMappingEntry>(),
+                BundleMode = BundleInterpretationMode.IndividualMessage
+            };
+            AdapterBuildContext ctx = CreateContext(blendShapeNames: new List<string> { "smile", "frown" });
+
+            _binding.OnStart(in ctx);
+            _bindingStarted = true;
+
+            _binding.HelperHost.Receiver.HandleOscMessage(
+                new uOSC.Message(OscReceiverAdapterBinding.PresetAddress, "custom", "/avatar/custom/"));
+            HandleHeartbeat("smile", "frown");
+            _binding.OnFixedTick(0.02f);
+
+            Assert.That(_binding.RuntimeMappings.Count, Is.EqualTo(2));
+            Assert.That(_binding.CurrentPreset, Is.EqualTo(AddressPresetKind.Custom));
+            Assert.That(_binding.CurrentCustomPrefix, Is.EqualTo("/avatar/custom/"));
+            Assert.That(_binding.LastHeartbeatHash,
+                Is.EqualTo(HeartbeatHashHelper.ComputeFnv1a(new[] { "smile", "frown" })));
+            Assert.That(_binding.GetMappingOrigin(0),
+                Is.EqualTo(OscReceiverAdapterBinding.MappingOrigin.HeartbeatAuto));
+            Assert.That(_binding.GetMappingOrigin(1),
+                Is.EqualTo(OscReceiverAdapterBinding.MappingOrigin.HeartbeatAuto));
+            Assert.Throws<ArgumentOutOfRangeException>(() => _binding.GetMappingOrigin(2));
+
+            _binding.Dispose();
+            _bindingStarted = false;
+
+            Assert.That(_binding.RuntimeMappings.Count, Is.EqualTo(0));
+            Assert.That(_binding.MappingOrigins.Count, Is.EqualTo(0));
+            Assert.That(_binding.CurrentPreset, Is.Null);
+            Assert.That(_binding.CurrentCustomPrefix, Is.Null);
+            Assert.That(_binding.LastHeartbeatHash, Is.EqualTo(0u));
+            Assert.That(_binding.Buffer, Is.Null);
+            Assert.That(_binding.InputSource, Is.Null);
+            Assert.That(_binding.IsStarted, Is.False);
+            Assert.Throws<ArgumentOutOfRangeException>(() => _binding.GetMappingOrigin(0));
+        }
+
         // ---------------------------------------------------------------
         // OnStart: helper AddComponent + InputSourceRegistry 登録
         // ---------------------------------------------------------------

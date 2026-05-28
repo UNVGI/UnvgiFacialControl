@@ -335,7 +335,11 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         public string CurrentPresetName => _currentPresetName;
 
+        public AddressPresetKind? CurrentPreset => ParseCurrentPreset(_currentPresetName);
+
         public string CurrentCustomPrefix => _currentCustomPrefix;
+
+        public uint LastHeartbeatHash => _lastHeartbeatHash;
 
         public IReadOnlyList<GazeVector2InputSource> GazeSources =>
             _gazeSources ?? (IReadOnlyList<GazeVector2InputSource>)Array.Empty<GazeVector2InputSource>();
@@ -348,6 +352,19 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         public IReadOnlyList<MappingOrigin> MappingOrigins =>
             _mappingOrigins ?? (IReadOnlyList<MappingOrigin>)Array.Empty<MappingOrigin>();
+
+        public MappingOrigin GetMappingOrigin(int runtimeMappingIndex)
+        {
+            if (_mappingOrigins == null ||
+                runtimeMappingIndex < 0 ||
+                runtimeMappingIndex >= _mappingOrigins.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(runtimeMappingIndex), runtimeMappingIndex,
+                    "runtimeMappingIndex must point to an active runtime mapping.");
+            }
+
+            return _mappingOrigins[runtimeMappingIndex];
+        }
 
         /// <summary>OnStart 済みかどうか。</summary>
         public bool IsStarted => _started;
@@ -530,6 +547,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _warnedOnUnknownPreset = false;
             _warnedOnMissingCustomPrefix = false;
             _runtimeRegistry = null;
+            _runtimeSlug = default;
             _runtimeMeshBlendShapeNames = null;
             _timeProvider = null;
             _currentSenderId = default;
@@ -554,6 +572,26 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _runtimeManualEntries = null;
 
             _started = false;
+        }
+
+        private static AddressPresetKind? ParseCurrentPreset(string presetName)
+        {
+            if (string.Equals(presetName, AddressPresetEstimator.PresetVrChat, StringComparison.OrdinalIgnoreCase))
+            {
+                return AddressPresetKind.VRChat;
+            }
+
+            if (string.Equals(presetName, AddressPresetEstimator.PresetArKit, StringComparison.OrdinalIgnoreCase))
+            {
+                return AddressPresetKind.ARKit;
+            }
+
+            if (string.Equals(presetName, AddressPresetEstimator.PresetCustom, StringComparison.OrdinalIgnoreCase))
+            {
+                return AddressPresetKind.Custom;
+            }
+
+            return null;
         }
 
         private void StartReceiverPhase(
@@ -1007,6 +1045,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         {
             _runtimeMappings = result.RuntimeMappings;
             _mappingOrigins = result.Origins;
+            LogRuntimeMappingDiagnostics(_runtimeMappings, _mappingOrigins);
             BuildNormalLookup(_runtimeMappings);
 
             if (_buffer == null || _helperHost == null || _effectiveSettings == null)
@@ -1041,6 +1080,30 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 contributeMask,
                 mappingIndexToMeshIndex);
             _runtimeRegistry.Replace(_runtimeSlug, _inputSource);
+        }
+
+        private static void LogRuntimeMappingDiagnostics(OscMapping[] mappings, MappingOrigin[] origins)
+        {
+            int manualCount = 0;
+            int heartbeatAutoCount = 0;
+            if (origins != null)
+            {
+                for (int i = 0; i < origins.Length; i++)
+                {
+                    if (origins[i] == MappingOrigin.Manual)
+                    {
+                        manualCount++;
+                    }
+                    else if (origins[i] == MappingOrigin.HeartbeatAuto)
+                    {
+                        heartbeatAutoCount++;
+                    }
+                }
+            }
+
+            int totalCount = mappings != null ? mappings.Length : 0;
+            Debug.Log(
+                $"[OscReceiverAdapterBinding] runtime mappings published: total={totalCount}, manual={manualCount}, heartbeatAuto={heartbeatAutoCount}.");
         }
 
         private static bool RuntimeMappingsEqual(OscMapping[] left, OscMapping[] right)
