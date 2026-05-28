@@ -8,6 +8,7 @@ using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
+using Hidano.FacialControl.Tests.Shared;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -294,6 +295,93 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         // ---------------------------------------------------------------
 
         [Test]
+        public void OnStart_ManualBlendShapeMappings_RegistersPrimarySourceWithMeshIndexContributeMask()
+        {
+            const string slug = "osc-manual-mask-regression";
+            int port = AllocatePort();
+            OscMapping[] mappings = new[]
+            {
+                new OscMapping("/avatar/parameters/frown", "frown", "emotion"),
+                new OscMapping("/avatar/parameters/smile", "smile", "emotion")
+            };
+            _binding = CreateBinding(slug: slug, endpoint: TestEndpoint, port: port, mappings: mappings);
+            AdapterBuildContext ctx = CreateContext(blendShapeNames: new List<string> { "smile", "blink", "frown" });
+
+            _binding.OnStart(in ctx);
+            _bindingStarted = true;
+
+            Assert.That(_binding.IsStarted, Is.True);
+            Assert.That(_binding.Buffer, Is.Not.Null);
+            Assert.That(_binding.Buffer.Size, Is.EqualTo(2));
+            Assert.That(_binding.InputSource, Is.Not.Null);
+            Assert.That(_registry.TryResolve(slug, out IInputSource source), Is.True);
+            Assert.That(source, Is.SameAs(_binding.InputSource));
+            AssertMask(source.ContributeMask, true, false, true);
+
+            _binding.HelperHost.Receiver.HandleOscMessage(
+                new uOSC.Message("/avatar/parameters/frown", 0.75f));
+            _binding.HelperHost.Receiver.HandleOscMessage(
+                new uOSC.Message("/avatar/parameters/smile", 0.25f));
+            _binding.OnFixedTick(0.02f);
+
+            var output = new float[] { -1f, -1f, -1f };
+            Assert.That(source.TryWriteValues(output), Is.True);
+            Assert.That(output[0], Is.EqualTo(0.25f).Within(1e-6f));
+            Assert.That(output[1], Is.EqualTo(-1f).Within(1e-6f));
+            Assert.That(output[2], Is.EqualTo(0.75f).Within(1e-6f));
+        }
+
+        [Test]
+        public void OnFixedTick_GazeVrchatBundleOnly_UsesAccumulatorWithoutPrimaryOscInputSource()
+        {
+            const string slug = "osc-gaze-bundle-regression";
+            var time = new ManualTimeProvider { UnscaledTimeSeconds = 0.0 };
+            _binding = new OscReceiverAdapterBinding
+            {
+                Slug = slug,
+                Port = AllocatePort(),
+                StalenessSeconds = 0f,
+                BundleMode = BundleInterpretationMode.AtomicSwap,
+                BundleAccumulationTimeoutMs = 5f,
+                Mappings = new List<OscMappingEntry>
+                {
+                    new OscMappingEntry
+                    {
+                        mode = OscMappingMode.Gaze_VRChat_XY,
+                        expressionId = "eye",
+                        addressPattern = "/avatar/parameters/eye",
+                    }
+                }
+            };
+            AdapterBuildContext ctx = CreateContext(timeProvider: time);
+
+            _binding.OnStart(in ctx);
+            _bindingStarted = true;
+
+            Assert.That(_binding.InputSource, Is.Null);
+            Assert.That(_registry.TryResolve(slug, out _), Is.False);
+            Assert.That(_registry.TryResolve(slug + ":eye", out IInputSource inputSource), Is.True);
+            Assert.That(inputSource, Is.InstanceOf<GazeVector2InputSource>());
+            AssertMask(inputSource.ContributeMask);
+
+            _binding.HelperHost.Receiver.HandleOscMessage(
+                FloatMessage("/avatar/parameters/eyeX", 0.2f, timestamp: 100UL));
+            _binding.HelperHost.Receiver.HandleOscMessage(
+                FloatMessage("/avatar/parameters/eyeY", -0.6f, timestamp: 100UL));
+            _binding.OnFixedTick(0.02f);
+
+            var gaze = (GazeVector2InputSource)inputSource;
+            Assert.That(gaze.TryReadVector2(out _, out _), Is.False);
+
+            time.UnscaledTimeSeconds = 0.006;
+            _binding.OnFixedTick(0.02f);
+
+            Assert.That(gaze.TryReadVector2(out float x, out float y), Is.True);
+            Assert.That(x, Is.EqualTo(0.2f).Within(1e-6f));
+            Assert.That(y, Is.EqualTo(-0.6f).Within(1e-6f));
+        }
+
+        [Test]
         public void PresetAddress_UpdatesRuntimeStateWithoutRecreatingInputSource()
         {
             const string slug = "osc-preset-runtime-state";
@@ -480,14 +568,16 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             return binding;
         }
 
-        private AdapterBuildContext CreateContext(IReadOnlyList<string> blendShapeNames = null)
+        private AdapterBuildContext CreateContext(
+            IReadOnlyList<string> blendShapeNames = null,
+            ITimeProvider timeProvider = null)
         {
             return new AdapterBuildContext(
                 profile: new FacialProfile("1.0"),
                 blendShapeNames: blendShapeNames ?? new List<string> { "smile", "frown" },
                 inputSourceRegistry: _registry,
                 facialOutputBus: new FacialOutputBus(),
-                timeProvider: new UnityTimeProvider(),
+                timeProvider: timeProvider ?? new UnityTimeProvider(),
                 hostGameObject: _hostGameObject,
                 lipSyncProvider: null);
         }
@@ -523,6 +613,22 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         private static bool TryReadValues(IInputSource source, float[] buffer)
         {
             return source.TryWriteValues(buffer.AsSpan());
+        }
+
+        private static uOSC.Message FloatMessage(string address, float value, ulong timestamp)
+        {
+            var message = new uOSC.Message(address, value);
+            message.timestamp = new uOSC.Timestamp(timestamp);
+            return message;
+        }
+
+        private static void AssertMask(BitArray mask, params bool[] expected)
+        {
+            Assert.That(mask.Length, Is.EqualTo(expected.Length));
+            for (int i = 0; i < expected.Length; i++)
+            {
+                Assert.That(mask[i], Is.EqualTo(expected[i]), $"mask[{i}]");
+            }
         }
     }
 }

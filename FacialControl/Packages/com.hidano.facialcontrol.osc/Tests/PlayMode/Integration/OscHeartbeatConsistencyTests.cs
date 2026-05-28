@@ -51,7 +51,8 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             _binding = CreateReceiver();
             _binding.OnStart(CreateContext(registry, time));
 
-            LogAssert.Expect(LogType.Warning, MismatchLog(SenderOnly, Blink));
+            Regex mismatchLog = MismatchLog(SenderOnly, Blink);
+            LogAssert.Expect(LogType.Warning, mismatchLog);
 
             HandleHeartbeat(Smile, SenderOnly);
             HandleFloat(Smile, 0.65f);
@@ -63,6 +64,10 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             CollectionAssert.AreEqual(new[] { Blink }, _binding.HeartbeatChecker.ReceiverOnlyNames);
             AssertMask(_binding.InputSource.ContributeMask, true, true);
             AssertBlendShapes(0.65f, 0.95f);
+
+            HandleHeartbeat(Smile, SenderOnly);
+            _binding.OnFixedTick(0.02f);
+            LogAssert.NoUnexpectedReceived();
         }
 
         private static OscReceiverAdapterBinding CreateReceiver()
