@@ -49,6 +49,17 @@ namespace Hidano.FacialControl.Adapters.InputSources
         }
 
         /// <inheritdoc />
+        public void Replace(AdapterSlug slug, IInputSource source)
+        {
+            if (source == null)
+            {
+                throw new ArgumentNullException(nameof(source));
+            }
+
+            ReplaceInternal(slug.Value, source);
+        }
+
+        /// <inheritdoc />
         public void Register(AdapterSlug slug, string sub, IInputSource source)
         {
             if (string.IsNullOrEmpty(sub))
@@ -63,6 +74,23 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
             string key = slug.Value + CompositeSeparator + sub;
             RegisterInternal(key, source);
+        }
+
+        /// <inheritdoc />
+        public void Replace(AdapterSlug slug, string sub, IInputSource source)
+        {
+            if (string.IsNullOrEmpty(sub))
+            {
+                throw new ArgumentException(
+                    "sub must not be null or empty for composite id replacement.", nameof(sub));
+            }
+            if (source == null)
+            {
+                throw new ArgumentNullException(nameof(source));
+            }
+
+            string key = slug.Value + CompositeSeparator + sub;
+            ReplaceInternal(key, source);
         }
 
         /// <inheritdoc />
@@ -106,6 +134,22 @@ namespace Hidano.FacialControl.Adapters.InputSources
 
             _entries.Add(key, source);
             _registeredIds.Add(key);
+        }
+
+        private void ReplaceInternal(string key, IInputSource source)
+        {
+            if (_entries.TryGetValue(key, out var previous))
+            {
+                _entries[key] = source;
+                Debug.Log(
+                    $"[InputSourceRegistry] replaced id '{key}' ({previous.GetType().Name} -> {source.GetType().Name}).");
+                return;
+            }
+
+            _entries.Add(key, source);
+            _registeredIds.Add(key);
+            Debug.Log(
+                $"[InputSourceRegistry] replaced id '{key}' (<unregistered> -> {source.GetType().Name}).");
         }
 
         private void UnregisterInternal(string key)

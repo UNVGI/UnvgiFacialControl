@@ -33,6 +33,15 @@ namespace Hidano.FacialControl.Adapters.InputSources
         void Register(AdapterSlug slug, IInputSource source);
 
         /// <summary>
+        /// <c>&lt;slug&gt;</c> primary id 縺ｮ <paramref name="source"/> 繧貞ｷｮ縺玲崛縺医ｋ縲・
+        /// 譛ｪ逋ｻ骭ｲ縺ｮ蝣ｴ蜷医・譁ｰ隕冗匳骭ｲ縺励√里蟄倥・ insertion order 繧剃ｿ晄戟縺吶ｋ縲・
+        /// </summary>
+        /// <exception cref="System.ArgumentNullException">
+        /// <paramref name="source"/> 縺・<c>null</c> 縺ｮ蝣ｴ蜷医・
+        /// </exception>
+        void Replace(AdapterSlug slug, IInputSource source);
+
+        /// <summary>
         /// <c>&lt;slug&gt;:&lt;sub&gt;</c> 複合 id で <paramref name="source"/> を登録する。
         /// 同 id 重複登録は LogError + 後勝ち上書きとする。
         /// </summary>
@@ -43,6 +52,18 @@ namespace Hidano.FacialControl.Adapters.InputSources
         /// <paramref name="source"/> が <c>null</c> の場合。
         /// </exception>
         void Register(AdapterSlug slug, string sub, IInputSource source);
+
+        /// <summary>
+        /// <c>&lt;slug&gt;:&lt;sub&gt;</c> 隍・粋 id 縺ｮ <paramref name="source"/> 繧貞ｷｮ縺玲崛縺医ｋ縲・
+        /// 譛ｪ逋ｻ骭ｲ縺ｮ蝣ｴ蜷医・譁ｰ隕冗匳骭ｲ縺吶ｋ縲・
+        /// </summary>
+        /// <exception cref="System.ArgumentException">
+        /// <paramref name="sub"/> 縺・<c>null</c> 縺ｾ縺溘・遨ｺ譁・ｭ怜・縺ｮ蝣ｴ蜷医・
+        /// </exception>
+        /// <exception cref="System.ArgumentNullException">
+        /// <paramref name="source"/> 縺・<c>null</c> 縺ｮ蝣ｴ蜷医・
+        /// </exception>
+        void Replace(AdapterSlug slug, string sub, IInputSource source);
 
         /// <summary>
         /// <c>&lt;slug&gt;</c> primary id の登録を解除する。未登録の場合は何もしない。
