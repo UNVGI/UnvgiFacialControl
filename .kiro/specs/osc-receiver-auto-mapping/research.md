@@ -1,8 +1,8 @@
 # Research & Design Decisions — osc-receiver-auto-mapping
 
 ---
-**Purpose**: requirements.md / gap-analysis.md で決まった 10 個の設計判断と、design.md に乗せ切れない代替案・トレードオフ・参照情報を記録する。
-**スコープ**: 受信側 `OscReceiverAdapterBinding` の auto mapping 経路 + sentinel 形式 heartbeat 拡張 (送信側最小改修) + `IInputSourceRegistry.Replace` 追加 + `AddressPresetKind.Custom` 追加。
+**Purpose**: requirements.md / gap-analysis.md で決まった設計判断と、design.md に乗せ切れない代替案・トレードオフ・参照情報を記録する。validate-design で確定した 3 つの解決方針（preset 別 address 方式 / OscDoubleBuffer 同一 lock 方式 / Gaze ContributeMask 影響なし）も反映済み。
+**スコープ**: 受信側 `OscReceiverAdapterBinding` の auto mapping 経路 + preset 専用 address `/_facialcontrol/preset` 送出 (送信側最小改修) + `IInputSourceRegistry.Replace` 追加 + `AddressPresetKind.Custom` 追加。
 ---
 
 ## Summary
@@ -13,7 +13,7 @@
 - **Key Findings**:
   - 既存 `OnStart` の `!hasBlendShapeMappings && !hasGazeMappings` 早期 return が空 Mappings 経路と直接矛盾しており、3 フェーズ分割が必須。
   - `OscInputSource._mappingIndexToMeshIndex` / `_skipMask` / `_contributeMask` は全て `readonly` で in-place 拡張不可。`Replace API + 新インスタンス差し替え` 戦略が最も影響範囲が小さい。
-  - heartbeat 既存経路は `string` 値のみ集約するため、sentinel `"__preset__"` を「BlendShape 名らしき string」として旧 receiver に渡しても mesh 不一致で自然に skip され、後方互換が保たれる。
+  - preset 情報は当初 heartbeat payload 末尾の sentinel `"__preset__"` で伝送する案（Option B）だったが、validate-design で「BlendShape 名 heartbeat が chunk 分割されると sentinel が末尾 chunk に乗らないと検出できない」chunk 分割問題が判明。**preset を独立 OSC address `/_facialcontrol/preset` で送る方式に確定変更**（chunk 境界と無関係、旧 receiver は未知 address を dispatch せず単純無視で後方互換がよりクリーン）。
 
 ---
 
@@ -46,19 +46,22 @@
   - **`IInputSourceRegistry.Replace(string id, IInputSource source)` を新規追加**。挙動: 既存登録があれば置換（挿入順を保持）、なければ新規登録。ログレベルは `Debug.Log`（LogDebug 相当）で、`LogError` は出さない。
   - 既存 `Register(slug, source)` の duplicate-LogError 仕様は本 spec で変更しない。`Replace` は「意図的差し替え」を明示する API として導入。
 
-### Topic 3: heartbeat payload 拡張（Option A/B/C の選定）
+### Topic 3: preset 情報伝送方式（Option A/B/C → 別 address D へ確定変更）
 
-- **Context**: receiver 側で preset 種別を確定するには (a) 名前ベース推定のみ / (b) sentinel + preset 文字列 / (c) 別 OSC 型タグ の 3 案があった。
+- **Context**: receiver 側で preset 種別を確定するには (a) 名前ベース推定のみ / (b) heartbeat payload 末尾 sentinel + preset 文字列 / (c) 別 OSC 型タグ / (d) 別 OSC address の案があった。当初 Option B（sentinel）を採用したが、validate-design で chunk 分割問題が判明し Option D（別 address）へ確定変更。
 - **Sources Consulted**:
-  - `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/OSC/OscBundleBuilder.cs:300-380`（`AddHeartbeatMessages`）
-  - `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/AdapterBindings/OscReceiverAdapterBinding.cs:778-795`（`HandleHeartbeatMessage` の `is string` フィルタ）
+  - `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/OSC/OscBundleBuilder.cs:300-380`（`AddHeartbeatMessages`、`GetFittingStringChunkCount` の chunk 分割ロジック）
+  - `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/AdapterBindings/OscReceiverAdapterBinding.cs:778-795`（`HandleHeartbeatMessage` の `is string` フィルタ、`BlendShapeNamesAddress` 定数定義箇所）
 - **Findings**:
-  - Option A（名前ベースのみ）は ARKit / VRChat の判別に sentinel 不要だが、custom prefix を payload に乗せられない。
-  - Option C（別 OSC 型タグ）は旧 receiver の `is string` フィルタが暗黙 skip してくれるが、`OscBundleBuilder.AddHeartbeatMessages` が string 専用 packing に最適化されているため builder 側の改修が大きい。
-  - Option B（sentinel `"__preset__"` + preset 名）は string 配列 1 本で完結し、旧 receiver には mesh 不一致名として渡って自然に warning だけで済む。
+  - Option A（名前ベースのみ）は ARKit / VRChat の判別に追加情報不要だが、custom prefix を伝送できない。
+  - Option B（sentinel `"__preset__"` + preset 名）は string 配列 1 本で完結するが、**BlendShape 名 heartbeat が MTU 制限で chunk 分割されると sentinel が末尾 chunk に乗っている保証がなく、preset 検出が chunk 受信順序に依存する致命的問題がある**（validate-design Critical Issue 1）。さらに旧 receiver で `__preset__` が `receiverOnly` 名一覧に載り warning が出る副作用もある。
+  - Option D（別 OSC address `/_facialcontrol/preset`）は preset を独立 message として送るため chunk 境界と完全に無関係。旧 receiver は当該 address に dispatcher ハンドラを持たず単純無視するため warning も致命エラーも発生しない（sentinel 方式より後方互換がクリーン）。
 - **Implications**:
-  - **Option B を採用**。送信側 `OscBundleBuilder.AddHeartbeatMessages` と `OscSenderAdapterBinding` の差分は「heartbeat 名配列の末尾に sentinel + preset 名 + (custom 時のみ) custom prefix を追加する」だけで済む。
-  - 送信側 Inspector / JSON に `preset 出力 ON/OFF オプション`（デフォルト ON）を追加し、preset 出力を急がない既存ユーザーへの逃げ道を残す。
+  - **Option D（別 address `/_facialcontrol/preset`）を確定採用**。`/_facialcontrol/blendshape_names` の `string[]` payload は一切変更しない。
+  - 送信側差分: `OscBundleBuilder` に preset 専用 address 送出経路 `AddPresetMessage(presetName, customPrefix)` を追加、`OscSenderAdapterBinding` で preset 名 + (custom 時) custom prefix を送出。
+  - 受信側差分: message dispatcher に `/_facialcontrol/preset` ハンドラを追加し preset 名 / custom prefix を runtime 内部状態に保持。BlendShape 名 heartbeat 受信時の mapping 再構築で参照（preset 受信単独では mapping 生成をトリガしない、Req 5.8）。
+  - `PresetAddress` は `BlendShapeNamesAddress` と同じ箇所で address 定数として単一定義。
+  - 送信側 Inspector / JSON に `preset 出力 ON/OFF オプション`（デフォルト ON）を追加。OFF 時は受信側が名前ベース推定にフォールバック。
 
 ### Topic 4: heartbeat 内容変化検出のハッシュ戦略
 
@@ -68,7 +71,7 @@
   - FNV-1a 参考: [Wikipedia: Fowler–Noll–Vo hash function](https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function)
 - **Findings**:
   - 32-bit FNV-1a は 1 文字あたり XOR + 32-bit 乗算のみで GC ゼロ。`string` 全体を 1 byte ずつ走査するだけで、別 buffer 確保が不要。
-  - 名前順依存（順序が変わるとハッシュも変わる）であり、heartbeat の sentinel 配置順を保ったまま差分検出に使える。
+  - 名前順依存（順序が変わるとハッシュも変わる）であり、heartbeat の BlendShape 名配列順を保ったまま差分検出に使える。preset は別 address のため hash 対象は BlendShape 名のみ。
 - **Implications**:
   - **FNV-1a を採用**（design.md 「Heartbeat 内容変化検出 (FNV-1a)」参照）。
   - 擬似コード（C# 風）:
@@ -88,17 +91,21 @@
     return hash;
     ```
 
-### Topic 5: `OscDoubleBuffer.Resize` 中の受信スレッド取りこぼし防止
+### Topic 5: `OscDoubleBuffer.Resize` 中の受信スレッド取りこぼし防止（pending list → 同一 lock へ確定変更）
 
-- **Context**: 受信スレッドが Write 中に Resize が走ると、書き込み先 NativeArray が Dispose されて crash する可能性がある。lock を長く保持すると受信スレッドが停止する。
+- **Context**: 受信スレッドが Write 中に Resize が走ると、書き込み先 NativeArray が Dispose されて native crash する可能性がある。当初 pending list 方式を採用したが、validate-design で pending mode 切替 / barrier / 再投入の複雑性と取りこぼしリスクが指摘され、同一 lock 方式へ確定変更。
 - **Sources Consulted**:
   - `FacialControl/Packages/com.hidano.facialcontrol.osc/Runtime/Adapters/OSC/OscDoubleBuffer.cs`（`_writeIndex` の Interlocked.Exchange と `Write` が同期されていない既存実装）
 - **Findings**:
   - 既存 `Write` は lock を持たないため、Resize 中の Dispose と競合する。
-  - 検討案: (a) 全 lock 化（受信スレッド停止リスク）、(b) Atomic swap pattern（pending list に切り替え、新 buffer 構築後に再投入）、(c) Resize を frame 境界に固定し受信 Pause（受信を一時止める）。
+  - 検討案: (a) 全 lock 化（`Write` と `Resize` を同一 lock）、(b) pending list 方式（pending mode に切替、新 buffer 構築後に再投入）、(c) Resize を frame 境界に固定し受信 Pause。
+  - pending list 方式（b）は lock 外で新 buffer を確保する利点があるが、pending mode の double-checked locking / 再投入 / barrier の正しさを担保するのが難しく、validate-design で「実装ミス時に取りこぼし or crash する」リスク評価で否決された。
+  - `GetReadBuffer` はメインスレッド専用、`Resize` も `OnFixedTick` でメインスレッド実行のため、lock が必要なのは `Write`（受信スレッド） vs `Resize`（メインスレッド）の競合のみ。`Write` ↔ `GetReadBuffer` は double buffer の `_writeIndex` swap で既に分離されており、新たな競合は発生しない。
 - **Implications**:
-  - **Pending list 方式を採用**（design.md 「OscDoubleBuffer Resize 擬似コード」参照）。
-  - lock 保持時間は「pending list への参照 swap 1 命令」のみに圧縮。new buffer 確保とコピーは lock 外で実施。
+  - **同一 lock 方式（a）を採用**（design.md 「OscDoubleBuffer Resize (同一 lock 方式) 擬似コード」参照）。`Write` と `Resize` を同一 lock オブジェクト（`Monitor`）で保護。
+  - lock は受信スレッド hot path に入るが `Monitor` ベースのため managed heap 確保ゼロ（Req 4.4 の「`TryWriteValues` 0 byte」と整合。lock が入るのは `Write`=受信スレッド側であり、`TryWriteValues`=メインスレッド読み取り側ではない）。
+  - Resize は heartbeat 内容変化時のみ発火するため lock 競合による latency スパイクは実用上無視できる。
+  - 検証: `OscDoubleBufferTests` に「Resize と Write を別スレッドから並行 1000 回実行しても native crash しない」テストを追加。
 
 ### Topic 6: `HeartbeatConsistencyChecker` のスリム化と SkipMask 廃止
 
@@ -111,8 +118,9 @@
   - `ContributeMask` は `OscInputSource` の `BlendShapeCount` を決めるために必要だが、Checker から切り離して binding 側が runtime mapping 配列から直接計算可能。
 - **Implications**:
   - **`SkipMask` 完全廃止**。Checker は sender/receiver 名前差分の mismatch warning 専用に縮退。
-  - **ContributeMask は `OscReceiverAdapterBinding` が runtime mapping 配列から生成**し、`OscInputSource` の constructor に渡す。
-  - 影響テスト（再構成 or 削除）: `HeartbeatConsistencyCheckerTests`（SkipMask assertion を削除）、`OscInputSourceMaskTests`（SkipMask 引数経路を削除）、`OscHeartbeatConsistencyTests`（SkipMask 検証パートを削除し ContributeMask 検証に置換）。
+  - **ContributeMask は `OscReceiverAdapterBinding` が runtime mapping 配列から生成**し、`OscInputSource` の constructor に渡す。`OscInputSource` constructor の `skipMask` 引数も削除する。
+  - **Gaze 経路は影響を受けない**（validate-design Critical Issue 3）。`GazeVector2InputSource` は `OscInputSource` ではなく ValueProvider 型で `BlendShapeCount=0` / `ContributeMask=new BitArray(0)`。`OscInputSource` constructor を共有しないため `skipMask` 引数削除・SkipMask 廃止の影響はゼロ（コード変更不要）。VMC / InputSystem 等の他 binding も `OscInputSource` を直接 new していないため影響なし。
+  - 影響テスト（再構成 or 削除）: `HeartbeatConsistencyCheckerTests`（SkipMask assertion を削除）、`OscInputSourceMaskTests`（SkipMask 引数経路を削除）、`OscHeartbeatConsistencyTests`（SkipMask 検証パートを削除し ContributeMask 検証に置換）。`OscReceiverAdapterBindingIntegrationTests` の Gaze 検証部分は退行禁止リストに入れ緑のまま維持。
 
 ### Topic 7: `AddressPresetKind.Custom` 追加と `OscAddressFormatter` 拡張
 
@@ -155,17 +163,18 @@
 
 ### Topic 10: `OscReceiverDemoProfile.asset` の運用変更方針
 
-- **Context**: 現状 5 件 mapping を含む asset を「空 Mappings に書き換える」か「空 variant を別ファイルとして追加」かを決める。
+- **Context**: 現状 5 件 mapping（4 件 Normal_BlendShape + 1 件 Gaze_VRChat_XY）を含む asset を、auto mapping をデフォルト経路として示すためどう書き換えるか決める。当初は「全削除（空 Mappings）」案だったが、Gaze が auto mapping 化できないためハイブリッド構成へ確定変更。
 - **Sources Consulted**:
   - `OscReceiverDemoProfile.asset`（4 件 Normal_BlendShape + 1 件 Gaze_VRChat_XY）
   - `OscReceiverDemo/README.md`（既に「`Mappings` 自動生成は別 spec で計画」と明記）
 - **Findings**:
-  - 既存 asset を空に書き換える方が「auto mapping がデフォルト経路」というメッセージが強く伝わる。
-  - 手入力サンプルを残したいニーズは backlog として別 spec / 別サンプルで対応可能。
+  - Normal_BlendShape を auto mapping にすることで「auto mapping がデフォルト経路」というメッセージが伝わる。
+  - **Gaze は heartbeat / preset address に Gaze id を含まないため本 spec で auto mapping 化できない**（validate-design Critical Issue 3）。Gaze entry を削除すると Gaze が一切疎通しないサンプルになってしまう。
 - **Implications**:
-  - **既存 asset を空 Mappings に書き換える**。Gaze entry も削除する（heartbeat に Gaze id が含まれないため Gaze は別 spec 課題）。
-  - README は「auto mapping がデフォルト経路。手入力サンプルは backlog で再提供」を 1 段落以上で説明。
-  - 「Gaze entry 無しで heartbeat 駆動の BlendShape mapping が生成されること」を確認するテストを Req 7.5 の integration test に含める。
+  - **ハイブリッド構成を採用**。`OscReceiverDemoProfile.asset` から手入力 `Normal_BlendShape` 4 件のみ削除し、`Gaze_VRChat_XY` 1 件は残す（BlendShape=auto / Gaze=手入力）。「完全に空 Mappings」ではない。
+  - README は「Normal_BlendShape は heartbeat 駆動の auto mapping がデフォルト経路、Gaze は heartbeat に id を含まないため手入力 mapping を残している」を 1 段落以上で説明。
+  - Gaze の auto mapping 化は follow-up spec として `docs/backlog.md` M-25 に登録済み。
+  - 「Normal_BlendShape entry 無し（Gaze 1 件のみ）で heartbeat 駆動の BlendShape auto mapping が生成され、Gaze 手入力と並存すること」を確認するテストを Req 7.5 の integration test に含める。
 
 ---
 
@@ -181,14 +190,14 @@
 
 ## Design Decisions
 
-### Decision 1: heartbeat payload = Option B (sentinel + preset 名)
+### Decision 1: preset 情報伝送 = 別 address `/_facialcontrol/preset`（当初の Option B sentinel を破棄）
 
 - **Context**: 受信側で preset 種別を確定し custom prefix を伝送する手段が必要。
-- **Alternatives**: A 名前ベースのみ / B sentinel + preset 名 / C 別 OSC 型タグ
-- **Selected**: **B**。配列末尾に `"__preset__"` + `"vrchat"|"arkit"|"custom"` + (custom 時のみ) prefix を追加。
-- **Rationale**: string 配列 1 本で完結し、旧 receiver には mesh 不一致名として渡るため自然に skip される（最小破壊）。送信側改修は `OscBundleBuilder.AddHeartbeatMessages` の末尾 append のみ。
-- **Trade-offs**: 旧 receiver で warning が 1 回出る可能性あり（`receiverOnly` 名一覧に `__preset__` が載る）。warning であり致命エラーではないため許容。
-- **Follow-up**: 後方互換マトリクス（design.md 末尾参照）の「旧 receiver × 新 sender」セル動作確認。
+- **Alternatives**: A 名前ベースのみ / B heartbeat 末尾 sentinel + preset 名 / C 別 OSC 型タグ / D 別 OSC address
+- **Selected**: **D（別 address `/_facialcontrol/preset`）**。preset 名 `"vrchat"|"arkit"|"custom"` + (custom 時のみ) custom prefix を独立 message で送る。`/_facialcontrol/blendshape_names` は一切変更しない。
+- **Rationale**: 当初採用した Option B（sentinel）は BlendShape 名 heartbeat が MTU で chunk 分割されると sentinel が末尾 chunk に乗る保証がなく、preset 検出が chunk 受信順序に依存する致命的問題があった（validate-design Critical Issue 1）。別 address は preset を独立 message として送るため chunk 境界と完全に無関係。旧 receiver は未知 address `/_facialcontrol/preset` を dispatcher が振り分けず単純無視するため warning も発生せず、sentinel 方式より後方互換がクリーン。
+- **Trade-offs**: 送信側 bundle に message が 1 本増える（MTU への影響は軽微）。受信側 dispatcher にハンドラ 1 本追加。
+- **Follow-up**: 後方互換マトリクス（design.md 末尾参照）の「旧 receiver × 新 sender (preset ON)」セル動作確認（旧 receiver が `/_facialcontrol/preset` を無視することの確認）。
 
 ### Decision 2: `OscInputSource` 差し替え = `IInputSourceRegistry.Replace` API 新設
 
@@ -199,14 +208,14 @@
 - **Trade-offs**: 新 API 追加によるインターフェース面積増加。テスト追加コスト。
 - **Follow-up**: ログレベルは `Debug.Log`（LogDebug 相当）で「id={id} replaced (prev type={prevType}, new type={newType})」を出力。LogError は出さない。
 
-### Decision 3: `OscDoubleBuffer.Resize` = Pending list 方式
+### Decision 3: `OscDoubleBuffer.Resize` = `Write` / `Resize` 同一 lock 方式（当初の pending list を破棄）
 
-- **Context**: Resize 中の受信スレッド取りこぼし防止。
-- **Alternatives**: 全 lock 化 / Pending list 方式 / 受信 Pause
-- **Selected**: **Pending list 方式**。Resize 開始直前に受信スレッドのストアを pending list (一時バッファ) に切り替え、メインスレッドで新 buffer 確保 → pending list の値を新 buffer に再投入 → 通常モードに戻す。
-- **Rationale**: lock 保持時間が pending list 切り替えの atomic swap のみで極小。受信スレッドはほぼ stall しない。
-- **Trade-offs**: 実装複雑度がやや上がる（pending list クラスの追加）。
-- **Follow-up**: design.md に thread safety 擬似コードを掲載。実装時に既存 `OscDoubleBufferTests` に Resize 中受信ケースを追加。
+- **Context**: Resize 中の受信スレッド書き込みと旧 buffer Dispose の競合（native crash）防止。
+- **Alternatives**: 全 lock 化（同一 lock）/ Pending list 方式 / 受信 Pause
+- **Selected**: **`Write` と `Resize` を同一 lock（`Monitor`）で保護**。Resize 中の受信スレッド書き込みが旧 buffer の Dispose と競合しないことを lock で保証する。
+- **Rationale**: 当初採用した pending list 方式は pending mode の double-checked locking / 再投入 / barrier の正しさを担保するのが難しく、validate-design で「実装ミス時に取りこぼし or crash する」リスク評価で否決された（Critical Issue 2）。同一 lock は `Monitor` ベースで managed heap 確保ゼロ（Req 4.4 と整合。lock が入るのは `Write`=受信スレッド側であり `TryWriteValues`=メインスレッド読み取り側ではない）。`GetReadBuffer` も `Resize` も `OnFixedTick` のメインスレッド実行なので両者は同一スレッドで競合せず、lock が必要なのは `Write`(受信スレッド) vs `Resize`(メインスレッド) の競合のみ。
+- **Trade-offs**: 受信スレッドの `Write` が Resize 中だけ lock 待ちになるが、Resize は heartbeat 内容変化時のみで頻度が低く実用上無視できる。通常時の `Write` は uncontended path で即取得。
+- **Follow-up**: design.md に thread safety 擬似コードを掲載。`OscDoubleBufferTests` に「Resize と Write の並行 1000 回で native crash しない」テストを追加。
 
 ### Decision 4: `HeartbeatConsistencyChecker` スリム化 + `SkipMask` 廃止
 
@@ -214,8 +223,9 @@
 - **Alternatives**: SkipMask 維持 / SkipMask 廃止
 - **Selected**: **SkipMask 廃止**。Checker は sender/receiver 名前差分の mismatch warning 専用に縮退。
 - **Rationale**: 責務が単純化し、ContributeMask は binding 側で生成する方が「mapping 配列を生成した側が長さも決める」自然な責務分担になる。
-- **Trade-offs**: 既存 SkipMask 依存テスト 3 ファイルの再構成 / 削除が必要。
-- **Follow-up**: タスク phase で影響テスト一覧（design.md 「既存 PlayMode 統合テストへの影響表」参照）を順番に修正。
+- **Trade-offs**: 既存 SkipMask 依存テスト 3 ファイルの再構成 / 削除、および `OscInputSource` constructor の `skipMask` 引数削除が必要。
+- **Gaze 影響**: `GazeVector2InputSource` は `OscInputSource` ではなく ValueProvider 型（`BlendShapeCount=0` / `ContributeMask=new BitArray(0)`）であり、`OscInputSource` constructor を共有しないため `skipMask` 引数削除・SkipMask 廃止の影響はゼロ（validate-design Critical Issue 3 で確認、コード変更不要）。
+- **Follow-up**: タスク phase で影響テスト一覧（design.md 「既存 PlayMode 統合テストへの影響表」参照）を順番に修正。`OscReceiverAdapterBindingIntegrationTests` の Gaze 検証部分を退行禁止リストに追加。
 
 ### Decision 5: heartbeat 変化検出ハッシュ = FNV-1a
 
@@ -253,14 +263,14 @@
 - **Trade-offs**: UDP loopback の真の経路カバレッジは別 spec の E2E テストに譲る。
 - **Follow-up**: backlog に「OSC auto mapping E2E (UDP loopback)」を追加候補として記録。
 
-### Decision 9: `OscReceiverDemoProfile.asset` = 既存 asset を空 Mappings に書き換え
+### Decision 9: `OscReceiverDemoProfile.asset` = ハイブリッド構成（BlendShape=auto / Gaze=手入力）
 
-- **Context**: 「auto mapping がデフォルト経路」を明確に伝える。
-- **Alternatives**: 既存 asset を空に書き換え / 空 variant を別ファイル追加
-- **Selected**: **既存 asset を書き換え**。
-- **Rationale**: ユーザーが Import Sample した直後に空 Mappings 経路が動くことが、本 spec の主目的を最も強く伝える。
-- **Trade-offs**: 手入力サンプルが失われる（backlog で独立サンプル化）。
-- **Follow-up**: README は auto mapping がデフォルト経路である旨を 1 段落以上で説明。Gaze entry 無しでも heartbeat 駆動で BlendShape mapping が生成されることを確認するテストを追加。
+- **Context**: 「auto mapping がデフォルト経路」を伝えつつ、Gaze が auto mapping 化できない制約を両立させる。
+- **Alternatives**: 全 Mappings 削除（空）/ Normal_BlendShape のみ削除し Gaze 残し / 空 variant を別ファイル追加
+- **Selected**: **手入力 `Normal_BlendShape` 4 件のみ削除し、`Gaze_VRChat_XY` 1 件は残すハイブリッド構成**（validate-design Critical Issue 3 で確定）。
+- **Rationale**: Gaze は heartbeat / preset address に Gaze id を含まないため本 spec で auto mapping 化できない。Gaze entry まで削除すると Gaze が一切疎通しないサンプルになってしまうため、Gaze は手入力 mapping として残す。Normal_BlendShape は auto mapping、Gaze は手入力という preview 段階のデフォルト運用を示す。
+- **Trade-offs**: 「完全に空 Mappings」ではないため、サンプルだけ見ると手入力 entry が残っているように見える（README で Gaze 残しの理由を明記して補う）。
+- **Follow-up**: README は「Normal_BlendShape は auto mapping がデフォルト経路、Gaze は手入力 mapping を残す」旨を 1 段落以上で説明。Gaze の auto mapping 化は `docs/backlog.md` M-25 に登録済み。「Normal_BlendShape entry 無し（Gaze 1 件のみ）で heartbeat 駆動の BlendShape auto mapping が生成され Gaze と並存する」ことを確認するテストを追加。
 
 ### Decision 10: `Replace` API ログレベル = LogDebug 出力
 
@@ -277,9 +287,15 @@
 
 - **R1: heartbeat 内容変化検出ハッシュ衝突** — FNV-1a の 32-bit 衝突確率は実用上無視できるが、万一同一ハッシュで内容が異なるケースが発生すると mapping 再構築が起きない。**Mitigation**: 5 秒間隔の heartbeat で衝突継続するシナリオは現実的でない。万一発生しても次の差分到来で修正されるため許容。
 - **R2: Replace API の他 binding への波及** — `Replace` API 追加で他 spec の binding（VMC, InputSystem 等）が誤って `Replace` を呼ぶリスクがある。**Mitigation**: API ドキュメントに「heartbeat 駆動の意図的差し替え専用」と明記。既存 binding は引き続き `Register` を使用。
-- **R3: OscDoubleBuffer pending list の lock 漏れ** — pending list 切り替え時の atomic swap を Interlocked で行わず通常代入してしまうと receiver thread が古いポインタを掴む。**Mitigation**: design.md に thread safety 擬似コードを記載し、実装時に `Interlocked.Exchange` を必須化。
-- **R4: 旧 receiver × 新 sender の warning 増加** — sentinel `"__preset__"` を含む heartbeat を旧 receiver が受信すると、receiverOnly 警告 1 回が出る。**Mitigation**: 後方互換マトリクス（design.md 末尾）で動作確認。warning 1 回は致命的でないため許容。送信側 `preset 出力 ON/OFF オプション` で OFF も選択可能（デフォルト ON）。
+- **R3: OscDoubleBuffer の Resize / Write 競合（native crash）** — 受信スレッドの `Write` 中に Resize が走り旧 NativeArray が Dispose されると native crash する。**Mitigation**: `Write` と `Resize` を同一 lock（`Monitor`）で保護（R7 で詳述）。design.md に thread safety 擬似コードを記載し、`OscDoubleBufferTests` に並行 1000 回テストを追加。
+- **R4: 新 sender × 旧 receiver の互換性** — preset 専用 address `/_facialcontrol/preset` を旧 receiver が受信したときの挙動。**Mitigation**: 旧 receiver は当該 address に dispatcher ハンドラを持たないため単純無視し、warning も致命エラーも発生しない（別 address 方式は sentinel 方式より後方互換がクリーン、R6 で詳述）。後方互換マトリクス（design.md 末尾）で動作確認。送信側 `preset 出力 ON/OFF オプション` で OFF も選択可能（デフォルト ON）。
 - **R5: 既存 SkipMask 依存テスト 3 ファイルの再構成漏れ** — 既存テストが SkipMask を assert している箇所を見落とすと CI 緑が崩れる。**Mitigation**: design.md 「既存 PlayMode 統合テストへの影響表」で全 SkipMask 参照箇所を列挙し、タスク phase で 1 ファイルずつ修正・削除する。
+
+### validate-design 由来 Critical Issue とその解決（R6 / R7 / R8）
+
+- **R6: heartbeat chunk 分割による preset sentinel 検出失敗（Critical Issue 1 / 解決済み）** — 当初案では preset 情報を heartbeat payload 末尾の sentinel `"__preset__"` で送る予定だったが、BlendShape 名 heartbeat が MTU で chunk 分割されると sentinel が末尾 chunk に乗る保証がなく、preset 検出が chunk 受信順序に依存して失敗するリスクがあった。**解決**: preset を独立 OSC address `/_facialcontrol/preset` で送る別 address 方式に確定変更。preset は独立 message のため chunk 境界と完全に無関係。`/_facialcontrol/blendshape_names` の payload は無改修。旧 receiver は未知 address を dispatch せず単純無視するため warning も発生しない（Topic 3 / Decision 1 参照）。
+- **R7: OscDoubleBuffer.Resize の thread safety（Critical Issue 2 / 解決済み）** — 当初案の pending list 方式は pending mode 切替 / barrier / 再投入の正しさを担保するのが難しく、実装ミス時に取りこぼし or native crash するリスクがあった。**解決**: `Write` と `Resize` を同一 lock（`Monitor`）で保護する方式に確定変更。lock は受信スレッド `Write` 側に入るが `Monitor` ベースで managed heap 確保ゼロ（Req 4.4 と整合。lock は `Write`=受信スレッド側であり `TryWriteValues`=メインスレッド読み取り側ではない）。`GetReadBuffer` と `Resize` は共に `OnFixedTick` のメインスレッド実行で競合せず、lock が必要なのは `Write`(受信) vs `Resize`(メイン) のみ。Resize は heartbeat 内容変化時のみ発火するため lock 競合の latency スパイクは無視できる（Topic 5 / Decision 3 参照）。
+- **R8: Gaze 経路への SkipMask 廃止 / ContributeMask 移動の影響（Critical Issue 3 / 解決済み・影響なし確認）** — SkipMask 廃止に伴い ContributeMask を binding 側に移し `OscInputSource` constructor から `skipMask` 引数を削除する改修が、Gaze 経路に波及しないか懸念があった。**解決（影響なし確認）**: `GazeVector2InputSource` は `OscInputSource` ではなく ValueProvider 型（`BlendShapeCount=0` / `ContributeMask=new BitArray(0)`）で `OscInputSource` constructor を共有しないため影響ゼロ（コード変更不要）。VMC / InputSystem 等の他 binding も `OscInputSource` を直接 new していないため影響なし。Demo asset は Gaze 手入力 1 件を残すハイブリッド構成（Decision 9）、Gaze auto mapping 化は `docs/backlog.md` M-25 に follow-up 登録済み。退行確認として `OscReceiverAdapterBindingIntegrationTests` の Gaze 検証部分を退行禁止リストに追加（Topic 6 / Decision 4 参照）。
 
 ---
 

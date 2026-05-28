@@ -13,19 +13,19 @@ OscReceiverAdapterBinding の Mappings 列挙を、送信側 heartbeat (/_facial
   - `HeartbeatConsistencyChecker` の責務スリム化 (mismatch warning 専用化、SkipMask 廃止)
   - `OscInputSource` の mapping 拡張対応 (runtime 中の mapping 件数増加と内部バッファ再構築、`OscDoubleBuffer.Resize` の pending list 化)
   - アドレスプリセット推定 (VRChat `/avatar/parameters/{name}` / ARKit `/ARKit/{name}` / カスタム任意 prefix)
-  - heartbeat メッセージフォーマットへの preset 識別子追加 (採用方針: 配列末尾 sentinel `"__preset__"` + preset 名)
+  - heartbeat とは別の独立 OSC address `/_facialcontrol/preset` での preset 情報送出 (preset 名 + custom prefix)。BlendShape 名 heartbeat (`/_facialcontrol/blendshape_names`) は一切変更しない
   - `IInputSourceRegistry` への `Replace(id, source)` API 追加 (LogDebug 出力)
   - `AddressPresetKind.Custom` enum 値追加 + `OscAddressFormatter` の custom prefix overload
-  - `OscReceiverDemo` / `OscOutputDemo` サンプルの空 Mappings での疎通確認 (既存 `OscReceiverDemoProfile.asset` を空 Mappings に書き換え)
+  - `OscReceiverDemo` / `OscOutputDemo` サンプルの auto mapping 運用確認 (`OscReceiverDemoProfile.asset` から手入力 `Normal_BlendShape` を削除し、`Gaze_VRChat_XY` 1 件のみ残すハイブリッド構成にする)
 - **Out of scope**:
-  - Gaze (`Gaze_VRChat_XY` / `Gaze_ARKit_8BS`) の自動 mapping (heartbeat に Gaze id を含まないため別 spec)
+  - Gaze (`Gaze_VRChat_XY` / `Gaze_ARKit_8BS`) の自動 mapping (heartbeat / preset address に Gaze id を含まないため別 spec)。本 spec 完了後の follow-up spec として「heartbeat または preset address に Gaze id を追加し Gaze も auto mapping 化する」提言を `docs/backlog.md` に登録する
   - 送信側 (`OscOutputAdapterBinding`) の自動 mapping 生成 (本 spec は受信側に閉じる)
   - heartbeat 以外の経路 (例: シーン外 JSON プリセット配信) からの mapping 投入
   - 表情 (Expression) id 体系の改廃
   - `OscRuntimeSettingsSO` のスキーマ破壊的変更
   - Inspector への「Manual / Auto」出自 badge UI (preview 段階は runtime 内部状態 + 診断ログのみ。Inspector UI 拡張は backlog)
 - **Adjacent expectations / 連動改修**:
-  - **送信側 heartbeat の小規模改修 (本 spec スコープに含む)**: `OscBundleBuilder.AddHeartbeatMessages` と `OscSenderAdapterBinding` で配列末尾に sentinel + preset 名を追加する。既存 `string[]` payload を破壊せず、preset 出力前の旧 receiver は sentinel を BlendShape 名として受信するが mesh と一致しないため自然に無視される。
+  - **送信側の preset address 送出改修 (本 spec スコープに含む)**: `OscBundleBuilder` に preset 専用 address (`/_facialcontrol/preset`) の送出経路を追加し、`OscSenderAdapterBinding` で preset 名 + (custom 時) custom prefix を送る。既存 `/_facialcontrol/blendshape_names` の `string[]` payload は無改修。旧 receiver は未知 address `/_facialcontrol/preset` を message filter / dispatcher が振り分けず単純に無視するため、警告も発生しない (sentinel 方式より後方互換がクリーン)。
   - `IInputSourceRegistry` への登録 slug `osc` は予約のまま維持し、本 spec で新 slug を導入しない
   - Domain 層は Unity 非依存契約を維持し、自動 mapping ロジックは Adapters 層に閉じ込める
   - 既存の手動 `OscMappingEntry` (mode=`Normal_BlendShape`) を含む `FacialAdapterBindingCollectionSO` の構成は無改修で動作する (後方互換)
@@ -60,10 +60,10 @@ OscReceiverAdapterBinding の Mappings 列挙を、送信側 heartbeat (/_facial
 
 #### Acceptance Criteria
 1. The OscReceiverAdapterBinding shall アドレスプリセットとして以下の 3 種を識別する: VRChat 形式 (`/avatar/parameters/{name}`), ARKit 形式 (`/ARKit/{name}`), カスタム形式 (任意プレフィックス + `{name}`)。`AddressPresetKind` enum に `Custom` 値を追加する。
-2. When heartbeat payload からプリセット種別を判定するとき、The OscReceiverAdapterBinding shall (a) heartbeat 末尾の sentinel `"__preset__"` + preset 名が含まれていればそれを採用し (Requirement 5)、(b) 含まれていなければ heartbeat の BlendShape 名と `ARKitDetector.ARKit52Names` (Domain) との一致率から推定する (一致率 ≥ 50% で ARKit、未満で VRChat)。
+2. When プリセット種別を判定するとき、The OscReceiverAdapterBinding shall (a) `/_facialcontrol/preset` address で preset 名を受信していればそれを採用し (Requirement 5)、(b) 受信していなければ `/_facialcontrol/blendshape_names` の BlendShape 名と `ARKitDetector.ARKit52Names` (Domain) との一致率から推定する (一致率 ≥ 50% で ARKit、未満で VRChat)。
 3. When プリセット種別が VRChat と判定されたとき、The OscReceiverAdapterBinding shall `OscAddressFormatter.FormatBlendShapeAddress(AddressPresetKind.VRChat, name)` を使い `/avatar/parameters/{name}` を `addressPattern` として割り当てる。
 4. When プリセット種別が ARKit と判定されたとき、The OscReceiverAdapterBinding shall `ARKitDetector.ARKit52Names` に一致する BlendShape へ `/ARKit/{name}` を割り当て、一致しない名前は `/avatar/parameters/{name}` (VRChat フォールバック) を割り当てる。
-5. When プリセット種別がカスタムと判定されたとき、The OscReceiverAdapterBinding shall heartbeat payload に含まれる custom prefix 文字列 (Requirement 5.4) を使い `OscAddressFormatter` の新 overload (`FormatBlendShapeAddress(string customPrefix, string name)`) でアドレスを組み立てる。custom prefix が欠落していれば VRChat 形式へフォールバックし `Debug.LogWarning` で fallback 採用を 1 度だけ通知する。
+5. When プリセット種別がカスタムと判定されたとき、The OscReceiverAdapterBinding shall `/_facialcontrol/preset` address で受信した custom prefix 文字列 (Requirement 5.4) を使い `OscAddressFormatter` の新 overload (`FormatBlendShapeAddress(string customPrefix, string name)`) でアドレスを組み立てる。custom prefix が欠落していれば VRChat 形式へフォールバックし `Debug.LogWarning` で fallback 採用を 1 度だけ通知する。
 6. If 推定結果として同一 BlendShape 名に対して複数候補アドレスが生成された場合, the OscReceiverAdapterBinding shall (a) heartbeat payload に明示された preset を最優先し、(b) 明示が無い場合は VRChat 形式を採用し、衝突発生を `Debug.LogWarning` で 1 度だけ通知する。
 7. The OscReceiverAdapterBinding shall ARKit 標準名一覧として `Hidano.FacialControl.Domain.Services.ARKitDetector.ARKit52Names` (52 名) を単一情報源として参照する (Adapters → Domain 依存は方向順)。
 
@@ -75,28 +75,29 @@ OscReceiverAdapterBinding の Mappings 列挙を、送信側 heartbeat (/_facial
 2. While heartbeat 内容が前回と同一 (ハッシュ一致) であるとき、The OscReceiverAdapterBinding shall mapping 配列・`OscInputSource`・`OscDoubleBuffer` を新規確保せず、既存インスタンスを再利用する。
 3. When heartbeat 内容が変化し runtime mapping の再構築が必要になったとき、The OscReceiverAdapterBinding shall mapping 配列確保・`OscDoubleBuffer` リサイズ・`OscInputSource` 差し替えをメインスレッドで実行し、受信スレッドの hot path でアロケーションを発生させない。受信スレッドのコールバックは「heartbeat 到着フラグを立てる」のみ行い、再構築は `OnFixedTick` で実行する。
 4. The OscInputSource shall `TryWriteValues` 1 回あたりの managed heap 確保 0 byte を維持する (mapping 拡張後も `_mappingIndexToMeshIndex` 再構築はメインスレッドの再構築タイミングで完結させる)。
-5. If heartbeat の BlendShape 名件数が `OscDoubleBuffer` の現在サイズを超える場合, the OscReceiverAdapterBinding shall `OscDoubleBuffer` を再確保する直前に受信スレッド側を pending list (一時バッファ) に切り替え、新 buffer 構築後に pending list の値を新 buffer へ再投入する。これにより lock 保持時間を最小化しつつ再確保中の受信メッセージを取りこぼさない。
+5. If heartbeat の BlendShape 名件数が `OscDoubleBuffer` の現在サイズを超える場合, the OscDoubleBuffer shall `Write` と `Resize` を同一 lock (`lock` / `Monitor`) で保護し、Resize 中の受信スレッド書き込みが旧 buffer の Dispose と競合しないことを保証する。lock は受信スレッド hot path に入るが、`Monitor` ベースのため managed heap 確保は発生しない (Req 4.4 の「0 byte 確保」を維持)。Resize は heartbeat 内容変化時のみ発火するため lock 競合による latency スパイクは実用上無視できる。
 6. The OscReceiverAdapterBinding shall ContributeMask を runtime mapping 配列から binding 自身で生成し、`OscInputSource` の constructor に渡す。SkipMask は本 spec で廃止し、heartbeat 駆動で常に最新化される mapping のみが OscInputSource の出力範囲を決める。`HeartbeatConsistencyChecker` は sender/receiver 名前差分の mismatch warning 専用にスリム化する。
 7. The IInputSourceRegistry shall `Replace(string id, IInputSource source)` API を提供する。`Replace` は既存登録を差し替え、ログレベルは `Debug.Log` (LogDebug 相当) とし、`Register` 重複時の `LogError` を発生させない。本 API は heartbeat 駆動の `OscInputSource` 差し替えで使用される。
 
-### Requirement 5: Heartbeat メッセージフォーマット拡張 (sentinel + preset 名)
-**Objective:** As a プロトコル設計者, I want `/_facialcontrol/blendshape_names` heartbeat に preset 識別子を後方互換な形式で追加したい, so that 受信側のプリセット推定を確定的に行えるようにする。
+### Requirement 5: Preset 情報の独立 address (`/_facialcontrol/preset`) 送出
+**Objective:** As a プロトコル設計者, I want preset 識別子を BlendShape 名 heartbeat とは別の独立 OSC address で送りたい, so that 既存 `/_facialcontrol/blendshape_names` の payload を一切変更せず、受信側のプリセット推定を確定的かつ後方互換に行える。
 
-#### Acceptance Criteria (採用方針: 配列末尾 sentinel `"__preset__"` + preset 名)
-1. The 送信側 (`OscBundleBuilder.AddHeartbeatMessages` および `OscSenderAdapterBinding`) shall heartbeat の string 配列末尾に sentinel `"__preset__"` + preset 名 (`"vrchat"` / `"arkit"` / `"custom"`) + (preset が `custom` の場合のみ) custom prefix 文字列 (例: `/myapp/`) を順に追加する。BlendShape 名の本体配列は変更しない。
-2. When 既存の旧 receiver (本 spec 改修前) が sentinel + preset 名を含む heartbeat を受信したとき、The 旧 receiver shall sentinel と preset 名を「未知の BlendShape 名」として受信側 mesh と一致しないため自然に無視する (HeartbeatConsistencyChecker の `receiverOnly` 警告に出る可能性はあるが致命エラーにはならない)。
-3. When 本 spec 改修後の OscReceiverAdapterBinding が heartbeat を受信したとき、The OscReceiverAdapterBinding shall 配列を末尾から走査し sentinel `"__preset__"` を検出したら以降を preset payload として消費し、BlendShape 名配列からは除外する。sentinel が存在しなければ Requirement 3.2(b) の名前ベース推定にフォールバックする。
-4. The OscReceiverAdapterBinding shall preset 識別子として `vrchat` / `arkit` / `custom` の 3 値を解釈できる。`custom` のときは続く 1 要素を custom prefix 文字列として扱う。
-5. If preset 識別子として未知の文字列を受信した場合, the OscReceiverAdapterBinding shall `Debug.LogWarning` で未知 preset を 1 度だけ通知し、Requirement 3.2(b) の名前ベース推定にフォールバックする。
-6. The OscReceiverAdapterBinding shall heartbeat payload のスキーマ判定結果を `OscRuntimeSettingsSO` を介さず runtime 内部状態として保持し、シリアライズ済みアセットの破壊的変更を伴わない。
-7. The OscSenderAdapterBinding shall preset 出力を Inspector / JSON 設定で ON/OFF できるオプションを提供する (デフォルト ON)。OFF 時は従来の `string[]` のみを送出する (preset 出力を急がない既存ユーザーへの逃げ道)。
+#### Acceptance Criteria (採用方針: 別 address `/_facialcontrol/preset`)
+1. The 送信側 (`OscBundleBuilder` および `OscSenderAdapterBinding`) shall preset 専用 address `/_facialcontrol/preset` に対し、preset 名 (`"vrchat"` / `"arkit"` / `"custom"`) を string で送出し、preset が `custom` の場合のみ続けて custom prefix 文字列 (例: `/myapp/`) を送る。`/_facialcontrol/blendshape_names` の `string[]` payload は一切変更しない。
+2. When 既存の旧 receiver (本 spec 改修前) が `/_facialcontrol/preset` メッセージを受信したとき、The 旧 receiver shall message filter / dispatcher が当該 address にハンドラを持たないため単純に読み飛ばし、警告も致命エラーも発生させない。
+3. When 本 spec 改修後の OscReceiverAdapterBinding が `/_facialcontrol/preset` メッセージを受信したとき、The OscReceiverAdapterBinding shall preset 名と (存在すれば) custom prefix を runtime 内部状態に保持し、次回 mapping 再構築時に Requirement 3 のアドレス推定へ反映する。`/_facialcontrol/preset` を一度も受信していなければ Requirement 3.2(b) の名前ベース推定にフォールバックする。
+4. The OscReceiverAdapterBinding shall preset 名として `vrchat` / `arkit` / `custom` の 3 値を解釈できる。`custom` のときは続く string 要素を custom prefix 文字列として扱う。
+5. If preset 名として未知の文字列を受信した場合, the OscReceiverAdapterBinding shall `Debug.LogWarning` で未知 preset を 1 度だけ通知し、Requirement 3.2(b) の名前ベース推定にフォールバックする。
+6. The OscReceiverAdapterBinding shall preset address の受信結果を `OscRuntimeSettingsSO` を介さず runtime 内部状態として保持し、シリアライズ済みアセットの破壊的変更を伴わない。`/_facialcontrol/preset` は `BlendShapeNamesAddress` と同様に address 定数として単一箇所で定義する。
+7. The OscSenderAdapterBinding shall preset address 送出を Inspector / JSON 設定で ON/OFF できるオプションを提供する (デフォルト ON)。OFF 時は `/_facialcontrol/preset` を送出せず、受信側は名前ベース推定にフォールバックする。
+8. The OscReceiverAdapterBinding shall `/_facialcontrol/preset` の受信タイミングが BlendShape 名 heartbeat より前後どちらでも正しく動作するよう、preset 状態と mapping 生成を疎結合に保つ (preset 受信のみで mapping は生成せず、BlendShape 名 heartbeat 受信時に最新 preset 状態を参照する)。
 
 ### Requirement 6: 既存実装との後方互換と Gaze 結線維持
 **Objective:** As a 既存 OSC サンプル / ユーザープロジェクトの保守担当, I want 自動 mapping 追加によって既存の手入力 mapping / Gaze 結線 / sender identity / staleness が壊れないことを保証したい, so that 段階的にバージョンアップしても運用が止まらない。
 
 #### Acceptance Criteria
 1. The OscReceiverAdapterBinding shall 既存の `OscMappingEntry` (mode=`Normal_BlendShape`) のみで構成された `Mappings` を持つ binding を、現行バージョンと同一の起動シーケンス・登録順序・mask 構成で動作させる。
-2. The OscReceiverAdapterBinding shall 既存の Gaze entry (`Gaze_VRChat_XY` / `Gaze_ARKit_8BS`) の解釈・`GazeVector2InputSource` 登録・bundle accumulator 経路を改変しない。
+2. The OscReceiverAdapterBinding shall 既存の Gaze entry (`Gaze_VRChat_XY` / `Gaze_ARKit_8BS`) の解釈・`GazeVector2InputSource` 登録・bundle accumulator 経路を改変しない。`GazeVector2InputSource` は `BlendShapeCount=0` / `ContributeMask=BitArray(0)` の ValueProvider 型であり、SkipMask 廃止 (Requirement 4.6) の影響を受けないことを design / テストで確認する。
 3. The OscReceiverAdapterBinding shall `SenderIdentity` / `ZombieEvictionPolicy` / `OscBundleAccumulator` / `FailSafeMode` の挙動を本 spec の変更で退行させない (既存 PlayMode 統合テストが緑のまま維持されること)。
 4. While heartbeat 由来の auto mapping が登録された状態であるとき、The HeartbeatConsistencyChecker shall sender / receiver の名前差分検出と `Debug.LogWarning` の 1 度だけログ機構を継続的に提供する (SkipMask は廃止するが mismatch 検出と warning は維持)。
 5. If `OscRuntimeSettingsSO.ReceiverEnabled` が false の場合, the OscReceiverAdapterBinding shall heartbeat 受信も auto mapping 生成も実行せず、現行の「OSC Adapter は起動しません」warning を維持する。
@@ -111,5 +112,6 @@ OscReceiverAdapterBinding の Mappings 列挙を、送信側 heartbeat (/_facial
 3. While `OscReceiverDemo` が空 `Mappings` で受信中であるとき、The OscReceiverDemo shall PlayMode 内で `Debug.LogError` を出力せず、heartbeat 未受信フェーズでは BlendShape weight を初期値のまま保持する。
 4. If 送信側が heartbeat を一度も送出しない場合, the OscReceiverDemo shall BlendShape weight を一切変更せず、`OscInputSource` を未登録のまま保持する。
 5. The 本 spec shall 上記受け入れ条件を検証する PlayMode 統合テスト (例: `OscReceiverAdapterBindingAutoMappingIntegrationTests` 名称は design phase で確定) を提供する。テストは `HandleHeartbeat` を直接呼び出す決定論的パターン (既存 `OscHeartbeatConsistencyTests` と同方式) を採用し、heartbeat 5 秒間隔の待ち時間を発生させない。
-6. The `OscReceiverDemoProfile.asset` shall 既存の手入力 mapping (4 件 `Normal_BlendShape` + 1 件 `Gaze_VRChat_XY`) を全削除し空 `Mappings` 状態で配布する。README は「auto mapping がデフォルト経路であり、手入力サンプルは backlog の独立サンプルとして再提供する」旨を 1 段落以上で説明する。
-7. The OscReceiverDemo / OscOutputDemo サンプル README shall 空 `Mappings` 運用と auto mapping の動作条件 (heartbeat 受信が前提、sentinel + preset 識別子の説明、custom prefix の指定方法) を含む節を追加する。
+6. The `OscReceiverDemoProfile.asset` shall 既存の手入力 `Normal_BlendShape` mapping (4 件) を全削除し、`Gaze_VRChat_XY` (1 件) のみ残すハイブリッド構成で配布する。これにより BlendShape は auto mapping、Gaze は手入力 mapping という preview 段階のデフォルト運用を示す。README は「Normal_BlendShape は heartbeat 駆動の auto mapping がデフォルト経路であり、Gaze は heartbeat に id を含まないため手入力 mapping を残している」旨を 1 段落以上で説明する。
+7. The OscReceiverDemo / OscOutputDemo サンプル README shall auto mapping の動作条件 (heartbeat 受信が前提、`/_facialcontrol/preset` address での preset 指定の説明、custom prefix の指定方法、Gaze は別 spec で auto 化予定) を含む節を追加する。
+8. The 本 spec shall Gaze の auto mapping 化 (heartbeat / preset address への Gaze id 追加) を follow-up spec として `docs/backlog.md` に登録し、本 spec では Gaze を手入力 mapping のまま維持する。
