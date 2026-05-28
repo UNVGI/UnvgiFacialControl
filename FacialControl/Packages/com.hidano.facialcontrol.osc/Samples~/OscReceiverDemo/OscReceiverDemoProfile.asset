@@ -72,30 +72,6 @@ MonoBehaviour:
         Slug: osc
         _settings: {fileID: 2279303358686531772, guid: ad0658dffa3b456490a48e50e22a0630, type: 2}
         _mappings:
-        - mode: 0
-          expressionId: Joy
-          addressPattern: /avatar/parameters/Joy
-          sourceIdLeft:
-          sourceIdRight:
-          leftRightIndependent: 0
-        - mode: 0
-          expressionId: Blink
-          addressPattern: /avatar/parameters/Blink
-          sourceIdLeft:
-          sourceIdRight:
-          leftRightIndependent: 0
-        - mode: 0
-          expressionId: MouthOpen
-          addressPattern: /avatar/parameters/MouthOpen
-          sourceIdLeft:
-          sourceIdRight:
-          leftRightIndependent: 0
-        - mode: 0
-          expressionId: BrowUp
-          addressPattern: /avatar/parameters/BrowUp
-          sourceIdLeft:
-          sourceIdRight:
-          leftRightIndependent: 0
         - mode: 1
           expressionId: eye_look
           addressPattern: /avatar/parameters/eye_look
