@@ -5,7 +5,8 @@ namespace Hidano.FacialControl.Adapters.OSC
     [Serializable]
     public enum AddressPresetKind
     {
-        VRChat,
-        ARKit
+        VRChat = 0,
+        ARKit = 1,
+        Custom = 2
     }
 }
