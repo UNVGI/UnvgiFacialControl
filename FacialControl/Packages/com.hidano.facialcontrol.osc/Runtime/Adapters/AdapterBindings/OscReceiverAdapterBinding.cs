@@ -367,15 +367,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 _mappings = new List<OscMappingEntry>();
             }
 
-            OscMapping[] runtimeMappings = _runtimeMappings ?? CreateNormalBlendShapeMappings(_mappings);
+            OscMapping[] runtimeMappings = _runtimeMappings ?? ResolveInitialNormalBlendShapeMappings(_mappings);
             bool hasBlendShapeMappings = runtimeMappings != null && runtimeMappings.Length > 0;
             bool hasGazeMappings = HasGazeMappings(_mappings);
-            if (!hasBlendShapeMappings && !hasGazeMappings)
-            {
-                Debug.LogWarning(
-                    $"[OscReceiverAdapterBinding] OSC mappings が未設定のため入力源を登録しません。slug='{Slug}'");
-                return;
-            }
 
             if (!AdapterSlug.TryParse(Slug, out var slug))
             {
@@ -384,59 +378,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return;
             }
 
-            _effectiveSettings = settings;
-            _timeProvider = ctx.TimeProvider;
-            _lastAcceptedPacketTime = ctx.TimeProvider.UnscaledTimeSeconds;
-            _failSafeActive = false;
-            _zombiePolicy = new ZombieEvictionPolicy();
-            _bundleSenderDecisions = new Dictionary<ulong, bool>();
-            _bundleSenderDecisionOrder = new Queue<ulong>();
-            _heartbeatScratch = new List<string>();
-            IReadOnlyList<string> meshBlendShapeNames = ResolveMeshBlendShapeNames(ctx.BlendShapeNames, runtimeMappings);
-            int[] mappingIndexToMeshIndex = hasBlendShapeMappings
-                ? BuildMappingIndexToMeshIndex(meshBlendShapeNames, runtimeMappings)
-                : Array.Empty<int>();
-
-            BuildNormalLookup(runtimeMappings);
-            _heartbeatChecker = hasBlendShapeMappings
-                ? new HeartbeatConsistencyChecker(meshBlendShapeNames, runtimeMappings, settings.ConsistencyCheckWarnLog)
-                : null;
-
-            if (hasGazeMappings)
-            {
-                InitializeGazeBundleState();
-                RegisterGazeSources(ctx.InputSourceRegistry, slug, _mappings);
-            }
-
-            _buffer = new OscDoubleBuffer(runtimeMappings.Length);
-            _bundleAccumulator = new OscBundleAccumulator(_buffer, settings.BundleAccumulationTimeoutMs);
-
-            _helperHost = ctx.HostGameObject.AddComponent<OscReceiverHost>();
-            _helperHost.Configure(
-                settings.ListenEndpoint,
-                settings.ListenPort,
-                _buffer,
-                runtimeMappings,
-                settings.BundleMode == BundleInterpretationMode.AtomicSwap ? _bundleAccumulator : null,
-                settings.BundleMode,
-                ctx.TimeProvider);
-
-            if (_helperHost.Receiver != null)
-            {
-                _helperHost.Receiver.SetMessageFilter(HandleIncomingOscMessage);
-            }
+            StartReceiverPhase(ctx, settings, slug, runtimeMappings, hasGazeMappings);
 
             if (hasBlendShapeMappings)
             {
-                BitArray contributeMask = CreateContributeMask(meshBlendShapeNames.Count, mappingIndexToMeshIndex);
-                _inputSource = new OscInputSource(
-                    _buffer,
-                    settings.StalenessSeconds,
-                    ctx.TimeProvider,
-                    settings.FailSafeMode,
-                    contributeMask,
-                    mappingIndexToMeshIndex);
-                ctx.InputSourceRegistry.Register(slug, _inputSource);
+                StartBlendShapeMappingPhase(ctx, settings, runtimeMappings, out int[] mappingIndexToMeshIndex, out BitArray contributeMask);
+                RegisterOscInputSourcePhase(ctx, settings, slug, mappingIndexToMeshIndex, contributeMask);
             }
 
             _started = true;
@@ -520,31 +467,84 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _started = false;
         }
 
-        private static OscMapping[] CreateNormalBlendShapeMappings(List<OscMappingEntry> mappings)
+        private void StartReceiverPhase(
+            in AdapterBuildContext ctx,
+            OscRuntimeSettingsSO settings,
+            AdapterSlug slug,
+            OscMapping[] runtimeMappings,
+            bool hasGazeMappings)
         {
-            if (mappings == null || mappings.Count == 0)
+            _effectiveSettings = settings;
+            _timeProvider = ctx.TimeProvider;
+            _lastAcceptedPacketTime = ctx.TimeProvider.UnscaledTimeSeconds;
+            _failSafeActive = false;
+            _zombiePolicy = new ZombieEvictionPolicy();
+            _bundleSenderDecisions = new Dictionary<ulong, bool>();
+            _bundleSenderDecisionOrder = new Queue<ulong>();
+            _heartbeatScratch = new List<string>();
+            BuildNormalLookup(runtimeMappings);
+
+            if (hasGazeMappings)
             {
-                return Array.Empty<OscMapping>();
+                InitializeGazeBundleState();
+                RegisterGazeSources(ctx.InputSourceRegistry, slug, _mappings);
             }
 
-            var result = new List<OscMapping>(mappings.Count);
-            for (int i = 0; i < mappings.Count; i++)
+            _buffer = new OscDoubleBuffer(runtimeMappings.Length);
+            _bundleAccumulator = new OscBundleAccumulator(_buffer, settings.BundleAccumulationTimeoutMs);
+
+            _helperHost = ctx.HostGameObject.AddComponent<OscReceiverHost>();
+            _helperHost.Configure(
+                settings.ListenEndpoint,
+                settings.ListenPort,
+                _buffer,
+                runtimeMappings,
+                settings.BundleMode == BundleInterpretationMode.AtomicSwap ? _bundleAccumulator : null,
+                settings.BundleMode,
+                ctx.TimeProvider);
+
+            if (_helperHost.Receiver != null)
             {
-                OscMappingEntry entry = mappings[i];
-                if (entry == null || entry.mode != OscMappingMode.Normal_BlendShape)
-                {
-                    continue;
-                }
-
-                if (string.IsNullOrEmpty(entry.expressionId) || string.IsNullOrEmpty(entry.addressPattern))
-                {
-                    continue;
-                }
-
-                result.Add(new OscMapping(entry.addressPattern, entry.expressionId, string.Empty));
+                _helperHost.Receiver.SetMessageFilter(HandleIncomingOscMessage);
             }
+        }
 
-            return result.ToArray();
+        private void StartBlendShapeMappingPhase(
+            in AdapterBuildContext ctx,
+            OscRuntimeSettingsSO settings,
+            OscMapping[] runtimeMappings,
+            out int[] mappingIndexToMeshIndex,
+            out BitArray contributeMask)
+        {
+            IReadOnlyList<string> meshBlendShapeNames = ResolveMeshBlendShapeNames(ctx.BlendShapeNames, runtimeMappings);
+            mappingIndexToMeshIndex = BuildMappingIndexToMeshIndex(meshBlendShapeNames, runtimeMappings);
+            contributeMask = CreateContributeMask(meshBlendShapeNames.Count, mappingIndexToMeshIndex);
+            _heartbeatChecker = new HeartbeatConsistencyChecker(
+                meshBlendShapeNames,
+                runtimeMappings,
+                settings.ConsistencyCheckWarnLog);
+        }
+
+        private void RegisterOscInputSourcePhase(
+            in AdapterBuildContext ctx,
+            OscRuntimeSettingsSO settings,
+            AdapterSlug slug,
+            int[] mappingIndexToMeshIndex,
+            BitArray contributeMask)
+        {
+            _inputSource = new OscInputSource(
+                _buffer,
+                settings.StalenessSeconds,
+                ctx.TimeProvider,
+                settings.FailSafeMode,
+                contributeMask,
+                mappingIndexToMeshIndex);
+            ctx.InputSourceRegistry.Register(slug, _inputSource);
+        }
+
+        private static OscMapping[] ResolveInitialNormalBlendShapeMappings(List<OscMappingEntry> mappings)
+        {
+            return RuntimeMappingResolver.ResolveInitialMappings(mappings).RuntimeMappings;
         }
 
         private void RegisterGazeSources(

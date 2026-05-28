@@ -79,6 +79,35 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             }
         }
 
+        [UnityTest]
+        public IEnumerator OnStart_EmptyMappings_StartsSocketWithoutRegisteringPrimaryInputSource()
+        {
+            const string slug = "osc-empty-socket";
+            int port = AllocatePort();
+            _binding = new OscReceiverAdapterBinding
+            {
+                Slug = slug,
+                Port = port,
+                Mappings = new List<OscMappingEntry>()
+            };
+            AdapterBuildContext ctx = CreateContext();
+
+            _binding.OnStart(in ctx);
+            _bindingStarted = true;
+
+            yield return new WaitForSeconds(0.2f);
+
+            Assert.That(_binding.IsStarted, Is.True);
+            Assert.That(_binding.HelperHost, Is.Not.Null);
+            Assert.That(_binding.HelperHost.IsConfigured, Is.True);
+            Assert.That(_binding.HelperHost.Receiver, Is.Not.Null);
+            Assert.That(_binding.HelperHost.Receiver.IsRunning, Is.True);
+            Assert.That(_binding.Buffer, Is.Not.Null);
+            Assert.That(_binding.Buffer.Size, Is.EqualTo(0));
+            Assert.That(_binding.InputSource, Is.Null);
+            Assert.That(_registry.TryResolve(slug, out _), Is.False);
+        }
+
         // ---------------------------------------------------------------
         // OnStart: helper AddComponent + InputSourceRegistry 登録
         // ---------------------------------------------------------------

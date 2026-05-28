@@ -235,6 +235,40 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         }
 
         [Test]
+        public void OnStart_EmptyMappings_StartsSocketWithoutRegisteringPrimaryInputSource()
+        {
+            var registry = new InputSourceRegistry();
+            int port = AllocatePort();
+            var binding = new OscReceiverAdapterBinding
+            {
+                Slug = "osc-empty",
+                Port = port,
+                Mappings = new List<OscMappingEntry>()
+            };
+
+            var host = new GameObject("OscAdapterBindingEmptyMappingsTests");
+            try
+            {
+                binding.OnStart(CreateContext(registry, host, blendShapeNames: new[] { "smile", "frown" }));
+
+                Assert.That(binding.IsStarted, Is.True);
+                Assert.That(binding.HelperHost, Is.Not.Null);
+                Assert.That(binding.HelperHost.IsConfigured, Is.True);
+                Assert.That(binding.HelperHost.Port, Is.EqualTo(port));
+                Assert.That(binding.Buffer, Is.Not.Null);
+                Assert.That(binding.Buffer.Size, Is.EqualTo(0));
+                Assert.That(binding.InputSource, Is.Null);
+                Assert.That(binding.HeartbeatChecker, Is.Null);
+                Assert.That(registry.TryResolve("osc-empty", out _), Is.False);
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
         public void OnStart_GazeVrchatMapping_RegistersVector2InputSourceUnderExpressionId()
         {
             var registry = new InputSourceRegistry();
