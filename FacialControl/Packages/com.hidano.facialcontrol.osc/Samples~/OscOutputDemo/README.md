@@ -20,7 +20,8 @@
 - BlendShape: **モデルが持つ全 BlendShape を自動送信**（`BlendShape Names (Optional Filter)` を空にしてあるため）
 - Gaze: **Profile の `Gaze Configs` で宣言された `expressionId` を自動送信**（`Gaze Expression Ids (Optional Filter)` を空にしてあるため。既定では `eye_look` 1 種類が定義されている）
 - ループバック抑制: 有効（同一プロセス内の受信を抑止）
-- heartbeat: 5 秒周期で `/_facialcontrol/blendshape_names` を送出（受信側の名前一覧整合性検査用）
+- heartbeat: 5 秒周期で `/_facialcontrol/blendshape_names` を送出（受信側の名前一覧整合性検査と auto mapping 用）
+- preset: bundle 内に `/_facialcontrol/preset` を同梱（受信側の address preset 判定用）
 
 ## 手順
 
@@ -34,6 +35,12 @@
 「200 個ある BlendShape のうち口形状 30 個だけ送信したい」のようなケースのみ、`OscOutputDemoProfile.asset` → `OSC Sender` → `BlendShape Names (Optional Filter)` に名前を列挙してください。空のままなら全送信が既定動作です。
 
 Gaze 側も同様に subset 配信したい時のみ `Gaze Expression Ids (Optional Filter)` を明示します。
+
+## Auto Mapping 用メタデータ
+
+`OscOutputDemo` は受信側の Normal_BlendShape auto mapping が成立するように、BlendShape 値と一緒に `/_facialcontrol/blendshape_names` heartbeat を送ります。`OscReceiverDemo` はこの heartbeat を受信してから送信側名と受信側モデル名の積集合を runtime mapping として生成するため、heartbeat が届く前のフレームでは auto mapping はまだ反映されません。Gaze は heartbeat に id を含まないため auto mapping 対象外で、受信側では `Gaze_VRChat_XY` / `Gaze_ARKit_8BS` の手入力 mapping を残します。Gaze auto mapping は別 spec で扱う予定です。
+
+`/_facialcontrol/preset` は address preset を明示する制御 address です。payload は `vrchat` または `arkit` の 1 文字列で、`vrchat` は `/avatar/parameters/{name}`、`arkit` は `/ARKit/{name}` として受信側に解釈されます。custom prefix を使う送信側は payload を `custom`, `{prefix}` の 2 文字列にし、`{prefix}` は `/custom/blendshape/` のように先頭 `/` と末尾区切りを含めた完全な prefix として指定してください。`OscOutputDemoProfile.asset` では `OSC Sender` → `Endpoints` の `preset` で VRChat / ARKit を選び、`OSC Sender` → `Send Preset Address` を ON にするとこの preset metadata を送信します。
 
 ## トラブルシューティング
 
