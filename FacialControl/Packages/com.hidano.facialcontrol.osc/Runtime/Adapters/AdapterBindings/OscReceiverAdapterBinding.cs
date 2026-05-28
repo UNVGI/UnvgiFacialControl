@@ -32,6 +32,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
     [FacialAdapterBinding(displayName: "OSC Receiver")]
     public sealed class OscReceiverAdapterBinding : AdapterBindingBase
     {
+        public enum MappingOrigin
+        {
+            Manual,
+            HeartbeatAuto
+        }
+
         public const string SenderIdentityAddress = SenderIdentity.OscAddress;
         public const string BlendShapeNamesAddress = "/_facialcontrol/blendshape_names";
 
