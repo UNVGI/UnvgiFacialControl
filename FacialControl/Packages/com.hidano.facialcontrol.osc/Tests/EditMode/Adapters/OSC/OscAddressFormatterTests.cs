@@ -93,6 +93,51 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         }
 
         [Test]
+        public void FormatBlendShapeAddress_CustomPrefix_ReturnsCompleteAddressString()
+        {
+            Assert.AreEqual(
+                "/myapp/eyeBlinkLeft",
+                OscAddressFormatter.FormatBlendShapeAddress("/myapp/", "eyeBlinkLeft"));
+        }
+
+        [Test]
+        public void FormatBlendShapeAddress_CustomPrefixWithoutLeadingSlash_DoesNotAddSlash()
+        {
+            Assert.AreEqual(
+                "myapp/eyeBlinkLeft",
+                OscAddressFormatter.FormatBlendShapeAddress("myapp/", "eyeBlinkLeft"));
+        }
+
+        [Test]
+        public void FormatBlendShapeAddress_CustomPreset_ThrowsNotSupportedException()
+        {
+            Assert.Throws<NotSupportedException>(() =>
+                OscAddressFormatter.FormatBlendShapeAddress(AddressPresetKind.Custom, "eyeBlinkLeft"));
+        }
+
+        [Test]
+        public void FormatBlendShapeAddress_NullCustomPrefix_ThrowsArgumentException()
+        {
+            Assert.Throws<ArgumentException>(() =>
+                OscAddressFormatter.FormatBlendShapeAddress(null, "eyeBlinkLeft"));
+        }
+
+        [Test]
+        public void FormatBlendShapeAddress_EmptyCustomPrefix_ThrowsArgumentException()
+        {
+            Assert.Throws<ArgumentException>(() =>
+                OscAddressFormatter.FormatBlendShapeAddress(string.Empty, "eyeBlinkLeft"));
+        }
+
+        [Test]
+        public void FormatBlendShapeAddressUtf8_CustomPrefix_ReturnsCompleteAddressBytes()
+        {
+            byte[] bytes = OscAddressFormatter.FormatBlendShapeAddressUtf8("/myapp/", "eyeBlinkLeft");
+
+            Assert.AreEqual("/myapp/eyeBlinkLeft", Encoding.UTF8.GetString(bytes));
+        }
+
+        [Test]
         public void GetOrAddBlendShapeAddressUtf8_SameNameAndPreset_ReturnsCachedBytes()
         {
             var pool = new Dictionary<(string name, AddressPresetKind preset), byte[]>();
@@ -127,6 +172,43 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             Assert.AreNotSame(vrchat, arkit);
             Assert.AreEqual("/avatar/parameters/eyeBlinkLeft", Encoding.UTF8.GetString(vrchat));
             Assert.AreEqual("/ARKit/eyeBlinkLeft", Encoding.UTF8.GetString(arkit));
+        }
+
+        [Test]
+        public void GetOrAddBlendShapeAddressUtf8_SameNameAndCustomPrefix_ReturnsCachedBytes()
+        {
+            var pool = new Dictionary<(string name, string customPrefix), byte[]>();
+
+            byte[] first = OscAddressFormatter.GetOrAddBlendShapeAddressUtf8(
+                pool,
+                "/myapp/",
+                "eyeBlinkLeft");
+            byte[] second = OscAddressFormatter.GetOrAddBlendShapeAddressUtf8(
+                pool,
+                "/myapp/",
+                "eyeBlinkLeft");
+
+            Assert.AreSame(first, second);
+            Assert.AreEqual("/myapp/eyeBlinkLeft", Encoding.UTF8.GetString(first));
+        }
+
+        [Test]
+        public void GetOrAddBlendShapeAddressUtf8_SameNameDifferentCustomPrefix_ReturnsDifferentAddresses()
+        {
+            var pool = new Dictionary<(string name, string customPrefix), byte[]>();
+
+            byte[] first = OscAddressFormatter.GetOrAddBlendShapeAddressUtf8(
+                pool,
+                "/first/",
+                "eyeBlinkLeft");
+            byte[] second = OscAddressFormatter.GetOrAddBlendShapeAddressUtf8(
+                pool,
+                "/second/",
+                "eyeBlinkLeft");
+
+            Assert.AreNotSame(first, second);
+            Assert.AreEqual("/first/eyeBlinkLeft", Encoding.UTF8.GetString(first));
+            Assert.AreEqual("/second/eyeBlinkLeft", Encoding.UTF8.GetString(second));
         }
 
         private static string ToString(ReadOnlySpan<char> value)

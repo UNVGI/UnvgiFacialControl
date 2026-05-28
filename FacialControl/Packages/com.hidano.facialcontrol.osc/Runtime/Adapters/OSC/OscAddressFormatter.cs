@@ -47,6 +47,17 @@ namespace Hidano.FacialControl.Adapters.OSC
             return Encoding.UTF8.GetBytes(FormatBlendShapeAddress(preset, blendShapeName));
         }
 
+        public static string FormatBlendShapeAddress(string customPrefix, string blendShapeName)
+        {
+            ValidateCustomPrefix(customPrefix);
+            return customPrefix + (blendShapeName ?? string.Empty);
+        }
+
+        public static byte[] FormatBlendShapeAddressUtf8(string customPrefix, string blendShapeName)
+        {
+            return Encoding.UTF8.GetBytes(FormatBlendShapeAddress(customPrefix, blendShapeName));
+        }
+
         public static byte[] GetOrAddBlendShapeAddressUtf8(
             Dictionary<(string name, AddressPresetKind preset), byte[]> addressBytesPool,
             AddressPresetKind preset,
@@ -65,6 +76,29 @@ namespace Hidano.FacialControl.Adapters.OSC
             }
 
             addressBytes = FormatBlendShapeAddressUtf8(preset, name);
+            addressBytesPool.Add(key, addressBytes);
+            return addressBytes;
+        }
+
+        public static byte[] GetOrAddBlendShapeAddressUtf8(
+            Dictionary<(string name, string customPrefix), byte[]> addressBytesPool,
+            string customPrefix,
+            string blendShapeName)
+        {
+            if (addressBytesPool == null)
+            {
+                throw new ArgumentNullException(nameof(addressBytesPool));
+            }
+
+            ValidateCustomPrefix(customPrefix);
+            string name = blendShapeName ?? string.Empty;
+            var key = (name, customPrefix);
+            if (addressBytesPool.TryGetValue(key, out byte[] addressBytes))
+            {
+                return addressBytes;
+            }
+
+            addressBytes = FormatBlendShapeAddressUtf8(customPrefix, name);
             addressBytesPool.Add(key, addressBytes);
             return addressBytes;
         }
@@ -156,6 +190,14 @@ namespace Hidano.FacialControl.Adapters.OSC
                     return VRChatParameterPrefix.AsSpan();
                 default:
                     throw new NotSupportedException($"{preset} address preset is not implemented for gaze sender output yet.");
+            }
+        }
+
+        private static void ValidateCustomPrefix(string customPrefix)
+        {
+            if (string.IsNullOrEmpty(customPrefix))
+            {
+                throw new ArgumentException("Custom OSC address prefix must not be null or empty.", nameof(customPrefix));
             }
         }
 
