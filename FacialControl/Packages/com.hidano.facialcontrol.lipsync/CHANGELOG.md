@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- phoneme overlay 入力源が解決されず口が動かない不具合を修正。`ULipSyncAdapterBinding` は overlay 入力源を binding の `Slug`（既定 `ulipsync`）で登録していた（キー `ulipsync:a`）が、レイヤーの入力源 id・`GetDefaultLayerInputSources`・サンプル・docs はすべて固定 prefix `lipsync-overlay:{slot}` を使うため、`FacialController` のレイヤー解決（`TryResolve("lipsync-overlay:a")`）がヒットせず集約に乗らなかった。登録/解除/重複検知を固定 prefix `lipsync-overlay` 基準に統一し、レイヤー id と一致させた。
+
 ### Changed
 
 - `ULipSyncProvider` の音量正規化を `LipSyncInfo.volume` 依存から `rawVolume` ベースへ変更。uLipSync 本体は `info.volume` を固定定数 (`Common.DefaultMinVolume`/`MaxVolume` = -2.5/-1.5) で正規化するため、低音量・低ゲインのマイクでは `volume` が常に 0 に潰れリップシンクが無音化していた。本家 `uLipSyncBlendShape` と同様に `rawVolume` を調整可能な min/max で正規化するよう修正。

@@ -350,14 +350,27 @@ namespace Hidano.FacialControl.Editor.Inspector
             RebuildExpressionIdMapping();
             RefreshLayerNameChoices();
 
-            if (!_autoSavePending)
+            ScheduleAutoSave();
+        }
+
+        /// <summary>
+        /// 自動保存（profile.json エクスポート + アセット保存）を次の delayCall で実行するよう予約する。
+        /// </summary>
+        /// <remarks>
+        /// SerializedProperty を経由せず managed モデルを直接書き換えるハンドラ
+        /// （Overlay の Suppress/Override 切替や clip 割当など）は <c>serializedObject.Update()</c> しか
+        /// 呼ばないため、<c>TrackSerializedObjectValue</c> による自動保存監視が発火しない。
+        /// それらのハンドラは本メソッドを明示的に呼び、保存を確実に予約する必要がある。
+        /// </remarks>
+        private void ScheduleAutoSave()
+        {
+            if (_autoSavePending) return;
+
+            _autoSavePending = true;
+            EditorApplication.delayCall += FlushAutoSave;
+            if (_saveStatusLabel != null)
             {
-                _autoSavePending = true;
-                EditorApplication.delayCall += FlushAutoSave;
-                if (_saveStatusLabel != null)
-                {
-                    _saveStatusLabel.text = "保存中…";
-                }
+                _saveStatusLabel.text = "保存中…";
             }
         }
 
@@ -839,6 +852,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             EditorUtility.SetDirty(target);
             serializedObject.Update();
+            ScheduleAutoSave();
         }
 
         private void NormalizeDefaultOverlayBinding(int overlayIndex)
@@ -2278,6 +2292,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             EditorUtility.SetDirty(target);
             serializedObject.Update();
+            ScheduleAutoSave();
         }
 
         private void ApplyExpressionOverlayClip(int exprIndex, string slot, AnimationClip clip)
@@ -2301,6 +2316,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             EditorUtility.SetDirty(target);
             serializedObject.Update();
+            ScheduleAutoSave();
         }
 
         private OverlaySlotBindingSerializable GetExpressionOverlayBinding(int exprIndex, string slot)

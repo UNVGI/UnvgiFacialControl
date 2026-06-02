@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Models;
@@ -26,6 +28,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         {
             if (_editor != null)
             {
+                // overlay 操作で予約された自動保存 delayCall を解除してから Editor を破棄する。
+                CancelPendingAutoSave(_editor);
                 Object.DestroyImmediate(_editor);
                 _editor = null;
             }
@@ -238,6 +242,25 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             bool hasRendererPaths = snapshot.rendererPaths != null && snapshot.rendererPaths.Count > 0;
             bool hasOverlays = snapshot.overlays != null && snapshot.overlays.Count > 0;
             return !hasBlendShapes && !hasBones && !hasRendererPaths && !hasOverlays;
+        }
+
+        private static void CancelPendingAutoSave(UnityEditor.Editor editor)
+        {
+            if (editor == null) return;
+
+            const BindingFlags instanceNonPublic = BindingFlags.Instance | BindingFlags.NonPublic;
+            var flush = typeof(FacialCharacterProfileSOInspector)
+                .GetMethod("FlushAutoSave", instanceNonPublic);
+            if (flush != null)
+            {
+                var del = (EditorApplication.CallbackFunction)Delegate.CreateDelegate(
+                    typeof(EditorApplication.CallbackFunction), editor, flush);
+                EditorApplication.delayCall -= del;
+            }
+
+            var pending = typeof(FacialCharacterProfileSOInspector)
+                .GetField("_autoSavePending", instanceNonPublic);
+            pending?.SetValue(editor, false);
         }
 
         private static void SetSlots(FacialCharacterProfileSO so, params string[] slots)

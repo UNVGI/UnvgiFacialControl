@@ -159,14 +159,16 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
 
         private void AssertRegistered(string slot)
         {
-            string id = $"{Slug}:{slot}";
+            // 登録キーはレイヤーの入力源 id と同じ固定 prefix "lipsync-overlay:{slot}" でなければ
+            // FacialController.ResolveLayerInputSourcesFromRegistry が解決できず集約に乗らない。
+            string id = $"{LipSyncPhonemeOverlayInputSource.SlugPrefix}:{slot}";
             Assert.That(_registry.TryResolve(id, out IInputSource source), Is.True, id);
             Assert.That(source, Is.InstanceOf<LipSyncPhonemeOverlayInputSource>(), id);
         }
 
         private void AssertNotRegistered(string slot)
         {
-            string id = $"{Slug}:{slot}";
+            string id = $"{LipSyncPhonemeOverlayInputSource.SlugPrefix}:{slot}";
             Assert.That(_registry.TryResolve(id, out IInputSource source), Is.False, id);
             Assert.That(source, Is.Null, id);
         }

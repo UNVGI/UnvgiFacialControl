@@ -12,6 +12,10 @@
 
 ## [0.1.0-preview.2] - Unreleased
 
+### Fixed
+
+- `FacialCharacterProfileSO` Inspector の Expression List / Default Overlays で Overlay の Suppress / Override 切替および override clip 割当が確実に保存されない不具合を修正。これらのハンドラは `SerializedProperty` を経由せず managed モデルを直接書き換えて `serializedObject.Update()` のみで終えていたため、`TrackSerializedObjectValue` による自動保存監視が発火せず、`EditorUtility.SetDirty` 任せの「次回の手動保存時にたまたま保存される」挙動になっていた。各ハンドラから自動保存予約 `ScheduleAutoSave()` を明示的に呼び、profile.json エクスポートとアセット保存を確実に走らせるようにした。
+
 ### Breaking changes
 
 - Overlay は旧 `(slot, expressionId)` 参照モデルを廃止し、`(slot, suppress, snapshot)` の 3 状態モデルへ破壊的に変更しました。`defaultOverlays[]` と `expressions[].snapshot.overlays[]` は `slot` / `suppress` / `snapshot` を保持し、`suppress=false && snapshot=null` は `FacialProfile.DefaultOverlays` への fallback、`suppress=true` は明示抑制、`snapshot` 指定時は個別 overlay override を表します。

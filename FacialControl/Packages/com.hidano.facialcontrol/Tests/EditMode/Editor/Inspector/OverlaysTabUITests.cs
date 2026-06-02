@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Hidano.FacialControl.Adapters.Json.Dto;
@@ -29,6 +30,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         {
             if (_editor != null)
             {
+                // 各テストの overlay 操作で予約された自動保存 delayCall を解除し、
+                // TearDown 後に破棄済み Editor / StreamingAssets へ書き込まれるのを防ぐ。
+                CancelPendingAutoSave(_editor);
                 Object.DestroyImmediate(_editor);
                 _editor = null;
             }
@@ -211,6 +215,55 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
 
             radio.value = ToRadioIndex(OverlaySlotBindingState.Override);
             Assert.That(binding.suppress, Is.False);
+        }
+
+        [Test]
+        public void OverlayStateRadioSelection_SchedulesAutoSave()
+        {
+            // 回帰テスト: Overlay の Suppress/Override 切替は SerializedProperty を経由せず
+            // managed モデルを直接書き換えるため、TrackSerializedObjectValue による自動保存監視が
+            // 発火しない。ハンドラが明示的に自動保存を予約しないと、設定が profile.json / アセットへ
+            // 確実に保存されない（「保存されない気がする」不具合）。panel 未接続のテスト環境では
+            // 監視ポーリングが走らないため、_autoSavePending が true になるのは
+            // ハンドラが ScheduleAutoSave() を呼んだ場合のみ。
+            _so = CreateProfileWithSlots(BlinkSlotName);
+            _so.Expressions.Add(CreateExpression(new OverlaySlotBindingSerializable { slot = BlinkSlotName }));
+
+            var root = BuildInspectorRoot();
+            var radio = root.Q<RadioButtonGroup>(FacialCharacterProfileSOInspector.ExpressionOverlayStateRadioName);
+            Assert.That(radio, Is.Not.Null);
+            Assert.That(GetAutoSavePending(_editor), Is.False, "前提: 初期状態では自動保存は予約されていません。");
+
+            radio.value = ToRadioIndex(OverlaySlotBindingState.Suppress);
+
+            Assert.That(
+                GetAutoSavePending(_editor),
+                Is.True,
+                "Overlay の Suppress 切替後に自動保存が予約されていません。"
+                + "managed モデルの直接書き換えでも保存を予約する必要があります。");
+        }
+
+        [Test]
+        public void ExpressionOverlayClipSelection_SchedulesAutoSave()
+        {
+            _so = CreateProfileWithSlots(BlinkSlotName);
+            _so.Expressions.Add(CreateExpression(new OverlaySlotBindingSerializable { slot = BlinkSlotName }));
+
+            var root = BuildInspectorRoot();
+            var radio = root.Q<RadioButtonGroup>(FacialCharacterProfileSOInspector.ExpressionOverlayStateRadioName);
+            var clipField = root.Q<ObjectField>(FacialCharacterProfileSOInspector.ExpressionOverlayAnimationClipFieldName);
+            Assert.That(radio, Is.Not.Null);
+            Assert.That(clipField, Is.Not.Null);
+
+            radio.value = ToRadioIndex(OverlaySlotBindingState.Override);
+            ResetAutoSavePending(_editor);
+
+            clipField.value = CreateClip("ExpressionOverlayClipSelection_OverrideClip");
+
+            Assert.That(
+                GetAutoSavePending(_editor),
+                Is.True,
+                "Overlay の Override clip 割当後に自動保存が予約されていません。");
         }
 
         [Test]
@@ -462,6 +515,41 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
                     Assert.Fail($"未知の OverlaySlotBindingState です: {state}");
                     return -1;
             }
+        }
+
+        private const BindingFlags InstanceNonPublic = BindingFlags.Instance | BindingFlags.NonPublic;
+
+        private static bool GetAutoSavePending(UnityEditor.Editor editor)
+        {
+            var field = typeof(FacialCharacterProfileSOInspector)
+                .GetField("_autoSavePending", InstanceNonPublic);
+            Assert.That(field, Is.Not.Null, "_autoSavePending フィールドが見つかりません。");
+            return (bool)field.GetValue(editor);
+        }
+
+        private static void ResetAutoSavePending(UnityEditor.Editor editor)
+        {
+            var field = typeof(FacialCharacterProfileSOInspector)
+                .GetField("_autoSavePending", InstanceNonPublic);
+            field?.SetValue(editor, false);
+        }
+
+        private static void CancelPendingAutoSave(UnityEditor.Editor editor)
+        {
+            if (editor == null) return;
+
+            var flush = typeof(FacialCharacterProfileSOInspector)
+                .GetMethod("FlushAutoSave", InstanceNonPublic);
+            if (flush != null)
+            {
+                // delayCall に登録された FlushAutoSave と同一の (target, method) デリゲートを作り、
+                // -= で取り除く。method group での += と等価なデリゲートは互いに等しいため除去できる。
+                var del = (EditorApplication.CallbackFunction)Delegate.CreateDelegate(
+                    typeof(EditorApplication.CallbackFunction), editor, flush);
+                EditorApplication.delayCall -= del;
+            }
+
+            ResetAutoSavePending(editor);
         }
 
         private static void SetSlots(FacialCharacterProfileSO so, params string[] slots)

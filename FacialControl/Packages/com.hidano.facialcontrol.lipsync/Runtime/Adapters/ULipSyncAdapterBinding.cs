@@ -20,6 +20,13 @@ namespace Hidano.FacialControl.LipSync.Adapters
     {
         private static readonly string[] DefaultPhonemeIds = { "A", "I", "U", "E", "O" };
 
+        // phoneme overlay 入力源は固定 prefix "lipsync-overlay" で登録する。
+        // レイヤーの入力源 id / GetDefaultLayerInputSources / サンプル / docs はすべてこの prefix を使うため、
+        // binding の Slug（任意値）で登録すると FacialController.ResolveLayerInputSourcesFromRegistry の
+        // TryResolve("lipsync-overlay:a") がヒットせず集約に乗らない。
+        private static readonly AdapterSlug PhonemeOverlaySlug =
+            AdapterSlug.Parse(LipSyncPhonemeOverlayInputSource.SlugPrefix);
+
         private const string DefaultSlug = "ulipsync";
         private const string DefaultLayerNameValue = "lipsync";
         private const string OverlayLayerNameValue = "overlay";
@@ -282,7 +289,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
                     minVolume: _minVolume,
                     maxVolume: _maxVolume);
                 _inputSourceRegistry = ctx.InputSourceRegistry;
-                _registeredSlug = slug;
+                _registeredSlug = PhonemeOverlaySlug;
                 RegisterPhonemeOverlayInputSources(ctx, slug);
 
                 _provider.RequestZeroOutputForNextFrame();
@@ -1023,7 +1030,8 @@ namespace Hidano.FacialControl.LipSync.Adapters
                     phonemeId,
                     _provider,
                     ctx.BlendShapeNames.Count);
-                ctx.InputSourceRegistry.Register(slug, slot, source);
+                // binding の slug ではなく固定 prefix "lipsync-overlay" で登録する（id 体系をレイヤーと一致させる）。
+                ctx.InputSourceRegistry.Register(PhonemeOverlaySlug, slot, source);
                 _registeredPhonemeSlots.Add(slot);
             }
 
@@ -1049,7 +1057,8 @@ namespace Hidano.FacialControl.LipSync.Adapters
                     continue;
                 }
 
-                string id = $"{slug.Value}:{slot}";
+                // 登録キーと同じ固定 prefix で重複検知する（binding slug ではなく "lipsync-overlay:{slot}"）。
+                string id = $"{LipSyncPhonemeOverlayInputSource.SlugPrefix}:{slot}";
                 if (ctx.InputSourceRegistry.TryResolve(id, out _))
                 {
                     Debug.LogError(
