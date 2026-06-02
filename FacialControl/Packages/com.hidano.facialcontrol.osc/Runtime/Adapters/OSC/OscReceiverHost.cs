@@ -94,6 +94,24 @@ namespace Hidano.FacialControl.Adapters.OSC
             _configured = true;
         }
 
+        public void ReconfigureMappings(
+            OscDoubleBuffer buffer,
+            OscMapping[] mappings,
+            OscBundleAccumulator bundleAccumulator = null)
+        {
+            if (buffer == null) throw new ArgumentNullException(nameof(buffer));
+            if (mappings == null) throw new ArgumentNullException(nameof(mappings));
+            if (_receiver == null)
+            {
+                throw new InvalidOperationException("OscReceiverHost must be configured before mappings can be replaced.");
+            }
+
+            _buffer = buffer;
+            _mappings = mappings;
+            _bundleAccumulator = bundleAccumulator;
+            _receiver.Initialize(buffer, mappings, bundleAccumulator, _bundleMode, _timeProvider);
+        }
+
         /// <summary>
         /// <see cref="OscDoubleBuffer.Swap"/> を呼んで write→read を入れ替える。
         /// binding の <c>OnFixedTick</c> 等から呼ばれる。

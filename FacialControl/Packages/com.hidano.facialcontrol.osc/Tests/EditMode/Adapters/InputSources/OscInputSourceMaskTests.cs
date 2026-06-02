@@ -27,7 +27,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
 
             var source = CreateMeshMappedSource(
                 buffer,
-                skipMask: new BitArray(4, false),
                 contributeMask: contributeMask,
                 mappingIndexToMeshIndex: new[] { 3, 0 });
 
@@ -44,7 +43,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
             using var buffer = new OscDoubleBuffer(2);
             var source = CreateMeshMappedSource(
                 buffer,
-                skipMask: new BitArray(4, false),
                 contributeMask: new BitArray(new[] { true, false, false, true }),
                 mappingIndexToMeshIndex: new[] { 3, 0 });
 
@@ -68,7 +66,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
             using var buffer = new OscDoubleBuffer(3);
             var source = CreateMeshMappedSource(
                 buffer,
-                skipMask: new BitArray(4, false),
                 contributeMask: new BitArray(new[] { false, true, false, true }),
                 mappingIndexToMeshIndex: new[] { 3, -1, 1 });
 
@@ -88,13 +85,32 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
         }
 
         [Test]
+        public void TryWriteValues_ContributeMaskFalseForMappedMeshIndex_StillWritesValue()
+        {
+            using var buffer = new OscDoubleBuffer(1);
+            var source = CreateMeshMappedSource(
+                buffer,
+                contributeMask: new BitArray(new[] { false, true }),
+                mappingIndexToMeshIndex: new[] { 0 });
+
+            buffer.Write(0, 0.6f);
+            buffer.Swap();
+
+            var output = new[] { -1f, -1f };
+            bool wrote = source.TryWriteValues(output);
+
+            Assert.That(wrote, Is.True);
+            Assert.That(output[0], Is.EqualTo(0.6f).Within(1e-6f));
+            Assert.That(output[1], Is.EqualTo(-1f).Within(1e-6f));
+        }
+
+        [Test]
         public void Aggregate_OscReceiverAndOutputDemoShapeMismatch_DoesNotThrow()
         {
             const int meshBlendShapeCount = 4;
             using var buffer = new OscDoubleBuffer(2);
             var source = CreateMeshMappedSource(
                 buffer,
-                skipMask: new BitArray(meshBlendShapeCount, false),
                 contributeMask: new BitArray(new[] { true, false, false, true }),
                 mappingIndexToMeshIndex: new[] { 3, 0 });
 
@@ -134,7 +150,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
 
         private static OscInputSource CreateMeshMappedSource(
             OscDoubleBuffer buffer,
-            BitArray skipMask,
             BitArray contributeMask,
             int[] mappingIndexToMeshIndex)
         {
@@ -144,7 +159,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
                 typeof(float),
                 typeof(Hidano.FacialControl.Domain.Interfaces.ITimeProvider),
                 typeof(FailSafeMode),
-                typeof(BitArray),
                 typeof(BitArray),
                 typeof(int[])
             });
@@ -160,7 +174,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
                 0f,
                 new ManualTimeProvider(),
                 FailSafeMode.HoldLastValue,
-                skipMask,
                 contributeMask,
                 mappingIndexToMeshIndex
             });

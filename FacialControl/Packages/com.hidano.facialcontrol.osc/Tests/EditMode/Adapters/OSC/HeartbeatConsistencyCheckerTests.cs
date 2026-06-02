@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Text.RegularExpressions;
 using Hidano.FacialControl.Adapters.OSC;
 using Hidano.FacialControl.Domain.Models;
@@ -12,7 +11,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
     public sealed class HeartbeatConsistencyCheckerTests
     {
         [Test]
-        public void Constructor_WithReceiverMappings_InitializesAllContributeMaskBits()
+        public void Constructor_WithReceiverMappings_InitializesReceiverNameCount()
         {
             var checker = new HeartbeatConsistencyChecker(new[]
             {
@@ -22,12 +21,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
 
             Assert.AreEqual(2, checker.BlendShapeCount);
             Assert.IsFalse(checker.HasMismatch);
-            AssertMask(checker.SkipMask, false, false);
-            AssertMask(checker.ContributeMask, true, true);
+            CollectionAssert.IsEmpty(checker.SenderOnlyNames);
+            CollectionAssert.IsEmpty(checker.ReceiverOnlyNames);
         }
 
         [Test]
-        public void Constructor_WithMeshBlendShapeNames_LengthEqualsMeshBlendShapeCount()
+        public void Constructor_WithMeshBlendShapeNames_UsesReceiverMappingNamesForMismatch()
         {
             var checker = new HeartbeatConsistencyChecker(
                 new[] { "Blink", "Happy", "Extra", "Angry" },
@@ -38,13 +37,16 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
                 },
                 false);
 
-            Assert.AreEqual(4, checker.BlendShapeCount);
-            AssertMask(checker.SkipMask, false, false, false, false);
-            AssertMask(checker.ContributeMask, false, true, false, true);
+            checker.UpdateFromHeartbeat(new[] { "Happy" });
+
+            Assert.AreEqual(2, checker.BlendShapeCount);
+            Assert.IsTrue(checker.HasMismatch);
+            CollectionAssert.IsEmpty(checker.SenderOnlyNames);
+            CollectionAssert.AreEqual(new[] { "Angry" }, checker.ReceiverOnlyNames);
         }
 
         [Test]
-        public void UpdateFromHeartbeat_MappingPresentInSender_ContributeBitSetAtMeshIndex()
+        public void UpdateFromHeartbeat_MappingPresentInSender_HasNoMismatch()
         {
             var checker = new HeartbeatConsistencyChecker(
                 new[] { "Blink", "Happy", "Angry" },
@@ -57,12 +59,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             checker.UpdateFromHeartbeat(new[] { "Angry" });
 
             Assert.IsFalse(checker.HasMismatch);
-            AssertMask(checker.SkipMask, false, false, false);
-            AssertMask(checker.ContributeMask, false, false, true);
+            CollectionAssert.IsEmpty(checker.SenderOnlyNames);
+            CollectionAssert.IsEmpty(checker.ReceiverOnlyNames);
         }
 
         [Test]
-        public void UpdateFromHeartbeat_MappingMissingInSender_SkipBitSetAtMeshIndex()
+        public void UpdateFromHeartbeat_MappingMissingInSender_RecordsReceiverOnlyName()
         {
             var checker = new HeartbeatConsistencyChecker(
                 new[] { "Blink", "Happy", "Angry" },
@@ -76,12 +78,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             checker.UpdateFromHeartbeat(new[] { "Happy" });
 
             Assert.IsTrue(checker.HasMismatch);
-            AssertMask(checker.SkipMask, false, false, true);
-            AssertMask(checker.ContributeMask, false, true, false);
+            CollectionAssert.IsEmpty(checker.SenderOnlyNames);
+            CollectionAssert.AreEqual(new[] { "Angry" }, checker.ReceiverOnlyNames);
         }
 
         [Test]
-        public void UpdateFromHeartbeat_PartialMismatch_SkipsOnlyReceiverMissingNames()
+        public void UpdateFromHeartbeat_PartialMismatch_RecordsSenderOnlyAndReceiverOnlyNames()
         {
             var checker = new HeartbeatConsistencyChecker(new[] { "Happy", "Angry", "Sad" });
 
@@ -89,12 +91,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             checker.UpdateFromHeartbeat(new[] { "Happy", "Extra" });
 
             Assert.IsTrue(checker.HasMismatch);
-            AssertMask(checker.SkipMask, false, true, true);
-            AssertMask(checker.ContributeMask, true, false, false);
+            CollectionAssert.AreEqual(new[] { "Extra" }, checker.SenderOnlyNames);
+            CollectionAssert.AreEqual(new[] { "Angry", "Sad" }, checker.ReceiverOnlyNames);
         }
 
         [Test]
-        public void UpdateFromHeartbeat_SenderOnlyMismatch_LeavesReceiverContributeMaskEnabled()
+        public void UpdateFromHeartbeat_SenderOnlyMismatch_RecordsSenderOnlyName()
         {
             var checker = new HeartbeatConsistencyChecker(new[] { "Happy" });
 
@@ -102,12 +104,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             checker.UpdateFromHeartbeat(new[] { "Happy", "Extra" });
 
             Assert.IsTrue(checker.HasMismatch);
-            AssertMask(checker.SkipMask, false);
-            AssertMask(checker.ContributeMask, true);
+            CollectionAssert.AreEqual(new[] { "Extra" }, checker.SenderOnlyNames);
+            CollectionAssert.IsEmpty(checker.ReceiverOnlyNames);
         }
 
         [Test]
-        public void UpdateFromHeartbeat_AllNamesMatch_ClearsPreviousSkipMask()
+        public void UpdateFromHeartbeat_AllNamesMatch_ClearsPreviousMismatch()
         {
             var checker = new HeartbeatConsistencyChecker(new[] { "Happy", "Angry" });
 
@@ -117,8 +119,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             checker.UpdateFromHeartbeat(new[] { "Angry", "Happy" });
 
             Assert.IsFalse(checker.HasMismatch);
-            AssertMask(checker.SkipMask, false, false);
-            AssertMask(checker.ContributeMask, true, true);
+            CollectionAssert.IsEmpty(checker.SenderOnlyNames);
+            CollectionAssert.IsEmpty(checker.ReceiverOnlyNames);
         }
 
         [Test]
@@ -130,7 +132,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             checker.UpdateFromHeartbeat(new[] { "Happy", "Extra" });
             checker.UpdateFromHeartbeat(new[] { "Extra", "Happy" });
 
-            AssertMask(checker.SkipMask, false, true);
+            Assert.IsTrue(checker.HasMismatch);
+            CollectionAssert.AreEqual(new[] { "Extra" }, checker.SenderOnlyNames);
+            CollectionAssert.AreEqual(new[] { "Angry" }, checker.ReceiverOnlyNames);
         }
 
         [Test]
@@ -144,11 +148,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             LogAssert.Expect(LogType.Warning, MismatchLog(string.Empty, "Sad"));
             checker.UpdateFromHeartbeat(new[] { "Happy", "Angry" });
 
-            AssertMask(checker.SkipMask, false, false, true);
+            Assert.IsTrue(checker.HasMismatch);
+            CollectionAssert.IsEmpty(checker.SenderOnlyNames);
+            CollectionAssert.AreEqual(new[] { "Sad" }, checker.ReceiverOnlyNames);
         }
 
         [Test]
-        public void Clear_AfterMismatch_ResetsMaskAndMismatchState()
+        public void Clear_AfterMismatch_ResetsMismatchState()
         {
             var checker = new HeartbeatConsistencyChecker(new[] { "Happy", "Angry" }, warnLogEnabled: false);
 
@@ -156,8 +162,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             checker.Clear();
 
             Assert.IsFalse(checker.HasMismatch);
-            AssertMask(checker.SkipMask, false, false);
-            AssertMask(checker.ContributeMask, true, true);
+            CollectionAssert.IsEmpty(checker.SenderOnlyNames);
+            CollectionAssert.IsEmpty(checker.ReceiverOnlyNames);
         }
 
         private static Regex MismatchLog(string senderOnlyName, params string[] receiverOnlyNames)
@@ -185,15 +191,6 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             }
 
             return new Regex(pattern);
-        }
-
-        private static void AssertMask(BitArray mask, params bool[] expected)
-        {
-            Assert.AreEqual(expected.Length, mask.Length);
-            for (int i = 0; i < expected.Length; i++)
-            {
-                Assert.AreEqual(expected[i], mask[i], $"mask[{i}]");
-            }
         }
     }
 }

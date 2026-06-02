@@ -34,6 +34,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
         private static readonly Regex DuplicateLogPattern =
             new Regex("InputSourceRegistry.*duplicate", RegexOptions.IgnoreCase);
 
+        private static readonly Regex ReplaceLogPattern =
+            new Regex("InputSourceRegistry.*replaced", RegexOptions.IgnoreCase);
+
         /// <summary>
         /// 識別だけ可能な最小の <see cref="IInputSource"/>。registry の lookup で
         /// instance identity が維持されるかどうかの検証用。
@@ -171,6 +174,76 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
         // 未登録 id 解決
         // ---------------------------------------------------------------
 
+        // ---------------------------------------------------------------
+        // Replace: Log + 差し替え / 新規登録
+        // ---------------------------------------------------------------
+
+        [Test]
+        public void Replace_ExistingPrimarySlug_LogsAndPreservesRegisteredIdOrder()
+        {
+            LogAssert.Expect(LogType.Log, ReplaceLogPattern);
+            var registry = new InputSourceRegistry();
+            var first = new StubInputSource("first");
+            var second = new StubInputSource("second");
+            var slug = AdapterSlug.Parse("osc");
+            registry.Register(slug, first);
+            registry.Register(AdapterSlug.Parse("input-system"), new StubInputSource("other"));
+
+            registry.Replace(slug, second);
+
+            Assert.IsTrue(registry.TryResolve("osc", out var resolved));
+            Assert.AreSame(second, resolved);
+            CollectionAssert.AreEqual(new[] { "osc", "input-system" }, registry.RegisteredIds);
+        }
+
+        [Test]
+        public void Replace_UnregisteredPrimarySlug_LogsAndRegistersNewSource()
+        {
+            LogAssert.Expect(LogType.Log, ReplaceLogPattern);
+            var registry = new InputSourceRegistry();
+            var source = new StubInputSource("new-primary");
+            var slug = AdapterSlug.Parse("osc");
+
+            registry.Replace(slug, source);
+
+            Assert.IsTrue(registry.TryResolve("osc", out var resolved));
+            Assert.AreSame(source, resolved);
+            CollectionAssert.AreEqual(new[] { "osc" }, registry.RegisteredIds);
+        }
+
+        [Test]
+        public void Replace_ExistingCompositeSlug_LogsAndPreservesRegisteredIdOrder()
+        {
+            LogAssert.Expect(LogType.Log, ReplaceLogPattern);
+            var registry = new InputSourceRegistry();
+            var first = new StubInputSource("first");
+            var second = new StubInputSource("second");
+            var slug = AdapterSlug.Parse("osc");
+            registry.Register(slug, "vrchat", first);
+            registry.Register(AdapterSlug.Parse("input-system"), new StubInputSource("other"));
+
+            registry.Replace(slug, "vrchat", second);
+
+            Assert.IsTrue(registry.TryResolve("osc:vrchat", out var resolved));
+            Assert.AreSame(second, resolved);
+            CollectionAssert.AreEqual(new[] { "osc:vrchat", "input-system" }, registry.RegisteredIds);
+        }
+
+        [Test]
+        public void Replace_UnregisteredCompositeSlug_LogsAndRegistersNewSource()
+        {
+            LogAssert.Expect(LogType.Log, ReplaceLogPattern);
+            var registry = new InputSourceRegistry();
+            var source = new StubInputSource("new-composite");
+            var slug = AdapterSlug.Parse("osc");
+
+            registry.Replace(slug, "vrchat", source);
+
+            Assert.IsTrue(registry.TryResolve("osc:vrchat", out var resolved));
+            Assert.AreSame(source, resolved);
+            CollectionAssert.AreEqual(new[] { "osc:vrchat" }, registry.RegisteredIds);
+        }
+
         [Test]
         public void TryResolve_UnregisteredPrimaryId_ReturnsFalseAndNull()
         {
@@ -306,6 +379,22 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
         }
 
         [Test]
+        public void Replace_NullPrimarySource_Throws()
+        {
+            var registry = new InputSourceRegistry();
+            Assert.Throws<ArgumentNullException>(
+                () => registry.Replace(AdapterSlug.Parse("osc"), source: null));
+        }
+
+        [Test]
+        public void Replace_NullCompositeSource_Throws()
+        {
+            var registry = new InputSourceRegistry();
+            Assert.Throws<ArgumentNullException>(
+                () => registry.Replace(AdapterSlug.Parse("osc"), "vrchat", source: null));
+        }
+
+        [Test]
         public void Register_NullOrEmptySub_Throws()
         {
             var registry = new InputSourceRegistry();
@@ -314,6 +403,18 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
                     AdapterSlug.Parse("osc"), sub: null, source: new StubInputSource("x")));
             Assert.Throws<ArgumentException>(
                 () => registry.Register(
+                    AdapterSlug.Parse("osc"), sub: string.Empty, source: new StubInputSource("x")));
+        }
+
+        [Test]
+        public void Replace_NullOrEmptySub_Throws()
+        {
+            var registry = new InputSourceRegistry();
+            Assert.Throws<ArgumentException>(
+                () => registry.Replace(
+                    AdapterSlug.Parse("osc"), sub: null, source: new StubInputSource("x")));
+            Assert.Throws<ArgumentException>(
+                () => registry.Replace(
                     AdapterSlug.Parse("osc"), sub: string.Empty, source: new StubInputSource("x")));
         }
 
@@ -327,22 +428,28 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.InputSources
             IInputSourceRegistry registry = new InputSourceRegistry();
             var primary = new StubInputSource("primary");
             var composite = new StubInputSource("composite");
+            var replacedPrimary = new StubInputSource("replaced-primary");
+            var replacedComposite = new StubInputSource("replaced-composite");
             var slug = AdapterSlug.Parse("osc");
 
             registry.Register(slug, primary);
             registry.Register(slug, "vrchat", composite);
+            LogAssert.Expect(LogType.Log, ReplaceLogPattern);
+            LogAssert.Expect(LogType.Log, ReplaceLogPattern);
+            registry.Replace(slug, replacedPrimary);
+            registry.Replace(slug, "vrchat", replacedComposite);
 
             Assert.IsTrue(registry.TryResolve("osc", out var p));
-            Assert.AreSame(primary, p);
+            Assert.AreSame(replacedPrimary, p);
             Assert.IsTrue(registry.TryResolve("osc:vrchat", out var c));
-            Assert.AreSame(composite, c);
+            Assert.AreSame(replacedComposite, c);
             Assert.AreEqual(2, registry.RegisteredIds.Count);
 
             registry.Unregister(slug);
             Assert.IsFalse(registry.TryResolve("osc", out var removed));
             Assert.IsNull(removed);
             Assert.IsTrue(registry.TryResolve("osc:vrchat", out c));
-            Assert.AreSame(composite, c);
+            Assert.AreSame(replacedComposite, c);
             Assert.AreEqual(1, registry.RegisteredIds.Count);
         }
     }

@@ -235,6 +235,40 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         }
 
         [Test]
+        public void OnStart_EmptyMappings_StartsSocketWithoutRegisteringPrimaryInputSource()
+        {
+            var registry = new InputSourceRegistry();
+            int port = AllocatePort();
+            var binding = new OscReceiverAdapterBinding
+            {
+                Slug = "osc-empty",
+                Port = port,
+                Mappings = new List<OscMappingEntry>()
+            };
+
+            var host = new GameObject("OscAdapterBindingEmptyMappingsTests");
+            try
+            {
+                binding.OnStart(CreateContext(registry, host, blendShapeNames: new[] { "smile", "frown" }));
+
+                Assert.That(binding.IsStarted, Is.True);
+                Assert.That(binding.HelperHost, Is.Not.Null);
+                Assert.That(binding.HelperHost.IsConfigured, Is.True);
+                Assert.That(binding.HelperHost.Port, Is.EqualTo(port));
+                Assert.That(binding.Buffer, Is.Not.Null);
+                Assert.That(binding.Buffer.Size, Is.EqualTo(0));
+                Assert.That(binding.InputSource, Is.Null);
+                Assert.That(binding.HeartbeatChecker, Is.Null);
+                Assert.That(registry.TryResolve("osc-empty", out _), Is.False);
+            }
+            finally
+            {
+                binding.Dispose();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
         public void OnStart_GazeVrchatMapping_RegistersVector2InputSourceUnderExpressionId()
         {
             var registry = new InputSourceRegistry();
@@ -523,7 +557,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         }
 
         [Test]
-        public void HeartbeatMismatch_SkipsOnlyMissingBlendShape()
+        public void HeartbeatMismatch_LogsWarningWithoutChangingContributeMask()
         {
             var registry = new InputSourceRegistry();
             var binding = new OscReceiverAdapterBinding
@@ -557,9 +591,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 var output = new float[2];
                 Assert.That(source.TryWriteValues(output), Is.True);
                 Assert.That(output[0], Is.EqualTo(0.25f).Within(1e-6f));
-                Assert.That(output[1], Is.EqualTo(0f).Within(1e-6f));
+                Assert.That(output[1], Is.EqualTo(0.9f).Within(1e-6f));
                 Assert.That(source.ContributeMask[0], Is.True);
-                Assert.That(source.ContributeMask[1], Is.False);
+                Assert.That(source.ContributeMask[1], Is.True);
             }
             finally
             {
@@ -593,9 +627,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                     host,
                     blendShapeNames: new[] { "smile", "blink", "frown" }));
 
-                Assert.That(binding.HeartbeatChecker.BlendShapeCount, Is.EqualTo(3));
-                AssertMask(binding.HeartbeatChecker.SkipMask, false, false, false);
-                AssertMask(binding.HeartbeatChecker.ContributeMask, true, false, true);
+                Assert.That(binding.HeartbeatChecker.BlendShapeCount, Is.EqualTo(2));
 
                 binding.HelperHost.Receiver.HandleOscMessage(
                     new uOSC.Message("/avatar/parameters/frown", 0.75f));

@@ -16,12 +16,16 @@ namespace Hidano.FacialControl.Adapters.OSC
     public class OscSender : MonoBehaviour
     {
         private const string BlendShapeNamesAddress = "/_facialcontrol/blendshape_names";
+        private const string PresetAddress = "/_facialcontrol/preset";
 
         private static readonly byte[] SenderIdentityAddressUtf8 =
             Encoding.UTF8.GetBytes(SenderIdentity.OscAddress);
 
         private static readonly byte[] BlendShapeNamesAddressUtf8 =
             Encoding.UTF8.GetBytes(BlendShapeNamesAddress);
+
+        private static readonly byte[] PresetAddressUtf8 =
+            Encoding.UTF8.GetBytes(PresetAddress);
 
         [SerializeField]
         private string _endpoint = "127.0.0.1";
@@ -351,6 +355,62 @@ namespace Hidano.FacialControl.Adapters.OSC
                     addressUtf8,
                     values,
                     messageCount);
+
+            EnsureBundleClient();
+            for (int i = 0; i < packetCount; i++)
+            {
+                OscBundlePacket packet = _bundleBuilder.GetPacket(i);
+                _bundleClient.Send(packet.Buffer, packet.Length, _bundleEndpoint);
+            }
+        }
+
+        /// <summary>
+        /// Sends a frame bundle using a caller-provided address table plus heartbeat and preset metadata.
+        /// </summary>
+        public void SendBundle(
+            byte[] senderUuidBytes,
+            string startedAtUnixMs,
+            byte[][] addressUtf8,
+            float[] values,
+            int count,
+            string[] heartbeatNames,
+            int heartbeatNameCount,
+            string presetName,
+            string customPrefix)
+        {
+            if (!_initialized || _client == null || !_client.isRunning)
+                return;
+
+            if (senderUuidBytes == null || senderUuidBytes.Length != SenderIdentity.UuidByteLength)
+                return;
+
+            if (string.IsNullOrEmpty(startedAtUnixMs) || addressUtf8 == null || values == null)
+                return;
+
+            if (heartbeatNames == null ||
+                heartbeatNameCount < 0 ||
+                heartbeatNameCount > heartbeatNames.Length ||
+                string.IsNullOrEmpty(presetName))
+            {
+                return;
+            }
+
+            int messageCount = Math.Min(Math.Min(Math.Max(count, 0), values.Length), addressUtf8.Length);
+            ulong timestamp = Timestamp.Now.value;
+            int packetCount = _bundleBuilder.BuildFrameBundle(
+                timestamp,
+                SenderIdentityAddressUtf8,
+                senderUuidBytes,
+                startedAtUnixMs,
+                addressUtf8,
+                values,
+                messageCount,
+                BlendShapeNamesAddressUtf8,
+                heartbeatNames,
+                heartbeatNameCount,
+                PresetAddressUtf8,
+                presetName,
+                customPrefix);
 
             EnsureBundleClient();
             for (int i = 0; i < packetCount; i++)

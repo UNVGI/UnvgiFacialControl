@@ -145,6 +145,90 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
         }
 
         [Test]
+        public void BuildFrameBundle_WithHeartbeatAndPreset_WritesIndependentPresetMessage()
+        {
+            using var builder = new OscBundleBuilder();
+            const ulong timestamp = 0x0000000900000000UL;
+            byte[] senderUuid = Guid.NewGuid().ToByteArray();
+            byte[][] addresses =
+            {
+                Utf8("/avatar/parameters/Joy")
+            };
+            float[] values = { 0.25f };
+            string[] names = { "Joy" };
+
+            int packetCount = builder.BuildFrameBundle(
+                timestamp,
+                Utf8(SenderIdentity.OscAddress),
+                senderUuid,
+                "123456789",
+                addresses,
+                values,
+                values.Length,
+                Utf8("/_facialcontrol/blendshape_names"),
+                names,
+                names.Length,
+                Utf8("/_facialcontrol/preset"),
+                "vrchat",
+                customPrefix: null);
+
+            Assert.AreEqual(1, packetCount);
+            List<uOSC.Message> parsed = ParseMessages(builder.GetPacket(0));
+            Assert.AreEqual(4, parsed.Count);
+            AssertFloatMessage(parsed[1], "/avatar/parameters/Joy", 0.25f, timestamp);
+            Assert.AreEqual("/_facialcontrol/blendshape_names", parsed[2].address);
+            CollectionAssert.AreEqual(names, parsed[2].values);
+            Assert.AreEqual("/_facialcontrol/preset", parsed[3].address);
+            Assert.AreEqual(timestamp, parsed[3].timestamp.value);
+            CollectionAssert.AreEqual(new object[] { "vrchat" }, parsed[3].values);
+        }
+
+        [Test]
+        public void BuildPresetBundle_CustomPreset_WritesPresetAndCustomPrefix()
+        {
+            using var builder = new OscBundleBuilder();
+            const ulong timestamp = 0x0000000A00000000UL;
+
+            int packetCount = builder.BuildPresetBundle(
+                timestamp,
+                Utf8("/_facialcontrol/preset"),
+                "custom",
+                "/myapp/");
+
+            Assert.AreEqual(1, packetCount);
+            List<uOSC.Message> parsed = ParseMessages(builder.GetPacket(0));
+            Assert.AreEqual(1, parsed.Count);
+            Assert.AreEqual("/_facialcontrol/preset", parsed[0].address);
+            Assert.AreEqual(timestamp, parsed[0].timestamp.value);
+            CollectionAssert.AreEqual(new object[] { "custom", "/myapp/" }, parsed[0].values);
+        }
+
+        [Test]
+        public void BuildHeartbeatBundle_WithPreset_DoesNotMutateBlendShapeNamePayload()
+        {
+            using var builder = new OscBundleBuilder();
+            const ulong timestamp = 0x0000000B00000000UL;
+            string[] names = { "Joy", "Angry" };
+
+            int packetCount = builder.BuildHeartbeatBundle(
+                timestamp,
+                Utf8("/_facialcontrol/blendshape_names"),
+                names,
+                names.Length,
+                Utf8("/_facialcontrol/preset"),
+                "arkit",
+                customPrefix: null);
+
+            Assert.AreEqual(1, packetCount);
+            List<uOSC.Message> parsed = ParseMessages(builder.GetPacket(0));
+            Assert.AreEqual(2, parsed.Count);
+            Assert.AreEqual("/_facialcontrol/blendshape_names", parsed[0].address);
+            CollectionAssert.AreEqual(names, parsed[0].values);
+            Assert.AreEqual("/_facialcontrol/preset", parsed[1].address);
+            CollectionAssert.AreEqual(new object[] { "arkit" }, parsed[1].values);
+        }
+
+        [Test]
         public void BuildFrameBundle_LargeHeartbeat_SplitsWithSenderIdentityAtEachPacketHead()
         {
             using var builder = new OscBundleBuilder();

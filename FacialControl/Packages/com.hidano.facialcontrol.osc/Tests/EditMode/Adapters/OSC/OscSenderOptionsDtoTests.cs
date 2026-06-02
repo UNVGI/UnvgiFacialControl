@@ -35,6 +35,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 {
                     "Look"
                 },
+                sendPreset = false,
                 suppressLoopback = false,
                 heartbeatIntervalSeconds = 2.5f
             };
@@ -53,6 +54,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             Assert.IsFalse(result.endpoints[1].enabled);
             Assert.AreEqual(source.blendShapeMapping, result.blendShapeMapping);
             Assert.AreEqual(source.gazeExpressionIds, result.gazeExpressionIds);
+            Assert.IsFalse(result.sendPreset);
             Assert.IsFalse(result.suppressLoopback);
             Assert.AreEqual(2.5f, result.heartbeatIntervalSeconds);
         }
@@ -66,6 +68,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 "\"endpoints\":[{\"ip\":\"127.0.0.1\",\"port\":9100,\"preset\":\"arkit\",\"enabled\":true,\"extra\":\"ignored\"}]," +
                 "\"blendShapeMapping\":[\"Smile\"]," +
                 "\"gazeExpressionIds\":[\"Eyes\"]," +
+                "\"sendPreset\":false," +
                 "\"suppressLoopback\":true," +
                 "\"heartbeatIntervalSeconds\":4.0" +
                 "}";
@@ -79,6 +82,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             Assert.IsTrue(result.endpoints[0].enabled);
             Assert.AreEqual(new[] { "Smile" }, result.blendShapeMapping);
             Assert.AreEqual(new[] { "Eyes" }, result.gazeExpressionIds);
+            Assert.IsFalse(result.sendPreset);
             Assert.IsTrue(result.suppressLoopback);
             Assert.AreEqual(4.0f, result.heartbeatIntervalSeconds);
         }
@@ -98,6 +102,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             Assert.IsEmpty(result.blendShapeMapping);
             Assert.IsNotNull(result.gazeExpressionIds);
             Assert.IsEmpty(result.gazeExpressionIds);
+            Assert.IsTrue(result.sendPreset);
             Assert.IsTrue(result.suppressLoopback);
             Assert.AreEqual(OscSenderOptionsDto.DefaultHeartbeatIntervalSeconds, result.heartbeatIntervalSeconds);
         }

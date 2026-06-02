@@ -28,7 +28,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters
             public void Register(AdapterSlug slug, IInputSource source) =>
                 throw new NotImplementedException();
 
+            public void Replace(AdapterSlug slug, IInputSource source) =>
+                throw new NotImplementedException();
+
             public void Register(AdapterSlug slug, string sub, IInputSource source) =>
+                throw new NotImplementedException();
+
+            public void Replace(AdapterSlug slug, string sub, IInputSource source) =>
                 throw new NotImplementedException();
 
             public void Unregister(AdapterSlug slug) =>

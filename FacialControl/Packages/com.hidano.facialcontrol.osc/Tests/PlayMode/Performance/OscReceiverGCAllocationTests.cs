@@ -9,6 +9,7 @@ using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
 using Hidano.FacialControl.Tests.Shared;
 using NUnit.Framework;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Profiling;
 
@@ -103,6 +104,54 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
             LogBaseline(nameof(OscReceiverGCAllocationTests), "atomicBundleGazeMessages", baseline);
         }
 
+        [Test]
+        public void OnFixedTick_HeartbeatHashUnchanged100Frames_ZeroGCAllocation()
+        {
+            var registry = new InputSourceRegistry();
+            var timeProvider = new ManualTimeProvider();
+            StartReceiverForAutoMapping(registry, timeProvider, "smile", "frown");
+
+            uOSC.Message heartbeatMessage = HeartbeatMessage("smile", "frown");
+            _binding.HelperHost.Receiver.HandleOscMessage(heartbeatMessage);
+            _binding.OnFixedTick(1f / 60f);
+
+            OscInputSource inputSource = _binding.InputSource;
+            OscDoubleBuffer buffer = _binding.Buffer;
+            uint heartbeatHash = _binding.LastHeartbeatHash;
+
+            Assert.That(inputSource, Is.Not.Null);
+            Assert.That(registry.TryResolve(Slug, out IInputSource source), Is.True);
+            Assert.That(source, Is.SameAs(inputSource));
+
+            for (int i = 0; i < 16; i++)
+            {
+                _binding.HelperHost.Receiver.HandleOscMessage(heartbeatMessage);
+                _binding.OnFixedTick(1f / 60f);
+            }
+
+            using var recorder = ProfilerRecorder.StartNew(
+                ProfilerCategory.Memory,
+                "GC.Alloc",
+                1,
+                ProfilerRecorderOptions.SumAllSamplesInFrame
+                    | ProfilerRecorderOptions.CollectOnlyOnCurrentThread);
+
+            for (int frame = 0; frame < FrameCount; frame++)
+            {
+                _binding.HelperHost.Receiver.HandleOscMessage(heartbeatMessage);
+                _binding.OnFixedTick(1f / 60f);
+            }
+
+            long gcAllocBytes = recorder.LastValue;
+
+            Assert.That(_binding.InputSource, Is.SameAs(inputSource));
+            Assert.That(_binding.Buffer, Is.SameAs(buffer));
+            Assert.That(_binding.LastHeartbeatHash, Is.EqualTo(heartbeatHash));
+            Assert.That(_binding.RuntimeMappings.Count, Is.EqualTo(2));
+            Assert.That(gcAllocBytes, Is.EqualTo(0L),
+                "heartbeat hash unchanged OnFixedTick hot path reported GC.Alloc: " + gcAllocBytes + " bytes.");
+        }
+
         private void StartReceiver(
             InputSourceRegistry registry,
             ManualTimeProvider timeProvider,
@@ -144,13 +193,37 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
             Assert.That(_binding.HelperHost, Is.Not.Null);
         }
 
+        private void StartReceiverForAutoMapping(
+            InputSourceRegistry registry,
+            ManualTimeProvider timeProvider,
+            params string[] blendShapeNames)
+        {
+            _host = new GameObject("OscReceiverGCAllocationTests");
+            _binding = new OscReceiverAdapterBinding
+            {
+                Slug = Slug,
+                Endpoint = Endpoint,
+                Port = AllocatePort(),
+                StalenessSeconds = 0f,
+                BundleMode = BundleInterpretationMode.IndividualMessage,
+                Mappings = new List<OscMappingEntry>(),
+            };
+
+            _binding.OnStart(CreateContext(registry, timeProvider, blendShapeNames));
+
+            Assert.That(_binding.IsStarted, Is.True);
+            Assert.That(_binding.HelperHost, Is.Not.Null);
+            Assert.That(_binding.InputSource, Is.Null);
+        }
+
         private AdapterBuildContext CreateContext(
             InputSourceRegistry registry,
-            ManualTimeProvider timeProvider)
+            ManualTimeProvider timeProvider,
+            string[] blendShapeNames = null)
         {
             return new AdapterBuildContext(
                 new FacialProfile("2.0.0"),
-                Array.Empty<string>(),
+                blendShapeNames ?? Array.Empty<string>(),
                 registry,
                 new FacialOutputBus(),
                 timeProvider,
@@ -181,6 +254,17 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
             var message = new uOSC.Message(address, value);
             message.timestamp = new uOSC.Timestamp(timestamp);
             return message;
+        }
+
+        private static uOSC.Message HeartbeatMessage(params string[] names)
+        {
+            var values = new object[names.Length];
+            for (int i = 0; i < names.Length; i++)
+            {
+                values[i] = names[i];
+            }
+
+            return new uOSC.Message(OscReceiverAdapterBinding.BlendShapeNamesAddress, values);
         }
 
         private static GazeVector2InputSource ResolveGaze(InputSourceRegistry registry, string id)

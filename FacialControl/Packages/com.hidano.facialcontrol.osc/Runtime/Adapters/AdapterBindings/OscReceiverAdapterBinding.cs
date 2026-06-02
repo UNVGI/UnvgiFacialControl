@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.OSC;
 using Hidano.FacialControl.Adapters.RuntimeSettings;
@@ -32,8 +34,15 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
     [FacialAdapterBinding(displayName: "OSC Receiver")]
     public sealed class OscReceiverAdapterBinding : AdapterBindingBase
     {
+        public enum MappingOrigin
+        {
+            Manual,
+            HeartbeatAuto
+        }
+
         public const string SenderIdentityAddress = SenderIdentity.OscAddress;
         public const string BlendShapeNamesAddress = "/_facialcontrol/blendshape_names";
+        public const string PresetAddress = "/_facialcontrol/preset";
 
         private const int MaxCachedBundleSenderDecisions = 32;
 
@@ -64,6 +73,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         [NonSerialized]
         private OscMapping[] _runtimeMappings;
+
+        [NonSerialized]
+        private MappingOrigin[] _mappingOrigins;
+
+        [NonSerialized]
+        private IReadOnlyList<OscMappingEntry> _runtimeManualEntries;
 
         [NonSerialized]
         private OscReceiverHost _helperHost;
@@ -129,10 +144,52 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         private List<string> _heartbeatScratch;
 
         [NonSerialized]
+        private List<string> _heartbeatProcessingScratch;
+
+        [NonSerialized]
+        private object _heartbeatSync;
+
+        [NonSerialized]
+        private int _heartbeatDirty;
+
+        [NonSerialized]
+        private uint _lastHeartbeatHash;
+
+        [NonSerialized]
+        private bool _hasProcessedHeartbeat;
+
+        [NonSerialized]
+        private bool _warnedOnEmptyHeartbeatIntersection;
+
+        [NonSerialized]
+        private bool _warnedOnAddressCollision;
+
+        [NonSerialized]
+        private bool _warnedOnUnknownPreset;
+
+        [NonSerialized]
+        private bool _warnedOnMissingCustomPrefix;
+
+        [NonSerialized]
+        private IInputSourceRegistry _runtimeRegistry;
+
+        [NonSerialized]
+        private AdapterSlug _runtimeSlug;
+
+        [NonSerialized]
+        private IReadOnlyList<string> _runtimeMeshBlendShapeNames;
+
+        [NonSerialized]
         private ITimeProvider _timeProvider;
 
         [NonSerialized]
         private SenderIdentity _currentSenderId;
+
+        [NonSerialized]
+        private string _currentPresetName;
+
+        [NonSerialized]
+        private string _currentCustomPrefix;
 
         [NonSerialized]
         private double _lastAcceptedPacketTime;
@@ -276,11 +333,38 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         public SenderIdentity? CurrentSenderId =>
             _hasCurrentSenderId ? _currentSenderId : (SenderIdentity?)null;
 
+        public string CurrentPresetName => _currentPresetName;
+
+        public AddressPresetKind? CurrentPreset => ParseCurrentPreset(_currentPresetName);
+
+        public string CurrentCustomPrefix => _currentCustomPrefix;
+
+        public uint LastHeartbeatHash => _lastHeartbeatHash;
+
         public IReadOnlyList<GazeVector2InputSource> GazeSources =>
             _gazeSources ?? (IReadOnlyList<GazeVector2InputSource>)Array.Empty<GazeVector2InputSource>();
 
         /// <summary>OnStart で構築した <see cref="OscInputSource"/>（テスト/診断用、未開始は null）。</summary>
         public OscInputSource InputSource => _inputSource;
+
+        public IReadOnlyList<OscMapping> RuntimeMappings =>
+            _runtimeMappings ?? (IReadOnlyList<OscMapping>)Array.Empty<OscMapping>();
+
+        public IReadOnlyList<MappingOrigin> MappingOrigins =>
+            _mappingOrigins ?? (IReadOnlyList<MappingOrigin>)Array.Empty<MappingOrigin>();
+
+        public MappingOrigin GetMappingOrigin(int runtimeMappingIndex)
+        {
+            if (_mappingOrigins == null ||
+                runtimeMappingIndex < 0 ||
+                runtimeMappingIndex >= _mappingOrigins.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(runtimeMappingIndex), runtimeMappingIndex,
+                    "runtimeMappingIndex must point to an active runtime mapping.");
+            }
+
+            return _mappingOrigins[runtimeMappingIndex];
+        }
 
         /// <summary>OnStart 済みかどうか。</summary>
         public bool IsStarted => _started;
@@ -360,15 +444,17 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 _mappings = new List<OscMappingEntry>();
             }
 
-            OscMapping[] runtimeMappings = _runtimeMappings ?? CreateNormalBlendShapeMappings(_mappings);
+            RuntimeMappingResolver.ResolveResult initialResult = _runtimeMappings != null
+                ? CreateConfiguredRuntimeMappingResult(_runtimeMappings)
+                : RuntimeMappingResolver.ResolveInitialMappings(_mappings);
+            OscMapping[] runtimeMappings = initialResult.RuntimeMappings;
+            _runtimeMappings = runtimeMappings;
+            _mappingOrigins = initialResult.Origins;
+            _runtimeManualEntries = _runtimeMappings != null && (_mappings == null || _mappings.Count == 0)
+                ? CreateManualEntriesFromRuntimeMappings(_runtimeMappings)
+                : _mappings;
             bool hasBlendShapeMappings = runtimeMappings != null && runtimeMappings.Length > 0;
             bool hasGazeMappings = HasGazeMappings(_mappings);
-            if (!hasBlendShapeMappings && !hasGazeMappings)
-            {
-                Debug.LogWarning(
-                    $"[OscReceiverAdapterBinding] OSC mappings が未設定のため入力源を登録しません。slug='{Slug}'");
-                return;
-            }
 
             if (!AdapterSlug.TryParse(Slug, out var slug))
             {
@@ -377,59 +463,16 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return;
             }
 
-            _effectiveSettings = settings;
-            _timeProvider = ctx.TimeProvider;
-            _lastAcceptedPacketTime = ctx.TimeProvider.UnscaledTimeSeconds;
-            _failSafeActive = false;
-            _zombiePolicy = new ZombieEvictionPolicy();
-            _bundleSenderDecisions = new Dictionary<ulong, bool>();
-            _bundleSenderDecisionOrder = new Queue<ulong>();
-            _heartbeatScratch = new List<string>();
-            IReadOnlyList<string> meshBlendShapeNames = ResolveMeshBlendShapeNames(ctx.BlendShapeNames, runtimeMappings);
-            int[] mappingIndexToMeshIndex = hasBlendShapeMappings
-                ? BuildMappingIndexToMeshIndex(meshBlendShapeNames, runtimeMappings)
-                : Array.Empty<int>();
+            _runtimeRegistry = ctx.InputSourceRegistry;
+            _runtimeSlug = slug;
+            _runtimeMeshBlendShapeNames = ResolveMeshBlendShapeNames(ctx.BlendShapeNames, runtimeMappings);
 
-            BuildNormalLookup(runtimeMappings);
-            _heartbeatChecker = hasBlendShapeMappings
-                ? new HeartbeatConsistencyChecker(meshBlendShapeNames, runtimeMappings, settings.ConsistencyCheckWarnLog)
-                : null;
-
-            if (hasGazeMappings)
-            {
-                InitializeGazeBundleState();
-                RegisterGazeSources(ctx.InputSourceRegistry, slug, _mappings);
-            }
-
-            _buffer = new OscDoubleBuffer(runtimeMappings.Length);
-            _bundleAccumulator = new OscBundleAccumulator(_buffer, settings.BundleAccumulationTimeoutMs);
-
-            _helperHost = ctx.HostGameObject.AddComponent<OscReceiverHost>();
-            _helperHost.Configure(
-                settings.ListenEndpoint,
-                settings.ListenPort,
-                _buffer,
-                runtimeMappings,
-                settings.BundleMode == BundleInterpretationMode.AtomicSwap ? _bundleAccumulator : null,
-                settings.BundleMode,
-                ctx.TimeProvider);
-
-            if (_helperHost.Receiver != null)
-            {
-                _helperHost.Receiver.SetMessageFilter(HandleIncomingOscMessage);
-            }
+            StartReceiverPhase(ctx, settings, slug, runtimeMappings, hasGazeMappings);
 
             if (hasBlendShapeMappings)
             {
-                _inputSource = new OscInputSource(
-                    _buffer,
-                    settings.StalenessSeconds,
-                    ctx.TimeProvider,
-                    settings.FailSafeMode,
-                    _heartbeatChecker?.SkipMask,
-                    _heartbeatChecker?.ContributeMask,
-                    mappingIndexToMeshIndex);
-                ctx.InputSourceRegistry.Register(slug, _inputSource);
+                StartBlendShapeMappingPhase(ctx, settings, runtimeMappings, out int[] mappingIndexToMeshIndex, out BitArray contributeMask);
+                RegisterOscInputSourcePhase(ctx, settings, slug, mappingIndexToMeshIndex, contributeMask);
             }
 
             _started = true;
@@ -447,6 +490,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             // OscReceiver の Update / 個別タイマに依存せず binding 自前 tick で進める。
             if (_helperHost != null)
             {
+                ProcessPendingHeartbeatMappings();
                 _helperHost.Tick();
             }
 
@@ -493,8 +537,22 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _bundleSenderDecisions = null;
             _bundleSenderDecisionOrder = null;
             _heartbeatScratch = null;
+            _heartbeatProcessingScratch = null;
+            _heartbeatSync = null;
+            _heartbeatDirty = 0;
+            _lastHeartbeatHash = 0u;
+            _hasProcessedHeartbeat = false;
+            _warnedOnEmptyHeartbeatIntersection = false;
+            _warnedOnAddressCollision = false;
+            _warnedOnUnknownPreset = false;
+            _warnedOnMissingCustomPrefix = false;
+            _runtimeRegistry = null;
+            _runtimeSlug = default;
+            _runtimeMeshBlendShapeNames = null;
             _timeProvider = null;
             _currentSenderId = default;
+            _currentPresetName = null;
+            _currentCustomPrefix = null;
             _hasCurrentSenderId = false;
             _hasBareSenderDecision = false;
             _bareSenderAccepted = false;
@@ -509,35 +567,141 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
             _bundleAccumulator = null;
             _effectiveSettings = null;
+            _runtimeMappings = null;
+            _mappingOrigins = null;
+            _runtimeManualEntries = null;
 
             _started = false;
         }
 
-        private static OscMapping[] CreateNormalBlendShapeMappings(List<OscMappingEntry> mappings)
+        private static AddressPresetKind? ParseCurrentPreset(string presetName)
         {
-            if (mappings == null || mappings.Count == 0)
+            if (string.Equals(presetName, AddressPresetEstimator.PresetVrChat, StringComparison.OrdinalIgnoreCase))
             {
-                return Array.Empty<OscMapping>();
+                return AddressPresetKind.VRChat;
             }
 
-            var result = new List<OscMapping>(mappings.Count);
-            for (int i = 0; i < mappings.Count; i++)
+            if (string.Equals(presetName, AddressPresetEstimator.PresetArKit, StringComparison.OrdinalIgnoreCase))
             {
-                OscMappingEntry entry = mappings[i];
-                if (entry == null || entry.mode != OscMappingMode.Normal_BlendShape)
-                {
-                    continue;
-                }
-
-                if (string.IsNullOrEmpty(entry.expressionId) || string.IsNullOrEmpty(entry.addressPattern))
-                {
-                    continue;
-                }
-
-                result.Add(new OscMapping(entry.addressPattern, entry.expressionId, string.Empty));
+                return AddressPresetKind.ARKit;
             }
 
-            return result.ToArray();
+            if (string.Equals(presetName, AddressPresetEstimator.PresetCustom, StringComparison.OrdinalIgnoreCase))
+            {
+                return AddressPresetKind.Custom;
+            }
+
+            return null;
+        }
+
+        private void StartReceiverPhase(
+            in AdapterBuildContext ctx,
+            OscRuntimeSettingsSO settings,
+            AdapterSlug slug,
+            OscMapping[] runtimeMappings,
+            bool hasGazeMappings)
+        {
+            _effectiveSettings = settings;
+            _timeProvider = ctx.TimeProvider;
+            _lastAcceptedPacketTime = ctx.TimeProvider.UnscaledTimeSeconds;
+            _failSafeActive = false;
+            _zombiePolicy = new ZombieEvictionPolicy();
+            _bundleSenderDecisions = new Dictionary<ulong, bool>();
+            _bundleSenderDecisionOrder = new Queue<ulong>();
+            _heartbeatScratch = new List<string>();
+            _heartbeatProcessingScratch = new List<string>();
+            _heartbeatSync = new object();
+            BuildNormalLookup(runtimeMappings);
+
+            if (hasGazeMappings)
+            {
+                InitializeGazeBundleState();
+                RegisterGazeSources(ctx.InputSourceRegistry, slug, _mappings);
+            }
+
+            _buffer = new OscDoubleBuffer(runtimeMappings.Length);
+            _bundleAccumulator = new OscBundleAccumulator(_buffer, settings.BundleAccumulationTimeoutMs);
+
+            _helperHost = ctx.HostGameObject.AddComponent<OscReceiverHost>();
+            _helperHost.Configure(
+                settings.ListenEndpoint,
+                settings.ListenPort,
+                _buffer,
+                runtimeMappings,
+                settings.BundleMode == BundleInterpretationMode.AtomicSwap ? _bundleAccumulator : null,
+                settings.BundleMode,
+                ctx.TimeProvider);
+
+            if (_helperHost.Receiver != null)
+            {
+                _helperHost.Receiver.SetMessageFilter(HandleIncomingOscMessage);
+            }
+        }
+
+        private void StartBlendShapeMappingPhase(
+            in AdapterBuildContext ctx,
+            OscRuntimeSettingsSO settings,
+            OscMapping[] runtimeMappings,
+            out int[] mappingIndexToMeshIndex,
+            out BitArray contributeMask)
+        {
+            IReadOnlyList<string> meshBlendShapeNames =
+                _runtimeMeshBlendShapeNames ?? ResolveMeshBlendShapeNames(ctx.BlendShapeNames, runtimeMappings);
+            mappingIndexToMeshIndex = BuildMappingIndexToMeshIndex(meshBlendShapeNames, runtimeMappings);
+            contributeMask = CreateContributeMask(meshBlendShapeNames.Count, mappingIndexToMeshIndex);
+            _heartbeatChecker = new HeartbeatConsistencyChecker(
+                meshBlendShapeNames,
+                runtimeMappings,
+                settings.ConsistencyCheckWarnLog);
+        }
+
+        private void RegisterOscInputSourcePhase(
+            in AdapterBuildContext ctx,
+            OscRuntimeSettingsSO settings,
+            AdapterSlug slug,
+            int[] mappingIndexToMeshIndex,
+            BitArray contributeMask)
+        {
+            _inputSource = new OscInputSource(
+                _buffer,
+                settings.StalenessSeconds,
+                ctx.TimeProvider,
+                settings.FailSafeMode,
+                contributeMask,
+                mappingIndexToMeshIndex);
+            ctx.InputSourceRegistry.Register(slug, _inputSource);
+        }
+
+        private static OscMapping[] ResolveInitialNormalBlendShapeMappings(List<OscMappingEntry> mappings)
+        {
+            return RuntimeMappingResolver.ResolveInitialMappings(mappings).RuntimeMappings;
+        }
+
+        private static RuntimeMappingResolver.ResolveResult CreateConfiguredRuntimeMappingResult(OscMapping[] mappings)
+        {
+            var origins = new MappingOrigin[mappings.Length];
+            for (int i = 0; i < origins.Length; i++)
+            {
+                origins[i] = MappingOrigin.Manual;
+            }
+
+            return new RuntimeMappingResolver.ResolveResult(mappings, origins, mappings.Length, 0);
+        }
+
+        private static List<OscMappingEntry> CreateManualEntriesFromRuntimeMappings(OscMapping[] mappings)
+        {
+            var entries = new List<OscMappingEntry>(mappings.Length);
+            for (int i = 0; i < mappings.Length; i++)
+            {
+                entries.Add(new OscMappingEntry
+                {
+                    mode = OscMappingMode.Normal_BlendShape,
+                    expressionId = mappings[i].BlendShapeName,
+                    addressPattern = mappings[i].OscAddress
+                });
+            }
+
+            return entries;
         }
 
         private void RegisterGazeSources(
@@ -695,6 +859,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return false;
             }
 
+            if (message.address == PresetAddress)
+            {
+                HandlePresetMessage(message);
+                return false;
+            }
+
             bool handledGaze = TryHandleGazeMessage(message);
             if (handledGaze || IsKnownNormalBlendShapeMessage(message.address))
             {
@@ -702,6 +872,22 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             return true;
+        }
+
+        private void HandlePresetMessage(uOSC.Message message)
+        {
+            if (message.values == null ||
+                message.values.Length == 0 ||
+                !(message.values[0] is string presetName) ||
+                string.IsNullOrEmpty(presetName))
+            {
+                return;
+            }
+
+            _currentPresetName = presetName;
+            _currentCustomPrefix = message.values.Length > 1 && message.values[1] is string customPrefix
+                ? customPrefix
+                : null;
         }
 
         private void HandleSenderIdentityMessage(uOSC.Message message)
@@ -777,21 +963,167 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         private void HandleHeartbeatMessage(uOSC.Message message)
         {
-            if (_heartbeatChecker == null || message.values == null)
+            if (_heartbeatScratch == null || message.values == null)
             {
                 return;
             }
 
-            _heartbeatScratch.Clear();
-            for (int i = 0; i < message.values.Length; i++)
+            lock (_heartbeatSync)
             {
-                if (message.values[i] is string name && !string.IsNullOrEmpty(name))
+                _heartbeatScratch.Clear();
+                for (int i = 0; i < message.values.Length; i++)
                 {
-                    _heartbeatScratch.Add(name);
+                    if (message.values[i] is string name && !string.IsNullOrEmpty(name))
+                    {
+                        _heartbeatScratch.Add(name);
+                    }
                 }
             }
 
-            _heartbeatChecker.UpdateFromHeartbeat(_heartbeatScratch);
+            Volatile.Write(ref _heartbeatDirty, 1);
+        }
+
+        private void ProcessPendingHeartbeatMappings()
+        {
+            if (Interlocked.Exchange(ref _heartbeatDirty, 0) == 0 ||
+                _heartbeatProcessingScratch == null ||
+                _runtimeMeshBlendShapeNames == null)
+            {
+                return;
+            }
+
+            lock (_heartbeatSync)
+            {
+                _heartbeatProcessingScratch.Clear();
+                for (int i = 0; i < _heartbeatScratch.Count; i++)
+                {
+                    _heartbeatProcessingScratch.Add(_heartbeatScratch[i]);
+                }
+            }
+
+            if (_heartbeatChecker != null)
+            {
+                _heartbeatChecker.UpdateFromHeartbeat(_heartbeatProcessingScratch);
+            }
+
+            uint heartbeatHash = HeartbeatHashHelper.ComputeFnv1a(_heartbeatProcessingScratch);
+            if (_hasProcessedHeartbeat && heartbeatHash == _lastHeartbeatHash)
+            {
+                return;
+            }
+
+            _lastHeartbeatHash = heartbeatHash;
+            _hasProcessedHeartbeat = true;
+
+            AddressPresetEstimator.EstimationResult preset = AddressPresetEstimator.Estimate(
+                _currentPresetName,
+                _currentCustomPrefix,
+                _heartbeatProcessingScratch,
+                ref _warnedOnUnknownPreset,
+                ref _warnedOnMissingCustomPrefix);
+
+            RuntimeMappingResolver.ResolveResult result = RuntimeMappingResolver.MergeWithHeartbeat(
+                _runtimeManualEntries,
+                _heartbeatProcessingScratch,
+                _runtimeMeshBlendShapeNames,
+                preset.Preset,
+                preset.CustomPrefix,
+                ref _warnedOnEmptyHeartbeatIntersection,
+                ref _warnedOnAddressCollision);
+
+            if (ReferenceEquals(result.RuntimeMappings, _runtimeMappings) ||
+                RuntimeMappingsEqual(_runtimeMappings, result.RuntimeMappings))
+            {
+                _mappingOrigins = result.Origins;
+                return;
+            }
+
+            PublishRuntimeMappings(result);
+        }
+
+        private void PublishRuntimeMappings(RuntimeMappingResolver.ResolveResult result)
+        {
+            _runtimeMappings = result.RuntimeMappings;
+            _mappingOrigins = result.Origins;
+            LogRuntimeMappingDiagnostics(_runtimeMappings, _mappingOrigins);
+            BuildNormalLookup(_runtimeMappings);
+
+            if (_buffer == null || _helperHost == null || _effectiveSettings == null)
+            {
+                return;
+            }
+
+            _buffer.Resize(_runtimeMappings.Length);
+            _bundleAccumulator = new OscBundleAccumulator(_buffer, _effectiveSettings.BundleAccumulationTimeoutMs);
+            _helperHost.ReconfigureMappings(
+                _buffer,
+                _runtimeMappings,
+                _effectiveSettings.BundleMode == BundleInterpretationMode.AtomicSwap ? _bundleAccumulator : null);
+
+            if (_runtimeMappings.Length == 0)
+            {
+                _heartbeatChecker = null;
+                return;
+            }
+
+            int[] mappingIndexToMeshIndex = BuildMappingIndexToMeshIndex(_runtimeMeshBlendShapeNames, _runtimeMappings);
+            BitArray contributeMask = CreateContributeMask(_runtimeMeshBlendShapeNames.Count, mappingIndexToMeshIndex);
+            _heartbeatChecker = new HeartbeatConsistencyChecker(
+                _runtimeMappings,
+                _effectiveSettings.ConsistencyCheckWarnLog);
+            _heartbeatChecker.UpdateFromHeartbeat(_heartbeatProcessingScratch);
+            _inputSource = new OscInputSource(
+                _buffer,
+                _effectiveSettings.StalenessSeconds,
+                _timeProvider,
+                _effectiveSettings.FailSafeMode,
+                contributeMask,
+                mappingIndexToMeshIndex);
+            _runtimeRegistry.Replace(_runtimeSlug, _inputSource);
+        }
+
+        private static void LogRuntimeMappingDiagnostics(OscMapping[] mappings, MappingOrigin[] origins)
+        {
+            int manualCount = 0;
+            int heartbeatAutoCount = 0;
+            if (origins != null)
+            {
+                for (int i = 0; i < origins.Length; i++)
+                {
+                    if (origins[i] == MappingOrigin.Manual)
+                    {
+                        manualCount++;
+                    }
+                    else if (origins[i] == MappingOrigin.HeartbeatAuto)
+                    {
+                        heartbeatAutoCount++;
+                    }
+                }
+            }
+
+            int totalCount = mappings != null ? mappings.Length : 0;
+            Debug.Log(
+                $"[OscReceiverAdapterBinding] runtime mappings published: total={totalCount}, manual={manualCount}, heartbeatAuto={heartbeatAutoCount}.");
+        }
+
+        private static bool RuntimeMappingsEqual(OscMapping[] left, OscMapping[] right)
+        {
+            if (left == null || right == null || left.Length != right.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Length; i++)
+            {
+                if (!string.Equals(left[i].OscAddress, right[i].OscAddress, StringComparison.Ordinal) ||
+                    !string.Equals(left[i].BlendShapeName, right[i].BlendShapeName, StringComparison.Ordinal) ||
+                    !string.Equals(left[i].Layer, right[i].Layer, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private bool TryHandleGazeMessage(uOSC.Message message)
@@ -1098,6 +1430,26 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             return mappingIndexToMeshIndex;
+        }
+
+        private static BitArray CreateContributeMask(int meshBlendShapeCount, int[] mappingIndexToMeshIndex)
+        {
+            var mask = new BitArray(meshBlendShapeCount, false);
+            if (mappingIndexToMeshIndex == null)
+            {
+                return mask;
+            }
+
+            for (int i = 0; i < mappingIndexToMeshIndex.Length; i++)
+            {
+                int meshIndex = mappingIndexToMeshIndex[i];
+                if (meshIndex >= 0 && meshIndex < mask.Length)
+                {
+                    mask[meshIndex] = true;
+                }
+            }
+
+            return mask;
         }
 
         private void MarkAcceptedPacket()

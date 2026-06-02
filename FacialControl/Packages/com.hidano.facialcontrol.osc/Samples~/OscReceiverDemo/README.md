@@ -16,7 +16,7 @@
 ## 受信内容
 
 - listen endpoint: `127.0.0.1:9000`
-- BlendShape: `OscReceiverDemoProfile.asset` の `OSC` → `Mappings` で定義されたアドレス → BlendShape 名のマッピング（既定では `Joy / Blink / MouthOpen / BrowUp` の 4 種類のサンプル）
+- BlendShape: 送信側 heartbeat `/_facialcontrol/blendshape_names` と受信側モデルの BlendShape 名一覧から自動生成される mapping
 - Gaze: VRChat 形式 X/Y 2 メッセージから Vector2 を復元する `Gaze_VRChat_XY` mode entry が必要（既定では `eye_look` が登録済み）
 - staleness: 1 秒受信が途絶えると base 表情へ復帰
 - bundle mode: atomic swap
@@ -25,15 +25,19 @@
 
 1. **シーンを開く**: Project ウィンドウで `OscReceiverDemo.unity` をダブルクリック。Hierarchy に `Character / Main Camera / Directional Light` が並びます。
 2. **モデルを置く**: お手持ちのキャラモデルの prefab を Hierarchy の **`Character` の子**にドラッグして配置します。
-3. **`Mappings` をモデルに合わせる（重要）**: `OscReceiverDemoProfile.asset` を Inspector で開き、**`OSC` → `Mappings`** に並ぶエントリの `expressionId` をモデル実装の BlendShape 名に書き換えます。`Joy / Blink / MouthOpen / BrowUp` というサンプル名はあくまでプレースホルダで、ほとんどのモデルでは異なる名前（`笑い` / `怒り` 等の日本語名や `eyeBlink_L` のような英語名）になっています。
+3. **Gaze mapping を確認**: `OscReceiverDemoProfile.asset` を Inspector で開き、**`OSC` → `Mappings`** に `Gaze_VRChat_XY` entry が残っていることを確認します。Normal_BlendShape entry は不要です。
 4. **listen port を必要に応じて変更**: 別 port で受けたいとき、`OscReceiverDemoProfile.asset` の `OSC` → `_endpoint` / `_port` を変更します。
 5. **Play**: 送信側（`OscOutputDemo` 等）から `127.0.0.1:9000` に向けて OSC を送ると、モデルの BlendShape が更新されます。
 
-## 将来の改善
+## Auto Mapping 運用
 
-現状、受信側 `Mappings` の `expressionId` 列挙は手作業です。送信側 heartbeat (`/_facialcontrol/blendshape_names`) を活用した「受信側 `Mappings` 自動生成」は別 spec で計画されており、それが入ると `Mappings` を空のままで送信側に流れる全 BlendShape を自動的にローカル mesh に貼り付けられるようになります。
+Normal_BlendShape は heartbeat 駆動の auto mapping が既定経路です。受信側は `/_facialcontrol/blendshape_names` を受け取った時点で、送信側が持つ BlendShape 名と受信側モデルの BlendShape 名の積集合から runtime mapping を生成します。そのため `OscReceiverDemoProfile.asset` には Normal_BlendShape の手入力 mapping を置かず、モデル差し替え時も BlendShape 名が一致していれば Inspector で 1 件ずつ追加する必要はありません。Gaze は現時点の heartbeat に `eye_look` などの Gaze id を含まないため auto mapping 対象外で、`Gaze_VRChat_XY` の手入力 mapping を残すハイブリッド構成にしています。
+
+auto mapping は heartbeat 受信が前提です。送信側の `/_facialcontrol/preset` は受信側にアドレスプリセットを知らせる制御 address で、payload の 1 番目に `vrchat` または `arkit` を送ると、それぞれ `/avatar/parameters/{name}` または `/ARKit/{name}` の BlendShape address として解釈されます。custom prefix を使う送信側は payload を `custom`, `{prefix}` の 2 文字列にし、`{prefix}` は `/custom/blendshape/` のように先頭 `/` と末尾区切りを含めた完全な prefix として指定してください。`/_facialcontrol/preset` が届かない場合は、受信した BlendShape 名から VRChat / ARKit を推定します。
+
+Gaze auto mapping は別 spec で扱う予定です。heartbeat または preset address に Gaze id を含める設計が入るまでは、Gaze は `Gaze_VRChat_XY` または `Gaze_ARKit_8BS` の手入力 mapping で運用してください。
 
 ## トラブルシューティング
 
-- **何も動かない**: Hierarchy の `Character` 配下にモデルの `SkinnedMeshRenderer` が居るか確認。`Mappings` の `expressionId` がモデル実装の BlendShape 名と一致しているか確認（不一致のときは heartbeat 整合性検査が警告ログを出します）。
+- **何も動かない**: Hierarchy の `Character` 配下にモデルの `SkinnedMeshRenderer` が居るか確認。送信側から `/_facialcontrol/blendshape_names` heartbeat が届いているか、送信側と受信側の BlendShape 名が一致しているか確認（不一致のときは heartbeat 整合性検査が警告ログを出します）。
 - **送信側と同居して動かしたい**: `OscOutputDemo` 側の `OSC Sender` で `Suppress Loopback` を ✗ OFF にする必要があります。

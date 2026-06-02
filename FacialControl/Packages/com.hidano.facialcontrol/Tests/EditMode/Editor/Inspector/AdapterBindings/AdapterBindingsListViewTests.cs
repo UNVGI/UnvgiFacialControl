@@ -33,6 +33,19 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
     public sealed class MockListViewThrowingDrawerBinding : AdapterBindingBase { }
 
     /// <summary>
+    /// SerializeField を持つ binding。AddBindingFromDescriptor が SerializedProperty 経由で
+    /// 追加していないと、子要素 `_settingsObject` の SerializedProperty が初回 Drawer 描画時に
+    /// null となり、PropertyField が DOM に生成されない現象 (= 「スロットが出ない」) を再現する。
+    /// </summary>
+    [Serializable]
+    [FacialAdapterBinding(displayName: "ZZZ_ListViewTest_DDD_HasSerializedField")]
+    public sealed class MockListViewWithSerializedField : AdapterBindingBase
+    {
+        [SerializeField]
+        public UnityEngine.Object _settingsObject;
+    }
+
+    /// <summary>
     /// task 5.6 で <c>MockListViewThrowingDrawerBinding</c> 用の PropertyDrawer が
     /// CreatePropertyGUI 内で例外を投げることをシミュレートする。
     /// </summary>
@@ -47,6 +60,34 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
         {
             throw new InvalidOperationException(
                 "Intentional PropertyDrawer exception from MockListViewThrowingDrawerBindingDrawer for task 5.3");
+        }
+    }
+
+    /// <summary>
+    /// MockListViewWithSerializedField 用 Drawer。
+    /// `property.FindPropertyRelative("_settingsObject")` で子 SerializedProperty を取得し
+    /// PropertyField を生成する。SerializeReference 追加直後でも子 SerializedProperty が
+    /// 解決できれば PropertyField が DOM に配置される。
+    /// </summary>
+    [CustomPropertyDrawer(typeof(MockListViewWithSerializedField))]
+    public sealed class MockListViewWithSerializedFieldDrawer : PropertyDrawer
+    {
+        public const string SettingsFieldElementName = "mock-listview-settings-field";
+
+        public override VisualElement CreatePropertyGUI(SerializedProperty property)
+        {
+            var root = new VisualElement();
+            SerializedProperty settingsProp = property.FindPropertyRelative("_settingsObject");
+            if (settingsProp == null)
+            {
+                root.Add(new Label("<missing field: _settingsObject>"));
+                return root;
+            }
+            root.Add(new PropertyField(settingsProp, "Settings Object")
+            {
+                name = SettingsFieldElementName,
+            });
+            return root;
         }
     }
 
@@ -338,6 +379,30 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector.AdapterBindings
             var propertyFields = view.Query<PropertyField>().ToList();
             Assert.GreaterOrEqual(propertyFields.Count, 2,
                 "PropertyDrawer 例外を投げない他 row は通常通り PropertyField で描画されているべき 。");
+        }
+
+        // ---------------------------------------------------------------
+        // SerializeReference 追加直後の Drawer 描画タイミング
+        // ---------------------------------------------------------------
+
+        [Test]
+        public void AddBindingFromDescriptor_DrawerWithSerializedField_CreatesPropertyFieldInRowImmediately()
+        {
+            // AdapterBindingsListView.AddBindingFromDescriptor が SerializedProperty 経由で
+            // 追加していない場合 (古い list.Add(instance) 経路) は、子 SerializedProperty
+            // `_settingsObject` が初回 Rebuild 時に解決できず、Drawer は missing label を出して
+            // PropertyField (= ObjectField のスロット) が DOM に生成されない。
+            // この regression を防ぐため、追加直後に PropertyField が存在することを確認する。
+            var view = CreateView();
+            var descriptor = RequireDescriptor(typeof(MockListViewWithSerializedField));
+
+            view.AddBindingFromDescriptor(descriptor);
+
+            var propertyField = view.Q<PropertyField>(name: MockListViewWithSerializedFieldDrawer.SettingsFieldElementName);
+            Assert.IsNotNull(propertyField,
+                "SerializeReference 追加直後でも Drawer の PropertyField が DOM に存在するべき。" +
+                " AdapterBindingsListView.AddBindingFromDescriptor が SerializedProperty 経由で追加していない場合、" +
+                " Drawer 内の FindPropertyRelative が null を返し missing label が出る現象を防ぐ。");
         }
     }
 }
