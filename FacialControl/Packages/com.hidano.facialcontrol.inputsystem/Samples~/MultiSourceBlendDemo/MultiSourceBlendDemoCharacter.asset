@@ -291,13 +291,13 @@ MonoBehaviour:
         value: 0.0
       - rendererPath: Body
         name: ウィンク２
-        value: 100.0
+        value: 1.0
       - rendererPath: Body
         name: ｳｨﾝｸ２右
-        value: 100.0
+        value: 1.0
       - rendererPath: Body
         name: 下
-        value: 30.0
+        value: 0.3
       bones: []
       rendererPaths:
       - Body
