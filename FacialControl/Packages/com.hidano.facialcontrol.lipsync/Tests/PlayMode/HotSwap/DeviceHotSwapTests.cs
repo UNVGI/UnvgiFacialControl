@@ -21,7 +21,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.HotSwap
     public class DeviceHotSwapTests
     {
         private const string Slug = "ulipsync";
-        private const string OverlayASlug = "ulipsync:a";
+        private const string OverlayASlug = "lipsync-overlay:a";
         private const string MicDeviceName = "Unit Test Mic";
         private const string MissingDeviceName = "Missing Mic";
         private const string BlendShapeName = "Mouth_A";

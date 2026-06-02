@@ -21,7 +21,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
     public class ULipSyncAdapterBindingLifecycleTests
     {
         private const string Slug = "ulipsync";
-        private const string OverlayASlug = "ulipsync:a";
+        private const string OverlayASlug = "lipsync-overlay:a";
         private const string MicDeviceName = "Unit Test Mic";
         private const string MissingDeviceName = "Missing Mic";
         private const string BlendShapeName = "Mouth_A";
@@ -268,7 +268,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Lifecycle
 
             LogAssert.Expect(
                 LogType.Error,
-                new Regex("ULipSyncAdapterBinding.*ulipsync:a.*already registered"));
+                new Regex("ULipSyncAdapterBinding.*lipsync-overlay:a.*already registered"));
             duplicate.OnStart(in ctx);
 
             Assert.That(duplicate.IsStarted, Is.False);

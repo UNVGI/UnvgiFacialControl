@@ -24,7 +24,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.MultiCharacter
         private const int SwapCharacterIndex = 4;
         private const double FrameBudgetMs = 16.6;
         private const string Slug = "ulipsync";
-        private const string OverlayASlug = "ulipsync:a";
+        private const string OverlayASlug = "lipsync-overlay:a";
         private const string BlendShapeName = "Mouth_A";
         private const string PhonemeId = "A";
 
