@@ -40,7 +40,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Performance
             var output = new float[4];
             var info = new uLipSync.LipSyncInfo
             {
-                volume = 0.8f,
+                rawVolume = 1f,
                 phonemeRatios = new Dictionary<string, float>(2)
                 {
                     { "A", 0.70f },
