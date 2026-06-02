@@ -100,6 +100,22 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Editor
         }
 
         [Test]
+        public void CreatePropertyGUI_BindingProperty_RendersVolumeRangeFields()
+        {
+            VisualElement root = CreateDrawerRoot();
+
+            Assert.That(
+                root.Q<FloatField>(ULipSyncAdapterBindingDrawer.MinVolumeFieldName),
+                Is.Not.Null);
+            Assert.That(
+                root.Q<FloatField>(ULipSyncAdapterBindingDrawer.MaxVolumeFieldName),
+                Is.Not.Null);
+            Assert.That(
+                root.Q<HelpBox>(ULipSyncAdapterBindingDrawer.VolumeRangeHelpBoxName),
+                Is.Not.Null);
+        }
+
+        [Test]
         public void AnalyzerProfile_Null_ShowsPackagedDefaultPlaceholder()
         {
             VisualElement root = CreateDrawerRoot();

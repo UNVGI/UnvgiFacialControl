@@ -2,6 +2,16 @@
 
 すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
 
+## [Unreleased]
+
+### Changed
+
+- `ULipSyncProvider` の音量正規化を `LipSyncInfo.volume` 依存から `rawVolume` ベースへ変更。uLipSync 本体は `info.volume` を固定定数 (`Common.DefaultMinVolume`/`MaxVolume` = -2.5/-1.5) で正規化するため、低音量・低ゲインのマイクでは `volume` が常に 0 に潰れリップシンクが無音化していた。本家 `uLipSyncBlendShape` と同様に `rawVolume` を調整可能な min/max で正規化するよう修正。
+
+### Added
+
+- `ULipSyncAdapterBinding` に `Min Volume` / `Max Volume` 設定を追加し、Inspector (PropertyDrawer) からマイク感度に合わせて音量正規化範囲を調整できるようにした。小さい声で口が動かない場合は `Min Volume` を下げる。
+
 ## [0.1.0-preview.1] - 2026-05-07
 
 初回プレリリース。`com.hidano.facialcontrol` と `com.hidano.ulipsync-asio` を接続する Windows 向け uLipSync 連携アダプタとして提供。

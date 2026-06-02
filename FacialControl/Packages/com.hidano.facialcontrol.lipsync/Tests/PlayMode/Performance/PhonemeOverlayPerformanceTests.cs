@@ -320,7 +320,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Performance
                     timeProvider: time);
                 eventSource.Invoke(new uLipSync.LipSyncInfo
                 {
-                    volume = 1f,
+                    rawVolume = 1f,
                     phonemeRatios = CreateRatios(),
                 });
 
