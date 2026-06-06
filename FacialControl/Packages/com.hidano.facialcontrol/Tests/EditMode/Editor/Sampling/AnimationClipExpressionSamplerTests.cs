@@ -44,9 +44,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
         public void SampleSnapshot_BlendShapeCurves_ReturnsValuesAtTimeZero()
         {
             var clip = CreateTrackedClip();
-            SetFloatCurve(clip, "Body/Face", typeof(SkinnedMeshRenderer), "blendShape.Smile", 0.5f);
-            SetFloatCurve(clip, "Body/Face", typeof(SkinnedMeshRenderer), "blendShape.Anger", 0.25f);
-            SetFloatCurve(clip, "Body/Head", typeof(SkinnedMeshRenderer), "blendShape.Surprise", 1.0f);
+            // blendShape カーブは Unity 標準 0..100 スケール。snapshot へは正規化 0..1 で格納される。
+            SetFloatCurve(clip, "Body/Face", typeof(SkinnedMeshRenderer), "blendShape.Smile", 50f);
+            SetFloatCurve(clip, "Body/Face", typeof(SkinnedMeshRenderer), "blendShape.Anger", 25f);
+            SetFloatCurve(clip, "Body/Head", typeof(SkinnedMeshRenderer), "blendShape.Surprise", 100f);
 
             var sampler = new AnimationClipExpressionSampler();
             var snapshot = sampler.SampleSnapshot("expr-001", clip);
@@ -60,9 +61,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
                 var bs = snapshot.BlendShapes.Span[i];
                 byKey[$"{bs.RendererPath}|{bs.Name}"] = bs;
             }
-            Assert.AreEqual(0.5f, byKey["Body/Face|Smile"].Value);
-            Assert.AreEqual(0.25f, byKey["Body/Face|Anger"].Value);
-            Assert.AreEqual(1.0f, byKey["Body/Head|Surprise"].Value);
+            Assert.AreEqual(0.5f, byKey["Body/Face|Smile"].Value, 1e-5f);
+            Assert.AreEqual(0.25f, byKey["Body/Face|Anger"].Value, 1e-5f);
+            Assert.AreEqual(1.0f, byKey["Body/Head|Surprise"].Value, 1e-5f);
 
             // Renderer paths は重複排除されている
             Assert.AreEqual(2, snapshot.RendererPaths.Length);
@@ -77,6 +78,30 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Sampling
             // metadata 抽出を行わないため fallback default
             Assert.AreEqual(Expression.DefaultTransitionDuration, snapshot.TransitionDuration);
             Assert.AreEqual(TransitionCurvePreset.Linear, snapshot.TransitionCurvePreset);
+        }
+
+        [Test]
+        public void SampleSnapshot_BlendShapePartialWeights_AreNormalizedNotSaturated()
+        {
+            // 回帰: 手書き / インポートした標準 Unity clip は blendShape を 0..100 で記録する。
+            // キーフレーム 30 / 40 が runtime で ×100 され全て 100 に飽和していた不具合の防止。
+            // snapshot は正規化 0..1 (0.3 / 0.4) を返し、ドメイン → runtime ×100 で 30 / 40 に戻る。
+            var clip = CreateTrackedClip();
+            SetFloatCurve(clip, "Body/Face", typeof(SkinnedMeshRenderer), "blendShape.MouthOpen", 30f);
+            SetFloatCurve(clip, "Body/Face", typeof(SkinnedMeshRenderer), "blendShape.BrowDown", 40f);
+
+            var sampler = new AnimationClipExpressionSampler();
+            var snapshot = sampler.SampleSnapshot("expr-partial", clip);
+
+            var byKey = new Dictionary<string, float>();
+            for (int i = 0; i < snapshot.BlendShapes.Length; i++)
+            {
+                var bs = snapshot.BlendShapes.Span[i];
+                byKey[bs.Name] = bs.Value;
+            }
+
+            Assert.AreEqual(0.3f, byKey["MouthOpen"], 1e-5f);
+            Assert.AreEqual(0.4f, byKey["BrowDown"], 1e-5f);
         }
 
         [Test]

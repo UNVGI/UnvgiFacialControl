@@ -245,9 +245,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Tools
                 byKey[$"{b.path}|{b.propertyName}"] = curve.Evaluate(0f);
             }
 
-            Assert.AreEqual(0.5f, byKey["Body/Face|blendShape.Smile"], 1e-5f);
-            Assert.AreEqual(0.25f, byKey["Body/Face|blendShape.Anger"], 1e-5f);
-            Assert.AreEqual(1.0f, byKey["Body/Head|blendShape.Surprise"], 1e-5f);
+            // 入力エントリは正規化 0..1。AnimationClip カーブは Unity 標準 0..100 スケールで書き込まれる。
+            Assert.AreEqual(50f, byKey["Body/Face|blendShape.Smile"], 1e-5f);
+            Assert.AreEqual(25f, byKey["Body/Face|blendShape.Anger"], 1e-5f);
+            Assert.AreEqual(100f, byKey["Body/Head|blendShape.Surprise"], 1e-5f);
         }
 
         [Test]

@@ -14,6 +14,7 @@
 
 ### Fixed
 
+- AnimationClip で登録した Expression の BlendShape weight が個別値を反映せず全て最大 (100) に飽和する不具合を修正。`AnimationClipExpressionSampler` が `blendShape.*` カーブ（Unity 標準 0..100 スケール）の値を正規化せず snapshot へ格納していたため、ドメイン / runtime apply 側の正規化 0..1 規約（`FacialController` の `×100`）と二重スケールになり、キーフレーム 30/40 が `×100` で 3000/4000 → 100 にクランプされていた。サンプラはカーブ値を `/100` して正規化 0..1 で格納し、`ExpressionClipBakery` は正規化 0..1 を `×100` して Unity 標準スケールでカーブへ書き込むよう統一した。これに伴い同梱 `MultiSourceBlendDemo` の `profile.json`（dev / Samples~ 両コピー）と SO `.asset` に残っていた 0..100 スケールの BlendShape 値を正規化 0..1 へ移行した（.anim カーブは元から 0..100 のため変更なし）。
 - `FacialCharacterProfileSO` Inspector の Expression List / Default Overlays で Overlay の Suppress / Override 切替および override clip 割当が確実に保存されない不具合を修正。これらのハンドラは `SerializedProperty` を経由せず managed モデルを直接書き換えて `serializedObject.Update()` のみで終えていたため、`TrackSerializedObjectValue` による自動保存監視が発火せず、`EditorUtility.SetDirty` 任せの「次回の手動保存時にたまたま保存される」挙動になっていた。各ハンドラから自動保存予約 `ScheduleAutoSave()` を明示的に呼び、profile.json エクスポートとアセット保存を確実に走らせるようにした。
 
 ### Breaking changes

@@ -19,6 +19,9 @@ namespace Hidano.FacialControl.Editor.Sampling
     /// </para>
     /// <para>
     /// BlendShape: <c>propertyName.StartsWith("blendShape.")</c> で判別。
+    /// AnimationClip 上の <c>blendShape.*</c> カーブは Unity 標準の 0..100 スケールで記録されるため、
+    /// snapshot へは <see cref="BlendShapeWeightScale"/> (=100) で除算した正規化値 0..1 として格納する
+    /// （ドメイン <c>BlendShapeMapping.Value</c> / runtime apply 側の <c>×100</c> と整合させる）。
     /// Transform: <c>m_LocalPosition.{x,y,z}</c> / <c>m_LocalScale.{x,y,z}</c> /
     /// <c>localEulerAnglesRaw.{x,y,z}</c> / <c>localEulerAngles.{x,y,z}</c> /
     /// <c>m_LocalRotation.{x,y,z,w}</c>（quaternion → euler 変換）で判別。
@@ -41,6 +44,12 @@ namespace Hidano.FacialControl.Editor.Sampling
         private const TransitionCurvePreset DefaultTransitionCurve = TransitionCurvePreset.Linear;
 
         private const string BlendShapePropertyPrefix = "blendShape.";
+
+        /// <summary>
+        /// Unity の <c>blendShape.*</c> アニメーションカーブ / <c>SkinnedMeshRenderer</c> weight のスケール (0..100)。
+        /// snapshot / ドメインは正規化 0..1 を採用するため、サンプリング時に本値で除算する。
+        /// </summary>
+        private const float BlendShapeWeightScale = 100f;
 
         private const string LocalPositionPrefix = "m_LocalPosition.";
         private const string LocalScalePrefix = "m_LocalScale.";
@@ -75,7 +84,8 @@ namespace Hidano.FacialControl.Editor.Sampling
 
                 if (TryParseBlendShape(binding, out var blendShapeName))
                 {
-                    blendShapes.Add(new BlendShapeSnapshot(binding.path, blendShapeName, value));
+                    // blendShape カーブは 0..100 スケール。snapshot / ドメインの正規化 0..1 へ変換する。
+                    blendShapes.Add(new BlendShapeSnapshot(binding.path, blendShapeName, value / BlendShapeWeightScale));
                     if (rendererPathSet.Add(binding.path))
                     {
                         rendererPaths.Add(binding.path);

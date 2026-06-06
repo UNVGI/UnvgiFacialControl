@@ -38,8 +38,15 @@ namespace Hidano.FacialControl.Editor.Tools
         private const string BlendShapePropertyPrefix = "blendShape.";
 
         /// <summary>
+        /// Unity の <c>blendShape.*</c> アニメーションカーブ / <c>SkinnedMeshRenderer</c> weight のスケール (0..100)。
+        /// <see cref="BlendShapeBakeEntry.Value"/> は正規化 0..1 のため、カーブ書き込み時に本値を乗算する。
+        /// </summary>
+        private const float BlendShapeWeightScale = 100f;
+
+        /// <summary>
         /// 1 つの BlendShape ベイクエントリ。RendererPath は AnimationClip binding.path に渡される
-        /// Transform 階層パス、Value は時刻 0 にベイクされる値。
+        /// Transform 階層パス、Value は時刻 0 にベイクされる正規化値 (0..1)。
+        /// AnimationClip カーブへは Unity 標準スケール (0..100) へ変換して書き込まれる。
         /// </summary>
         public readonly struct BlendShapeBakeEntry
         {
@@ -88,7 +95,8 @@ namespace Hidano.FacialControl.Editor.Tools
                     type = typeof(SkinnedMeshRenderer),
                     propertyName = BlendShapePropertyPrefix + entry.BlendShapeName,
                 };
-                var curve = AnimationCurve.Constant(0f, 0f, entry.Value);
+                // 正規化値 (0..1) を Unity 標準の blendShape weight スケール (0..100) へ変換して書き込む。
+                var curve = AnimationCurve.Constant(0f, 0f, entry.Value * BlendShapeWeightScale);
                 AnimationUtility.SetEditorCurve(clip, binding, curve);
             }
 
