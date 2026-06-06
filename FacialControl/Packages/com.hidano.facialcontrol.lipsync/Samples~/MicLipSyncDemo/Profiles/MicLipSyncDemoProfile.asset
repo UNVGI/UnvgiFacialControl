@@ -127,28 +127,28 @@ MonoBehaviour:
       data:
         PhonemeId: A
         MaxWeight: 100
-        BlendShapeName: A
+        BlendShapeName: あ
     - rid: 4448593420807569410
       type: {class: BlendShapePhonemeEntry, ns: Hidano.FacialControl.LipSync.Adapters.PhonemeEntries, asm: Hidano.FacialControl.LipSync}
       data:
         PhonemeId: I
         MaxWeight: 100
-        BlendShapeName: I
+        BlendShapeName: い
     - rid: 4448593420807569411
       type: {class: BlendShapePhonemeEntry, ns: Hidano.FacialControl.LipSync.Adapters.PhonemeEntries, asm: Hidano.FacialControl.LipSync}
       data:
         PhonemeId: U
         MaxWeight: 100
-        BlendShapeName: U
+        BlendShapeName: う
     - rid: 4448593420807569412
       type: {class: BlendShapePhonemeEntry, ns: Hidano.FacialControl.LipSync.Adapters.PhonemeEntries, asm: Hidano.FacialControl.LipSync}
       data:
         PhonemeId: E
         MaxWeight: 100
-        BlendShapeName: E
+        BlendShapeName: え
     - rid: 4448593420807569413
       type: {class: BlendShapePhonemeEntry, ns: Hidano.FacialControl.LipSync.Adapters.PhonemeEntries, asm: Hidano.FacialControl.LipSync}
       data:
         PhonemeId: O
         MaxWeight: 100
-        BlendShapeName: O
+        BlendShapeName: お
