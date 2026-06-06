@@ -208,7 +208,7 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Integration
         {
             private readonly FacialProfile _profile;
             private readonly StubActiveExpressionProvider _activeProvider;
-            private readonly FakeULipSyncEventSource _eventSource;
+            private readonly FakePhonemeWeightSource _weightSource;
             private readonly ULipSyncProvider _provider;
             private readonly Dictionary<string, OverlayInputSource> _overlays =
                 new Dictionary<string, OverlayInputSource>(StringComparer.Ordinal);
@@ -222,17 +222,15 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Integration
             {
                 _profile = profile;
                 _activeProvider = activeProvider;
-                _eventSource = new FakeULipSyncEventSource();
+                _weightSource = new FakePhonemeWeightSource();
                 _provider = new ULipSyncProvider(
-                    _eventSource,
+                    _weightSource,
                     new[]
                     {
                         new PhonemeSnapshot("A", new[] { 0.35f, 0f }),
                         new PhonemeSnapshot("I", new[] { 0f, 0.5f }),
                     },
-                    BlendShapeNames.Length,
-                    smoothness: 0f,
-                    timeProvider: timeProvider);
+                    BlendShapeNames.Length);
                 Output = new float[BlendShapeNames.Length];
                 LipSyncOutput = new float[BlendShapeNames.Length];
             }
@@ -241,20 +239,14 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Integration
 
             public float[] LipSyncOutput { get; }
 
-            public void SetLipSyncFrame(float volume, params (string PhonemeId, float Ratio)[] ratios)
+            public void SetLipSyncFrame(float volume, params (string PhonemeId, float Weight)[] weights)
             {
-                var phonemeRatios = new Dictionary<string, float>(ratios.Length, StringComparer.Ordinal);
-                for (int i = 0; i < ratios.Length; i++)
+                // uLipSync 委譲後の確定 weight/volume を直接与える（テストは単一音素 weight=1 を使用）。
+                _weightSource.CurrentVolume = volume;
+                for (int i = 0; i < weights.Length; i++)
                 {
-                    phonemeRatios[ratios[i].PhonemeId] = ratios[i].Ratio;
+                    _weightSource.SetPhonemeWeight(weights[i].PhonemeId, weights[i].Weight);
                 }
-
-                // provider は uLipSync 本体が正規化済みの info.volume をそのまま反映する。
-                _eventSource.Invoke(new uLipSync.LipSyncInfo
-                {
-                    volume = volume,
-                    phonemeRatios = phonemeRatios,
-                });
             }
 
             public bool TryResolve(string slot)

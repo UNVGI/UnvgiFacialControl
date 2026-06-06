@@ -85,6 +85,9 @@ namespace Hidano.FacialControl.LipSync.Adapters
         private ULipSyncEventBridge _eventBridge;
 
         [NonSerialized]
+        private FacialControlULipSyncBlendShape _blendShape;
+
+        [NonSerialized]
         private ULipSyncProvider _provider;
 
         [NonSerialized]
@@ -271,12 +274,17 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
                 AddInputComponent(_hostGameObject, resolution);
 
-                _eventBridge = new ULipSyncEventBridge(_analyzer);
+                // uLipSync 公式の音量正規化・SmoothDamp・sum=1 正規化を委譲する算出器。
+                // min/max/smoothness/usePhonemeBlend は uLipSync 既定値のまま据え置き、
+                // FacialControl 側では一切加工しない。External モードのため SkinnedMeshRenderer 不要。
+                _blendShape = _hostGameObject.AddComponent<FacialControlULipSyncBlendShape>();
+                _blendShape.ConfigurePhonemes(BuildPhonemeIdList(snapshots));
+                _analyzer.onLipSyncUpdate.AddListener(_blendShape.OnLipSyncUpdate);
+
                 _provider = new ULipSyncProvider(
-                    _eventBridge,
+                    _blendShape,
                     snapshots,
-                    ctx.BlendShapeNames.Count,
-                    smoothness: ULipSyncProvider.DefaultSmoothness);
+                    ctx.BlendShapeNames.Count);
                 _inputSourceRegistry = ctx.InputSourceRegistry;
                 _registeredSlug = PhonemeOverlaySlug;
                 RegisterPhonemeOverlayInputSources(ctx, slug);
@@ -419,6 +427,17 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 fieldName,
                 BindingFlags.Instance | BindingFlags.NonPublic);
             field?.SetValue(_asioInput, value);
+        }
+
+        private static List<string> BuildPhonemeIdList(PhonemeSnapshot[] snapshots)
+        {
+            var ids = new List<string>(snapshots.Length);
+            for (int i = 0; i < snapshots.Length; i++)
+            {
+                ids.Add(snapshots[i].PhonemeId);
+            }
+
+            return ids;
         }
 
         private PhonemeSnapshot[] BuildSnapshots(in AdapterBuildContext ctx)
@@ -1151,6 +1170,17 @@ namespace Hidano.FacialControl.LipSync.Adapters
             {
                 _eventBridge.Dispose();
                 _eventBridge = null;
+            }
+
+            if (_blendShape != null)
+            {
+                if (_analyzer != null)
+                {
+                    _analyzer.onLipSyncUpdate.RemoveListener(_blendShape.OnLipSyncUpdate);
+                }
+
+                UnityEngine.Object.Destroy(_blendShape);
+                _blendShape = null;
             }
 
             DestroyInputComponents();

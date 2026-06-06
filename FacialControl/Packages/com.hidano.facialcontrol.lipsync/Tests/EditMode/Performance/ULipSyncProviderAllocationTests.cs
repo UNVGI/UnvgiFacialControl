@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Reflection;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Domain.Adapters;
@@ -19,42 +18,24 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Performance
     public class ULipSyncProviderAllocationTests
     {
         private const int Iterations = 10000;
-        private const double FrameDt = 1.0 / 60.0;
 
         [Test]
-        public void OnLipSyncUpdateAndGetLipSyncValues_TenThousandIterations_ZeroBytes()
+        public void GetLipSyncValues_TenThousandIterations_ZeroBytes()
         {
-            var source = new FakeULipSyncEventSource();
-            var time = new ManualTimeProvider();
+            var source = new FakePhonemeWeightSource();
             var snapshots = new[]
             {
                 new PhonemeSnapshot("A", new[] { 0.50f, 0.00f, 0.25f, 0.10f }),
                 new PhonemeSnapshot("I", new[] { 0.20f, 0.40f, 0.00f, 0.30f }),
                 new PhonemeSnapshot("O", new[] { 0.00f, 0.10f, 0.75f, 0.20f }),
             };
-            using var provider = new ULipSyncProvider(
-                source,
-                snapshots,
-                blendShapeCount: 4,
-                smoothness: ULipSyncProvider.DefaultSmoothness,
-                timeProvider: time);
+            using var provider = new ULipSyncProvider(source, snapshots, blendShapeCount: 4);
             var output = new float[4];
-            var info = new uLipSync.LipSyncInfo
-            {
-                volume = 1f,
-                phonemeRatios = new Dictionary<string, float>(3)
-                {
-                    { "A", 0.70f },
-                    { "I", 0.15f },
-                    { "O", 0.35f },
-                },
-            };
+            source.SetFrame(1f, ("A", 0.70f), ("I", 0.15f), ("O", 0.35f));
 
-            // warmup: SmoothDamp の内部状態を収束させ、計測中の状態遷移を除外する。
+            // warmup: provider 内部バッファのウォームアップ。
             for (int i = 0; i < 128; i++)
             {
-                time.UnscaledTimeSeconds += FrameDt;
-                source.Invoke(info);
                 provider.GetLipSyncValues(output);
             }
 
@@ -68,8 +49,6 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Performance
 
             for (int i = 0; i < Iterations; i++)
             {
-                time.UnscaledTimeSeconds += FrameDt;
-                source.Invoke(info);
                 provider.GetLipSyncValues(output);
             }
 
@@ -81,31 +60,16 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Performance
         }
 
         [Test]
-        public void Update_WithExpressionPhonemeEntrySnapshots_ZeroGCPerFrame()
+        public void GetLipSyncValues_WithExpressionPhonemeEntrySnapshots_ZeroGCPerFrame()
         {
-            var source = new FakeULipSyncEventSource();
-            var time = new ManualTimeProvider();
+            var source = new FakePhonemeWeightSource();
             PhonemeSnapshot[] snapshots = BuildExpressionSnapshots();
-            using var provider = new ULipSyncProvider(
-                source,
-                snapshots,
-                blendShapeCount: 4,
-                smoothness: ULipSyncProvider.DefaultSmoothness,
-                timeProvider: time);
+            using var provider = new ULipSyncProvider(source, snapshots, blendShapeCount: 4);
             var output = new float[4];
-            var info = new uLipSync.LipSyncInfo
-            {
-                volume = 1f,
-                phonemeRatios = new Dictionary<string, float>(1)
-                {
-                    { "A", 1f },
-                },
-            };
+            source.SetFrame(1f, ("A", 1f));
 
             for (int i = 0; i < 128; i++)
             {
-                time.UnscaledTimeSeconds += FrameDt;
-                source.Invoke(info);
                 provider.GetLipSyncValues(output);
             }
 
@@ -119,8 +83,6 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Performance
 
             for (int i = 0; i < Iterations; i++)
             {
-                time.UnscaledTimeSeconds += FrameDt;
-                source.Invoke(info);
                 provider.GetLipSyncValues(output);
             }
 

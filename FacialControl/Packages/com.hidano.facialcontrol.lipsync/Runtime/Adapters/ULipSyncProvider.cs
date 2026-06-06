@@ -7,12 +7,19 @@ using UnityEngine;
 
 namespace Hidano.FacialControl.LipSync.Adapters
 {
+    /// <summary>
+    /// uLipSync の音素別ウェイトと音量を BlendShape 値へ合成する provider。
+    /// </summary>
+    /// <remarks>
+    /// 音量正規化・SmoothDamp 平滑化・sum=1 正規化は uLipSync 公式
+    /// （<see cref="FacialControlULipSyncBlendShape"/> 経由）に委譲し、本クラスは
+    /// <see cref="IPhonemeWeightSource"/> から読み取った値を「音素→複数BlendShape」snapshot に
+    /// 適用するだけに徹する。FacialControl 側では volume / min-max / 平滑化を一切加工しない。
+    /// 合成は固定長バッファで GC フリー。
+    /// </remarks>
     public sealed class ULipSyncProvider : ILipSyncProvider, ILipSyncContributeMaskProvider, IDisposable
     {
-        // 本家 uLipSyncBlendShape.cs:27 と同値。SmoothDamp の追従時間定数 (秒)。
-        public const float DefaultSmoothness = 0.05f;
-
-        private readonly IULipSyncEventSource _eventSource;
+        private readonly IPhonemeWeightSource _source;
         private readonly float[] _accum;
         private readonly BitArray _contributeMask;
         private readonly string[] _blendShapeNames;
@@ -22,39 +29,18 @@ namespace Hidano.FacialControl.LipSync.Adapters
         private readonly BitArray[] _phonemeContributeMasks;
         private readonly int _phonemeCount;
 
-        private readonly ITimeProvider _timeProvider;
-        private readonly float _smoothness;
-
-        // volume 系 (uLipSyncBlendShape.UpdateVolume と等価)。
-        private float _targetVolume;
-        private float _smoothedVolume;
-        private float _volumeVelocity;
-
-        // phoneme weight 系 (uLipSyncBlendShape.UpdateVowels と等価)。
-        // OnLipSyncUpdate で target を更新し、GetLipSyncValues で SmoothDamp + sum=1 正規化する。
-        private readonly float[] _phonemeTargetRatios;
-        private readonly float[] _phonemeSmoothedWeights;
-        private readonly float[] _phonemeVelocities;
-
-        // ITimeProvider.UnscaledTimeSeconds の差分から dt を算出する。
-        // 初期値 -1 は「初回呼び出しなので dt=0 で再起動」のセンチネル。
-        private double _lastTimeSeconds;
-        private double _currentFrameStamp;
-
         private bool _zeroOutputRequested;
         private bool _isDisposed;
         private bool _unknownPhonemeWarningEmitted;
 
         public ULipSyncProvider(
-            IULipSyncEventSource eventSource,
+            IPhonemeWeightSource source,
             IReadOnlyList<PhonemeSnapshot> snapshots,
-            int blendShapeCount,
-            float smoothness = DefaultSmoothness,
-            ITimeProvider timeProvider = null)
+            int blendShapeCount)
         {
-            if (eventSource == null)
+            if (source == null)
             {
-                throw new ArgumentNullException(nameof(eventSource));
+                throw new ArgumentNullException(nameof(source));
             }
 
             if (snapshots == null)
@@ -67,14 +53,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 throw new ArgumentOutOfRangeException(nameof(blendShapeCount));
             }
 
-            if (smoothness < 0f)
-            {
-                throw new ArgumentOutOfRangeException(nameof(smoothness));
-            }
-
-            _eventSource = eventSource;
-            _smoothness = smoothness;
-            _timeProvider = timeProvider ?? DefaultTimeProvider.Instance;
+            _source = source;
 
             _accum = new float[blendShapeCount];
             _contributeMask = new BitArray(blendShapeCount, false);
@@ -111,15 +90,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
             }
 
             _phonemeCount = validCount;
-
-            _phonemeTargetRatios = validCount == 0 ? Array.Empty<float>() : new float[validCount];
-            _phonemeSmoothedWeights = validCount == 0 ? Array.Empty<float>() : new float[validCount];
-            _phonemeVelocities = validCount == 0 ? Array.Empty<float>() : new float[validCount];
-
-            _lastTimeSeconds = -1.0;
-            _currentFrameStamp = double.NaN;
-
-            _eventSource.OnLipSyncUpdate += OnLipSyncUpdate;
         }
 
         public ReadOnlySpan<string> BlendShapeNames => _blendShapeNames;
@@ -162,14 +132,15 @@ namespace Hidano.FacialControl.LipSync.Adapters
             if (_zeroOutputRequested)
             {
                 output.Clear();
-                ResetSmoothedOutputPreservingTargets();
                 _zeroOutputRequested = false;
                 return false;
             }
 
-            EnsureCurrentFrameComposed();
-
-            float factor = _phonemeSmoothedWeights[index] * _smoothedVolume;
+            // factor = 音素ウェイト(uLipSync 委譲) * 音量(uLipSync 委譲)。
+            // SmoothDamp / sum=1 正規化 / volume 正規化はいずれも source 側（uLipSync 公式）で
+            // 適用済み。本クラスは snapshot への適用のみ行う。
+            _source.TryGetPhonemeWeight(_phonemeKeys[index], out float phonemeWeight);
+            float factor = phonemeWeight * _source.CurrentVolume;
             float[] weights = _snapshotWeights[_phonemeIndices[index]];
             int copyLength = output.Length < weights.Length ? output.Length : weights.Length;
             for (int i = 0; i < copyLength; i++)
@@ -185,30 +156,18 @@ namespace Hidano.FacialControl.LipSync.Adapters
             if (_zeroOutputRequested)
             {
                 output.Clear();
-                // smoothed values / velocity / accum を 0 リセット。target は維持し、次回呼出時に
-                // 「初回フレーム扱い (_lastTimeSeconds<0)」で target に即時 snap する。
-                _smoothedVolume = 0f;
-                _volumeVelocity = 0f;
-                for (int i = 0; i < _phonemeCount; i++)
-                {
-                    _phonemeSmoothedWeights[i] = 0f;
-                    _phonemeVelocities[i] = 0f;
-                }
                 Array.Clear(_accum, 0, _accum.Length);
                 _zeroOutputRequested = false;
-                _lastTimeSeconds = -1.0;
-                _currentFrameStamp = double.NaN;
                 return;
             }
 
-            EnsureCurrentFrameComposed();
-
-            // _accum 組み立て: factor_i = smoothedWeight_i * smoothedVolume。
-            // 本家 uLipSyncBlendShape.cs:173 (bs.weight * bs.maxWeight * volume) と等価な合成。
+            // _accum 組み立て: factor_i = phonemeWeight_i * volume（いずれも uLipSync 委譲値）。
             Array.Clear(_accum, 0, _accum.Length);
+            float volume = _source.CurrentVolume;
             for (int i = 0; i < _phonemeCount; i++)
             {
-                float factor = _phonemeSmoothedWeights[i] * _smoothedVolume;
+                _source.TryGetPhonemeWeight(_phonemeKeys[i], out float phonemeWeight);
+                float factor = phonemeWeight * volume;
                 if (factor == 0f) continue;
                 float[] weights = _snapshotWeights[_phonemeIndices[i]];
                 for (int k = 0; k < weights.Length; k++)
@@ -217,7 +176,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 }
             }
 
-            // output コピー。
             int copyLength = output.Length < _accum.Length ? output.Length : _accum.Length;
             for (int i = 0; i < copyLength; i++)
             {
@@ -255,66 +213,13 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 $"[ULipSyncProvider] Phoneme '{phonemeId ?? "<null>"}' is not registered. Further unknown phoneme warnings are suppressed.");
         }
 
-        private void EnsureCurrentFrameComposed()
-        {
-            double now = _timeProvider.UnscaledTimeSeconds;
-            if (!double.IsNaN(_currentFrameStamp) && now == _currentFrameStamp)
-            {
-                return;
-            }
-
-            _currentFrameStamp = now;
-
-            // 初回 (= _lastTimeSeconds < 0) は target を smoothed に即時 snap する。
-            // 同一フレーム内の連続呼出でも一度値が立ち上がるよう、dt=0 では SmoothDamp が
-            // 進まない問題を回避する目的。次回以降は通常の dt ベース SmoothDamp 経路。
-            float sum;
-            if (_lastTimeSeconds < 0.0)
-            {
-                _smoothedVolume = _targetVolume;
-                _volumeVelocity = 0f;
-                sum = 0f;
-                for (int i = 0; i < _phonemeCount; i++)
-                {
-                    _phonemeSmoothedWeights[i] = _phonemeTargetRatios[i];
-                    _phonemeVelocities[i] = 0f;
-                    sum += _phonemeSmoothedWeights[i];
-                }
-                _lastTimeSeconds = now;
-            }
-            else
-            {
-                float dt = (float)(now - _lastTimeSeconds);
-                if (dt < 0f) dt = 0f;
-                _lastTimeSeconds = now;
-
-                // (a) volume の SmoothDamp。本家 uLipSyncBlendShape.cs:117 と等価。
-                _smoothedVolume = Mathf.SmoothDamp(
-                    _smoothedVolume, _targetVolume, ref _volumeVelocity,
-                    _smoothness, Mathf.Infinity, dt);
-
-                // (b) 各 phoneme weight の SmoothDamp。本家 uLipSyncBlendShape.cs:139-142 と等価。
-                sum = 0f;
-                for (int i = 0; i < _phonemeCount; i++)
-                {
-                    _phonemeSmoothedWeights[i] = Mathf.SmoothDamp(
-                        _phonemeSmoothedWeights[i], _phonemeTargetRatios[i],
-                        ref _phonemeVelocities[i], _smoothness, Mathf.Infinity, dt);
-                    sum += _phonemeSmoothedWeights[i];
-                }
-            }
-
-            // (c) 母音 sum=1 正規化。本家 uLipSyncBlendShape.cs:145-148 と等価。
-            if (sum > 0f)
-            {
-                float inv = 1f / sum;
-                for (int i = 0; i < _phonemeCount; i++)
-                {
-                    _phonemeSmoothedWeights[i] *= inv;
-                }
-            }
-        }
-
+        /// <summary>
+        /// device swap / 初期化直後に、次の 1 フレームだけ出力をゼロ化する。
+        /// </summary>
+        /// <remarks>
+        /// 平滑化状態は uLipSync 公式（source）側が保持しており本クラスからは
+        /// リセットできないため、本フラグは provider 出力を 1 フレーム抑止するのみ。
+        /// </remarks>
         public void RequestZeroOutputForNextFrame()
         {
             _zeroOutputRequested = true;
@@ -327,70 +232,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
                 return;
             }
 
-            _eventSource.OnLipSyncUpdate -= OnLipSyncUpdate;
             _isDisposed = true;
-        }
-
-        private void OnLipSyncUpdate(uLipSync.LipSyncInfo info)
-        {
-            if (_isDisposed)
-            {
-                return;
-            }
-
-            // target のみ更新する。実際の SmoothDamp は GetLipSyncValues 側で
-            // フレーム同期した dt を使って適用される。
-            // info.volume は uLipSync 本体が log10 正規化済み (uLipSync.cs UpdateResult) の
-            // 解析結果。FacialControl 側で再加工せず、そのまま target へ反映する。
-            _targetVolume = info.volume;
-
-            if (info.phonemeRatios == null)
-            {
-                for (int i = 0; i < _phonemeCount; i++)
-                {
-                    _phonemeTargetRatios[i] = 0f;
-                }
-                return;
-            }
-
-            for (int i = 0; i < _phonemeCount; i++)
-            {
-                _phonemeTargetRatios[i] = info.phonemeRatios.TryGetValue(_phonemeKeys[i], out float ratio)
-                    ? ratio
-                    : 0f;
-            }
-        }
-
-        // device swap / Dispose 直前等で前回状態を完全に消すための共通リセット。
-        // velocity も含めて 0 に戻すことで、再開時の SmoothDamp 立ち上がりを初回相当にする。
-        private void ResetSmoothingState()
-        {
-            _targetVolume = 0f;
-            _smoothedVolume = 0f;
-            _volumeVelocity = 0f;
-            for (int i = 0; i < _phonemeCount; i++)
-            {
-                _phonemeTargetRatios[i] = 0f;
-                _phonemeSmoothedWeights[i] = 0f;
-                _phonemeVelocities[i] = 0f;
-            }
-            Array.Clear(_accum, 0, _accum.Length);
-            _lastTimeSeconds = -1.0;
-            _currentFrameStamp = double.NaN;
-        }
-
-        private void ResetSmoothedOutputPreservingTargets()
-        {
-            _smoothedVolume = 0f;
-            _volumeVelocity = 0f;
-            for (int i = 0; i < _phonemeCount; i++)
-            {
-                _phonemeSmoothedWeights[i] = 0f;
-                _phonemeVelocities[i] = 0f;
-            }
-            Array.Clear(_accum, 0, _accum.Length);
-            _lastTimeSeconds = -1.0;
-            _currentFrameStamp = double.NaN;
         }
 
         private static float[] CopyWeights(float[] source, int blendShapeCount)
@@ -433,16 +275,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
                     mask[i] = true;
                 }
             }
-        }
-
-        // ITimeProvider が注入されなかった場合のフォールバック。
-        // LayerInputSourceAggregator.DefaultTimeProvider と同じパターンで、
-        // 単独で使えるようにする。
-        private sealed class DefaultTimeProvider : ITimeProvider
-        {
-            public static readonly DefaultTimeProvider Instance = new DefaultTimeProvider();
-            private DefaultTimeProvider() { }
-            public double UnscaledTimeSeconds => UnityEngine.Time.unscaledTimeAsDouble;
         }
     }
 }

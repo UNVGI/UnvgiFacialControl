@@ -22,6 +22,9 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.MultiCharacter
     {
         private const int CharacterCount = 10;
         private const int SwapCharacterIndex = 4;
+        // 音量・音素ウェイトの SmoothDamp は uLipSync 公式へ委譲済み。
+        // 旧 provider の「初回フレーム即時 snap」は廃止されたため、定常値まで収束させる投入回数。
+        private const int SettleFrameCount = 256;
         private const double FrameBudgetMs = 16.6;
         private const string Slug = "ulipsync";
         private const string OverlayASlug = "lipsync-overlay:a";
@@ -112,6 +115,14 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.MultiCharacter
                     $"Character {i} の初回読み出しは OnStart の zero settle で無音扱いになるべき。");
                 Assert.That(output[0], Is.EqualTo(-1f),
                     $"Character {i} の無音フレームでは output が変更されないべき。");
+
+                // SmoothDamp（uLipSync 委譲）を定常値まで収束させてから出力を検証する。
+                // LipSyncUpdateEvent モードでは onLipSyncUpdate 受信時のみ SmoothDamp が進むため、
+                // 収束後は追加投入なしで定常値を保持する。
+                for (int f = 0; f < SettleFrameCount; f++)
+                {
+                    character.EmitPhonemeFrame();
+                }
 
                 AssertOutputContinues(character, i, "primed output");
             }

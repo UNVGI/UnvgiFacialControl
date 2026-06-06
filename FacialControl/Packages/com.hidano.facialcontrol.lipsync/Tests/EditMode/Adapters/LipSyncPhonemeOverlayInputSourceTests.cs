@@ -31,7 +31,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         [Test]
         public void Constructor_UnknownPhonemeId_LogsWarningOnce()
         {
-            using var provider = CreateProvider(new FakeULipSyncEventSource(), new ManualTimeProvider(), Snapshot("A", 1f, 0f, 0f));
+            using var provider = CreateProvider(new FakePhonemeWeightSource(), Snapshot("A", 1f, 0f, 0f));
 
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("Phoneme 'Unknown' is not registered"));
             var source = new LipSyncPhonemeOverlayInputSource(
@@ -49,7 +49,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         [Test]
         public void TryWriteValues_PhonemeNotRegistered_ReturnsFalse()
         {
-            using var provider = CreateProvider(new FakeULipSyncEventSource(), new ManualTimeProvider(), Snapshot("A", 1f, 0f, 0f));
+            using var provider = CreateProvider(new FakePhonemeWeightSource(), Snapshot("A", 1f, 0f, 0f));
             LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("Phoneme 'Unknown' is not registered"));
             var source = new LipSyncPhonemeOverlayInputSource(
                 InputSourceId.Parse("lipsync-overlay:unknown"),
@@ -67,9 +67,8 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         [Test]
         public void TryWriteValues_ProviderActiveWithVolume_WritesScaledWeights()
         {
-            var eventSource = new FakeULipSyncEventSource();
-            var time = new ManualTimeProvider();
-            using var provider = CreateProvider(eventSource, time, Snapshot("A", 0.5f, 0.25f, 0f));
+            var weightSource = new FakePhonemeWeightSource();
+            using var provider = CreateProvider(weightSource, Snapshot("A", 0.5f, 0.25f, 0f));
             var source = new LipSyncPhonemeOverlayInputSource(
                 InputSourceId.Parse("lipsync-overlay:a"),
                 "A",
@@ -77,8 +76,8 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
                 BlendShapeCount);
             var output = new float[BlendShapeCount];
 
-            eventSource.Invoke(Info(0.8f, ("A", 0.5f)));
-            time.UnscaledTimeSeconds += 1.0 / 60.0;
+            // weight=1（uLipSync 委譲後の確定値）, volume=0.8 → factor=0.8。
+            weightSource.SetFrame(0.8f, ("A", 1f));
             bool written = source.TryWriteValues(output);
 
             Assert.That(written, Is.True);
@@ -88,9 +87,8 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         [Test]
         public void TryWriteValues_ProviderSilent_ReturnsFalse()
         {
-            var eventSource = new FakeULipSyncEventSource();
-            var time = new ManualTimeProvider();
-            using var provider = CreateProvider(eventSource, time, Snapshot("A", 1f, 0.5f, 0.25f));
+            var weightSource = new FakePhonemeWeightSource();
+            using var provider = CreateProvider(weightSource, Snapshot("A", 1f, 0.5f, 0.25f));
             var source = new LipSyncPhonemeOverlayInputSource(
                 InputSourceId.Parse("lipsync-overlay:a"),
                 "A",
@@ -98,8 +96,8 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
                 BlendShapeCount);
             var output = new[] { 0.1f, 0.2f, 0.3f };
 
-            eventSource.Invoke(Info(0f, ("A", 1f)));
-            time.UnscaledTimeSeconds += 1.0 / 60.0;
+            // volume=0 → factor=0 → sum < SilenceThreshold → false。
+            weightSource.SetFrame(0f, ("A", 1f));
             bool written = source.TryWriteValues(output);
 
             Assert.That(written, Is.False);
@@ -110,8 +108,7 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         public void ContributeMask_AfterConstruction_MatchesProviderMask()
         {
             using var provider = CreateProvider(
-                new FakeULipSyncEventSource(),
-                new ManualTimeProvider(),
+                new FakePhonemeWeightSource(),
                 Snapshot("A", 1f, 0f, 0.25f),
                 Snapshot("I", 0f, 0.5f, 0f));
             var source = new LipSyncPhonemeOverlayInputSource(
@@ -129,39 +126,15 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
         }
 
         private static ULipSyncProvider CreateProvider(
-            FakeULipSyncEventSource eventSource,
-            ManualTimeProvider time,
+            FakePhonemeWeightSource source,
             params PhonemeSnapshot[] snapshots)
         {
-            return new ULipSyncProvider(
-                eventSource,
-                snapshots,
-                BlendShapeCount,
-                smoothness: ULipSyncProvider.DefaultSmoothness,
-                timeProvider: time);
+            return new ULipSyncProvider(source, snapshots, BlendShapeCount);
         }
 
         private static PhonemeSnapshot Snapshot(string phonemeId, params float[] weights)
         {
             return new PhonemeSnapshot(phonemeId, weights);
-        }
-
-        private static uLipSync.LipSyncInfo Info(
-            float volume,
-            params (string PhonemeId, float Ratio)[] ratios)
-        {
-            var phonemeRatios = new System.Collections.Generic.Dictionary<string, float>(ratios.Length);
-            for (int i = 0; i < ratios.Length; i++)
-            {
-                phonemeRatios[ratios[i].PhonemeId] = ratios[i].Ratio;
-            }
-
-            // provider は uLipSync 本体が正規化済みの info.volume をそのまま反映する。
-            return new uLipSync.LipSyncInfo
-            {
-                volume = volume,
-                phonemeRatios = phonemeRatios,
-            };
         }
 
         private static void AssertValuesClose(float[] actual, params float[] expected)
