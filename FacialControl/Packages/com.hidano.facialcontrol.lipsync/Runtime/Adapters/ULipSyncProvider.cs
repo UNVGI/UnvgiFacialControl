@@ -12,13 +12,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
         // 本家 uLipSyncBlendShape.cs:27 と同値。SmoothDamp の追従時間定数 (秒)。
         public const float DefaultSmoothness = 0.05f;
 
-        // 本家 uLipSync Common.DefaultMinVolume / DefaultMaxVolume と同値。
-        // rawVolume(log10) をこの範囲で 0..1 へ正規化する。uLipSync 本体は info.volume を
-        // この定数で固定正規化してしまい (uLipSync.cs / Common.cs) マイク感度に合わせられないため、
-        // provider 側で rawVolume から再正規化し、調整可能な床/天井として公開する。
-        public const float DefaultMinVolume = -2.5f;
-        public const float DefaultMaxVolume = -1.5f;
-
         private readonly IULipSyncEventSource _eventSource;
         private readonly float[] _accum;
         private readonly BitArray _contributeMask;
@@ -31,8 +24,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
         private readonly ITimeProvider _timeProvider;
         private readonly float _smoothness;
-        private readonly float _minVolume;
-        private readonly float _maxVolume;
 
         // volume 系 (uLipSyncBlendShape.UpdateVolume と等価)。
         private float _targetVolume;
@@ -59,8 +50,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
             IReadOnlyList<PhonemeSnapshot> snapshots,
             int blendShapeCount,
             float smoothness = DefaultSmoothness,
-            float minVolume = DefaultMinVolume,
-            float maxVolume = DefaultMaxVolume,
             ITimeProvider timeProvider = null)
         {
             if (eventSource == null)
@@ -85,8 +74,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
             _eventSource = eventSource;
             _smoothness = smoothness;
-            _minVolume = minVolume;
-            _maxVolume = maxVolume;
             _timeProvider = timeProvider ?? DefaultTimeProvider.Instance;
 
             _accum = new float[blendShapeCount];
@@ -353,10 +340,9 @@ namespace Hidano.FacialControl.LipSync.Adapters
 
             // target のみ更新する。実際の SmoothDamp は GetLipSyncValues 側で
             // フレーム同期した dt を使って適用される。
-            // info.volume は uLipSync 本体が固定定数 (Common.DefaultMin/MaxVolume) で正規化済みのため、
-            // マイク感度に合わせられない。本家 uLipSyncBlendShape と同様に rawVolume から
-            // 調整可能な min/max で再正規化する。
-            _targetVolume = NormalizeVolume(info.rawVolume);
+            // info.volume は uLipSync 本体が log10 正規化済み (uLipSync.cs UpdateResult) の
+            // 解析結果。FacialControl 側で再加工せず、そのまま target へ反映する。
+            _targetVolume = info.volume;
 
             if (info.phonemeRatios == null)
             {
@@ -373,20 +359,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
                     ? ratio
                     : 0f;
             }
-        }
-
-        // rawVolume(線形振幅) を log10 した上で [_minVolume, _maxVolume] を 0..1 へ写像する。
-        // 本家 uLipSyncBlendShape.cs UpdateVolume と等価。rawVolume<=0 (無音) は 0 を返す。
-        private float NormalizeVolume(float rawVolume)
-        {
-            if (rawVolume <= 0f)
-            {
-                return 0f;
-            }
-
-            float normalized = Mathf.Log10(rawVolume);
-            normalized = (normalized - _minVolume) / Mathf.Max(_maxVolume - _minVolume, 1e-4f);
-            return Mathf.Clamp01(normalized);
         }
 
         // device swap / Dispose 直前等で前回状態を完全に消すための共通リセット。

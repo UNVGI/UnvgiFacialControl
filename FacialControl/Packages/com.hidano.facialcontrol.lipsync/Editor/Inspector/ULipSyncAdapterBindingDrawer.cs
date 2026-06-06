@@ -15,8 +15,6 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
         private const string AnalyzerProfilePropertyName = "_analyzerProfile";
         private const string PhonemeEntriesPropertyName = "_phonemeEntries";
         private const string MaxWeightScalePropertyName = "_maxWeightScale";
-        private const string MinVolumePropertyName = "_minVolume";
-        private const string MaxVolumePropertyName = "_maxVolume";
 
         public const string RootClassName = "facial-control-lipsync-adapter-binding";
         public const string SlugPropertyFieldName = "ulipsync-adapter-binding-slug-field";
@@ -28,9 +26,6 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             "ulipsync-adapter-binding-default-profile-placeholder";
         public const string PhonemeEntriesSectionName = "ulipsync-adapter-binding-phoneme-section";
         public const string MaxWeightScaleFieldName = "ulipsync-adapter-binding-max-weight-scale-field";
-        public const string MinVolumeFieldName = "ulipsync-adapter-binding-min-volume-field";
-        public const string MaxVolumeFieldName = "ulipsync-adapter-binding-max-volume-field";
-        public const string VolumeRangeHelpBoxName = "ulipsync-adapter-binding-volume-range-helpbox";
 
         public override VisualElement CreatePropertyGUI(SerializedProperty property)
         {
@@ -44,7 +39,6 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
             AddAnalyzerProfileField(root, property);
             AddPhonemeEntryList(root, property);
             AddMaxWeightScaleField(root, property);
-            AddVolumeRangeField(root, property);
 
             return root;
         }
@@ -183,51 +177,6 @@ namespace Hidano.FacialControl.LipSync.Editor.Inspector
                 SetFloat(property, MaxWeightScalePropertyName, Mathf.Max(0f, evt.newValue));
             });
             root.Add(field);
-        }
-
-        private static void AddVolumeRangeField(VisualElement root, SerializedProperty property)
-        {
-            SerializedProperty minProperty = property.FindPropertyRelative(MinVolumePropertyName);
-            SerializedProperty maxProperty = property.FindPropertyRelative(MaxVolumePropertyName);
-            if (minProperty == null || maxProperty == null)
-            {
-                AddMissingFieldLabel(
-                    root,
-                    minProperty == null ? MinVolumePropertyName : MaxVolumePropertyName);
-                return;
-            }
-
-            var minField = new FloatField("Min Volume")
-            {
-                name = MinVolumeFieldName,
-            };
-            minField.SetValueWithoutNotify(minProperty.floatValue);
-            minField.RegisterValueChangedCallback(evt =>
-            {
-                SetFloat(property, MinVolumePropertyName, evt.newValue);
-            });
-
-            var maxField = new FloatField("Max Volume")
-            {
-                name = MaxVolumeFieldName,
-            };
-            maxField.SetValueWithoutNotify(maxProperty.floatValue);
-            maxField.RegisterValueChangedCallback(evt =>
-            {
-                SetFloat(property, MaxVolumePropertyName, evt.newValue);
-            });
-
-            var helpBox = new HelpBox(
-                "マイク音量(log10)を 0..1 へ正規化する範囲です。小さい声や低ゲインのマイクで口が "
-                + "動かない場合は Min Volume を下げてください (例: -4)。",
-                HelpBoxMessageType.Info)
-            {
-                name = VolumeRangeHelpBoxName,
-            };
-
-            root.Add(minField);
-            root.Add(maxField);
-            root.Add(helpBox);
         }
 
         private static void SetObjectReference(

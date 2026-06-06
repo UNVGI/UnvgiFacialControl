@@ -57,15 +57,6 @@ namespace Hidano.FacialControl.LipSync.Adapters
         [SerializeField]
         private float _maxWeightScale = 1f;
 
-        // マイク音量(log10)を 0..1 へ正規化する範囲。uLipSync 本体の info.volume は固定定数
-        // 正規化のためマイク感度に追従できない。小さい声や低ゲインのマイクで口が動かない場合は
-        // _minVolume を下げる (例: -4) ことで provider 側が rawVolume から再正規化する。
-        [SerializeField]
-        private float _minVolume = ULipSyncProvider.DefaultMinVolume;
-
-        [SerializeField]
-        private float _maxVolume = ULipSyncProvider.DefaultMaxVolume;
-
         [NonSerialized]
         private DeviceDescriptor _runtimeDescriptor;
 
@@ -285,9 +276,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
                     _eventBridge,
                     snapshots,
                     ctx.BlendShapeNames.Count,
-                    smoothness: ULipSyncProvider.DefaultSmoothness,
-                    minVolume: _minVolume,
-                    maxVolume: _maxVolume);
+                    smoothness: ULipSyncProvider.DefaultSmoothness);
                 _inputSourceRegistry = ctx.InputSourceRegistry;
                 _registeredSlug = PhonemeOverlaySlug;
                 RegisterPhonemeOverlayInputSources(ctx, slug);
