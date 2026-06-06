@@ -19,39 +19,23 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Performance
         [Test]
         public void TryWriteValues_RepeatedCalls_AllocatesZeroBytes()
         {
-            var source = new FakeULipSyncEventSource();
-            var time = new ManualTimeProvider();
+            var source = new FakePhonemeWeightSource();
             var snapshots = new[]
             {
                 new PhonemeSnapshot("A", new[] { 0.50f, 0.00f, 0.25f, 0.10f }),
                 new PhonemeSnapshot("I", new[] { 0.20f, 0.40f, 0.00f, 0.30f }),
             };
-            using var provider = new ULipSyncProvider(
-                source,
-                snapshots,
-                blendShapeCount: 4,
-                smoothness: ULipSyncProvider.DefaultSmoothness,
-                timeProvider: time);
+            using var provider = new ULipSyncProvider(source, snapshots, blendShapeCount: 4);
             var inputSource = new LipSyncPhonemeOverlayInputSource(
                 InputSourceId.Parse("lipsync-overlay:a"),
                 "A",
                 provider,
                 blendShapeCount: 4);
             var output = new float[4];
-            var info = new uLipSync.LipSyncInfo
-            {
-                volume = 1f,
-                phonemeRatios = new Dictionary<string, float>(2)
-                {
-                    { "A", 0.70f },
-                    { "I", 0.30f },
-                },
-            };
+            source.SetFrame(1f, ("A", 0.70f), ("I", 0.30f));
 
-            source.Invoke(info);
             for (int i = 0; i < 128; i++)
             {
-                time.UnscaledTimeSeconds += FrameDt;
                 inputSource.TryWriteValues(output);
             }
 
@@ -66,7 +50,6 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Performance
             bool wroteAllFrames = true;
             for (int i = 0; i < FramesToMeasure; i++)
             {
-                time.UnscaledTimeSeconds += FrameDt;
                 wroteAllFrames &= inputSource.TryWriteValues(output);
             }
 

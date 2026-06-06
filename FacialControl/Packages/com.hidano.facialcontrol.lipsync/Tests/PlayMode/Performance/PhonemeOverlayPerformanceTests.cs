@@ -248,6 +248,15 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Performance
             return ratios;
         }
 
+        private static void ApplyRatios(FakePhonemeWeightSource source, Dictionary<string, float> ratios)
+        {
+            source.CurrentVolume = 1f;
+            foreach (KeyValuePair<string, float> ratio in ratios)
+            {
+                source.SetPhonemeWeight(ratio.Key, ratio.Value);
+            }
+        }
+
         private static string[] CreateBlendShapeNames()
         {
             var names = new string[BlendShapeCount];
@@ -311,18 +320,12 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Performance
                 var profile = BuildProfile(primary, secondary);
                 var activeProvider = new StubActiveExpressionProvider();
                 var time = new ManualTimeProvider();
-                var eventSource = new FakeULipSyncEventSource();
+                var weightSource = new FakePhonemeWeightSource();
                 var provider = new ULipSyncProvider(
-                    eventSource,
+                    weightSource,
                     CreatePhonemeSnapshots(characterIndex),
-                    BlendShapeCount,
-                    smoothness: 0f,
-                    timeProvider: time);
-                eventSource.Invoke(new uLipSync.LipSyncInfo
-                {
-                    volume = 1f,
-                    phonemeRatios = CreateRatios(),
-                });
+                    BlendShapeCount);
+                ApplyRatios(weightSource, CreateRatios());
 
                 var bindings = new List<(int, int, IInputSource)>(ReservedSlots.Length);
                 for (int i = 0; i < ReservedSlots.Length; i++)
@@ -374,13 +377,11 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Performance
                 Expression secondary)
             {
                 var time = new ManualTimeProvider();
-                var eventSource = new FakeULipSyncEventSource();
+                var weightSource = new FakePhonemeWeightSource();
                 var provider = new ULipSyncProvider(
-                    eventSource,
+                    weightSource,
                     CreatePhonemeSnapshots(characterIndex),
-                    BlendShapeCount,
-                    smoothness: 0f,
-                    timeProvider: time);
+                    BlendShapeCount);
 
                 var bindings = new List<(int, int, IInputSource)>(ReservedSlots.Length);
                 for (int i = 0; i < ReservedSlots.Length; i++)

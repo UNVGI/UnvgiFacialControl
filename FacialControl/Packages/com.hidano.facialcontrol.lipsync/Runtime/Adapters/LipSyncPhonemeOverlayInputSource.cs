@@ -8,6 +8,9 @@ namespace Hidano.FacialControl.LipSync.Adapters
     public sealed class LipSyncPhonemeOverlayInputSource : ValueProviderInputSourceBase
     {
         public const string SlugPrefix = "lipsync-overlay";
+
+        // provider が出す合成値（uLipSync 委譲後の volume × phoneme weight × snapshot）の総和が
+        // この閾値を下回るフレームはレイヤー合成に乗せない。無音時に下位レイヤーを上書きしない契約。
         public const float SilenceThreshold = 1e-4f;
 
         private readonly string _phonemeId;

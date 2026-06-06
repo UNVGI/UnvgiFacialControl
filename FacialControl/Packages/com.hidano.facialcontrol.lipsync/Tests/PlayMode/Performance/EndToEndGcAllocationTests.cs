@@ -121,8 +121,10 @@ namespace Hidano.FacialControl.LipSync.Tests.PlayMode.Performance
             Assert.That(snapshots[0].PhonemeId, Is.EqualTo(PhonemeId), scenario);
 
             var analyzer = _hostGameObject.AddComponent<uLipSync.uLipSync>();
-            using var bridge = new ULipSyncEventBridge(analyzer);
-            using var provider = new ULipSyncProvider(bridge, snapshots, BlendShapeCount);
+            var blendShape = _hostGameObject.AddComponent<FacialControlULipSyncBlendShape>();
+            blendShape.ConfigurePhonemes(new[] { PhonemeId });
+            analyzer.onLipSyncUpdate.AddListener(blendShape.OnLipSyncUpdate);
+            using var provider = new ULipSyncProvider(blendShape, snapshots, BlendShapeCount);
             var inputSource = new LipSyncPhonemeOverlayInputSource(
                 InputSourceId.Parse("lipsync-overlay:a"),
                 PhonemeId,
