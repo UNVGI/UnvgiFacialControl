@@ -11,7 +11,10 @@ namespace Hidano.FacialControl.LipSync.Adapters
     /// </summary>
     /// <remarks>
     /// LipSyncUpdateEvent モードでは <c>OnLipSyncUpdate(info)</c> 受信時に <c>UpdateLipSync()</c>
-    /// （UpdateVolume/UpdateVowels）が同期実行され、Unity の Update フレームに依存しない。
+    /// （UpdateVolume/UpdateVowels）が同期実行される。uLipSync の <c>onLipSyncUpdate</c> は実測で
+    /// 毎フレーム発火する（解析 Job が 1 フレームで完了するため ratio≈1.0）ので、素の LateUpdate と
+    /// 平滑化頻度は同等であり、テストの同期実行が可能な本モードを採用する。
+    /// <see cref="OnApplyBlendShapes"/> は no-op 化しているため SkinnedMeshRenderer 直書きは発生せず、
     /// <see cref="OnApplyBlendShapes"/> は no-op 化しているため SkinnedMeshRenderer 直書きは発生せず、
     /// 本クラスは SkinnedMeshRenderer を持たない。算出した値は FacialControl のレイヤー合成系へ
     /// <see cref="IPhonemeWeightSource"/> 経由で渡す。
@@ -32,7 +35,7 @@ namespace Hidano.FacialControl.LipSync.Adapters
         /// <remarks>
         /// 各エントリは <c>index = -1</c>（SkinnedMeshRenderer 非依存）で、
         /// <see cref="UpdateMethod.LipSyncUpdateEvent"/> 下では <c>OnLipSyncUpdate</c> 受信時の
-        /// UpdateVowels によって <c>weight</c> が同期算出される。
+        /// UpdateVowels によって <c>weight</c> が同期算出される（発火は実測で毎フレーム）。
         /// min/max/smoothness/usePhonemeBlend は変更しない。
         /// </remarks>
         public void ConfigurePhonemes(IReadOnlyList<string> phonemeIds)
