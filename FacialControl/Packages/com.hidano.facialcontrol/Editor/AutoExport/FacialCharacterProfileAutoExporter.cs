@@ -1,5 +1,5 @@
 using System;
-using Hidano.FacialControl.Adapters.ScriptableObject;
+using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Editor.Sampling;
 using UnityEditor;
 using UnityEditor.Build;
