@@ -156,19 +156,10 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
                 phonemeRatios[ratios[i].PhonemeId] = ratios[i].Ratio;
             }
 
-            // provider は info.volume ではなく info.rawVolume を既定 min/max(-2.5/-1.5) で
-            // 正規化する。正規化済み volume へ戻る rawVolume を逆算してセットする。
-            float rawVolume = volume <= 0f
-                ? 0f
-                : Mathf.Pow(
-                    10f,
-                    volume
-                        * (ULipSyncProvider.DefaultMaxVolume - ULipSyncProvider.DefaultMinVolume)
-                        + ULipSyncProvider.DefaultMinVolume);
-
+            // provider は uLipSync 本体が正規化済みの info.volume をそのまま反映する。
             return new uLipSync.LipSyncInfo
             {
-                rawVolume = rawVolume,
+                volume = volume,
                 phonemeRatios = phonemeRatios,
             };
         }

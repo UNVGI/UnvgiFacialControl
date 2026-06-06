@@ -7,14 +7,7 @@
 ### Fixed
 
 - phoneme overlay 入力源が解決されず口が動かない不具合を修正。`ULipSyncAdapterBinding` は overlay 入力源を binding の `Slug`（既定 `ulipsync`）で登録していた（キー `ulipsync:a`）が、レイヤーの入力源 id・`GetDefaultLayerInputSources`・サンプル・docs はすべて固定 prefix `lipsync-overlay:{slot}` を使うため、`FacialController` のレイヤー解決（`TryResolve("lipsync-overlay:a")`）がヒットせず集約に乗らなかった。登録/解除/重複検知を固定 prefix `lipsync-overlay` 基準に統一し、レイヤー id と一致させた。
-
-### Changed
-
-- `ULipSyncProvider` の音量正規化を `LipSyncInfo.volume` 依存から `rawVolume` ベースへ変更。uLipSync 本体は `info.volume` を固定定数 (`Common.DefaultMinVolume`/`MaxVolume` = -2.5/-1.5) で正規化するため、低音量・低ゲインのマイクでは `volume` が常に 0 に潰れリップシンクが無音化していた。本家 `uLipSyncBlendShape` と同様に `rawVolume` を調整可能な min/max で正規化するよう修正。
-
-### Added
-
-- `ULipSyncAdapterBinding` に `Min Volume` / `Max Volume` 設定を追加し、Inspector (PropertyDrawer) からマイク感度に合わせて音量正規化範囲を調整できるようにした。小さい声で口が動かない場合は `Min Volume` を下げる。
+- マイク未接続時にノイズを拾って口が開くことがある不具合を修正。`ULipSyncProvider` の音量正規化を `rawVolume` の自前再正規化から uLipSync 本体が正規化済みの `LipSyncInfo.volume` 直結へ戻した。`rawVolume` を調整可能な `Min Volume`/`Max Volume` で再正規化する実装は、`Min Volume` を下げるほどノイズフロアを増幅してしまい、未接続・無音時の瞬間的なノイズで口が開いていた。音量正規化は uLipSync 本体の責務に委ね、FacialControl 側では再加工しない。これに伴い `ULipSyncAdapterBinding` の `Min Volume`/`Max Volume` 設定（Inspector 含む）と `ULipSyncProvider` の `minVolume`/`maxVolume` コンストラクタ引数を削除（preview 段階の破壊的変更）。小さい声・低ゲインで口が動かない場合は uLipSync 側（マイク gain / `uLipSyncMicrophone` / Profile）で調整する。
 
 ## [0.1.0-preview.1] - 2026-05-07
 

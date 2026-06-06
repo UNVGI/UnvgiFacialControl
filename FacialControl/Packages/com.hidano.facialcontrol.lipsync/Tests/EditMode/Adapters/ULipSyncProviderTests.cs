@@ -320,74 +320,6 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
             AssertValuesClose(output, 0.4f, 0.2f, 0.1f);
         }
 
-        // ---- 新規テスト: rawVolume ベースの調整可能 min/max 正規化 -----------------------
-
-        [Test]
-        public void OnLipSyncUpdate_QuietRawVolume_WithDefaultMinVolume_StaysSilent()
-        {
-            // rawVolume=0.0004 (log10≒-3.4) は既定の床 -2.5 を下回るため volume が 0 に潰れ、
-            // 出力は SilenceThreshold 未満になる (静かなマイクで口が動かない本不具合の再現)。
-            var source = new FakeULipSyncEventSource();
-            var time = new ManualTimeProvider();
-            using var provider = CreateProvider(source, time, 1, Snapshot("A", 1f));
-            var output = new float[1];
-
-            source.Invoke(RawInfo(0.0004f, ("A", 1f)));
-            AdvanceUntilConverged(time, provider, output);
-
-            Assert.That(Sum(output), Is.LessThan(SilenceThreshold));
-        }
-
-        [Test]
-        public void OnLipSyncUpdate_QuietRawVolume_WithLoweredMinVolume_ProducesAudibleOutput()
-        {
-            // 同じ静かな rawVolume でも minVolume を下げれば volume が立ち上がり、口が動く。
-            var source = new FakeULipSyncEventSource();
-            var time = new ManualTimeProvider();
-            using var provider = CreateProvider(
-                source, time, 1, minVolume: -4f, maxVolume: -3f, Snapshot("A", 1f));
-            var output = new float[1];
-
-            source.Invoke(RawInfo(0.0004f, ("A", 1f)));
-            AdvanceUntilConverged(time, provider, output);
-
-            Assert.That(output[0], Is.GreaterThan(SilenceThreshold));
-        }
-
-        [Test]
-        public void OnLipSyncUpdate_RawVolume_NormalizedWithinConfiguredRange()
-        {
-            // rawVolume=10^-3.5。min=-4,max=-3 → (-3.5-(-4))/(-3-(-4)) = 0.5。
-            // 単独音素 A は sum 正規化後 1.0、snapshot 重み 1.0 のため
-            // output[0] == smoothedVolume == 0.5 に収束する。
-            var source = new FakeULipSyncEventSource();
-            var time = new ManualTimeProvider();
-            using var provider = CreateProvider(
-                source, time, 1, minVolume: -4f, maxVolume: -3f, Snapshot("A", 1f));
-            var output = new float[1];
-
-            source.Invoke(RawInfo(Mathf.Pow(10f, -3.5f), ("A", 1f)));
-            AdvanceUntilConverged(time, provider, output);
-
-            Assert.That(output[0], Is.EqualTo(0.5f).Within(ConvergenceTolerance));
-        }
-
-        [Test]
-        public void OnLipSyncUpdate_ZeroRawVolume_ProducesSilence()
-        {
-            // rawVolume=0 (真の無音) は min/max 設定に依らず volume 0 → 出力ゼロ。
-            var source = new FakeULipSyncEventSource();
-            var time = new ManualTimeProvider();
-            using var provider = CreateProvider(
-                source, time, 1, minVolume: -4f, maxVolume: -3f, Snapshot("A", 1f));
-            var output = new float[1];
-
-            source.Invoke(RawInfo(0f, ("A", 1f)));
-            AdvanceUntilConverged(time, provider, output);
-
-            Assert.That(Sum(output), Is.LessThan(SilenceThreshold));
-        }
-
         // ---- 新規テスト: 本家準拠 SmoothDamp 挙動の検証 ---------------------------------
 
         [Test]
@@ -565,24 +497,6 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
                 timeProvider: timeProvider);
         }
 
-        private static ULipSyncProvider CreateProvider(
-            FakeULipSyncEventSource source,
-            ManualTimeProvider timeProvider,
-            int blendShapeCount,
-            float minVolume,
-            float maxVolume,
-            params PhonemeSnapshot[] snapshots)
-        {
-            return new ULipSyncProvider(
-                source,
-                snapshots,
-                blendShapeCount,
-                smoothness: ULipSyncProvider.DefaultSmoothness,
-                minVolume: minVolume,
-                maxVolume: maxVolume,
-                timeProvider: timeProvider);
-        }
-
         private static void AdvanceUntilConverged(
             ManualTimeProvider time, ULipSyncProvider provider, float[] buffer,
             int frames = DefaultConvergenceFrames, double frameDt = DefaultFrameDt)
@@ -655,41 +569,18 @@ namespace Hidano.FacialControl.LipSync.Tests.EditMode.Adapters
             float volume,
             params (string PhonemeId, float Ratio)[] ratios)
         {
-            // provider は info.volume ではなく info.rawVolume を既定 min/max(-2.5/-1.5) で正規化する。
-            // 既存テストは「正規化済み volume」を期待値の基準にしているため、その volume へ戻る
-            // rawVolume を逆算してセットする (normalize(10^(v*(max-min)+min)) == v)。
-            return RawInfo(NormalizedVolumeToRaw(volume), ratios);
-        }
-
-        private static uLipSync.LipSyncInfo RawInfo(
-            float rawVolume,
-            params (string PhonemeId, float Ratio)[] ratios)
-        {
             var phonemeRatios = new Dictionary<string, float>(ratios.Length);
             for (int i = 0; i < ratios.Length; i++)
             {
                 phonemeRatios[ratios[i].PhonemeId] = ratios[i].Ratio;
             }
 
+            // provider は uLipSync 本体が正規化済みの info.volume をそのまま target に反映する。
             return new uLipSync.LipSyncInfo
             {
-                rawVolume = rawVolume,
+                volume = volume,
                 phonemeRatios = phonemeRatios,
             };
-        }
-
-        private static float NormalizedVolumeToRaw(float normalizedVolume)
-        {
-            if (normalizedVolume <= 0f)
-            {
-                return 0f;
-            }
-
-            return Mathf.Pow(
-                10f,
-                normalizedVolume
-                    * (ULipSyncProvider.DefaultMaxVolume - ULipSyncProvider.DefaultMinVolume)
-                    + ULipSyncProvider.DefaultMinVolume);
         }
 
         private static float Sum(float[] values)
