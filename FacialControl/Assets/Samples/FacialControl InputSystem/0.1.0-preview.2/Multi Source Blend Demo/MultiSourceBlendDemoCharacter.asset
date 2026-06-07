@@ -61,7 +61,7 @@ MonoBehaviour:
       - Body
       overlays:
       - slot: blink
-        suppress: 0
+        suppress: 1
         snapshot:
           transitionDuration: 0.06666667
           transitionCurvePreset: Linear
@@ -70,7 +70,7 @@ MonoBehaviour:
           rendererPaths: []
     overlays:
     - slot: blink
-      suppress: 0
+      suppress: 1
       animationClip: {fileID: 0}
       cachedSnapshot:
         transitionDuration: 0.25

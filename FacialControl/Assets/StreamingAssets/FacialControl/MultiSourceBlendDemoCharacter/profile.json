@@ -62,7 +62,7 @@
                 "overlays": [
                     {
                         "slot": "blink",
-                        "suppress": false,
+                        "suppress": true,
                         "snapshot": {
                             "transitionDuration": 0.06666667014360428,
                             "transitionCurvePreset": "Linear",
