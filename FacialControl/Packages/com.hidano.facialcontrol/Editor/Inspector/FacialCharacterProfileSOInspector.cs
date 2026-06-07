@@ -158,6 +158,9 @@ namespace Hidano.FacialControl.Editor.Inspector
         private VisualElement _expressionLibraryContainer;
         private VisualElement _gazeConfigsContainer;
         private Tab _gazeTab;
+        // CreateInspectorGUI が返すルート要素。overlay 編集を bind 更新サイクルと衝突させないよう
+        // 次ティックへ遅延実行する際の schedule / panel 判定に使用する。
+        private VisualElement _rootElement;
         private readonly List<DropdownField> _slotDropdowns = new List<DropdownField>();
         private readonly List<ExpressionLayerDropdownField> _expressionLayerDropdowns = new List<ExpressionLayerDropdownField>();
 
@@ -186,6 +189,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             _sampler = new AnimationClipExpressionSampler();
 
             var root = new VisualElement();
+            _rootElement = root;
 
             var styleSheet = FacialControlStyles.Load();
             if (styleSheet != null)
@@ -833,25 +837,51 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             binding.suppress = false;
             binding.animationClip = null;
-            binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+            binding.cachedSnapshot = OverlaySlotBindingSerializable.CreateEmptySnapshot();
             EditorUtility.SetDirty(target);
         }
 
         private void ApplyDefaultOverlayClip(int overlayIndex, AnimationClip clip)
         {
-            var binding = EnsureDefaultOverlayBinding(overlayIndex);
-            if (binding == null) return;
+            // 実機 Inspector では bind 更新サイクルとの衝突（Assertion failed）を避けるため
+            // 次ティックへ遅延実行する。テスト等の Panel 未 attach 環境では同期実行される。
+            RunOverlayEditDeferredOrImmediate(
+                () => ApplyDefaultOverlayClipCore(overlayIndex, clip));
+        }
 
-            Undo.RecordObject(target, "Change Default Overlay Clip");
-            binding.suppress = false;
-            binding.animationClip = clip;
-            if (clip == null)
+        /// <summary>
+        /// Default overlay の AnimationClip を SerializedProperty 経由で確定する
+        /// （managed 直書き + Update のみによる巻き戻り回避。ApplyExpressionOverlayStateCore のコメント参照）。
+        /// 遅延実行されうるため overlayIndex は本メソッド内で再検証する。
+        /// </summary>
+        private void ApplyDefaultOverlayClipCore(int overlayIndex, AnimationClip clip)
+        {
+            serializedObject.Update();
+            if (_defaultOverlaysProperty == null
+                || overlayIndex < 0
+                || overlayIndex >= _defaultOverlaysProperty.arraySize)
             {
-                binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                return;
             }
 
+            var bindingProp = _defaultOverlaysProperty.GetArrayElementAtIndex(overlayIndex);
+            if (bindingProp == null) return;
+
+            int undoGroup = BeginUndoGroup("Change Default Overlay Clip");
+
+            var suppressProp = bindingProp.FindPropertyRelative("suppress");
+            var clipProp = bindingProp.FindPropertyRelative("animationClip");
+            var snapshotProp = bindingProp.FindPropertyRelative("cachedSnapshot");
+
+            if (suppressProp != null) suppressProp.boolValue = false;
+            if (clipProp != null) clipProp.objectReferenceValue = clip;
+            if (clip == null)
+            {
+                ClearOverlaySnapshotProperty(snapshotProp);
+            }
+
+            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
             EditorUtility.SetDirty(target);
-            serializedObject.Update();
             ScheduleAutoSave();
         }
 
@@ -862,9 +892,9 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             bool changed = binding.suppress;
             binding.suppress = false;
-            if (binding.animationClip == null && !BaseExpressionSerializable.IsSnapshotEmpty(binding.cachedSnapshot))
+            if (binding.animationClip == null && !OverlaySlotBindingSerializable.IsSnapshotEmpty(binding.cachedSnapshot))
             {
-                binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                binding.cachedSnapshot = OverlaySlotBindingSerializable.CreateEmptySnapshot();
                 changed = true;
             }
 
@@ -2267,56 +2297,165 @@ namespace Hidano.FacialControl.Editor.Inspector
             OverlaySlotBindingState state,
             ObjectField clipField)
         {
-            var binding = GetOrCreateExpressionOverlayBinding(exprIndex, slot);
-            if (binding == null) return;
+            // 実機 Inspector では bind 更新サイクルとの衝突（Assertion failed）を避けるため
+            // 次ティックへ遅延実行する。テスト等の Panel 未 attach 環境では同期実行される。
+            RunOverlayEditDeferredOrImmediate(
+                () => ApplyExpressionOverlayStateCore(exprIndex, slot, state, clipField));
+        }
 
-            Undo.RecordObject(target, "Change Expression Overlay State");
+        /// <summary>
+        /// Expression overlay の状態（Suppress / Override / DefaultFallback）を SerializedProperty 経由で確定する。
+        /// </summary>
+        /// <remarks>
+        /// SerializedProperty 経由で編集し ApplyModifiedProperties() で確定する。
+        /// managed モデルを直接書き換えて serializedObject.Update() のみで終えると、
+        /// bound な ListView / ObjectField が保持する SerializedObject の内部キャッシュが
+        /// 巻き戻り前の値（例: suppress=0）のまま残り、Domain Reload 直前の最終
+        /// ApplyModifiedProperties で managed の新値を古い値で上書きしてしまう
+        /// （Suppress 設定が Play 突入で .asset 上 1→0 に戻る不具合の根因）。
+        /// 遅延実行されうるため exprIndex / slot は本メソッド内で再検証する。
+        /// </remarks>
+        private void ApplyExpressionOverlayStateCore(
+            int exprIndex,
+            string slot,
+            OverlaySlotBindingState state,
+            ObjectField clipField)
+        {
+            serializedObject.Update();
+            var bindingProp = GetOrCreateExpressionOverlayBindingProperty(exprIndex, slot);
+            if (bindingProp == null) return;
+
+            int undoGroup = BeginUndoGroup("Change Expression Overlay State");
+
+            var suppressProp = bindingProp.FindPropertyRelative("suppress");
+            var clipProp = bindingProp.FindPropertyRelative("animationClip");
+            var snapshotProp = bindingProp.FindPropertyRelative("cachedSnapshot");
+
             switch (state)
             {
                 case OverlaySlotBindingState.Suppress:
-                    binding.suppress = true;
-                    binding.animationClip = null;
-                    binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                    if (suppressProp != null) suppressProp.boolValue = true;
+                    if (clipProp != null) clipProp.objectReferenceValue = null;
+                    ClearOverlaySnapshotProperty(snapshotProp);
                     if (clipField != null) clipField.SetValueWithoutNotify(null);
                     break;
                 case OverlaySlotBindingState.Override:
-                    binding.suppress = false;
+                    if (suppressProp != null) suppressProp.boolValue = false;
                     break;
                 default:
-                    binding.suppress = false;
-                    binding.animationClip = null;
-                    binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                    if (suppressProp != null) suppressProp.boolValue = false;
+                    if (clipProp != null) clipProp.objectReferenceValue = null;
+                    ClearOverlaySnapshotProperty(snapshotProp);
                     if (clipField != null) clipField.SetValueWithoutNotify(null);
                     break;
             }
 
+            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
             EditorUtility.SetDirty(target);
-            serializedObject.Update();
             ScheduleAutoSave();
         }
 
         private void ApplyExpressionOverlayClip(int exprIndex, string slot, AnimationClip clip)
         {
-            var binding = GetOrCreateExpressionOverlayBinding(exprIndex, slot);
-            if (binding == null) return;
+            // 実機 Inspector では bind 更新サイクルとの衝突（Assertion failed）を避けるため
+            // 次ティックへ遅延実行する。テスト等の Panel 未 attach 環境では同期実行される。
+            RunOverlayEditDeferredOrImmediate(
+                () => ApplyExpressionOverlayClipCore(exprIndex, slot, clip));
+        }
 
-            Undo.RecordObject(target, "Change Expression Overlay Clip");
-            binding.suppress = false;
-            binding.animationClip = clip;
+        /// <summary>
+        /// Expression overlay の AnimationClip を SerializedProperty 経由で確定する
+        /// （managed 直書き + Update のみによる巻き戻り回避。ApplyExpressionOverlayStateCore のコメント参照）。
+        /// 遅延実行されうるため exprIndex / slot は本メソッド内で再検証する。
+        /// </summary>
+        private void ApplyExpressionOverlayClipCore(int exprIndex, string slot, AnimationClip clip)
+        {
+            serializedObject.Update();
+            var bindingProp = GetOrCreateExpressionOverlayBindingProperty(exprIndex, slot);
+            if (bindingProp == null) return;
+
+            int undoGroup = BeginUndoGroup("Change Expression Overlay Clip");
+
+            var suppressProp = bindingProp.FindPropertyRelative("suppress");
+            var clipProp = bindingProp.FindPropertyRelative("animationClip");
+            var snapshotProp = bindingProp.FindPropertyRelative("cachedSnapshot");
+
+            if (suppressProp != null) suppressProp.boolValue = false;
+            if (clipProp != null) clipProp.objectReferenceValue = clip;
             if (clip == null)
             {
-                binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                ClearOverlaySnapshotProperty(snapshotProp);
             }
-            else if (target is FacialCharacterProfileSO profileSO)
+
+            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
+
+            // cachedSnapshot のベイクは AnimationClip サンプリングを伴い SerializedProperty では
+            // 表現しづらいため、確定後に managed モデルへ反映してから再度確定する。
+            if (clip != null && target is FacialCharacterProfileSO profileSO)
             {
+                serializedObject.Update();
                 FacialCharacterProfileExporter.SampleAnimationClipsIntoCachedSnapshots(
                     profileSO,
                     _sampler ?? new AnimationClipExpressionSampler());
+                serializedObject.ApplyModifiedPropertiesWithoutUndo();
             }
 
             EditorUtility.SetDirty(target);
-            serializedObject.Update();
             ScheduleAutoSave();
+        }
+
+        /// <summary>
+        /// overlay snapshot SerializedProperty を空（blendShapes/bones/rendererPaths を 0 件）にする。
+        /// </summary>
+        private static void ClearOverlaySnapshotProperty(SerializedProperty snapshotProp)
+        {
+            if (snapshotProp == null) return;
+
+            var blendShapesProp = snapshotProp.FindPropertyRelative("blendShapes");
+            if (blendShapesProp != null && blendShapesProp.isArray) blendShapesProp.ClearArray();
+
+            var bonesProp = snapshotProp.FindPropertyRelative("bones");
+            if (bonesProp != null && bonesProp.isArray) bonesProp.ClearArray();
+
+            var rendererPathsProp = snapshotProp.FindPropertyRelative("rendererPaths");
+            if (rendererPathsProp != null && rendererPathsProp.isArray) rendererPathsProp.ClearArray();
+        }
+
+        /// <summary>
+        /// 指定 expression / slot の overlay binding を表す SerializedProperty を取得する。
+        /// 存在しない場合は overlays 配列へ新規要素を <c>InsertArrayElementAtIndex</c> で追加し
+        /// slot を設定してから返す（配列構造変更も SerializedObject 経由で確定する）。
+        /// 戻り値の編集後は呼び出し側で <c>ApplyModifiedProperties()</c> を必ず実行すること。
+        /// </summary>
+        private SerializedProperty GetOrCreateExpressionOverlayBindingProperty(int exprIndex, string slot)
+        {
+            if (_expressionsProperty == null) return null;
+            if (exprIndex < 0 || exprIndex >= _expressionsProperty.arraySize) return null;
+
+            var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
+            var overlaysProp = entryProp.FindPropertyRelative("overlays");
+            if (overlaysProp == null || !overlaysProp.isArray) return null;
+
+            int existingIndex = FindOverlayBindingIndex(overlaysProp, slot);
+            if (existingIndex >= 0)
+            {
+                return overlaysProp.GetArrayElementAtIndex(existingIndex);
+            }
+
+            int newIndex = overlaysProp.arraySize;
+            overlaysProp.InsertArrayElementAtIndex(newIndex);
+            var newBindingProp = overlaysProp.GetArrayElementAtIndex(newIndex);
+
+            // InsertArrayElementAtIndex は直前要素を複製するため、各フィールドを明示的に初期化する。
+            var slotProp = newBindingProp.FindPropertyRelative("slot");
+            if (slotProp != null) slotProp.stringValue = slot;
+            var suppressProp = newBindingProp.FindPropertyRelative("suppress");
+            if (suppressProp != null) suppressProp.boolValue = false;
+            var clipProp = newBindingProp.FindPropertyRelative("animationClip");
+            if (clipProp != null) clipProp.objectReferenceValue = null;
+            ClearOverlaySnapshotProperty(newBindingProp.FindPropertyRelative("cachedSnapshot"));
+
+            return newBindingProp;
         }
 
         private OverlaySlotBindingSerializable GetExpressionOverlayBinding(int exprIndex, string slot)
@@ -2338,34 +2477,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             }
 
             return null;
-        }
-
-        private OverlaySlotBindingSerializable GetOrCreateExpressionOverlayBinding(int exprIndex, string slot)
-        {
-            var profileSO = target as FacialCharacterProfileSO;
-            if (profileSO == null || profileSO.Expressions == null) return null;
-            if (exprIndex < 0 || exprIndex >= profileSO.Expressions.Count) return null;
-
-            var expression = profileSO.Expressions[exprIndex];
-            if (expression.overlays == null)
-            {
-                expression.overlays = new List<OverlaySlotBindingSerializable>();
-            }
-
-            var existing = GetExpressionOverlayBinding(exprIndex, slot);
-            if (existing != null)
-            {
-                return existing;
-            }
-
-            var created = new OverlaySlotBindingSerializable
-            {
-                slot = slot,
-                suppress = false,
-                cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot(),
-            };
-            expression.overlays.Add(created);
-            return created;
         }
 
         private void AutoAssignGazeConfigForExpression(int exprIndex)
@@ -2550,6 +2661,37 @@ namespace Hidano.FacialControl.Editor.Inspector
             ExplicitUserRemoval,
             ExpressionDeletion,
             AnalogToNonAnalogKindTransition,
+        }
+
+        /// <summary>
+        /// overlay 編集（SerializedProperty 構造変更 + ApplyModifiedProperties）を、
+        /// UI Toolkit の bind 更新サイクルと衝突させないよう実行する。
+        ///
+        /// ラジオ / ObjectField の値変更コールバックは Panel の bindings 更新フェーズ中に発火しうる。
+        /// その最中に bound な配列（_expressions 以下の overlays）を InsertArrayElementAtIndex で
+        /// 構造変更したり ApplyModifiedProperties で確定すると、bound UI の再 bind が再入的に走り、
+        /// BaseVisualTreeHierarchyTrackerUpdater が整合性 Assert（Assertion failed）に引っかかる。
+        ///
+        /// ライブ Panel に attach 済み（実機 Inspector）の場合は次ティックへ遅延実行して衝突を避ける。
+        /// Panel 未 attach（EditMode テスト等、スケジューラが回らない環境）の場合は同期実行する。
+        /// いずれの場合も <paramref name="editCore"/> 内で ApplyModifiedProperties + ScheduleAutoSave まで確定する。
+        /// </summary>
+        private void RunOverlayEditDeferredOrImmediate(Action editCore)
+        {
+            if (editCore == null) return;
+
+            if (_rootElement != null && _rootElement.panel != null)
+            {
+                _rootElement.schedule.Execute(() =>
+                {
+                    // 遅延実行時点で target / serializedObject が破棄されていないか再検証する。
+                    if (this == null || target == null || serializedObject == null) return;
+                    editCore();
+                });
+                return;
+            }
+
+            editCore();
         }
 
         private static int BeginUndoGroup(string groupName)

@@ -216,9 +216,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             return clip;
         }
 
-        private static ExpressionSnapshotDto CreateCachedSnapshot(string blendShapeName, float value)
+        private static OverlaySnapshotDto CreateCachedSnapshot(string blendShapeName, float value)
         {
-            return new ExpressionSnapshotDto
+            return new OverlaySnapshotDto
             {
                 blendShapes = new List<BlendShapeSnapshotDto>
                 {
@@ -234,14 +234,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             };
         }
 
-        private static bool IsEmptySnapshot(ExpressionSnapshotDto snapshot)
+        private static bool IsEmptySnapshot(OverlaySnapshotDto snapshot)
         {
             if (snapshot == null) return true;
             bool hasBlendShapes = snapshot.blendShapes != null && snapshot.blendShapes.Count > 0;
             bool hasBones = snapshot.bones != null && snapshot.bones.Count > 0;
             bool hasRendererPaths = snapshot.rendererPaths != null && snapshot.rendererPaths.Count > 0;
-            bool hasOverlays = snapshot.overlays != null && snapshot.overlays.Count > 0;
-            return !hasBlendShapes && !hasBones && !hasRendererPaths && !hasOverlays;
+            return !hasBlendShapes && !hasBones && !hasRendererPaths;
         }
 
         private static void CancelPendingAutoSave(UnityEditor.Editor editor)

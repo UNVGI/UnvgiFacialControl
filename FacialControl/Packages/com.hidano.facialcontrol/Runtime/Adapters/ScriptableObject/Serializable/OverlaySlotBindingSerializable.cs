@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Hidano.FacialControl.Adapters.Json.Dto;
 using UnityEngine;
 
@@ -22,7 +23,30 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
         public AnimationClip animationClip;
 
         [Tooltip("Exporter がベイクした overlay snapshot。空の場合は default fallback として扱います。")]
-        public ExpressionSnapshotDto cachedSnapshot;
+        public OverlaySnapshotDto cachedSnapshot;
+
+        /// <summary>
+        /// overlay 用の空 snapshot を生成する。overlay binding の cachedSnapshot は
+        /// 再帰終端型 <see cref="OverlaySnapshotDto"/> なので、base/expression 用の
+        /// <see cref="BaseExpressionSerializable.CreateEmptySnapshot"/>（ExpressionSnapshotDto）と区別する。
+        /// </summary>
+        public static OverlaySnapshotDto CreateEmptySnapshot()
+        {
+            return new OverlaySnapshotDto
+            {
+                blendShapes = new List<BlendShapeSnapshotDto>(),
+            };
+        }
+
+        /// <summary>
+        /// overlay snapshot が「実質空」（BlendShape を 1 つも持たない）かを判定する。
+        /// </summary>
+        public static bool IsSnapshotEmpty(OverlaySnapshotDto snapshot)
+        {
+            return snapshot == null
+                   || snapshot.blendShapes == null
+                   || snapshot.blendShapes.Count == 0;
+        }
     }
 
     public enum OverlaySlotBindingState

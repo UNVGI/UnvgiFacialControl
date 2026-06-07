@@ -355,12 +355,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
             Assert.That(FacialCharacterProfileConverter.ToSORootGazeConfigs(new ProfileSnapshotDto()), Is.Empty);
         }
 
-        private static ExpressionSnapshotDto CreateSnapshotDto(
+        private static OverlaySnapshotDto CreateSnapshotDto(
             string rendererPath,
             string blendShapeName,
             float value)
         {
-            return new ExpressionSnapshotDto
+            return new OverlaySnapshotDto
             {
                 transitionDuration = 0.1f,
                 transitionCurvePreset = "EaseIn",
