@@ -82,6 +82,46 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
         }
 
         // ================================================================
+        // Parse_LayerOverrideMask_MapsToOverrideMaskBits
+        // ================================================================
+
+        [Test]
+        public void Parse_LayerOverrideMask_MapsToOverrideMaskBits()
+        {
+            // layers 宣言順: emotion(bit0), overlay(bit1)。
+            // smile.layerOverrideMask=["overlay"] が OverrideMask=Bit1 に変換されることを検証する。
+            var json = @"{
+                ""schemaVersion"": ""1.0"",
+                ""rendererPaths"": [""Body""],
+                ""layers"": [
+                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[]},
+                    {""name"":""overlay"",""priority"":1,""exclusionMode"":""lastWins"",""inputSources"":[]}
+                ],
+                ""expressions"": [
+                    {
+                        ""id"": ""smile"",
+                        ""name"": ""Smile"",
+                        ""layer"": ""emotion"",
+                        ""layerOverrideMask"": [""overlay""],
+                        ""snapshot"": {
+                            ""transitionDuration"": 0.1,
+                            ""transitionCurvePreset"": ""Linear"",
+                            ""blendShapes"": [],
+                            ""bones"": [],
+                            ""rendererPaths"": []
+                        }
+                    }
+                ]
+            }";
+
+            var profile = _parser.ParseProfile(json);
+            var expr = profile.Expressions.Span[0];
+
+            Assert.AreEqual(LayerOverrideMask.Bit1, expr.OverrideMask,
+                "overlay は layers index1 なので Bit1 が立つべき。");
+        }
+
+        // ================================================================
         // Parse_UnsupportedSchemaVersion_ThrowsNotSupportedException
         // ================================================================
 

@@ -124,6 +124,79 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
             Assert.DoesNotThrow(() => _useCase.SetLayerWeight("unknown", 0.5f));
         }
 
+        // --- UpdateWeights: LayerOverrideMask 抑制 ---
+
+        private static (LayerUseCase useCase, ExpressionUseCase expr) BuildOverrideScenario(
+            LayerOverrideMask smileMask,
+            out Expression smile,
+            out Expression overlayExpr)
+        {
+            // emotion(bit0, priority0) と overlay(bit1, priority1) の 2 レイヤー。
+            var layers = new[]
+            {
+                new LayerDefinition("emotion", 0, ExclusionMode.LastWins),
+                new LayerDefinition("overlay", 1, ExclusionMode.LastWins),
+            };
+            var bsNames = new[] { "bs_a", "bs_b" };
+            smile = new Expression(
+                "smile", "smile", "emotion", 0.1f, TransitionCurve.Linear,
+                new[] { new BlendShapeMapping("bs_a", 1f, null) },
+                null,
+                smileMask);
+            overlayExpr = new Expression(
+                "ov", "ov", "overlay", 0.1f, TransitionCurve.Linear,
+                new[] { new BlendShapeMapping("bs_b", 1f, null) });
+            var profile = new FacialProfile("1.0", layers, new[] { smile, overlayExpr });
+            var euc = new ExpressionUseCase(profile);
+            var luc = new LayerUseCase(profile, euc, bsNames);
+            return (luc, euc);
+        }
+
+        [Test]
+        public void UpdateWeights_ActiveExpressionOverridesLayer_SuppressesTargetLayer()
+        {
+            // smile(emotion) が overlay(bit1) を OverrideMask で抑制する。
+            var (luc, euc) = BuildOverrideScenario(LayerOverrideMask.Bit1, out var smile, out var ov);
+            euc.Activate(smile);
+            euc.Activate(ov);
+
+            luc.UpdateWeights(1f);
+            var output = luc.GetBlendedOutput();
+
+            Assert.AreEqual(1f, output[0], 1e-5f, "emotion(自己)は出力される");
+            Assert.AreEqual(0f, output[1], 1e-5f, "overlay は OverrideMask により抑制される");
+        }
+
+        [Test]
+        public void UpdateWeights_NoOverrideMask_TargetLayerContributes()
+        {
+            // OverrideMask=None なら overlay は通常どおりブレンドされる（対照）。
+            var (luc, euc) = BuildOverrideScenario(LayerOverrideMask.None, out var smile, out var ov);
+            euc.Activate(smile);
+            euc.Activate(ov);
+
+            luc.UpdateWeights(1f);
+            var output = luc.GetBlendedOutput();
+
+            Assert.AreEqual(1f, output[0], 1e-5f, "emotion が出力される");
+            Assert.AreEqual(1f, output[1], 1e-5f, "OverrideMask が無いので overlay も出力される");
+        }
+
+        [Test]
+        public void UpdateWeights_OverrideMaskSelfLayer_DoesNotSuppressSelf()
+        {
+            // smile が自己レイヤー(emotion=bit0)を mask に含めても自己は抑制しない（レイヤー内ブレンド担保）。
+            var (luc, euc) = BuildOverrideScenario(LayerOverrideMask.Bit0, out var smile, out var ov);
+            euc.Activate(smile);
+            euc.Activate(ov);
+
+            luc.UpdateWeights(1f);
+            var output = luc.GetBlendedOutput();
+
+            Assert.AreEqual(1f, output[0], 1e-5f, "自己レイヤー emotion は抑制対象外");
+            Assert.AreEqual(1f, output[1], 1e-5f, "overlay は mask 対象外なので出力される");
+        }
+
         // --- UpdateWeights ---
 
         [Test]
