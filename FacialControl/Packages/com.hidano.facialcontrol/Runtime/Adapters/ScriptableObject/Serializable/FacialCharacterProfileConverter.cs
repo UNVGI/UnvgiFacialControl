@@ -376,7 +376,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             return result.ToArray();
         }
 
-        private static ExpressionSnapshot ConvertExpressionSnapshot(ExpressionSnapshotDto dto, string fallbackId)
+        private static ExpressionSnapshot ConvertExpressionSnapshot(OverlaySnapshotDto dto, string fallbackId)
         {
             return new ExpressionSnapshot(
                 fallbackId ?? string.Empty,
@@ -434,7 +434,7 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             return result;
         }
 
-        private static bool IsSnapshotEmpty(ExpressionSnapshotDto snapshot)
+        private static bool IsSnapshotEmpty(OverlaySnapshotDto snapshot)
         {
             return snapshot == null
                 || ((snapshot.blendShapes == null || snapshot.blendShapes.Count == 0)
@@ -507,16 +507,15 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             return list;
         }
 
-        private static ExpressionSnapshotDto BuildExpressionSnapshotDto(ExpressionSnapshot snapshot)
+        private static OverlaySnapshotDto BuildExpressionSnapshotDto(ExpressionSnapshot snapshot)
         {
-            var dto = new ExpressionSnapshotDto
+            var dto = new OverlaySnapshotDto
             {
                 transitionDuration = snapshot.TransitionDuration,
                 transitionCurvePreset = SerializeTransitionCurvePreset(snapshot.TransitionCurvePreset),
                 blendShapes = new List<BlendShapeSnapshotDto>(),
                 bones = new List<BoneSnapshotDto>(),
                 rendererPaths = new List<string>(),
-                overlays = new List<OverlaySlotBindingDto>(),
             };
 
             var blendShapeSpan = snapshot.BlendShapes.Span;

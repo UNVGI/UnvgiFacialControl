@@ -93,13 +93,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.Ser
             }
         }
 
-        private static bool IsEffectivelyEmpty(ExpressionSnapshotDto snapshot)
+        private static bool IsEffectivelyEmpty(OverlaySnapshotDto snapshot)
         {
             if (snapshot == null) return true;
             return (snapshot.blendShapes == null || snapshot.blendShapes.Count == 0)
                 && (snapshot.bones == null || snapshot.bones.Count == 0)
-                && (snapshot.rendererPaths == null || snapshot.rendererPaths.Count == 0)
-                && (snapshot.overlays == null || snapshot.overlays.Count == 0);
+                && (snapshot.rendererPaths == null || snapshot.rendererPaths.Count == 0);
         }
 
         private sealed class SerializationHost : ScriptableObject

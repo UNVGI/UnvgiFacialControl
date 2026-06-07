@@ -271,9 +271,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
                 rendererPaths: new[] { "Face" });
         }
 
-        private static ExpressionSnapshotDto CreateSnapshotDto(string blendShapeName, float value)
+        private static OverlaySnapshotDto CreateSnapshotDto(string blendShapeName, float value)
         {
-            return new ExpressionSnapshotDto
+            return new OverlaySnapshotDto
             {
                 transitionDuration = 0.1f,
                 transitionCurvePreset = "Linear",

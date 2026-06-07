@@ -180,12 +180,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.AutoExport
             serializedObject.ApplyModifiedProperties();
         }
 
-        private static ExpressionSnapshotDto CreateSnapshotDto(
+        private static OverlaySnapshotDto CreateSnapshotDto(
             string rendererPath,
             string blendShapeName,
             float value)
         {
-            return new ExpressionSnapshotDto
+            return new OverlaySnapshotDto
             {
                 rendererPaths = new List<string> { rendererPath },
                 blendShapes = new List<BlendShapeSnapshotDto>
@@ -201,7 +201,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.AutoExport
             };
         }
 
-        private static void AssertSnapshot(ExpressionSnapshotDto snapshot, string blendShapeName, float value)
+        private static void AssertSnapshot(OverlaySnapshotDto snapshot, string blendShapeName, float value)
         {
             Assert.That(snapshot, Is.Not.Null);
             Assert.That(snapshot.blendShapes, Has.Count.EqualTo(1));
@@ -209,7 +209,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.AutoExport
             Assert.That(snapshot.blendShapes[0].value, Is.EqualTo(value).Within(1e-6f));
         }
 
-        private static void AssertEmptySnapshot(ExpressionSnapshotDto snapshot)
+        private static void AssertEmptySnapshot(OverlaySnapshotDto snapshot)
         {
             Assert.That(snapshot, Is.Not.Null);
             Assert.That(snapshot.blendShapes, Is.Not.Null);

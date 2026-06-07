@@ -149,7 +149,7 @@ namespace Hidano.FacialControl.Adapters.Json
                     continue;
                 }
 
-                overlay.snapshot = NormalizeExpressionSnapshotDto(overlay.snapshot);
+                overlay.snapshot = NormalizeOverlaySnapshotDto(overlay.snapshot);
             }
         }
 
@@ -164,6 +164,38 @@ namespace Hidano.FacialControl.Adapters.Json
                 };
             }
 
+            NormalizeCommonSnapshotFields(snapshot);
+            if (snapshot.overlays == null)
+                snapshot.overlays = new List<OverlaySlotBindingDto>();
+
+            return snapshot;
+        }
+
+        /// <summary>
+        /// overlay binding 用の snapshot（再帰終端型 <see cref="OverlaySnapshotDto"/>）を正規化する。
+        /// expression 用の <see cref="NormalizeExpressionSnapshotDto"/> と異なり overlays フィールドを持たない。
+        /// </summary>
+        private static OverlaySnapshotDto NormalizeOverlaySnapshotDto(OverlaySnapshotDto snapshot)
+        {
+            if (snapshot == null)
+            {
+                snapshot = new OverlaySnapshotDto
+                {
+                    transitionDuration = Expression.DefaultTransitionDuration,
+                    transitionCurvePreset = "Linear",
+                };
+            }
+
+            NormalizeCommonSnapshotFields(snapshot);
+            return snapshot;
+        }
+
+        /// <summary>
+        /// <see cref="OverlaySnapshotDto"/>（および派生 <see cref="ExpressionSnapshotDto"/>）共通フィールドの
+        /// null collection / 空 preset を正規化する。
+        /// </summary>
+        private static void NormalizeCommonSnapshotFields(OverlaySnapshotDto snapshot)
+        {
             if (string.IsNullOrEmpty(snapshot.transitionCurvePreset))
                 snapshot.transitionCurvePreset = "Linear";
             if (snapshot.blendShapes == null)
@@ -172,10 +204,6 @@ namespace Hidano.FacialControl.Adapters.Json
                 snapshot.bones = new List<BoneSnapshotDto>();
             if (snapshot.rendererPaths == null)
                 snapshot.rendererPaths = new List<string>();
-            if (snapshot.overlays == null)
-                snapshot.overlays = new List<OverlaySlotBindingDto>();
-
-            return snapshot;
         }
 
         // preview 破壊的変更 (D-5): inputSources は必須フィールド。欠落 / 空配列はエラー。
@@ -696,7 +724,7 @@ namespace Hidano.FacialControl.Adapters.Json
             return list.Count == 0 ? null : list.ToArray();
         }
 
-        private static bool IsEffectivelyEmptyOverlaySnapshot(ExpressionSnapshotDto snapshot)
+        private static bool IsEffectivelyEmptyOverlaySnapshot(OverlaySnapshotDto snapshot)
         {
             if (snapshot == null)
                 return true;
@@ -705,8 +733,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 && (string.IsNullOrEmpty(snapshot.transitionCurvePreset) || snapshot.transitionCurvePreset == "Linear")
                 && IsNullOrEffectivelyEmpty(snapshot.blendShapes)
                 && IsNullOrEffectivelyEmpty(snapshot.bones)
-                && IsNullOrEffectivelyEmpty(snapshot.rendererPaths)
-                && IsNullOrEffectivelyEmpty(snapshot.overlays);
+                && IsNullOrEffectivelyEmpty(snapshot.rendererPaths);
         }
 
         private static bool IsEmptyTransitionDuration(float value)
@@ -759,22 +786,7 @@ namespace Hidano.FacialControl.Adapters.Json
             return true;
         }
 
-        private static bool IsNullOrEffectivelyEmpty(List<OverlaySlotBindingDto> list)
-        {
-            if (list == null || list.Count == 0)
-                return true;
-
-            for (int i = 0; i < list.Count; i++)
-            {
-                var item = list[i];
-                if (item != null && (!string.IsNullOrWhiteSpace(item.slot) || item.suppress || !IsEffectivelyEmptyOverlaySnapshot(item.snapshot)))
-                    return false;
-            }
-
-            return true;
-        }
-
-        private static ExpressionSnapshot ConvertExpressionSnapshot(ExpressionSnapshotDto dto, string fallbackId)
+        private static ExpressionSnapshot ConvertExpressionSnapshot(OverlaySnapshotDto dto, string fallbackId)
         {
             if (dto == null)
                 throw new ArgumentNullException(nameof(dto));

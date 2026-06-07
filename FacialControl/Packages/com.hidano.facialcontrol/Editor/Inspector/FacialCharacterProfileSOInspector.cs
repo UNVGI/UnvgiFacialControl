@@ -833,7 +833,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             binding.suppress = false;
             binding.animationClip = null;
-            binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+            binding.cachedSnapshot = OverlaySlotBindingSerializable.CreateEmptySnapshot();
             EditorUtility.SetDirty(target);
         }
 
@@ -847,7 +847,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             binding.animationClip = clip;
             if (clip == null)
             {
-                binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                binding.cachedSnapshot = OverlaySlotBindingSerializable.CreateEmptySnapshot();
             }
 
             EditorUtility.SetDirty(target);
@@ -862,9 +862,9 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             bool changed = binding.suppress;
             binding.suppress = false;
-            if (binding.animationClip == null && !BaseExpressionSerializable.IsSnapshotEmpty(binding.cachedSnapshot))
+            if (binding.animationClip == null && !OverlaySlotBindingSerializable.IsSnapshotEmpty(binding.cachedSnapshot))
             {
-                binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                binding.cachedSnapshot = OverlaySlotBindingSerializable.CreateEmptySnapshot();
                 changed = true;
             }
 
@@ -2276,7 +2276,7 @@ namespace Hidano.FacialControl.Editor.Inspector
                 case OverlaySlotBindingState.Suppress:
                     binding.suppress = true;
                     binding.animationClip = null;
-                    binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                    binding.cachedSnapshot = OverlaySlotBindingSerializable.CreateEmptySnapshot();
                     if (clipField != null) clipField.SetValueWithoutNotify(null);
                     break;
                 case OverlaySlotBindingState.Override:
@@ -2285,7 +2285,7 @@ namespace Hidano.FacialControl.Editor.Inspector
                 default:
                     binding.suppress = false;
                     binding.animationClip = null;
-                    binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                    binding.cachedSnapshot = OverlaySlotBindingSerializable.CreateEmptySnapshot();
                     if (clipField != null) clipField.SetValueWithoutNotify(null);
                     break;
             }
@@ -2305,7 +2305,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             binding.animationClip = clip;
             if (clip == null)
             {
-                binding.cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot();
+                binding.cachedSnapshot = OverlaySlotBindingSerializable.CreateEmptySnapshot();
             }
             else if (target is FacialCharacterProfileSO profileSO)
             {
@@ -2362,7 +2362,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             {
                 slot = slot,
                 suppress = false,
-                cachedSnapshot = BaseExpressionSerializable.CreateEmptySnapshot(),
+                cachedSnapshot = OverlaySlotBindingSerializable.CreateEmptySnapshot(),
             };
             expression.overlays.Add(created);
             return created;
