@@ -267,6 +267,106 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         }
 
         [Test]
+        public void OverlayStateRadioSelection_Suppress_SurvivesSerializedObjectRoundTrip()
+        {
+            // 回帰テスト（Suppress 設定が Play 突入で .asset 上 1→0 に戻る不具合）。
+            // bound な ListView / ObjectField は SerializedObject の内部キャッシュを保持し、
+            // Domain Reload 直前に ApplyModifiedProperties で書き戻す。Suppress 切替が
+            // SerializedProperty 経由で確定されていないと、その書き戻しで suppress が
+            // 旧値(false) に巻き戻る。ここでは radio で Suppress にしたあと、SerializedObject の
+            // ラウンドトリップ（ApplyModifiedProperties → 新規 SerializedObject で再読込）を
+            // 経ても suppress が保持されることを検証する。
+            _so = CreateProfileWithSlots(BlinkSlotName);
+            _so.Expressions.Add(CreateExpression(new OverlaySlotBindingSerializable { slot = BlinkSlotName }));
+
+            var root = BuildInspectorRoot();
+            var radio = root.Q<RadioButtonGroup>(FacialCharacterProfileSOInspector.ExpressionOverlayStateRadioName);
+            Assert.That(radio, Is.Not.Null);
+
+            radio.value = ToRadioIndex(OverlaySlotBindingState.Suppress);
+
+            // managed モデル即時反映を確認。
+            Assert.That(_so.Expressions[0].overlays[0].suppress, Is.True,
+                "Suppress 切替直後の managed モデルで suppress=true である必要があります。");
+
+            // bound UI が保持する SerializedObject の書き戻しを模す。
+            // SerializedProperty 経由で確定していれば、Inspector の serializedObject を
+            // ApplyModifiedProperties しても managed の suppress=true を上書きしない。
+            var inspectorSerialized = GetSerializedObject(_editor);
+            inspectorSerialized.ApplyModifiedProperties();
+            Assert.That(_so.Expressions[0].overlays[0].suppress, Is.True,
+                "Inspector serializedObject の ApplyModifiedProperties 後に suppress が巻き戻りました。");
+
+            // .asset へ書かれる値（新規 SerializedObject 読み出し）でも保持されること。
+            var fresh = new SerializedObject(_so);
+            var suppressProp = fresh
+                .FindProperty("_expressions")
+                .GetArrayElementAtIndex(0)
+                .FindPropertyRelative("overlays")
+                .GetArrayElementAtIndex(0)
+                .FindPropertyRelative("suppress");
+            Assert.That(suppressProp, Is.Not.Null);
+            Assert.That(suppressProp.boolValue, Is.True,
+                "永続化対象の SerializedObject で suppress=true が保持されていません。");
+        }
+
+        [Test]
+        public void OverlayStateRadioSelection_DefaultFallbackToSuppress_AddsBindingAndSurvivesRoundTrip()
+        {
+            // DefaultFallback（overlays に該当 slot の binding が無い）から Suppress へ切替える際は、
+            // overlays 配列へ新規要素を Add する。配列構造変更が SerializedObject 経由で確定されていないと
+            // 新要素ごと巻き戻る。新規 Add ケースでもラウンドトリップで suppress が保持されることを検証する。
+            _so = CreateProfileWithSlots(BlinkSlotName, WinkSlotName);
+            // overlays は blink のみ宣言。wink slot の binding は未作成（DefaultFallback）。
+            _so.Expressions.Add(CreateExpression(new OverlaySlotBindingSerializable { slot = BlinkSlotName }));
+
+            var root = BuildInspectorRoot();
+            var radios = new List<RadioButtonGroup>();
+            root.Query<RadioButtonGroup>(FacialCharacterProfileSOInspector.ExpressionOverlayStateRadioName)
+                .ForEach(radios.Add);
+            // blink / wink の 2 行が描画される（wink は CollectOverlaySlotsForExpression が宣言 slot を補完）。
+            Assert.That(radios, Has.Count.GreaterThanOrEqualTo(2),
+                "宣言済み slot ごとに overlay 行とラジオが描画される必要があります。");
+
+            int initialOverlayCount = _so.Expressions[0].overlays.Count;
+
+            // 2 行目（wink, DefaultFallback）を Suppress に切替える → 新規 binding を Add。
+            radios[1].value = ToRadioIndex(OverlaySlotBindingState.Suppress);
+
+            Assert.That(_so.Expressions[0].overlays.Count, Is.GreaterThan(initialOverlayCount),
+                "DefaultFallback→Suppress で overlays に新規 binding が Add される必要があります。");
+
+            var added = _so.Expressions[0].overlays.Find(b => b != null && b.slot == WinkSlotName);
+            Assert.That(added, Is.Not.Null, "wink slot の binding が Add されていません。");
+            Assert.That(added.suppress, Is.True, "Add された binding の suppress が true ではありません。");
+
+            // ラウンドトリップで新規要素・suppress が保持されること。
+            var inspectorSerialized = GetSerializedObject(_editor);
+            inspectorSerialized.ApplyModifiedProperties();
+
+            var fresh = new SerializedObject(_so);
+            var overlaysProp = fresh
+                .FindProperty("_expressions")
+                .GetArrayElementAtIndex(0)
+                .FindPropertyRelative("overlays");
+            int foundIndex = -1;
+            for (int i = 0; i < overlaysProp.arraySize; i++)
+            {
+                var slotProp = overlaysProp.GetArrayElementAtIndex(i).FindPropertyRelative("slot");
+                if (slotProp != null && slotProp.stringValue == WinkSlotName)
+                {
+                    foundIndex = i;
+                    break;
+                }
+            }
+            Assert.That(foundIndex, Is.GreaterThanOrEqualTo(0),
+                "ラウンドトリップ後の SerializedObject に wink binding が存在しません。");
+            var freshSuppress = overlaysProp.GetArrayElementAtIndex(foundIndex).FindPropertyRelative("suppress");
+            Assert.That(freshSuppress.boolValue, Is.True,
+                "ラウンドトリップ後に Add された binding の suppress が巻き戻りました。");
+        }
+
+        [Test]
         public void CreateInspectorGUI_UndeclaredSlotReference_RendersWarningHelpBoxOnOverlayRow()
         {
             _so = CreateProfileWithSlots();
@@ -517,6 +617,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
         }
 
         private const BindingFlags InstanceNonPublic = BindingFlags.Instance | BindingFlags.NonPublic;
+
+        private static SerializedObject GetSerializedObject(UnityEditor.Editor editor)
+        {
+            Assert.That(editor, Is.Not.Null);
+            return editor.serializedObject;
+        }
 
         private static bool GetAutoSavePending(UnityEditor.Editor editor)
         {
