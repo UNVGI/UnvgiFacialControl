@@ -94,8 +94,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""schemaVersion"": ""1.0"",
                 ""rendererPaths"": [""Body""],
                 ""layers"": [
-                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[]},
-                    {""name"":""overlay"",""priority"":1,""exclusionMode"":""lastWins"",""inputSources"":[]}
+                    {""name"":""emotion"",""priority"":0,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""input"",""weight"":1.0}]},
+                    {""name"":""overlay"",""priority"":1,""exclusionMode"":""lastWins"",""inputSources"":[{""id"":""input:overlay:blink"",""weight"":1.0}]}
                 ],
                 ""expressions"": [
                     {
