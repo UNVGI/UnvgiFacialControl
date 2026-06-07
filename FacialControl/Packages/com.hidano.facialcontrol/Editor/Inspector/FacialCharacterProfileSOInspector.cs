@@ -158,6 +158,9 @@ namespace Hidano.FacialControl.Editor.Inspector
         private VisualElement _expressionLibraryContainer;
         private VisualElement _gazeConfigsContainer;
         private Tab _gazeTab;
+        // CreateInspectorGUI が返すルート要素。overlay 編集を bind 更新サイクルと衝突させないよう
+        // 次ティックへ遅延実行する際の schedule / panel 判定に使用する。
+        private VisualElement _rootElement;
         private readonly List<DropdownField> _slotDropdowns = new List<DropdownField>();
         private readonly List<ExpressionLayerDropdownField> _expressionLayerDropdowns = new List<ExpressionLayerDropdownField>();
 
@@ -186,6 +189,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             _sampler = new AnimationClipExpressionSampler();
 
             var root = new VisualElement();
+            _rootElement = root;
 
             var styleSheet = FacialControlStyles.Load();
             if (styleSheet != null)
@@ -839,8 +843,19 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         private void ApplyDefaultOverlayClip(int overlayIndex, AnimationClip clip)
         {
-            // SerializedProperty 経由で確定する（managed 直書き + Update のみによる巻き戻り回避。
-            // ApplyExpressionOverlayState のコメント参照）。
+            // 実機 Inspector では bind 更新サイクルとの衝突（Assertion failed）を避けるため
+            // 次ティックへ遅延実行する。テスト等の Panel 未 attach 環境では同期実行される。
+            RunOverlayEditDeferredOrImmediate(
+                () => ApplyDefaultOverlayClipCore(overlayIndex, clip));
+        }
+
+        /// <summary>
+        /// Default overlay の AnimationClip を SerializedProperty 経由で確定する
+        /// （managed 直書き + Update のみによる巻き戻り回避。ApplyExpressionOverlayStateCore のコメント参照）。
+        /// 遅延実行されうるため overlayIndex は本メソッド内で再検証する。
+        /// </summary>
+        private void ApplyDefaultOverlayClipCore(int overlayIndex, AnimationClip clip)
+        {
             serializedObject.Update();
             if (_defaultOverlaysProperty == null
                 || overlayIndex < 0
@@ -2282,12 +2297,30 @@ namespace Hidano.FacialControl.Editor.Inspector
             OverlaySlotBindingState state,
             ObjectField clipField)
         {
-            // SerializedProperty 経由で編集し ApplyModifiedProperties() で確定する。
-            // managed モデルを直接書き換えて serializedObject.Update() のみで終えると、
-            // bound な ListView / ObjectField が保持する SerializedObject の内部キャッシュが
-            // 巻き戻り前の値（例: suppress=0）のまま残り、Domain Reload 直前の最終
-            // ApplyModifiedProperties で managed の新値を古い値で上書きしてしまう
-            // （Suppress 設定が Play 突入で .asset 上 1→0 に戻る不具合の根因）。
+            // 実機 Inspector では bind 更新サイクルとの衝突（Assertion failed）を避けるため
+            // 次ティックへ遅延実行する。テスト等の Panel 未 attach 環境では同期実行される。
+            RunOverlayEditDeferredOrImmediate(
+                () => ApplyExpressionOverlayStateCore(exprIndex, slot, state, clipField));
+        }
+
+        /// <summary>
+        /// Expression overlay の状態（Suppress / Override / DefaultFallback）を SerializedProperty 経由で確定する。
+        /// </summary>
+        /// <remarks>
+        /// SerializedProperty 経由で編集し ApplyModifiedProperties() で確定する。
+        /// managed モデルを直接書き換えて serializedObject.Update() のみで終えると、
+        /// bound な ListView / ObjectField が保持する SerializedObject の内部キャッシュが
+        /// 巻き戻り前の値（例: suppress=0）のまま残り、Domain Reload 直前の最終
+        /// ApplyModifiedProperties で managed の新値を古い値で上書きしてしまう
+        /// （Suppress 設定が Play 突入で .asset 上 1→0 に戻る不具合の根因）。
+        /// 遅延実行されうるため exprIndex / slot は本メソッド内で再検証する。
+        /// </remarks>
+        private void ApplyExpressionOverlayStateCore(
+            int exprIndex,
+            string slot,
+            OverlaySlotBindingState state,
+            ObjectField clipField)
+        {
             serializedObject.Update();
             var bindingProp = GetOrCreateExpressionOverlayBindingProperty(exprIndex, slot);
             if (bindingProp == null) return;
@@ -2324,9 +2357,19 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         private void ApplyExpressionOverlayClip(int exprIndex, string slot, AnimationClip clip)
         {
-            // SerializedProperty 経由で suppress / animationClip を確定する
-            // （managed 直書き + Update のみによる巻き戻り回避。
-            //  ApplyExpressionOverlayState のコメント参照）。
+            // 実機 Inspector では bind 更新サイクルとの衝突（Assertion failed）を避けるため
+            // 次ティックへ遅延実行する。テスト等の Panel 未 attach 環境では同期実行される。
+            RunOverlayEditDeferredOrImmediate(
+                () => ApplyExpressionOverlayClipCore(exprIndex, slot, clip));
+        }
+
+        /// <summary>
+        /// Expression overlay の AnimationClip を SerializedProperty 経由で確定する
+        /// （managed 直書き + Update のみによる巻き戻り回避。ApplyExpressionOverlayStateCore のコメント参照）。
+        /// 遅延実行されうるため exprIndex / slot は本メソッド内で再検証する。
+        /// </summary>
+        private void ApplyExpressionOverlayClipCore(int exprIndex, string slot, AnimationClip clip)
+        {
             serializedObject.Update();
             var bindingProp = GetOrCreateExpressionOverlayBindingProperty(exprIndex, slot);
             if (bindingProp == null) return;
@@ -2618,6 +2661,37 @@ namespace Hidano.FacialControl.Editor.Inspector
             ExplicitUserRemoval,
             ExpressionDeletion,
             AnalogToNonAnalogKindTransition,
+        }
+
+        /// <summary>
+        /// overlay 編集（SerializedProperty 構造変更 + ApplyModifiedProperties）を、
+        /// UI Toolkit の bind 更新サイクルと衝突させないよう実行する。
+        ///
+        /// ラジオ / ObjectField の値変更コールバックは Panel の bindings 更新フェーズ中に発火しうる。
+        /// その最中に bound な配列（_expressions 以下の overlays）を InsertArrayElementAtIndex で
+        /// 構造変更したり ApplyModifiedProperties で確定すると、bound UI の再 bind が再入的に走り、
+        /// BaseVisualTreeHierarchyTrackerUpdater が整合性 Assert（Assertion failed）に引っかかる。
+        ///
+        /// ライブ Panel に attach 済み（実機 Inspector）の場合は次ティックへ遅延実行して衝突を避ける。
+        /// Panel 未 attach（EditMode テスト等、スケジューラが回らない環境）の場合は同期実行する。
+        /// いずれの場合も <paramref name="editCore"/> 内で ApplyModifiedProperties + ScheduleAutoSave まで確定する。
+        /// </summary>
+        private void RunOverlayEditDeferredOrImmediate(Action editCore)
+        {
+            if (editCore == null) return;
+
+            if (_rootElement != null && _rootElement.panel != null)
+            {
+                _rootElement.schedule.Execute(() =>
+                {
+                    // 遅延実行時点で target / serializedObject が破棄されていないか再検証する。
+                    if (this == null || target == null || serializedObject == null) return;
+                    editCore();
+                });
+                return;
+            }
+
+            editCore();
         }
 
         private static int BeginUndoGroup(string groupName)
