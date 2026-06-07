@@ -42,7 +42,9 @@ namespace Hidano.FacialControl.Editor.AutoExport
                 return;
             }
 
-            ExportAll("playmode");
+            // [一時切り分け 2026-06-07] AutoExporter が Suppress を巻き戻す犯人か判定するため Play 突入時のエクスポートを無効化。
+            // 切り分け後に必ず元へ戻す。
+            // ExportAll("playmode");
         }
 
         /// <summary>
