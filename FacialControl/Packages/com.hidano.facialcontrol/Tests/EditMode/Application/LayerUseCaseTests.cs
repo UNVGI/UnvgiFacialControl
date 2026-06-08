@@ -124,12 +124,29 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
             Assert.DoesNotThrow(() => _useCase.SetLayerWeight("unknown", 0.5f));
         }
 
-        // --- UpdateWeights: LayerOverrideMask 抑制 ---
+        // --- UpdateWeights: LayerOverrideMask 抑制（系2 駆動）---
+        //
+        // 抑制計算は系2(ExpressionTriggerInputSource)の active を見るため、
+        // emotion レイヤーに系2 sink を additionalSources で追加し TriggerOn で active 化する。
+        // 出力駆動(系1 の LayerExpressionSource)は euc.Activate のまま（Q2=A: 系1 残す）。
 
-        private static (LayerUseCase useCase, ExpressionUseCase expr) BuildOverrideScenario(
-            LayerOverrideMask smileMask,
-            out Expression smile,
-            out Expression overlayExpr)
+        // 系2 の具象は別アセンブリ(InputSystem)にあるため、テストでは基底を継承した Fake を使う。
+        private sealed class FakeTriggerSource : ExpressionTriggerInputSourceBase
+        {
+            public FakeTriggerSource(FacialProfile profile, string[] blendShapeNames)
+                : base(
+                    InputSourceId.Parse("input"),
+                    blendShapeNames.Length,
+                    maxStackDepth: 4,
+                    exclusionMode: ExclusionMode.LastWins,
+                    blendShapeNames: blendShapeNames,
+                    profile: profile)
+            {
+            }
+        }
+
+        private static (LayerUseCase luc, ExpressionUseCase euc, FakeTriggerSource emotionTrigger, Expression smile, Expression ov)
+            BuildOverrideScenario(LayerOverrideMask smileMask)
         {
             // emotion(bit0, priority0) と overlay(bit1, priority1) の 2 レイヤー。
             var layers = new[]
@@ -138,27 +155,32 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
                 new LayerDefinition("overlay", 1, ExclusionMode.LastWins),
             };
             var bsNames = new[] { "bs_a", "bs_b" };
-            smile = new Expression(
+            var smile = new Expression(
                 "smile", "smile", "emotion", 0.1f, TransitionCurve.Linear,
                 new[] { new BlendShapeMapping("bs_a", 1f, null) },
                 null,
                 smileMask);
-            overlayExpr = new Expression(
+            var ov = new Expression(
                 "ov", "ov", "overlay", 0.1f, TransitionCurve.Linear,
                 new[] { new BlendShapeMapping("bs_b", 1f, null) });
-            var profile = new FacialProfile("1.0", layers, new[] { smile, overlayExpr });
+            var profile = new FacialProfile("1.0", layers, new[] { smile, ov });
             var euc = new ExpressionUseCase(profile);
-            var luc = new LayerUseCase(profile, euc, bsNames);
-            return (luc, euc);
+            // emotion レイヤー(idx0)に系2 を追加。抑制計算は系2 の active から行われる。
+            var emotionTrigger = new FakeTriggerSource(profile, bsNames);
+            var luc = new LayerUseCase(
+                profile, euc, bsNames,
+                new[] { (0, (IInputSource)emotionTrigger, 1f) });
+            return (luc, euc, emotionTrigger, smile, ov);
         }
 
         [Test]
         public void UpdateWeights_ActiveExpressionOverridesLayer_SuppressesTargetLayer()
         {
             // smile(emotion) が overlay(bit1) を OverrideMask で抑制する。
-            var (luc, euc) = BuildOverrideScenario(LayerOverrideMask.Bit1, out var smile, out var ov);
+            var (luc, euc, emotionTrigger, smile, ov) = BuildOverrideScenario(LayerOverrideMask.Bit1);
             euc.Activate(smile);
             euc.Activate(ov);
+            emotionTrigger.TriggerOn("smile");
 
             luc.UpdateWeights(1f);
             var output = luc.GetBlendedOutput();
@@ -171,9 +193,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
         public void UpdateWeights_NoOverrideMask_TargetLayerContributes()
         {
             // OverrideMask=None なら overlay は通常どおりブレンドされる（対照）。
-            var (luc, euc) = BuildOverrideScenario(LayerOverrideMask.None, out var smile, out var ov);
+            var (luc, euc, emotionTrigger, smile, ov) = BuildOverrideScenario(LayerOverrideMask.None);
             euc.Activate(smile);
             euc.Activate(ov);
+            emotionTrigger.TriggerOn("smile");
 
             luc.UpdateWeights(1f);
             var output = luc.GetBlendedOutput();
@@ -186,9 +209,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
         public void UpdateWeights_OverrideMaskSelfLayer_DoesNotSuppressSelf()
         {
             // smile が自己レイヤー(emotion=bit0)を mask に含めても自己は抑制しない（レイヤー内ブレンド担保）。
-            var (luc, euc) = BuildOverrideScenario(LayerOverrideMask.Bit0, out var smile, out var ov);
+            var (luc, euc, emotionTrigger, smile, ov) = BuildOverrideScenario(LayerOverrideMask.Bit0);
             euc.Activate(smile);
             euc.Activate(ov);
+            emotionTrigger.TriggerOn("smile");
 
             luc.UpdateWeights(1f);
             var output = luc.GetBlendedOutput();

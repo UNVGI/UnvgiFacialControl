@@ -179,6 +179,16 @@
 - **出典**: S-9（LipSync の AnimationClip 形式が動かない件の根本対応） / [`.kiro/specs/lipsync-animationclip-rework/requirements.md`](../.kiro/specs/lipsync-animationclip-rework/requirements.md) 要件 1.3 / [`.kiro/specs/lipsync-animationclip-rework/design.md`](../.kiro/specs/lipsync-animationclip-rework/design.md) Non-Goals
 - **内容**: S-9 の主要対応は `lipsync-animationclip-rework` spec で対応済み。`ExpressionPhonemeEntry` の追加と `AnimationClipPhonemeEntry` sample 失敗時 fallback により、「AnimationClip 形式が rendererPath 不一致などで動かない」体験は本 spec で解消した。一方、候補 (b)「`AnimationUtility.GetCurveBindings` による Editor 事前検証 + runtime path 補正」は本 spec のスコープ外とし、将来課題として残置する。
 - **トリガ**: AnimationClip 形式を引き続き主経路として使いたいユーザー要望が増えたとき / rendererPath 不一致を Inspector 上で自動診断・補正したい需要が顕在化したとき / AnimationClip 作成支援ツールの spec を切るとき
+
+### M-25: 表情 active 取得の系1/系2 二重化解消（ExpressionUseCase + 空 LayerExpressionSource の撤去）
+- **出典**: 2026-06-08 active-expression-unification 設計セッション（[`.kiro/specs/active-expression-unification/design-notes.md`](../.kiro/specs/active-expression-unification/design-notes.md)）
+- **内容**: overlay suppress / layerOverrideMask の active 取得を系2（`ExpressionTriggerInputSource`）ベースに統一する際、回帰最小・preview 期限のため暫定的に系1（`ExpressionUseCase` + sourceIdx=0 の空 `LayerExpressionSource` 約240行）を残す。実機 InputSystem 経路では系1 は populate されず death-weight（系1 と系2 は相互排他で、実機では系2 のみ動く）。将来、系2 に一本化する:
+  - (a) `ExpressionUseCase` を系2 のファサード化（`Activate/Deactivate`→系2 `TriggerOn/Off`、`GetActiveExpressions`→系2 読み）または削除。
+  - (b) `LayerUseCase` の sourceIdx=0 `LayerExpressionSource` 撤去（系2 が transition を担うため重複）。
+  - (c) public API `FacialController.Activate/Deactivate` を系2 に繋ぐ場合の専用（非デバイス）系2 sink の要否。CLAUDE.md「公開 API シグネチャは非破壊に維持」との整合（`LayerUseCase` コンストラクタ変更に注意）。
+- **トリガ**: active-expression-unification 実装が実機で安定後 / Domain refactor 時 / preview 後の整理フェーズ
+- **影響範囲**: `ExpressionUseCase`, `LayerUseCase`(コンストラクタ/`LayerExpressionSource`), `FacialController.Activate/Deactivate`, `OverlayInputSource` provider 経路, 対応 EditMode/PlayMode テスト
+- **関連**: M-18（ベース表情の Layer/OverrideMask 保持）, M-14（Domain への動的 Expression driver 概念導入）
 - **影響範囲**: `com.hidano.facialcontrol.lipsync` の Editor 検証 UI、`AnimationClipPhonemeEntry` の Inspector 表示、AnimationClip path 解決 helper、対応 EditMode テスト
 - **関連**: `lipsync-animationclip-rework` spec（S-9 本体対応済み）、将来の AnimationClip 作成支援ツール
 

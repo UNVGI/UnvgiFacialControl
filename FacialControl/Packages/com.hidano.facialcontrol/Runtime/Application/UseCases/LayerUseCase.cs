@@ -23,6 +23,8 @@ namespace Hidano.FacialControl.Application.UseCases
         private string[] _blendShapeNames;
         private readonly Dictionary<string, float> _layerWeights;
         private IReadOnlyList<(int layerIdx, IInputSource source, float weight)> _additionalInputSources;
+        // layerOverrideMask 抑制計算用: 系2(ExpressionTriggerInputSource)から集約した active 表情の再利用バッファ（GC 回避）。
+        private readonly List<Expression> _layer2ActiveBuffer = new List<Expression>();
 
         private LayerInputSourceRegistry _registry;
         private LayerInputSourceWeightBuffer _weightBuffer;
@@ -137,14 +139,17 @@ namespace Hidano.FacialControl.Application.UseCases
             if (_layerSuppressed != null && _layerSuppressed.Length > 0)
             {
                 Array.Clear(_layerSuppressed, 0, _layerSuppressed.Length);
-                for (int e = 0; e < activeExpressions.Count; e++)
+                // 抑制は実機の active 表情（系2 = ExpressionTriggerInputSource 群）から計算する。
+                // 系1(GetActiveExpressions)は InputSystem 経路で空のため、additionalSources の系2 を集約する。
+                CollectActiveExpressionsFromAdditionalSources(_layer2ActiveBuffer);
+                for (int e = 0; e < _layer2ActiveBuffer.Count; e++)
                 {
-                    var mask = activeExpressions[e].OverrideMask;
+                    var mask = _layer2ActiveBuffer[e].OverrideMask;
                     if (mask == LayerOverrideMask.None)
                     {
                         continue;
                     }
-                    string selfLayer = _profile.GetEffectiveLayer(activeExpressions[e]);
+                    string selfLayer = _profile.GetEffectiveLayer(_layer2ActiveBuffer[e]);
                     for (int l = 0; l < layerSpan.Length && l < 32; l++)
                     {
                         if (layerSpan[l].Name == selfLayer)
@@ -428,6 +433,40 @@ namespace Hidano.FacialControl.Application.UseCases
                 _weightBuffer.SetWeight(aw.layerIdx, aw.sourceIdx, aw.weight);
             }
             _aggregator = new LayerInputSourceAggregator(_registry, _weightBuffer, bsCount);
+        }
+
+        /// <summary>
+        /// 追加入力源（系2 = <see cref="ExpressionTriggerInputSourceBase"/> 群）の
+        /// <see cref="ExpressionTriggerInputSourceBase.ActiveExpressionIds"/> を走査し、
+        /// 実機で active な表情を <paramref name="buffer"/> に集約する（layerOverrideMask 抑制計算用）。
+        /// 同一 id が複数 sink に積まれていても OverrideMask 適用は冪等なので重複は許容する。
+        /// </summary>
+        private void CollectActiveExpressionsFromAdditionalSources(List<Expression> buffer)
+        {
+            buffer.Clear();
+            if (_additionalInputSources == null)
+            {
+                return;
+            }
+            for (int i = 0; i < _additionalInputSources.Count; i++)
+            {
+                if (_additionalInputSources[i].source is ExpressionTriggerInputSourceBase trigger)
+                {
+                    var ids = trigger.ActiveExpressionIds;
+                    if (ids == null)
+                    {
+                        continue;
+                    }
+                    for (int j = 0; j < ids.Count; j++)
+                    {
+                        var expr = _profile.FindExpressionById(ids[j]);
+                        if (expr.HasValue)
+                        {
+                            buffer.Add(expr.Value);
+                        }
+                    }
+                }
+            }
         }
 
         private Dictionary<string, List<Expression>> GroupByLayer(List<Expression> expressions)

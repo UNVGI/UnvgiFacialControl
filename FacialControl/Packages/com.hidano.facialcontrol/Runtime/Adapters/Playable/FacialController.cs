@@ -49,6 +49,9 @@ namespace Hidano.FacialControl.Adapters.Playable
         private Animator _animator;
         private PlayableGraphBuilder.BuildResult _graphBuildResult;
         private ExpressionUseCase _expressionUseCase;
+        // 系2(ExpressionTriggerInputSource)ベースの active provider。OverlayInputSource(overlay suppress)へ
+        // 後期バインドで供給する（実機 InputSystem 経路の active 表情を解決するため）。
+        private Layer2ActiveExpressionProvider _layer2Provider;
         private LayerUseCase _layerUseCase;
         private FacialProfile? _currentProfile;
         private string[] _blendShapeNames;
@@ -226,6 +229,7 @@ namespace Hidano.FacialControl.Adapters.Playable
 
             _currentProfile = profile;
             _expressionUseCase = new ExpressionUseCase(profile);
+            _layer2Provider = new Layer2ActiveExpressionProvider(profile);
 
             var blendShapeNames = _blendShapeNames ?? Array.Empty<string>();
 
@@ -236,6 +240,11 @@ namespace Hidano.FacialControl.Adapters.Playable
 
             // profile.LayerInputSources を child scope 内 InputSourceRegistry 経由で IInputSource に解決する。
             var additionalSources = ResolveLayerInputSourcesFromRegistry(profile);
+
+            // overlay suppress の active 取得を系2(ExpressionTriggerInputSource)ベースにする。
+            // OverlayInputSource は child scope build 時点（additionalSources 解決前）に
+            // _layer2Provider を受け取っているため、解決済みの系2 群をここで後期バインドで流し込む。
+            PopulateLayer2Provider(profile, additionalSources);
 
             // LayerUseCase に組み立て済み IInputSource 列を注入し、
             // 内部で LayerInputSourceRegistry / LayerInputSourceWeightBuffer / LayerInputSourceAggregator を再構築させる。
@@ -292,7 +301,7 @@ namespace Hidano.FacialControl.Adapters.Playable
                     bindings,
                     gameObject,
                     childScopeName: name,
-                    activeExpressionProvider: _expressionUseCase);
+                    activeExpressionProvider: _layer2Provider);
                 CacheChildScopeServices();
             }
             catch (Exception ex)
@@ -629,6 +638,36 @@ namespace Hidano.FacialControl.Adapters.Playable
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// 解決済みの追加入力源のうち系2（<see cref="Hidano.FacialControl.Domain.Services.ExpressionTriggerInputSourceBase"/>）を
+        /// レイヤー名付きで <see cref="_layer2Provider"/> に後期バインドする。
+        /// OverlayInputSource は本メソッド実行前に空の provider を注入済みのため、
+        /// ここで実体を流し込むことで実機 InputSystem 経路の active 表情が overlay suppress に反映される。
+        /// </summary>
+        private void PopulateLayer2Provider(
+            FacialProfile profile,
+            System.Collections.Generic.List<(int layerIdx, Hidano.FacialControl.Domain.Interfaces.IInputSource source, float weight)> additionalSources)
+        {
+            if (_layer2Provider == null || additionalSources == null)
+            {
+                return;
+            }
+
+            var layerSpan = profile.Layers.Span;
+            var list = new System.Collections.Generic.List<(string, Hidano.FacialControl.Domain.Services.ExpressionTriggerInputSourceBase)>(additionalSources.Count);
+            for (int i = 0; i < additionalSources.Count; i++)
+            {
+                var entry = additionalSources[i];
+                if (entry.source is Hidano.FacialControl.Domain.Services.ExpressionTriggerInputSourceBase trigger
+                    && (uint)entry.layerIdx < (uint)layerSpan.Length)
+                {
+                    list.Add((layerSpan[entry.layerIdx].Name, trigger));
+                }
+            }
+
+            _layer2Provider.SetSources(list);
         }
 
         private void SetupBoneWriter(FacialProfile profile)
