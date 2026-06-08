@@ -673,7 +673,7 @@ namespace Hidano.FacialControl.Adapters.Json
         private static FacialProfile ConvertToProfile(ProfileSnapshotDto dto, InputSourceDto[][] inputSourceDtos)
         {
             var layers = ConvertLayers(dto.layers);
-            var expressions = ConvertExpressions(dto.expressions);
+            var expressions = ConvertExpressions(dto.expressions, dto.layers);
             var rendererPaths = ConvertRendererPaths(dto.rendererPaths);
             var layerInputSources = ConvertLayerInputSources(inputSourceDtos);
             var defaultOverlays = ConvertOverlaySlotBindings(dto.defaultOverlays);
@@ -911,10 +911,21 @@ namespace Hidano.FacialControl.Adapters.Json
             return layers;
         }
 
-        private static Expression[] ConvertExpressions(List<ExpressionDto> dtos)
+        private static Expression[] ConvertExpressions(List<ExpressionDto> dtos, List<LayerDefinitionDto> layerDtos)
         {
             if (dtos == null || dtos.Count == 0)
                 return Array.Empty<Expression>();
+
+            // OverrideMask の bit position ↔ layer 名の対応表（layers の宣言順）。
+            List<string> orderedLayerNames = null;
+            if (layerDtos != null)
+            {
+                orderedLayerNames = new List<string>(layerDtos.Count);
+                for (int li = 0; li < layerDtos.Count; li++)
+                {
+                    orderedLayerNames.Add(layerDtos[li]?.name);
+                }
+            }
 
             var expressions = new Expression[dtos.Count];
             for (int i = 0; i < dtos.Count; i++)
@@ -925,6 +936,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 var curve = ConvertTransitionCurve(snapshot != null ? snapshot.transitionCurvePreset : "Linear");
                 var blendShapes = ConvertBlendShapeMappings(snapshot != null ? snapshot.blendShapes : null);
                 var overlays = ConvertOverlaySlotBindings(snapshot != null ? snapshot.overlays : null);
+                var overrideMask = ToOverrideMask(d.layerOverrideMask, orderedLayerNames);
 
                 expressions[i] = new Expression(
                     d.id,
@@ -933,9 +945,34 @@ namespace Hidano.FacialControl.Adapters.Json
                     duration,
                     curve,
                     blendShapes,
-                    overlays);
+                    overlays,
+                    overrideMask);
             }
             return expressions;
+        }
+
+        /// <summary>
+        /// expression の layerOverrideMask（layer 名配列）を <see cref="LayerOverrideMask"/> へ変換する。
+        /// bit position は orderedLayerNames（layers の宣言順）の index に対応する。
+        /// 未登録の名前および 32 番目以降の bit はサイレントに無視する。
+        /// </summary>
+        private static LayerOverrideMask ToOverrideMask(List<string> layerNames, List<string> orderedLayerNames)
+        {
+            if (layerNames == null || layerNames.Count == 0
+                || orderedLayerNames == null || orderedLayerNames.Count == 0)
+            {
+                return LayerOverrideMask.None;
+            }
+            int mask = 0;
+            for (int i = 0; i < layerNames.Count; i++)
+            {
+                int idx = orderedLayerNames.IndexOf(layerNames[i]);
+                if (idx >= 0 && idx < 32)
+                {
+                    mask |= (1 << idx);
+                }
+            }
+            return (LayerOverrideMask)mask;
         }
 
         private static BlendShapeMapping[] ConvertBlendShapeMappings(List<BlendShapeSnapshotDto> dtos)

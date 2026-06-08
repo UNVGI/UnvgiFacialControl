@@ -295,6 +295,19 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
             IReadOnlyList<LayerDefinitionSerializable> _layers)
         {
             if (expressions == null || expressions.Count == 0) return Array.Empty<Expression>();
+
+            // OverrideMask の bit position ↔ layer 名の対応表（_layers の宣言順）。
+            // LayerOverrideMaskSerializable.ToMask が orderedLayerNames の index を bit position とする。
+            List<string> orderedLayerNames = null;
+            if (_layers != null)
+            {
+                orderedLayerNames = new List<string>(_layers.Count);
+                for (int li = 0; li < _layers.Count; li++)
+                {
+                    orderedLayerNames.Add(_layers[li]?.name);
+                }
+            }
+
             var result = new List<Expression>(expressions.Count);
             for (int i = 0; i < expressions.Count; i++)
             {
@@ -320,7 +333,8 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
                 }
 
                 var overlays = ConvertOverlays(src.overlays);
-                result.Add(new Expression(src.id, src.name, src.layer, duration, curve, blendShapes, overlays));
+                var overrideMask = LayerOverrideMaskSerializable.ToMask(src.layerOverrideMask, orderedLayerNames);
+                result.Add(new Expression(src.id, src.name, src.layer, duration, curve, blendShapes, overlays, overrideMask));
             }
             return result.ToArray();
         }

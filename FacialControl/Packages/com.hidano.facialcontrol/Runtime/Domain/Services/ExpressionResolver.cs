@@ -16,7 +16,7 @@ namespace Hidano.FacialControl.Domain.Services
     /// 出力バッファに対して値書込みのみを行う（managed heap 確保ゼロ）。
     /// </para>
     /// <para>
-    /// LayerOverrideMask の解釈は呼出側 (<c>LayerInputSourceAggregator</c>) で行う想定で、
+    /// LayerOverrideMask による他レイヤー抑制は <c>LayerUseCase</c> が最終ブレンド前に担い、
     /// 本サービスは snapshot table 引きと出力バッファへの値展開のみを担う。
     /// </para>
     /// </remarks>
