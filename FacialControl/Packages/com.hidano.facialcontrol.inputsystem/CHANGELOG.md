@@ -1,22 +1,20 @@
 # Changelog
 
-> **本パッケージはこれが初回リリースです**（以下の preview 系バージョンは npm 未公開の開発イテレーション履歴であり、公開リリースとしては本バージョンが最初です）。
+すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
 
-## preview.1 リリースノート追補
+## 初回リリース
+
+本パッケージはこれが初回リリースです。
 
 ### Breaking Changes
 
-- **`InputSystemAdapterBindingDrawer` の表示順を変更**: Input Drawer は InputActionAsset / Trigger bindings / Analog bindings / Gaze settings の順で、実際の設定フローに合わせて並び替えました。既存 preview の Inspector 表示順との見た目互換は維持しません。
-- **自動マイグレーション無し**: 過去 preview のスクリーンショット、手順書、Inspector 操作順を前提にした説明は更新が必要です。既存データの自動変換は行いません。必要に応じて `InputSystemAdapterBinding` の内容を Inspector 上で確認し直してください。
+- **`InputSystemAdapterBindingDrawer` の表示順を変更**: Input Drawer は InputActionAsset / Trigger bindings / Analog bindings / Gaze settings の順で、実際の設定フローに合わせて並び替えました。既存の Inspector 表示順との見た目互換は維持しません。
+- **自動マイグレーション無し**: 過去のスクリーンショット、手順書、Inspector 操作順を前提にした説明は更新が必要です。既存データの自動変換は行いません。必要に応じて `InputSystemAdapterBinding` の内容を Inspector 上で確認し直してください。
 - 根拠: spec `preview1-polish-pack` Req 6.5 / task 8.2。
-
-すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
-
-## [Unreleased]
 
 ### ⚠ BREAKING CHANGES
 
-- **ExpressionTrigger 系の予約 ID を `controller-expr` / `keyboard-expr` から単一の `input` に統合**。`ControllerExpressionInputSource` / `KeyboardExpressionInputSource` の二系統クラス分離は撤廃され、単一の `ExpressionTriggerInputSource` (予約 ID `input`) に統一された。`ExpressionTriggerInputSource.InputReservedId = "input"` を新設し、旧 `ControllerReservedId` / `KeyboardReservedId` 定数は削除。`InputRegistration` も `RegisterReservedId(InputReservedId, ...)` の単一登録に変更。InputSystem の Action 名で device 種別が抽象化されるため、コア側で device 別 ID を分ける必要がなくなった旨の設計判断による。**preview 段階のため後方互換は持たない**: 既存 SO / profile.json で `inputSources[].id` が `controller-expr` / `keyboard-expr` のままだと parse 時に warning + skip されるため、`input` (1 件) に書き換える必要がある。同梱サンプル (`Multi Source Blend Demo` の SO / profile.json / HUD) も新 ID に更新済み。
+- **ExpressionTrigger 系の予約 ID を `controller-expr` / `keyboard-expr` から単一の `input` に統合**。`ControllerExpressionInputSource` / `KeyboardExpressionInputSource` の二系統クラス分離は撤廃され、単一の `ExpressionTriggerInputSource` (予約 ID `input`) に統一された。`ExpressionTriggerInputSource.InputReservedId = "input"` を新設し、旧 `ControllerReservedId` / `KeyboardReservedId` 定数は削除。`InputRegistration` も `RegisterReservedId(InputReservedId, ...)` の単一登録に変更。InputSystem の Action 名で device 種別が抽象化されるため、コア側で device 別 ID を分ける必要がなくなった旨の設計判断による。**後方互換は持たない**: 既存 SO / profile.json で `inputSources[].id` が `controller-expr` / `keyboard-expr` のままだと parse 時に warning + skip されるため、`input` (1 件) に書き換える必要がある。同梱サンプル (`Multi Source Blend Demo` の SO / profile.json / HUD) も新 ID に更新済み。
 - **Gaze サブシステムを core パッケージへ移管**。`GazeExpressionConfig` の汎用フィールド (両目ボーン path / 初期回転 / yaw・pitch 軸 / 可動範囲 / Look 4 系統 clip / sample 配列) を core の新設 `Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig` に集約し、`GazeExpressionConfig` は `: GazeBindingConfig` 派生クラスとして `InputActionReference inputAction` のみを保持する形に縮小。フィールドアクセス (`cfg.leftEyeBonePath` 等) は継承により互換維持されるが、**namespace 由来の using 文や型直参照は破壊**: `Hidano.FacialControl.InputSystem.Adapters.ScriptableObject.GazeBlendShapeSampleEntry` → `Hidano.FacialControl.Adapters.ScriptableObject.GazeBlendShapeSampleEntry` へ移動。
 - **`GazeBonePoseProvider` を core (`Hidano.FacialControl.Adapters.Bone`) へ移管 + コンストラクタ署名変更**。旧 `(BoneTransformResolver, IReadOnlyDictionary<string, IAnalogInputSource>, IReadOnlyList<GazeExpressionConfig>)` から、新 `(BoneTransformResolver, IReadOnlyList<GazeBoneBinding>)` へ。`GazeBoneBinding` は `(GazeBindingConfig, IAnalogInputSource)` のペア readonly struct。sourceId 解決の責務は呼出側 (`FacialCharacterInputExtension`) に移動。これにより本 provider は Unity InputSystem に依存せず、OSC や ARKit 経路から目線ボーン制御を再利用できる。
 - **`GazeClipBlendShapeSampler` を core (`Hidano.FacialControl.Editor.Sampling`) へ移管**。旧 `Hidano.FacialControl.InputSystem.Editor.Sampling.GazeClipBlendShapeSampler` を参照していた外部コードは破壊。
@@ -60,11 +58,9 @@
 - `FacialCharacterSOInspector.BuildGazeBlendShapeField` (TextField 版) を削除。
 - 旧定数 `ExpressionRowGazeLeftXName` / `ExpressionRowGazeLeftYName` / `ExpressionRowGazeRightXName` / `ExpressionRowGazeRightYName` を削除。
 
-## [0.1.0-preview.2] - 2026-05-01
-
 ### ⚠ BREAKING CHANGES
 
-> 本リリースは spec `inspector-and-data-model-redesign` に基づく InputSystem 連携の全面改修を含みます。**v0.1.0-preview.1 以前の `FacialCharacterSO` / `*.inputactions` / Scene / Prefab はそのままでは動作しません**。アップグレード前に必ず [`Migration Guide v0.x → v1.0`](Documentation~/MIGRATION-v0.x-to-v1.0.md) の手順で資産を変換してください（Req 10.1, 10.6）。
+> 本リリースは spec `inspector-and-data-model-redesign` に基づく InputSystem 連携の全面改修を含みます。**旧バージョンの `FacialCharacterSO` / `*.inputactions` / Scene / Prefab はそのままでは動作しません**。アップグレード前に必ず [`Migration Guide v0.x → v1.0`](Documentation~/MIGRATION-v0.x-to-v1.0.md) の手順で資産を変換してください（Req 10.1, 10.6）。
 
 #### MonoBehaviour / Inspector の撤去
 
@@ -105,9 +101,7 @@
 - `Adapters.ScriptableObject.ExpressionBindingEntry.Category` field
 - `Adapters.ScriptableObject.Serializable.AnalogMappingFunctionSerializable`
 
-## [0.1.0-preview.1] - Unreleased
-
-初回プレリリース。`com.hidano.facialcontrol` の Unity InputSystem 連携アダプタとして提供。
+初回リリースで `com.hidano.facialcontrol` の Unity InputSystem 連携アダプタとして提供します。
 
 ### Added
 

@@ -1,19 +1,17 @@
 # Changelog
 
-> **本パッケージはこれが初回リリースです**（以下の preview 系バージョンは npm 未公開の開発イテレーション履歴であり、公開リリースとしては本バージョンが最初です）。
-
 すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
 
-## [Unreleased]
+## 初回リリース
+
+本パッケージはこれが初回リリースです。
 
 ### Fixed
 
 - phoneme overlay 入力源が解決されず口が動かない不具合を修正。`ULipSyncAdapterBinding` は overlay 入力源を binding の `Slug`（既定 `ulipsync`）で登録していた（キー `ulipsync:a`）が、レイヤーの入力源 id・`GetDefaultLayerInputSources`・サンプル・docs はすべて固定 prefix `lipsync-overlay:{slot}` を使うため、`FacialController` のレイヤー解決（`TryResolve("lipsync-overlay:a")`）がヒットせず集約に乗らなかった。登録/解除/重複検知を固定 prefix `lipsync-overlay` 基準に統一し、レイヤー id と一致させた。
-- マイク未接続時にノイズを拾って口が開くことがある不具合を修正。`ULipSyncProvider` の音量正規化を `rawVolume` の自前再正規化から uLipSync 本体が正規化済みの `LipSyncInfo.volume` 直結へ戻した。`rawVolume` を調整可能な `Min Volume`/`Max Volume` で再正規化する実装は、`Min Volume` を下げるほどノイズフロアを増幅してしまい、未接続・無音時の瞬間的なノイズで口が開いていた。音量正規化は uLipSync 本体の責務に委ね、FacialControl 側では再加工しない。これに伴い `ULipSyncAdapterBinding` の `Min Volume`/`Max Volume` 設定（Inspector 含む）と `ULipSyncProvider` の `minVolume`/`maxVolume` コンストラクタ引数を削除（preview 段階の破壊的変更）。小さい声・低ゲインで口が動かない場合は uLipSync 側（マイク gain / `uLipSyncMicrophone` / Profile）で調整する。
+- マイク未接続時にノイズを拾って口が開くことがある不具合を修正。`ULipSyncProvider` の音量正規化を `rawVolume` の自前再正規化から uLipSync 本体が正規化済みの `LipSyncInfo.volume` 直結へ戻した。`rawVolume` を調整可能な `Min Volume`/`Max Volume` で再正規化する実装は、`Min Volume` を下げるほどノイズフロアを増幅してしまい、未接続・無音時の瞬間的なノイズで口が開いていた。音量正規化は uLipSync 本体の責務に委ね、FacialControl 側では再加工しない。これに伴い `ULipSyncAdapterBinding` の `Min Volume`/`Max Volume` 設定（Inspector 含む）と `ULipSyncProvider` の `minVolume`/`maxVolume` コンストラクタ引数を削除。小さい声・低ゲインで口が動かない場合は uLipSync 側（マイク gain / `uLipSyncMicrophone` / Profile）で調整する。
 
-## [0.1.0-preview.1] - 2026-05-07
-
-初回プレリリース。`com.hidano.facialcontrol` と `com.hidano.ulipsync-asio` を接続する Windows 向け uLipSync 連携アダプタとして提供。
+初回リリースで `com.hidano.facialcontrol` と `com.hidano.ulipsync-asio` を接続する Windows 向け uLipSync 連携アダプタとして提供します。
 
 ### Added
 
