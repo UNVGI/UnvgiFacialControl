@@ -1,5 +1,7 @@
 # Changelog
 
+> **本パッケージはこれが初回リリースです**（以下の preview 系バージョンは npm 未公開の開発イテレーション履歴であり、公開リリースとしては本バージョンが最初です）。
+
 すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
 
 ## [Unreleased]
