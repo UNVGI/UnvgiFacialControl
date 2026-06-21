@@ -12,6 +12,7 @@ using Hidano.FacialControl.Editor.AutoExport;
 using Hidano.FacialControl.Editor.Common;
 using Hidano.FacialControl.Editor.Inspector.AdapterBindings;
 using Hidano.FacialControl.Editor.Sampling;
+using Hidano.FacialControl.Editor.Windows.Routing.Logic;
 
 namespace Hidano.FacialControl.Editor.Inspector
 {
@@ -170,6 +171,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         protected readonly List<string> _layerNameChoices = new List<string>();
         protected readonly List<string> _slotNameChoices = new List<string>();
+        private static readonly IPhonemeSlotInitializer s_phonemeSlotInitializer = new PhonemeSlotInitializer();
 
         protected IExpressionAnimationClipSampler _sampler;
         private bool _autoSavePending;
@@ -591,28 +593,10 @@ namespace Hidano.FacialControl.Editor.Inspector
         {
             if (_slotsProperty == null) return;
 
-            serializedObject.Update();
-            bool changed = false;
-            foreach (var reservedSlot in PhonemeOverlaySlots.ReservedNames)
-            {
-                if (ContainsSlot(_slotsProperty, reservedSlot))
-                {
-                    continue;
-                }
-
-                int index = _slotsProperty.arraySize;
-                _slotsProperty.InsertArrayElementAtIndex(index);
-                var slotProp = _slotsProperty.GetArrayElementAtIndex(index);
-                if (slotProp != null)
-                {
-                    slotProp.stringValue = reservedSlot;
-                    changed = true;
-                }
-            }
+            bool changed = s_phonemeSlotInitializer.EnsureReservedSlots(serializedObject);
 
             if (!changed) return;
 
-            serializedObject.ApplyModifiedProperties();
             EditorUtility.SetDirty(target);
             OnSlotsPropertyChanged();
         }
