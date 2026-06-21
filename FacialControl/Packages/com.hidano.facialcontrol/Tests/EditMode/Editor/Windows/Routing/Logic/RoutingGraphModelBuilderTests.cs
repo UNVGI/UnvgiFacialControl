@@ -128,7 +128,19 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Logic
             RoutingGraphModel model = _builder.Build(_profile);
 
             int declarationCount = _profile.Layers.Sum(layer => layer.inputSources.Count);
+            string[] allDeclarationCoordinates = _profile.Layers
+                .SelectMany(
+                    static (layer, layerIndex) => layer.inputSources.Select(
+                        static (_, declarationIndex) => $"{layerIndex}:{declarationIndex}"))
+                .ToArray();
+            string[] classifiedCoordinates = model.Edges
+                .Select(edge => $"{edge.LayerIndex}:{FindDeclarationIndex(_profile.Layers[edge.LayerIndex], edge.CanonicalId)}")
+                .Concat(model.InvalidEdges.Select(edge => $"{edge.LayerIndex}:{edge.DeclarationIndex}"))
+                .ToArray();
+
             Assert.That(model.Edges.Count + model.InvalidEdges.Count, Is.EqualTo(declarationCount));
+            CollectionAssert.AreEquivalent(allDeclarationCoordinates, classifiedCoordinates);
+            Assert.That(classifiedCoordinates.Distinct().Count(), Is.EqualTo(declarationCount));
 
             CollectionAssert.AreEqual(
                 new[]
@@ -147,6 +159,20 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Logic
             CollectionAssert.AreEqual(
                 new[] { "overlay" },
                 model.LayerNodes[1].OverrideMask.ToArray());
+        }
+
+        private static int FindDeclarationIndex(LayerDefinitionSerializable layer, string canonicalId)
+        {
+            for (int declarationIndex = 0; declarationIndex < layer.inputSources.Count; declarationIndex++)
+            {
+                if (layer.inputSources[declarationIndex].id == canonicalId)
+                {
+                    return declarationIndex;
+                }
+            }
+
+            Assert.Fail($"Declaration '{canonicalId}' was not found in the source profile.");
+            return -1;
         }
     }
 }
