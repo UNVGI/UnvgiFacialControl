@@ -125,6 +125,26 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Logic
         }
 
         [Test]
+        public void EnumerateForLayer_OverlayOnULipSyncBinding_ReturnsOnlyOverlayPhonemePorts()
+        {
+            var enumerator = new SourcePortEnumerator();
+            var binding = new ULipSyncAdapterBinding();
+
+            IReadOnlyList<SourcePort> ports = enumerator.EnumerateForLayer(binding, "overlay");
+
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    "lipsync-overlay:a",
+                    "lipsync-overlay:i",
+                    "lipsync-overlay:u",
+                    "lipsync-overlay:e",
+                    "lipsync-overlay:o",
+                },
+                ports.Select(port => port.CanonicalId).ToArray());
+        }
+
+        [Test]
         public void Enumerate_MultiSourceLegacyAndOverlayDerivedIds_AggregatesDistinctCanonicalIds()
         {
             var enumerator = new SourcePortEnumerator();

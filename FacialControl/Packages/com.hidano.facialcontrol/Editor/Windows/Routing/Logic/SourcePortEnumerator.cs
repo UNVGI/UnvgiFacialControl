@@ -46,6 +46,8 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Logic
 
     public interface ISourcePortEnumerator
     {
+        IReadOnlyList<SourcePort> EnumerateForLayer(AdapterBindingBase binding, string layerName);
+
         IReadOnlyList<SourcePort> Enumerate(AdapterBindingBase binding, IReadOnlyList<string> allLayerNames);
 
         IReadOnlyList<SourcePort> Enumerate(
@@ -60,6 +62,35 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Logic
     public sealed class SourcePortEnumerator : ISourcePortEnumerator
     {
         private const string OverlayLayerName = "overlay";
+
+        public IReadOnlyList<SourcePort> EnumerateForLayer(AdapterBindingBase binding, string layerName)
+        {
+            if (binding == null)
+            {
+                throw new ArgumentNullException(nameof(binding));
+            }
+
+            if (binding is not IAdapterBindingDefaultLayerInputs multipleInputs)
+            {
+                return Array.Empty<SourcePort>();
+            }
+
+            var ports = new List<SourcePort>();
+            var seenCanonicalIds = new HashSet<string>(StringComparer.Ordinal);
+
+            IEnumerable<(string id, float weight)> sources = multipleInputs.GetDefaultLayerInputSources(layerName);
+            if (sources == null)
+            {
+                return ports;
+            }
+
+            foreach ((string id, _) in sources)
+            {
+                TryAddPort(binding.Slug, id, seenCanonicalIds, ports);
+            }
+
+            return ports;
+        }
 
         public IReadOnlyList<SourcePort> Enumerate(
             AdapterBindingBase binding,
@@ -96,9 +127,14 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Logic
                         TryAddPort(binding.Slug, id, seenCanonicalIds, ports);
                     }
                 }
+
+                TryAddPort(binding.Slug, defaultLayer.DefaultLayerInputSourceId, seenCanonicalIds, ports);
+            }
+            else
+            {
+                TryAddPort(binding.Slug, defaultLayer.DefaultLayerInputSourceId, seenCanonicalIds, ports);
             }
 
-            TryAddPort(binding.Slug, defaultLayer.DefaultLayerInputSourceId, seenCanonicalIds, ports);
             return ports;
         }
 
