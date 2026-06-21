@@ -4,6 +4,7 @@ using System.Reflection;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.Editor.Windows.Routing.Logic;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEditor.UIElements;
@@ -232,26 +233,70 @@ namespace Hidano.FacialControl.Editor.Inspector.AdapterBindings
             IAdapterBindingDefaultLayer defaultLayer)
         {
             var result = new List<(string id, float weight)>();
-            if (defaultLayer is IAdapterBindingDefaultLayerInputs multipleInputs)
+            if (defaultLayer is not AdapterBindingBase binding)
             {
-                var sources = multipleInputs.GetDefaultLayerInputSources(defaultLayer.DefaultLayerName);
-                if (sources != null)
-                {
-                    foreach (var source in sources)
-                    {
-                        if (string.IsNullOrEmpty(source.id)) continue;
-                        result.Add((source.id, source.weight));
-                    }
-                }
                 return result;
             }
 
-            string sourceId = defaultLayer.DefaultLayerInputSourceId;
-            if (!string.IsNullOrEmpty(sourceId))
+            var sourcePorts = new SourcePortEnumerator().Enumerate(binding, Array.Empty<string>());
+            for (int i = 0; i < sourcePorts.Count; i++)
             {
-                result.Add((sourceId, 1f));
+                string canonicalId = sourcePorts[i].CanonicalId;
+                if (string.IsNullOrEmpty(canonicalId))
+                {
+                    continue;
+                }
+
+                result.Add((canonicalId, ResolveDefaultInputWeight(defaultLayer, canonicalId)));
             }
+
             return result;
+        }
+
+        private static float ResolveDefaultInputWeight(
+            IAdapterBindingDefaultLayer defaultLayer,
+            string canonicalId)
+        {
+            if (defaultLayer is IAdapterBindingDefaultLayerInputs multipleInputs)
+            {
+                foreach ((string layerName, IEnumerable<(string id, float weight)> sources) in
+                    EnumerateDefaultLayerSources(defaultLayer, multipleInputs))
+                {
+                    if (sources == null)
+                    {
+                        continue;
+                    }
+
+                    foreach ((string id, float weight) in sources)
+                    {
+                        if (string.Equals(id, canonicalId, StringComparison.Ordinal))
+                        {
+                            return weight;
+                        }
+                    }
+                }
+            }
+
+            return string.Equals(defaultLayer.DefaultLayerInputSourceId, canonicalId, StringComparison.Ordinal)
+                ? 1f
+                : 1f;
+        }
+
+        private static IEnumerable<(string layerName, IEnumerable<(string id, float weight)> sources)>
+            EnumerateDefaultLayerSources(
+                IAdapterBindingDefaultLayer defaultLayer,
+                IAdapterBindingDefaultLayerInputs multipleInputs)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string layerName in new[] { defaultLayer.DefaultLayerName, "overlay" })
+            {
+                if (string.IsNullOrEmpty(layerName) || !seen.Add(layerName))
+                {
+                    continue;
+                }
+
+                yield return (layerName, multipleInputs.GetDefaultLayerInputSources(layerName));
+            }
         }
 
         private static bool LayerContainsAnyInputSourceId(

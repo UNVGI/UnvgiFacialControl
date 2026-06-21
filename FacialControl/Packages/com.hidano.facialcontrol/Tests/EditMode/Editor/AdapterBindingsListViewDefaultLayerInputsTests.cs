@@ -126,9 +126,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
                 AssetDatabase.DeleteAsset(_assetPath);
                 _assetPath = null;
             }
+
             if (AssetDatabase.IsValidFolder(TempFolderPath))
             {
-                var remaining = AssetDatabase.FindAssets(string.Empty, new[] { TempFolderPath });
+                string[] remaining = AssetDatabase.FindAssets(string.Empty, new[] { TempFolderPath });
                 if (remaining == null || remaining.Length == 0)
                 {
                     AssetDatabase.DeleteAsset(TempFolderPath);
@@ -139,7 +140,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
         [Test]
         public void AutoFillDefaultInputSources_BindingImplementsMultipleInputs_AddsAllIdsToLayer()
         {
-            var descriptor = AdapterBindingDiscovery.FindByType(typeof(MockDefaultLayerInputsBinding));
+            AdapterBindingDescriptor? descriptor =
+                AdapterBindingDiscovery.FindByType(typeof(MockDefaultLayerInputsBinding));
             Assert.IsTrue(descriptor.HasValue);
 
             var view = new AdapterBindingsListView(_listProperty);
@@ -148,18 +150,17 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
             _serializedObject.Update();
 
             Assert.AreEqual(1, _so.Layers.Count);
-            var layer = _so.Layers[0];
+            LayerDefinitionSerializable layer = _so.Layers[0];
             Assert.AreEqual("overlay", layer.name);
             Assert.AreEqual(ExclusionMode.Blend, layer.exclusionMode);
 
-            var ids = layer.inputSources.Select(source => source.id).ToArray();
+            string[] ids = layer.inputSources.Select(source => source.id).ToArray();
             CollectionAssert.AreEqual(
-                new[] { "overlay:a", "lipsync-overlay:a", "overlay:i" },
+                new[] { "overlay:a", "lipsync-overlay:a", "overlay:i", "legacy-single" },
                 ids);
-            CollectionAssert.DoesNotContain(ids, "legacy-single");
 
-            var weights = layer.inputSources.Select(source => source.weight).ToArray();
-            CollectionAssert.AreEqual(new[] { 1.0f, 0.75f, 0.5f }, weights);
+            float[] weights = layer.inputSources.Select(source => source.weight).ToArray();
+            CollectionAssert.AreEqual(new[] { 1.0f, 0.75f, 0.5f, 1.0f }, weights);
         }
 
         [Test]
@@ -167,16 +168,17 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
         {
             var binding = new MockLayerNameSensitiveDefaultLayerInputsBinding();
 
-            var sources = InvokeResolveDefaultInputSources(binding);
+            IReadOnlyList<(string id, float weight)> sources = InvokeResolveDefaultInputSources(binding);
 
             CollectionAssert.AreEqual(
                 new[]
                 {
                     ("special:primary", 1.0f),
                     ("special:secondary", 0.25f),
+                    ("overlay:unexpected", 1.0f),
+                    ("legacy-should-not-be-used", 1.0f),
                 },
                 sources);
-            CollectionAssert.DoesNotContain(sources.Select(source => source.id).ToArray(), "legacy-should-not-be-used");
         }
 
         [Test]
@@ -184,7 +186,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
         {
             var binding = new MockLegacySingleDefaultLayerBinding();
 
-            var sources = InvokeResolveDefaultInputSources(binding);
+            IReadOnlyList<(string id, float weight)> sources = InvokeResolveDefaultInputSources(binding);
 
             CollectionAssert.AreEqual(
                 new[]
@@ -195,15 +197,23 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
         }
 
         [Test]
-        public void ResolveDefaultInputSources_ULipSyncBinding_CurrentInspectorPathReturnsEmpty()
+        public void ResolveDefaultInputSources_ULipSyncBinding_UsesSourcePortEnumeratorCanonicalIds()
         {
             var binding = new ULipSyncAdapterBinding();
 
-            var sources = InvokeResolveDefaultInputSources(binding);
+            IReadOnlyList<(string id, float weight)> sources = InvokeResolveDefaultInputSources(binding);
 
-            Assert.That(sources, Is.Empty,
-                "現行 AdapterBindingsListView は DefaultLayerName ('lipsync') をそのまま GetDefaultLayerInputSources に渡すため、" +
-                "overlay のみを返す uLipSync binding では source が列挙されない挙動を先に固定する。");
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    ("lipsync-overlay:a", 1.0f),
+                    ("lipsync-overlay:i", 1.0f),
+                    ("lipsync-overlay:u", 1.0f),
+                    ("lipsync-overlay:e", 1.0f),
+                    ("lipsync-overlay:o", 1.0f),
+                    ("ulipsync", 1.0f),
+                },
+                sources);
         }
 
         private static IReadOnlyList<(string id, float weight)> InvokeResolveDefaultInputSources(
@@ -214,10 +224,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor
                     "ResolveDefaultInputSources",
                     BindingFlags.NonPublic | BindingFlags.Static);
 
-            Assert.IsNotNull(s_resolveDefaultInputSourcesMethod,
-                "AdapterBindingsListView.ResolveDefaultInputSources を reflection で解決できる必要がある。");
+            Assert.IsNotNull(
+                s_resolveDefaultInputSourcesMethod,
+                "AdapterBindingsListView.ResolveDefaultInputSources must be available via reflection.");
 
-            return (List<(string id, float weight)>)s_resolveDefaultInputSourcesMethod.Invoke(null, new object[] { binding });
+            return (List<(string id, float weight)>)s_resolveDefaultInputSourcesMethod.Invoke(
+                null,
+                new object[] { binding });
         }
     }
 }
