@@ -130,8 +130,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Logic
             int declarationCount = _profile.Layers.Sum(layer => layer.inputSources.Count);
             string[] allDeclarationCoordinates = _profile.Layers
                 .SelectMany(
-                    static (layer, layerIndex) => layer.inputSources.Select(
-                        static (_, declarationIndex) => $"{layerIndex}:{declarationIndex}"))
+                    (layer, layerIndex) => layer.inputSources.Select(
+                        (_, declarationIndex) => $"{layerIndex}:{declarationIndex}"))
                 .ToArray();
             string[] classifiedCoordinates = model.Edges
                 .Select(edge => $"{edge.LayerIndex}:{FindDeclarationIndex(_profile.Layers[edge.LayerIndex], edge.CanonicalId)}")
