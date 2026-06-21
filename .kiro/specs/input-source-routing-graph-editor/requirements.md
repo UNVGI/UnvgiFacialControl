@@ -4,7 +4,7 @@
 入力源ルーティング・グラフエディタ（Input Source Routing Graph Editor）。
 
 ## 背景・解決する課題
-FacialControl のプロファイル（FacialCharacterProfileSO）では、各レイヤーの入力源を `inputSources[].id` という文字列 slug（例 `lipsync-overlay:a`）で保持し、現状 Inspector では生の PropertyField で人間が手打ちしている（FacialCharacterProfileSOInspector.cs:1708-1712）。この id は本来自由入力ではなく、プロファイルに載った Adapter Binding が GetDefaultLayerInputSources()/registry slug/overlay slot 宣言から算出できる確定値である。手打ち運用のため binding slug 形（ulipsync:a）と overlay 登録 prefix 形（lipsync-overlay:a）の取り違えが起き、InputSourceRegistry.TryResolve が無言で外れて音素が欠落する事故が実際に発生した（HANDOVER 参照）。本機能はこの「人間が id 文字列を直書きする運用」を廃し、グラフィカルな配線 UI に置き換える。
+FacialControl のプロファイル（FacialCharacterProfileSO）では、各レイヤーの入力源を `inputSources[].id` という文字列 slug（例 `lipsync-overlay:a`）で保持し、現状 Inspector では生の PropertyField で人間が手打ちしている（FacialCharacterProfileSOInspector.cs:1738-1743）。この id は本来自由入力ではなく、プロファイルに載った Adapter Binding が GetDefaultLayerInputSources()/registry slug/overlay slot 宣言から算出できる確定値である。手打ち運用のため binding slug 形（ulipsync:a）と overlay 登録 prefix 形（lipsync-overlay:a）の取り違えが起き、InputSourceRegistry.TryResolve が無言で外れて音素が欠落する事故が実際に発生した（HANDOVER 参照）。本機能はこの「人間が id 文字列を直書きする運用」を廃し、グラフィカルな配線 UI に置き換える。
 
 ## 中心思想
 id 文字列をソースノードの出力ポートが内部保持し、画面にはラベル（「あ」等）のみ表示。ユーザーはノード間に線（エッジ）を引くだけ。エッジが canonical id を運ぶので slug 不一致が物理的に発生不能になる。
