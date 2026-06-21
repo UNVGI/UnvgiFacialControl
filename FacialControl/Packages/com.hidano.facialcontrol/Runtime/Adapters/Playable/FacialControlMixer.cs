@@ -11,8 +11,9 @@ namespace Hidano.FacialControl.Adapters.Playable
     /// PlayableGraph のルートノードとして機能する ScriptPlayable。
     /// 複数の LayerPlayable からの出力をレイヤー優先度に基づいてブレンドして最終出力を生成する。
     /// <para>
-    /// オーバーライドは <c>ExpressionResolver</c> 経由で
-    /// <see cref="Hidano.FacialControl.Domain.Models.LayerOverrideMask"/> を解釈する形で適用される。
+    /// <see cref="Hidano.FacialControl.Domain.Models.LayerOverrideMask"/> による他レイヤー抑制は
+    /// Animator ベース経路（<c>LayerUseCase</c>）で適用される。Playable/Timeline 経路（本クラス）は
+    /// 将来対応で、現状 OverrideMask を解釈しない。
     /// </para>
     /// </summary>
     public class FacialControlMixer : PlayableBehaviour, IDisposable

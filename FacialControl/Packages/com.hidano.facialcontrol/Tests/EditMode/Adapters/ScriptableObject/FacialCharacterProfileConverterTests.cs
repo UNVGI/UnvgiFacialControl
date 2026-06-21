@@ -75,6 +75,58 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
         }
 
         [Test]
+        public void ConvertExpressions_LayerOverrideMask_MapsToOverrideMaskBits()
+        {
+            // layers 宣言順: emotion(bit0), overlay(bit1)。
+            // smile.layerOverrideMask=["overlay"] が OverrideMask=Bit1 に変換されることを検証する。
+            var layers = new List<LayerDefinitionSerializable>
+            {
+                new LayerDefinitionSerializable { name = "emotion", priority = 0, exclusionMode = ExclusionMode.LastWins },
+                new LayerDefinitionSerializable { name = "overlay", priority = 1, exclusionMode = ExclusionMode.LastWins },
+            };
+            var expressions = new List<ExpressionSerializable>
+            {
+                new ExpressionSerializable
+                {
+                    id = "smile",
+                    name = "Smile",
+                    layer = "emotion",
+                    transitionDuration = 0.1f,
+                    layerOverrideMask = new List<string> { "overlay" },
+                },
+            };
+
+            var profile = FacialCharacterProfileConverter.ToFacialProfile(
+                "2.0", layers, expressions, new List<string> { "Body" });
+
+            var expr = profile.Expressions.Span[0];
+            Assert.That(expr.OverrideMask, Is.EqualTo(LayerOverrideMask.Bit1),
+                "overlay は layers index1 なので Bit1 が立つべき。");
+        }
+
+        [Test]
+        public void ConvertExpressions_EmptyLayerOverrideMask_OverrideMaskNone()
+        {
+            var layers = new List<LayerDefinitionSerializable>
+            {
+                new LayerDefinitionSerializable { name = "emotion", priority = 0, exclusionMode = ExclusionMode.LastWins },
+            };
+            var expressions = new List<ExpressionSerializable>
+            {
+                new ExpressionSerializable
+                {
+                    id = "smile", name = "Smile", layer = "emotion", transitionDuration = 0.1f,
+                    layerOverrideMask = new List<string>(),
+                },
+            };
+
+            var profile = FacialCharacterProfileConverter.ToFacialProfile(
+                "2.0", layers, expressions, new List<string> { "Body" });
+
+            Assert.That(profile.Expressions.Span[0].OverrideMask, Is.EqualTo(LayerOverrideMask.None));
+        }
+
+        [Test]
         public void ConvertExpressions_CachedSnapshotAbsent_UsesInspectorTransitionDuration()
         {
             // cachedSnapshot が無い場合も従来通り src.transitionDuration が使われる。
@@ -355,12 +407,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests
             Assert.That(FacialCharacterProfileConverter.ToSORootGazeConfigs(new ProfileSnapshotDto()), Is.Empty);
         }
 
-        private static ExpressionSnapshotDto CreateSnapshotDto(
+        private static OverlaySnapshotDto CreateSnapshotDto(
             string rendererPath,
             string blendShapeName,
             float value)
         {
-            return new ExpressionSnapshotDto
+            return new OverlaySnapshotDto
             {
                 transitionDuration = 0.1f,
                 transitionCurvePreset = "EaseIn",

@@ -23,6 +23,8 @@ namespace Hidano.FacialControl.Application.UseCases
         private string[] _blendShapeNames;
         private readonly Dictionary<string, float> _layerWeights;
         private IReadOnlyList<(int layerIdx, IInputSource source, float weight)> _additionalInputSources;
+        // layerOverrideMask 抑制計算用: 系2(ExpressionTriggerInputSource)から集約した active 表情の再利用バッファ（GC 回避）。
+        private readonly List<Expression> _layer2ActiveBuffer = new List<Expression>();
 
         private LayerInputSourceRegistry _registry;
         private LayerInputSourceWeightBuffer _weightBuffer;
@@ -37,6 +39,9 @@ namespace Hidano.FacialControl.Application.UseCases
         // 宣言したソースが未トリガ状態でも intra-layer aggregator 出力はゼロに保たれるため
         // blend 結果を損ねない一方、trigger が入った瞬間に最終出力へ反映される。
         private bool[] _layerHasAdditionalSources;
+        // アクティブ表情の OverrideMask により抑制される（最終ブレンドから除外される）レイヤーのフラグ。
+        // UpdateWeights で per-frame 再計算する。
+        private bool[] _layerSuppressed;
         private float[] _finalOutput;
         private bool _disposed;
 
@@ -126,6 +131,39 @@ namespace Hidano.FacialControl.Application.UseCases
             var expressionsByLayer = GroupByLayer(activeExpressions);
 
             var layerSpan = _profile.Layers.Span;
+
+            // アクティブ表情の OverrideMask による他レイヤー抑制を計算する（抑制方式）。
+            // アクティブ表情が OverrideMask に立てたレイヤー（自己レイヤーを除く）を最終ブレンドから除外する。
+            // 自己レイヤーは「レイヤー内ブレンド担保」のため抑制対象外（LayerDefinition.layerOverrideMask の仕様）。
+            // bit position l は _profile.Layers の宣言順（= 変換時の orderedLayerNames）に対応する。
+            if (_layerSuppressed != null && _layerSuppressed.Length > 0)
+            {
+                Array.Clear(_layerSuppressed, 0, _layerSuppressed.Length);
+                // 抑制は実機の active 表情（系2 = ExpressionTriggerInputSource 群）から計算する。
+                // 系1(GetActiveExpressions)は InputSystem 経路で空のため、additionalSources の系2 を集約する。
+                CollectActiveExpressionsFromAdditionalSources(_layer2ActiveBuffer);
+                for (int e = 0; e < _layer2ActiveBuffer.Count; e++)
+                {
+                    var mask = _layer2ActiveBuffer[e].OverrideMask;
+                    if (mask == LayerOverrideMask.None)
+                    {
+                        continue;
+                    }
+                    string selfLayer = _profile.GetEffectiveLayer(_layer2ActiveBuffer[e]);
+                    for (int l = 0; l < layerSpan.Length && l < 32; l++)
+                    {
+                        if (layerSpan[l].Name == selfLayer)
+                        {
+                            continue;
+                        }
+                        if (((int)mask & (1 << l)) != 0)
+                        {
+                            _layerSuppressed[l] = true;
+                        }
+                    }
+                }
+            }
+
             for (int l = 0; l < layerSpan.Length; l++)
             {
                 string layerName = layerSpan[l].Name;
@@ -162,7 +200,10 @@ namespace Hidano.FacialControl.Application.UseCases
                 bool hasAdditional = _layerHasAdditionalSources != null
                     && l < _layerHasAdditionalSources.Length
                     && _layerHasAdditionalSources[l];
-                if (_layerSources[l].HasBeenActive || hasAdditional)
+                bool suppressed = _layerSuppressed != null
+                    && l < _layerSuppressed.Length
+                    && _layerSuppressed[l];
+                if ((_layerSources[l].HasBeenActive || hasAdditional) && !suppressed)
                 {
                     _filteredLayerInputs[activeCount++] = _layerInputScratch[l];
                 }
@@ -342,6 +383,7 @@ namespace Hidano.FacialControl.Application.UseCases
             _layerInputScratch = layerCount == 0 ? Array.Empty<LayerBlender.LayerInput>() : new LayerBlender.LayerInput[layerCount];
             _filteredLayerInputs = layerCount == 0 ? Array.Empty<LayerBlender.LayerInput>() : new LayerBlender.LayerInput[layerCount];
             _layerHasAdditionalSources = layerCount == 0 ? Array.Empty<bool>() : new bool[layerCount];
+            _layerSuppressed = layerCount == 0 ? Array.Empty<bool>() : new bool[layerCount];
 
             var bindings = new List<(int layerIdx, int sourceIdx, IInputSource source)>(layerCount);
             var layerSpan = _profile.Layers.Span;
@@ -391,6 +433,40 @@ namespace Hidano.FacialControl.Application.UseCases
                 _weightBuffer.SetWeight(aw.layerIdx, aw.sourceIdx, aw.weight);
             }
             _aggregator = new LayerInputSourceAggregator(_registry, _weightBuffer, bsCount);
+        }
+
+        /// <summary>
+        /// 追加入力源（系2 = <see cref="ExpressionTriggerInputSourceBase"/> 群）の
+        /// <see cref="ExpressionTriggerInputSourceBase.ActiveExpressionIds"/> を走査し、
+        /// 実機で active な表情を <paramref name="buffer"/> に集約する（layerOverrideMask 抑制計算用）。
+        /// 同一 id が複数 sink に積まれていても OverrideMask 適用は冪等なので重複は許容する。
+        /// </summary>
+        private void CollectActiveExpressionsFromAdditionalSources(List<Expression> buffer)
+        {
+            buffer.Clear();
+            if (_additionalInputSources == null)
+            {
+                return;
+            }
+            for (int i = 0; i < _additionalInputSources.Count; i++)
+            {
+                if (_additionalInputSources[i].source is ExpressionTriggerInputSourceBase trigger)
+                {
+                    var ids = trigger.ActiveExpressionIds;
+                    if (ids == null)
+                    {
+                        continue;
+                    }
+                    for (int j = 0; j < ids.Count; j++)
+                    {
+                        var expr = _profile.FindExpressionById(ids[j]);
+                        if (expr.HasValue)
+                        {
+                            buffer.Add(expr.Value);
+                        }
+                    }
+                }
+            }
         }
 
         private Dictionary<string, List<Expression>> GroupByLayer(List<Expression> expressions)

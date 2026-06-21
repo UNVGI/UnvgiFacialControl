@@ -99,13 +99,13 @@ namespace Hidano.FacialControl.Editor.AutoExport
 
             if (overlay.suppress || overlay.animationClip == null)
             {
-                overlay.cachedSnapshot = CreateDefaultSnapshotDto();
+                overlay.cachedSnapshot = CreateDefaultOverlaySnapshotDto();
                 return;
             }
 
             var snapshotId = string.IsNullOrEmpty(overlay.slot) ? string.Empty : overlay.slot;
             var snapshot = sampler.SampleSnapshot(snapshotId, overlay.animationClip);
-            overlay.cachedSnapshot = ConvertSnapshotToDto(snapshot);
+            overlay.cachedSnapshot = ConvertSnapshotToOverlayDto(snapshot);
         }
 
         private static void BakeBaseExpressionSnapshot(
@@ -399,14 +399,33 @@ namespace Hidano.FacialControl.Editor.AutoExport
 
         private static ExpressionSnapshotDto ConvertSnapshotToDto(ExpressionSnapshot snapshot)
         {
-            var dto = new ExpressionSnapshotDto
-            {
-                transitionDuration = snapshot.TransitionDuration,
-                transitionCurvePreset = snapshot.TransitionCurvePreset.ToString(),
-                blendShapes = new List<BlendShapeSnapshotDto>(snapshot.BlendShapes.Length),
-                bones = new List<BoneSnapshotDto>(snapshot.Bones.Length),
-                rendererPaths = new List<string>(snapshot.RendererPaths.Length),
-            };
+            var dto = new ExpressionSnapshotDto();
+            PopulateSnapshotDto(dto, snapshot);
+            return dto;
+        }
+
+        /// <summary>
+        /// overlay binding 用の snapshot DTO（再帰終端型 <see cref="OverlaySnapshotDto"/>）を生成する。
+        /// expression レベルの <see cref="ConvertSnapshotToDto"/> と異なり overlays フィールドを持たない。
+        /// </summary>
+        private static OverlaySnapshotDto ConvertSnapshotToOverlayDto(ExpressionSnapshot snapshot)
+        {
+            var dto = new OverlaySnapshotDto();
+            PopulateSnapshotDto(dto, snapshot);
+            return dto;
+        }
+
+        /// <summary>
+        /// <see cref="OverlaySnapshotDto"/>（および派生の <see cref="ExpressionSnapshotDto"/>）共通フィールドを
+        /// ドメイン snapshot から埋める。expression / overlay 双方の変換経路で共有する。
+        /// </summary>
+        private static void PopulateSnapshotDto(OverlaySnapshotDto dto, ExpressionSnapshot snapshot)
+        {
+            dto.transitionDuration = snapshot.TransitionDuration;
+            dto.transitionCurvePreset = snapshot.TransitionCurvePreset.ToString();
+            dto.blendShapes = new List<BlendShapeSnapshotDto>(snapshot.BlendShapes.Length);
+            dto.bones = new List<BoneSnapshotDto>(snapshot.Bones.Length);
+            dto.rendererPaths = new List<string>(snapshot.RendererPaths.Length);
 
             var bsSpan = snapshot.BlendShapes.Span;
             for (int i = 0; i < bsSpan.Length; i++)
@@ -437,13 +456,27 @@ namespace Hidano.FacialControl.Editor.AutoExport
             {
                 dto.rendererPaths.Add(rpSpan[i] ?? string.Empty);
             }
-
-            return dto;
         }
 
         private static ExpressionSnapshotDto CreateDefaultSnapshotDto()
         {
             return new ExpressionSnapshotDto
+            {
+                transitionDuration = 0.25f,
+                transitionCurvePreset = "Linear",
+                blendShapes = new List<BlendShapeSnapshotDto>(),
+                bones = new List<BoneSnapshotDto>(),
+                rendererPaths = new List<string>(),
+            };
+        }
+
+        /// <summary>
+        /// overlay binding 用のデフォルト（空）snapshot DTO（再帰終端型 <see cref="OverlaySnapshotDto"/>）。
+        /// suppress / clip 未割り当て時に <c>overlay.cachedSnapshot</c> へ入れる。
+        /// </summary>
+        private static OverlaySnapshotDto CreateDefaultOverlaySnapshotDto()
+        {
+            return new OverlaySnapshotDto
             {
                 transitionDuration = 0.25f,
                 transitionCurvePreset = "Linear",
@@ -491,7 +524,7 @@ namespace Hidano.FacialControl.Editor.AutoExport
                 && !IsSnapshotEmpty(overlay.cachedSnapshot);
         }
 
-        private static bool IsSnapshotEmpty(ExpressionSnapshotDto snapshot)
+        private static bool IsSnapshotEmpty(OverlaySnapshotDto snapshot)
         {
             return snapshot == null
                 || ((snapshot.blendShapes == null || snapshot.blendShapes.Count == 0)
@@ -515,7 +548,7 @@ namespace Hidano.FacialControl.Editor.AutoExport
         }
 
         private static void MergeRendererPaths(
-            ExpressionSnapshotDto snapshot,
+            OverlaySnapshotDto snapshot,
             HashSet<string> rendererPathSet,
             List<string> rendererPaths)
         {

@@ -8,8 +8,8 @@ namespace Hidano.FacialControl.Domain.Services
     /// レイヤー優先度に基づくウェイトブレンドを行う静的サービス。
     /// 全メソッドは GC フリーで動作する（事前確保済み配列の再利用を前提）。
     /// <para>
-    /// オーバーライドは <c>ExpressionResolver</c> 経由で
-    /// <see cref="LayerOverrideMask"/> を解釈する形で適用される。
+    /// <see cref="LayerOverrideMask"/> による他レイヤー抑制は <c>LayerUseCase</c> が
+    /// 最終ブレンド前に対象レイヤーを除外する形で適用する（本クラスは OverrideMask を関知しない）。
     /// </para>
     /// </summary>
     public static class LayerBlender

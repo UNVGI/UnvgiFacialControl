@@ -135,6 +135,11 @@ namespace Hidano.FacialControl.Domain.Models
         /// <param name="transitionDuration">遷移時間（0〜1 秒、範囲外は自動クランプ）</param>
         /// <param name="transitionCurve">遷移カーブ設定</param>
         /// <param name="blendShapeValues">BlendShape 値の配列。null の場合は空配列</param>
+        /// <param name="overlays">overlay slot binding の配列。null の場合は空配列</param>
+        /// <param name="overrideMask">
+        /// この表情がアクティブな間、抑制対象とする他レイヤーのビットフラグ。
+        /// 既定値 <see cref="LayerOverrideMask.None"/>（後方互換）。
+        /// </param>
         public Expression(
             string id,
             string name,
@@ -142,7 +147,8 @@ namespace Hidano.FacialControl.Domain.Models
             float transitionDuration = DefaultTransitionDuration,
             TransitionCurve transitionCurve = default,
             BlendShapeMapping[] blendShapeValues = null,
-            OverlaySlotBinding[] overlays = null)
+            OverlaySlotBinding[] overlays = null,
+            LayerOverrideMask overrideMask = LayerOverrideMask.None)
         {
             if (id == null)
                 throw new ArgumentNullException(nameof(id));
@@ -160,7 +166,7 @@ namespace Hidano.FacialControl.Domain.Models
             Id = id;
             Name = name;
             Layer = layer;
-            OverrideMask = LayerOverrideMask.None;
+            OverrideMask = overrideMask;
             SnapshotId = id;
             TransitionDuration = Math.Clamp(transitionDuration, 0f, 1f);
             TransitionCurve = transitionCurve;

@@ -20,7 +20,9 @@ namespace Hidano.FacialControl.Adapters.Json.Dto
 
         /// <summary>
         /// 個別 override として適用する snapshot。null の場合は default fallback または suppress。
+        /// 再帰終端型 <see cref="OverlaySnapshotDto"/>（overlays を持たない）を宣言型とすることで、
+        /// JsonUtility / Unity シリアライザの自己再帰（depth limit 10 超過）を型レベルで断つ。
         /// </summary>
-        public ExpressionSnapshotDto snapshot;
+        public OverlaySnapshotDto snapshot;
     }
 }

@@ -149,7 +149,7 @@ namespace Hidano.FacialControl.Adapters.Json
                     continue;
                 }
 
-                overlay.snapshot = NormalizeExpressionSnapshotDto(overlay.snapshot);
+                overlay.snapshot = NormalizeOverlaySnapshotDto(overlay.snapshot);
             }
         }
 
@@ -164,6 +164,38 @@ namespace Hidano.FacialControl.Adapters.Json
                 };
             }
 
+            NormalizeCommonSnapshotFields(snapshot);
+            if (snapshot.overlays == null)
+                snapshot.overlays = new List<OverlaySlotBindingDto>();
+
+            return snapshot;
+        }
+
+        /// <summary>
+        /// overlay binding 用の snapshot（再帰終端型 <see cref="OverlaySnapshotDto"/>）を正規化する。
+        /// expression 用の <see cref="NormalizeExpressionSnapshotDto"/> と異なり overlays フィールドを持たない。
+        /// </summary>
+        private static OverlaySnapshotDto NormalizeOverlaySnapshotDto(OverlaySnapshotDto snapshot)
+        {
+            if (snapshot == null)
+            {
+                snapshot = new OverlaySnapshotDto
+                {
+                    transitionDuration = Expression.DefaultTransitionDuration,
+                    transitionCurvePreset = "Linear",
+                };
+            }
+
+            NormalizeCommonSnapshotFields(snapshot);
+            return snapshot;
+        }
+
+        /// <summary>
+        /// <see cref="OverlaySnapshotDto"/>（および派生 <see cref="ExpressionSnapshotDto"/>）共通フィールドの
+        /// null collection / 空 preset を正規化する。
+        /// </summary>
+        private static void NormalizeCommonSnapshotFields(OverlaySnapshotDto snapshot)
+        {
             if (string.IsNullOrEmpty(snapshot.transitionCurvePreset))
                 snapshot.transitionCurvePreset = "Linear";
             if (snapshot.blendShapes == null)
@@ -172,10 +204,6 @@ namespace Hidano.FacialControl.Adapters.Json
                 snapshot.bones = new List<BoneSnapshotDto>();
             if (snapshot.rendererPaths == null)
                 snapshot.rendererPaths = new List<string>();
-            if (snapshot.overlays == null)
-                snapshot.overlays = new List<OverlaySlotBindingDto>();
-
-            return snapshot;
         }
 
         // preview 破壊的変更 (D-5): inputSources は必須フィールド。欠落 / 空配列はエラー。
@@ -645,7 +673,7 @@ namespace Hidano.FacialControl.Adapters.Json
         private static FacialProfile ConvertToProfile(ProfileSnapshotDto dto, InputSourceDto[][] inputSourceDtos)
         {
             var layers = ConvertLayers(dto.layers);
-            var expressions = ConvertExpressions(dto.expressions);
+            var expressions = ConvertExpressions(dto.expressions, dto.layers);
             var rendererPaths = ConvertRendererPaths(dto.rendererPaths);
             var layerInputSources = ConvertLayerInputSources(inputSourceDtos);
             var defaultOverlays = ConvertOverlaySlotBindings(dto.defaultOverlays);
@@ -696,7 +724,7 @@ namespace Hidano.FacialControl.Adapters.Json
             return list.Count == 0 ? null : list.ToArray();
         }
 
-        private static bool IsEffectivelyEmptyOverlaySnapshot(ExpressionSnapshotDto snapshot)
+        private static bool IsEffectivelyEmptyOverlaySnapshot(OverlaySnapshotDto snapshot)
         {
             if (snapshot == null)
                 return true;
@@ -705,8 +733,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 && (string.IsNullOrEmpty(snapshot.transitionCurvePreset) || snapshot.transitionCurvePreset == "Linear")
                 && IsNullOrEffectivelyEmpty(snapshot.blendShapes)
                 && IsNullOrEffectivelyEmpty(snapshot.bones)
-                && IsNullOrEffectivelyEmpty(snapshot.rendererPaths)
-                && IsNullOrEffectivelyEmpty(snapshot.overlays);
+                && IsNullOrEffectivelyEmpty(snapshot.rendererPaths);
         }
 
         private static bool IsEmptyTransitionDuration(float value)
@@ -759,22 +786,7 @@ namespace Hidano.FacialControl.Adapters.Json
             return true;
         }
 
-        private static bool IsNullOrEffectivelyEmpty(List<OverlaySlotBindingDto> list)
-        {
-            if (list == null || list.Count == 0)
-                return true;
-
-            for (int i = 0; i < list.Count; i++)
-            {
-                var item = list[i];
-                if (item != null && (!string.IsNullOrWhiteSpace(item.slot) || item.suppress || !IsEffectivelyEmptyOverlaySnapshot(item.snapshot)))
-                    return false;
-            }
-
-            return true;
-        }
-
-        private static ExpressionSnapshot ConvertExpressionSnapshot(ExpressionSnapshotDto dto, string fallbackId)
+        private static ExpressionSnapshot ConvertExpressionSnapshot(OverlaySnapshotDto dto, string fallbackId)
         {
             if (dto == null)
                 throw new ArgumentNullException(nameof(dto));
@@ -899,10 +911,21 @@ namespace Hidano.FacialControl.Adapters.Json
             return layers;
         }
 
-        private static Expression[] ConvertExpressions(List<ExpressionDto> dtos)
+        private static Expression[] ConvertExpressions(List<ExpressionDto> dtos, List<LayerDefinitionDto> layerDtos)
         {
             if (dtos == null || dtos.Count == 0)
                 return Array.Empty<Expression>();
+
+            // OverrideMask の bit position ↔ layer 名の対応表（layers の宣言順）。
+            List<string> orderedLayerNames = null;
+            if (layerDtos != null)
+            {
+                orderedLayerNames = new List<string>(layerDtos.Count);
+                for (int li = 0; li < layerDtos.Count; li++)
+                {
+                    orderedLayerNames.Add(layerDtos[li]?.name);
+                }
+            }
 
             var expressions = new Expression[dtos.Count];
             for (int i = 0; i < dtos.Count; i++)
@@ -913,6 +936,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 var curve = ConvertTransitionCurve(snapshot != null ? snapshot.transitionCurvePreset : "Linear");
                 var blendShapes = ConvertBlendShapeMappings(snapshot != null ? snapshot.blendShapes : null);
                 var overlays = ConvertOverlaySlotBindings(snapshot != null ? snapshot.overlays : null);
+                var overrideMask = ToOverrideMask(d.layerOverrideMask, orderedLayerNames);
 
                 expressions[i] = new Expression(
                     d.id,
@@ -921,9 +945,34 @@ namespace Hidano.FacialControl.Adapters.Json
                     duration,
                     curve,
                     blendShapes,
-                    overlays);
+                    overlays,
+                    overrideMask);
             }
             return expressions;
+        }
+
+        /// <summary>
+        /// expression の layerOverrideMask（layer 名配列）を <see cref="LayerOverrideMask"/> へ変換する。
+        /// bit position は orderedLayerNames（layers の宣言順）の index に対応する。
+        /// 未登録の名前および 32 番目以降の bit はサイレントに無視する。
+        /// </summary>
+        private static LayerOverrideMask ToOverrideMask(List<string> layerNames, List<string> orderedLayerNames)
+        {
+            if (layerNames == null || layerNames.Count == 0
+                || orderedLayerNames == null || orderedLayerNames.Count == 0)
+            {
+                return LayerOverrideMask.None;
+            }
+            int mask = 0;
+            for (int i = 0; i < layerNames.Count; i++)
+            {
+                int idx = orderedLayerNames.IndexOf(layerNames[i]);
+                if (idx >= 0 && idx < 32)
+                {
+                    mask |= (1 << idx);
+                }
+            }
+            return (LayerOverrideMask)mask;
         }
 
         private static BlendShapeMapping[] ConvertBlendShapeMappings(List<BlendShapeSnapshotDto> dtos)
