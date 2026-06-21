@@ -1,5 +1,6 @@
 ---
 name: uloop-simulate-keyboard
+toolName: simulate-keyboard
 description: "Simulate keyboard input in PlayMode through Unity Input System. Use for key presses, holds, releases, and game controls such as WASD or Space."
 context: fork
 ---
@@ -36,6 +37,11 @@ uloop simulate-keyboard --action <action> --key <key> [options]
 | `Press` | KeyDown → wait → KeyUp | One-shot tap (jump, use item) |
 | `KeyDown` | KeyDown only (held until KeyUp) | Start continuous movement, hold sprint |
 | `KeyUp` | KeyUp only (release held key) | Stop movement, release sprint |
+
+Use `Press` for edge-triggered gameplay code such as `Keyboard.current.spaceKey.wasPressedThisFrame`.
+`KeyDown` emits one initial press edge, then only keeps the key held. It does not keep `wasPressedThisFrame` true while the key remains held.
+If a successful `Press` or `KeyDown` leaves `Keyboard.current.<key>.isPressed` true but the game state does not change, do not immediately rewrite the user's gameplay code to `isPressed`. First verify that the gameplay component is active during the command, that it polls input in the configured Input System update phase, and that a missed `KeyDown` edge is followed by `KeyUp` before retrying.
+Use `KeyDown` / `KeyUp` when the scenario intentionally needs a held key.
 
 ### KeyDown/KeyUp Rules
 

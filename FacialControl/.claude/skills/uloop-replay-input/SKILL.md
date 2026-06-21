@@ -1,5 +1,6 @@
 ---
 name: uloop-replay-input
+toolName: replay-input
 description: "Replay recorded PlayMode keyboard and mouse input. Use for exact gameplay reproduction, E2E runs, or consistent demos from JSON recordings."
 ---
 
@@ -17,7 +18,7 @@ uloop replay-input --action Start
 uloop replay-input --action Start --input-path scripts/my-play.json
 
 # Start replay with looping
-uloop replay-input --action Start --loop true
+uloop replay-input --action Start --loop
 
 # Check replay progress
 uloop replay-input --action Status
@@ -32,8 +33,8 @@ uloop replay-input --action Stop
 |-----------|------|---------|-------------|
 | `--action` | enum | `Start` | `Start`, `Stop`, `Status` |
 | `--input-path` | string | auto | JSON path. Auto-detects latest in `.uloop/outputs/InputRecordings/` |
-| `--show-overlay` | boolean | `true` | Show replay progress overlay |
-| `--loop` | boolean | `false` | Loop continuously |
+| `--no-show-overlay` | flag | - | Hide replay progress overlay |
+| `--loop` | flag | - | Loop continuously |
 
 ## Deterministic Replay
 
