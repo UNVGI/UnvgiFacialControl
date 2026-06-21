@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Models;
@@ -115,6 +116,39 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
 
             Assert.That(graphView.RoutingEdges, Has.Count.EqualTo(1));
             Assert.That(graphView.RoutingEdges[0].WeightField.value, Is.EqualTo(0.9f));
+        }
+
+        [Test]
+        public void SetDanglingEdges_BuildsReadOnlyDanglingEdgeWithoutRepairButton()
+        {
+            RoutingGraphView graphView = CreateGraphView();
+
+            graphView.SetDanglingEdges(
+                new[] { new DanglingEdgeData(0, 2, "ulipsync:a") });
+
+            Assert.That(graphView.DanglingEdges, Has.Count.EqualTo(1));
+            DanglingEdge edge = graphView.DanglingEdges[0];
+            Assert.That(edge.output, Is.Null);
+            Assert.That(edge.input, Is.SameAs(graphView.LayerNodeViews[0].InputPort));
+            Assert.That(edge.IdBadge.text, Is.EqualTo("ulipsync:a"));
+            Assert.That(edge.CurrentWireColor.r, Is.EqualTo(1f).Within(0.001f));
+            Assert.That(edge.CurrentWireColor.g, Is.LessThan(0.35f));
+            Assert.That(edge.IsSelectable(), Is.False);
+            Assert.That(edge.Children().OfType<UnityEngine.UIElements.Button>().ToArray(), Is.Empty);
+        }
+
+        [Test]
+        public void SetDanglingEdges_RebuildsExistingDanglingEdges()
+        {
+            RoutingGraphView graphView = CreateGraphView();
+
+            graphView.SetDanglingEdges(
+                new[] { new DanglingEdgeData(0, 1, "legacy:a") });
+            graphView.SetDanglingEdges(
+                new[] { new DanglingEdgeData(0, 3, "legacy:b") });
+
+            Assert.That(graphView.DanglingEdges, Has.Count.EqualTo(1));
+            Assert.That(graphView.DanglingEdges[0].IdBadge.text, Is.EqualTo("legacy:b"));
         }
 
         private RoutingGraphView CreateGraphView()

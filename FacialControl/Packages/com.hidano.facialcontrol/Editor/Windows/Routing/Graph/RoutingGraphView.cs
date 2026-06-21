@@ -16,6 +16,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
         private readonly List<SourceNodeView> _sourceNodeViews = new List<SourceNodeView>();
         private readonly List<LayerNodeView> _layerNodeViews = new List<LayerNodeView>();
         private readonly List<RoutingEdge> _routingEdges = new List<RoutingEdge>();
+        private readonly List<DanglingEdge> _danglingEdges = new List<DanglingEdge>();
         private OutputNodeView _outputNodeView;
 
         public RoutingGraphView()
@@ -35,6 +36,8 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 
         public IReadOnlyList<RoutingEdge> RoutingEdges => _routingEdges;
 
+        public IReadOnlyList<DanglingEdge> DanglingEdges => _danglingEdges;
+
         public OutputNodeView OutputNodeView => _outputNodeView;
 
         public void SetSourceNodes(
@@ -47,6 +50,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             }
 
             ClearRoutingEdges();
+            ClearDanglingEdges();
             ClearSourceNodes();
 
             for (int i = 0; i < sourceNodes.Count; i++)
@@ -79,6 +83,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             }
 
             ClearRoutingEdges();
+            ClearDanglingEdges();
             ClearLayerNodes();
 
             for (int i = 0; i < layerNodes.Count; i++)
@@ -147,6 +152,30 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             }
         }
 
+        public void SetDanglingEdges(IReadOnlyList<DanglingEdgeData> invalidEdges)
+        {
+            if (invalidEdges == null)
+            {
+                throw new ArgumentNullException(nameof(invalidEdges));
+            }
+
+            ClearDanglingEdges();
+
+            for (int i = 0; i < invalidEdges.Count; i++)
+            {
+                DanglingEdgeData edgeData = invalidEdges[i];
+                LayerNodeView layerNode = FindLayerNode(edgeData.LayerIndex);
+                if (layerNode == null)
+                {
+                    continue;
+                }
+
+                var edge = new DanglingEdge(layerNode.InputPort, edgeData);
+                _danglingEdges.Add(edge);
+                AddElement(edge);
+            }
+        }
+
         private void ClearSourceNodes()
         {
             for (int i = 0; i < _sourceNodeViews.Count; i++)
@@ -186,6 +215,16 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             }
 
             _routingEdges.Clear();
+        }
+
+        private void ClearDanglingEdges()
+        {
+            for (int i = 0; i < _danglingEdges.Count; i++)
+            {
+                RemoveElement(_danglingEdges[i]);
+            }
+
+            _danglingEdges.Clear();
         }
 
         private SourceNodeView FindSourceNode(string canonicalId)
