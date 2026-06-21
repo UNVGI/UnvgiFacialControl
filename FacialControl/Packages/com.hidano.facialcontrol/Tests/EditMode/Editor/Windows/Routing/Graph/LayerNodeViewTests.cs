@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.Windows.Routing.Graph;
@@ -53,6 +54,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
             Assert.That(view.PriorityField.value, Is.EqualTo(1));
             Assert.That((ExclusionMode)view.ExclusionModeField.value, Is.EqualTo(ExclusionMode.Blend));
             Assert.That(view.OverrideMaskField.value, Is.EqualTo("emotion"));
+            Assert.That(view.InputPort, Is.Not.Null);
+            Assert.That(view.InputPort.direction, Is.EqualTo(UnityEditor.Experimental.GraphView.Direction.Input));
         }
 
         [Test]
@@ -60,10 +63,10 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
         {
             var view = CreateView();
 
-            view.NameField.value = "overlay-updated";
-            view.PriorityField.value = 4;
-            view.ExclusionModeField.value = ExclusionMode.LastWins;
-            view.OverrideMaskField.value = "emotion, fx\nface";
+            InvokeApplyLayerProperties(view, "overlay-updated", 1, ExclusionMode.Blend, new[] { "emotion" });
+            InvokeApplyLayerProperties(view, "overlay-updated", 4, ExclusionMode.Blend, new[] { "emotion" });
+            InvokeApplyLayerProperties(view, "overlay-updated", 4, ExclusionMode.LastWins, new[] { "emotion" });
+            InvokeApplyLayerProperties(view, "overlay-updated", 4, ExclusionMode.LastWins, new[] { "emotion", "fx", "face" });
 
             Assert.That(_mapper.Invocations, Has.Count.EqualTo(4));
             Assert.That(_mapper.LastLayerIndex, Is.EqualTo(0));
@@ -98,6 +101,20 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
                 new LayerNodeData(0, "overlay", 1, ExclusionMode.Blend, new[] { "emotion" }),
                 _serializedObject,
                 _mapper);
+        }
+
+        private static void InvokeApplyLayerProperties(
+            LayerNodeView view,
+            string layerName,
+            int priority,
+            ExclusionMode exclusionMode,
+            IReadOnlyList<string> overrideMask)
+        {
+            MethodInfo method = typeof(LayerNodeView).GetMethod(
+                "ApplyLayerProperties",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(view, new object[] { layerName, priority, exclusionMode, overrideMask });
         }
 
         private sealed class RecordingWiringSerializedMapper : IWiringSerializedMapper

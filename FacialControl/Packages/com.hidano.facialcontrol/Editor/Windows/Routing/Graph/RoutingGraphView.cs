@@ -15,6 +15,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
     {
         private readonly List<SourceNodeView> _sourceNodeViews = new List<SourceNodeView>();
         private readonly List<LayerNodeView> _layerNodeViews = new List<LayerNodeView>();
+        private readonly List<RoutingEdge> _routingEdges = new List<RoutingEdge>();
         private OutputNodeView _outputNodeView;
 
         public RoutingGraphView()
@@ -32,6 +33,8 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 
         public IReadOnlyList<LayerNodeView> LayerNodeViews => _layerNodeViews;
 
+        public IReadOnlyList<RoutingEdge> RoutingEdges => _routingEdges;
+
         public OutputNodeView OutputNodeView => _outputNodeView;
 
         public void SetSourceNodes(
@@ -43,6 +46,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
                 throw new ArgumentNullException(nameof(sourceNodes));
             }
 
+            ClearRoutingEdges();
             ClearSourceNodes();
 
             for (int i = 0; i < sourceNodes.Count; i++)
@@ -74,6 +78,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
                 throw new ArgumentNullException(nameof(wiringSerializedMapper));
             }
 
+            ClearRoutingEdges();
             ClearLayerNodes();
 
             for (int i = 0; i < layerNodes.Count; i++)
@@ -97,6 +102,49 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             _outputNodeView = new OutputNodeView(outputNodeData);
             _outputNodeView.SetPosition(new Rect(672f, 32f, 320f, Mathf.Max(140f, 56f + (outputNodeData.OrderedLayers.Count * 24f))));
             AddElement(_outputNodeView);
+        }
+
+        public void SetWiringEdges(
+            IReadOnlyList<WiringEdgeData> edges,
+            SerializedObject serializedObject,
+            IWiringSerializedMapper wiringSerializedMapper)
+        {
+            if (edges == null)
+            {
+                throw new ArgumentNullException(nameof(edges));
+            }
+
+            if (serializedObject == null)
+            {
+                throw new ArgumentNullException(nameof(serializedObject));
+            }
+
+            if (wiringSerializedMapper == null)
+            {
+                throw new ArgumentNullException(nameof(wiringSerializedMapper));
+            }
+
+            ClearRoutingEdges();
+
+            for (int i = 0; i < edges.Count; i++)
+            {
+                WiringEdgeData edgeData = edges[i];
+                SourceNodeView sourceNode = FindSourceNode(edgeData.CanonicalId);
+                LayerNodeView layerNode = FindLayerNode(edgeData.LayerIndex);
+                if (sourceNode == null || layerNode == null)
+                {
+                    continue;
+                }
+
+                var edge = new RoutingEdge(
+                    sourceNode.OutputPort,
+                    layerNode.InputPort,
+                    serializedObject,
+                    wiringSerializedMapper,
+                    edgeData);
+                _routingEdges.Add(edge);
+                AddElement(edge);
+            }
         }
 
         private void ClearSourceNodes()
@@ -128,6 +176,44 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 
             RemoveElement(_outputNodeView);
             _outputNodeView = null;
+        }
+
+        private void ClearRoutingEdges()
+        {
+            for (int i = 0; i < _routingEdges.Count; i++)
+            {
+                RemoveElement(_routingEdges[i]);
+            }
+
+            _routingEdges.Clear();
+        }
+
+        private SourceNodeView FindSourceNode(string canonicalId)
+        {
+            for (int i = 0; i < _sourceNodeViews.Count; i++)
+            {
+                SourceNodeView sourceNode = _sourceNodeViews[i];
+                if (string.Equals(sourceNode.Descriptor.CanonicalId, canonicalId, StringComparison.Ordinal))
+                {
+                    return sourceNode;
+                }
+            }
+
+            return null;
+        }
+
+        private LayerNodeView FindLayerNode(int layerIndex)
+        {
+            for (int i = 0; i < _layerNodeViews.Count; i++)
+            {
+                LayerNodeView layerNode = _layerNodeViews[i];
+                if (layerNode.LayerNodeData.LayerIndex == layerIndex)
+                {
+                    return layerNode;
+                }
+            }
+
+            return null;
         }
     }
 }

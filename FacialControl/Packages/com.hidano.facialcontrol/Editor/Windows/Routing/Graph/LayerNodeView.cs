@@ -51,6 +51,16 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 
             capabilities &= ~(Capabilities.Deletable | Capabilities.Copiable | Capabilities.Renamable);
 
+            InputPort = InstantiatePort(
+                Orientation.Horizontal,
+                Direction.Input,
+                Port.Capacity.Multi,
+                typeof(float));
+            InputPort.portName = "Inputs";
+            InputPort.tooltip = $"Layer {LayerNodeData.LayerIndex}";
+            InputPort.userData = LayerNodeData.LayerIndex;
+            inputContainer.Add(InputPort);
+
             NameField = new TextField("Name")
             {
                 name = NameFieldName,
@@ -114,6 +124,8 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
         public EnumField ExclusionModeField { get; }
 
         public TextField OverrideMaskField { get; }
+
+        public Port InputPort { get; }
 
         private void ApplyLayerProperties(
             string layerName,
