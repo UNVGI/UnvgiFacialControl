@@ -242,7 +242,7 @@
       }
     },
     "io.github.hatayama.uloopmcp": {
-      "version": "2.1.1",
+      "version": "2.1.9",
       "depth": 0,
       "source": "registry",
       "dependencies": {
