@@ -158,7 +158,7 @@
   - _Depends: 4.1, 6.1_
   - _Boundary: RoutingEditorWindow_
 
-- [ ] 6.3 Inspector に「ルーティングを編集」起動ボタンを追加する
+- [x] 6.3 Inspector に「ルーティングを編集」起動ボタンを追加する
   - 既存 Inspector に「ルーティングを編集」ボタンを追加し、対象 SO を読み込んだルーティングエディタウィンドウを開く
   - 観測可能な完了条件: Inspector のボタン押下で対象 SO を読み込んだ独立ウィンドウが開き、既存 Inspector が従来通り利用可能なまま維持される
   - _Requirements: 1.1, 1.3_
