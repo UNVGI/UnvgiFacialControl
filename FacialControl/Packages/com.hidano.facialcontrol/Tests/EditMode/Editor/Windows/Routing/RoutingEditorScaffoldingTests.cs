@@ -57,10 +57,28 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing
             RoutingEditorWindow window = RoutingEditorWindow.Open(null);
 
             Assert.That(window, Is.Null);
+            Assert.That(CountOpenWindows(), Is.EqualTo(0));
         }
 
         [Test]
-        public void Open_SameProfileTwice_FocusesExistingWindow()
+        public void Open_InvalidProfileType_LogsWarningAndDoesNotOpen()
+        {
+            var unrelatedProfile = ScriptableObject.CreateInstance<UnrelatedScriptableObject>();
+
+            LogAssert.Expect(
+                LogType.Warning,
+                "[RoutingEditorWindow] FacialCharacterProfileSO is null or invalid. Window will not open.");
+
+            RoutingEditorWindow window = RoutingEditorWindow.Open(unrelatedProfile);
+
+            Assert.That(window, Is.Null);
+            Assert.That(CountOpenWindows(), Is.EqualTo(0));
+
+            Object.DestroyImmediate(unrelatedProfile);
+        }
+
+        [Test]
+        public void Open_SameProfileTwice_FocusesExistingWindowWithoutCreatingDuplicate()
         {
             TestFacialCharacterProfileSO profile = CreateProfile("overlay");
 
@@ -69,6 +87,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing
             RoutingEditorWindow second = RoutingEditorWindow.Open(profile);
 
             Assert.That(second, Is.SameAs(first));
+            Assert.That(CountOpenWindows(), Is.EqualTo(1));
 
             Object.DestroyImmediate(profile);
         }
@@ -123,6 +142,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(method, Is.Not.Null);
             method.Invoke(window, null);
+        }
+
+        private static int CountOpenWindows()
+        {
+            return Resources.FindObjectsOfTypeAll<RoutingEditorWindow>().Length;
+        }
+
+        private sealed class UnrelatedScriptableObject : ScriptableObject
+        {
         }
     }
 }
