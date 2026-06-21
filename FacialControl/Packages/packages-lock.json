@@ -259,11 +259,11 @@
       "url": "https://package.openupm.com"
     },
     "jp.lilxyzw.liltoon": {
-      "version": "git+ssh://git@github.com/NHidano/Mikunote_Models.git?path=/Mikunote_Models/Packages/jp.lilxyzw.liltoon",
+      "version": "https://github.com/lilxyzw/lilToon.git?path=Assets/lilToon#master",
       "depth": 0,
       "source": "git",
       "dependencies": {},
-      "hash": "f23be65e21f80d2ba7a92123192328e77e72b715"
+      "hash": "6ef0cc43b7d56d27f516ea27717faf08486b2842"
     },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",
