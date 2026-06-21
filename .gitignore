@@ -270,3 +270,5 @@ HANDOVER.md
 # Claude Code ローカル設定・ランタイム（マシン固有、追跡しない）
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+FacialControl/Assets/Samples/Debug_Temp
+FacialControl/Assets/Samples/Debug_Temp.meta
