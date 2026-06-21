@@ -139,6 +139,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Logic
             Assert.That(layer.priority, Is.EqualTo(4));
             Assert.That(layer.exclusionMode, Is.EqualTo(ExclusionMode.LastWins));
             CollectionAssert.AreEqual(new[] { "emotion", "fx" }, layer.layerOverrideMask);
+            Assert.That(EditorUtility.IsDirty(_profile), Is.True);
+
+            Undo.PerformUndo();
+
+            layer = _profile.Layers[0];
+            Assert.That(layer.name, Is.EqualTo("overlay"));
+            Assert.That(layer.priority, Is.EqualTo(1));
+            Assert.That(layer.exclusionMode, Is.EqualTo(ExclusionMode.Blend));
+            CollectionAssert.AreEqual(new[] { "emotion" }, layer.layerOverrideMask);
         }
 
         [Test]

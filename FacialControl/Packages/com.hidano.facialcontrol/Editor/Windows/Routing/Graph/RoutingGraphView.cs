@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Hidano.FacialControl.Editor.Common;
 using Hidano.FacialControl.Editor.Windows.Routing.Logic;
+using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 
@@ -13,6 +14,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
     public sealed class RoutingGraphView : GraphView
     {
         private readonly List<SourceNodeView> _sourceNodeViews = new List<SourceNodeView>();
+        private readonly List<LayerNodeView> _layerNodeViews = new List<LayerNodeView>();
 
         public RoutingGraphView()
         {
@@ -26,6 +28,8 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
         }
 
         public IReadOnlyList<SourceNodeView> SourceNodeViews => _sourceNodeViews;
+
+        public IReadOnlyList<LayerNodeView> LayerNodeViews => _layerNodeViews;
 
         public void SetSourceNodes(
             IReadOnlyList<SourceNodeDescriptor> sourceNodes,
@@ -47,6 +51,37 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             }
         }
 
+        public void SetLayerNodes(
+            IReadOnlyList<LayerNodeData> layerNodes,
+            SerializedObject serializedObject,
+            IWiringSerializedMapper wiringSerializedMapper)
+        {
+            if (layerNodes == null)
+            {
+                throw new ArgumentNullException(nameof(layerNodes));
+            }
+
+            if (serializedObject == null)
+            {
+                throw new ArgumentNullException(nameof(serializedObject));
+            }
+
+            if (wiringSerializedMapper == null)
+            {
+                throw new ArgumentNullException(nameof(wiringSerializedMapper));
+            }
+
+            ClearLayerNodes();
+
+            for (int i = 0; i < layerNodes.Count; i++)
+            {
+                var layerNodeView = new LayerNodeView(layerNodes[i], serializedObject, wiringSerializedMapper);
+                layerNodeView.SetPosition(new Rect(336f, 32f + (i * 240f), 280f, 180f));
+                _layerNodeViews.Add(layerNodeView);
+                AddElement(layerNodeView);
+            }
+        }
+
         private void ClearSourceNodes()
         {
             for (int i = 0; i < _sourceNodeViews.Count; i++)
@@ -55,6 +90,16 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             }
 
             _sourceNodeViews.Clear();
+        }
+
+        private void ClearLayerNodes()
+        {
+            for (int i = 0; i < _layerNodeViews.Count; i++)
+            {
+                RemoveElement(_layerNodeViews[i]);
+            }
+
+            _layerNodeViews.Clear();
         }
     }
 }
