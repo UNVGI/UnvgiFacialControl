@@ -113,7 +113,7 @@
   - _Depends: 4.1, 3.1_
   - _Boundary: LayerNodeView, WiringSerializedMapper_
 
-- [ ] 5.3 (P) 合成出力ノード描画を実装する
+- [x] 5.3 (P) 合成出力ノード描画を実装する
   - グラフモデルの出力ノードデータから priority と layerOverrideMask による合成順序を俯瞰する読み取り専用ノードを右端に描画する
   - 合成順序をグラフ上で直接編集させない読み取り専用化を行う
   - 観測可能な完了条件: 出力ノードが合成順序を読み取り専用で描画し、priority/mask 変更後の rebuild で更新後の値に再描画される

@@ -15,6 +15,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
     {
         private readonly List<SourceNodeView> _sourceNodeViews = new List<SourceNodeView>();
         private readonly List<LayerNodeView> _layerNodeViews = new List<LayerNodeView>();
+        private OutputNodeView _outputNodeView;
 
         public RoutingGraphView()
         {
@@ -30,6 +31,8 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
         public IReadOnlyList<SourceNodeView> SourceNodeViews => _sourceNodeViews;
 
         public IReadOnlyList<LayerNodeView> LayerNodeViews => _layerNodeViews;
+
+        public OutputNodeView OutputNodeView => _outputNodeView;
 
         public void SetSourceNodes(
             IReadOnlyList<SourceNodeDescriptor> sourceNodes,
@@ -82,6 +85,20 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             }
         }
 
+        public void SetOutputNode(OutputNodeData outputNodeData)
+        {
+            if (outputNodeData == null)
+            {
+                throw new ArgumentNullException(nameof(outputNodeData));
+            }
+
+            ClearOutputNode();
+
+            _outputNodeView = new OutputNodeView(outputNodeData);
+            _outputNodeView.SetPosition(new Rect(672f, 32f, 320f, Mathf.Max(140f, 56f + (outputNodeData.OrderedLayers.Count * 24f))));
+            AddElement(_outputNodeView);
+        }
+
         private void ClearSourceNodes()
         {
             for (int i = 0; i < _sourceNodeViews.Count; i++)
@@ -100,6 +117,17 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             }
 
             _layerNodeViews.Clear();
+        }
+
+        private void ClearOutputNode()
+        {
+            if (_outputNodeView == null)
+            {
+                return;
+            }
+
+            RemoveElement(_outputNodeView);
+            _outputNodeView = null;
         }
     }
 }
