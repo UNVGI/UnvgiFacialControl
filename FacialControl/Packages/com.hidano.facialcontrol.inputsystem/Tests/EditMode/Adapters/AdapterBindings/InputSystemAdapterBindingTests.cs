@@ -2,6 +2,8 @@ using System;
 using System.Linq;
 using Hidano.FacialControl.Adapters.AdapterBindings.InputSystem;
 using Hidano.FacialControl.Domain.Adapters;
+using Hidano.FacialControl.Domain.Models;
+using Hidano.FacialControl.InputSystem.Adapters.ScriptableObject;
 using NUnit.Framework;
 using UnityEditor;
 
@@ -76,6 +78,37 @@ namespace Hidano.FacialControl.InputSystem.Tests.EditMode.Adapters.AdapterBindin
 
             Assert.That(ctor, Is.Not.Null,
                 "Activator.CreateInstance で生成可能な parameterless constructor が必要。");
+        }
+
+        [Test]
+        public void GetDeclaredInputSourceIds_TriggerAnalogOverlay_ReturnsSlugScopedIds()
+        {
+            var binding = new InputSystemAdapterBinding { Slug = "input-system" };
+            binding.Configure(
+                asset: null,
+                actionMapName: "Expression",
+                expressionBindings: new[]
+                {
+                    new ExpressionBindingEntry { bindingMode = BindingMode.Normal, actionName = "Smile", expressionId = "smile" },
+                    new ExpressionBindingEntry { bindingMode = BindingMode.Analog, actionName = "Mouth", expressionId = "aa" },
+                    new ExpressionBindingEntry { bindingMode = BindingMode.Overlay, actionName = "Blink", overlaySlot = "blink" },
+                });
+
+            string[] ids = ((IAdapterBindingDeclaredInputs)binding).GetDeclaredInputSourceIds().ToArray();
+
+            CollectionAssert.AreEqual(
+                new[] { "input-system", "input-system:analog-expression", "input-system:overlay:blink" },
+                ids);
+        }
+
+        [Test]
+        public void GetDeclaredInputSourceIds_NoSlug_ReturnsEmpty()
+        {
+            var binding = new InputSystemAdapterBinding();
+
+            string[] ids = ((IAdapterBindingDeclaredInputs)binding).GetDeclaredInputSourceIds().ToArray();
+
+            Assert.That(ids, Is.Empty);
         }
 
         [Test]

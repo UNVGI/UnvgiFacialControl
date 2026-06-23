@@ -84,6 +84,22 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Logic
         public ExclusionMode DefaultLayerExclusionMode => ExclusionMode.LastWins;
     }
 
+    [Serializable]
+    internal sealed class DeclaredInputsBindingStub :
+        AdapterBindingBase,
+        IAdapterBindingDeclaredInputs
+    {
+        public IEnumerable<string> GetDeclaredInputSourceIds()
+        {
+            return new[]
+            {
+                "input-system",
+                "input-system:analog-expression",
+                "input-system:overlay:blink",
+            };
+        }
+    }
+
     [TestFixture]
     public class SourcePortEnumeratorTests
     {
@@ -176,6 +192,28 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Logic
             Assert.That(ports[0].CanonicalId, Is.EqualTo("legacy-only"));
             Assert.That(ports[0].Label, Is.EqualTo("legacy-only"));
             Assert.That(ports[0].BindingSlug, Is.EqualTo("legacy-binding"));
+        }
+
+        [Test]
+        public void Enumerate_DeclaredInputsBinding_ReturnsDeclaredCanonicalIdsAsPorts()
+        {
+            var enumerator = new SourcePortEnumerator();
+            var binding = new DeclaredInputsBindingStub { Slug = "input-system" };
+
+            IReadOnlyList<SourcePort> ports = enumerator.Enumerate(binding, Array.Empty<string>());
+
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    "input-system",
+                    "input-system:analog-expression",
+                    "input-system:overlay:blink",
+                },
+                ports.Select(port => port.CanonicalId).ToArray());
+            CollectionAssert.AreEqual(
+                new[] { "input-system", "analog-expression", "blink" },
+                ports.Select(port => port.Label).ToArray());
+            Assert.That(ports.All(port => string.Equals(port.BindingSlug, "input-system", StringComparison.Ordinal)));
         }
 
         [Test]
