@@ -41,7 +41,7 @@ namespace Hidano.FacialControl.Editor.Windows
         /// <summary>
         /// メニューからダイアログを起動する
         /// </summary>
-        [MenuItem("FacialControl/新規プロファイル作成", false, 10)]
+        [MenuItem("Tools/FacialControl/新規プロファイル作成", false, 10)]
         public static void OpenFromMenu()
         {
             ShowDialog();

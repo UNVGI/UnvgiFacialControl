@@ -16,10 +16,18 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
     public sealed class RoutingGraphView : GraphView
     {
         private const float DefaultDeclarationWeight = 1f;
+
+        // 左上固定の MiniMap (16,16,200,140 → 下端 156) とノード/ダングリングバッジが
+        // 重ならないよう、ノード行の開始 Y を MiniMap 下端より下に置く。
+        private const float ContentTopMargin = 176f;
         private readonly List<SourceNodeView> _sourceNodeViews = new List<SourceNodeView>();
         private readonly List<LayerNodeView> _layerNodeViews = new List<LayerNodeView>();
+        private const float OrphanColumnX = 32f;
+        private const float OrphanRowSpacing = 120f;
         private readonly List<RoutingEdge> _routingEdges = new List<RoutingEdge>();
-        private readonly List<DanglingEdge> _danglingEdges = new List<DanglingEdge>();
+        private readonly List<OrphanInputNodeView> _orphanInputNodes = new List<OrphanInputNodeView>();
+        private readonly List<Edge> _orphanInputEdges = new List<Edge>();
+        private readonly List<Edge> _compositionEdges = new List<Edge>();
         private readonly MiniMap _miniMap;
         private OutputNodeView _outputNodeView;
         private SerializedObject _serializedObject;
@@ -60,7 +68,11 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 
         public IReadOnlyList<RoutingEdge> RoutingEdges => _routingEdges;
 
-        public IReadOnlyList<DanglingEdge> DanglingEdges => _danglingEdges;
+        public IReadOnlyList<OrphanInputNodeView> OrphanInputNodes => _orphanInputNodes;
+
+        public IReadOnlyList<Edge> OrphanInputEdges => _orphanInputEdges;
+
+        public IReadOnlyList<Edge> CompositionEdges => _compositionEdges;
 
         public OutputNodeView OutputNodeView => _outputNodeView;
 
@@ -76,13 +88,14 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             }
 
             ClearRoutingEdges();
-            ClearDanglingEdges();
+            ClearOrphanInputs();
+            ClearCompositionEdges();
             ClearSourceNodes();
 
             for (int i = 0; i < sourceNodes.Count; i++)
             {
                 var sourceNodeView = new SourceNodeView(sourceNodes[i], onAutoWireRequested);
-                sourceNodeView.SetPosition(new Rect(32f, 32f + (i * 140f), 240f, 96f));
+                sourceNodeView.SetPosition(new Rect(32f, ContentTopMargin + (i * 140f), 240f, 96f));
                 _sourceNodeViews.Add(sourceNodeView);
                 AddElement(sourceNodeView);
             }
@@ -112,13 +125,14 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             _wiringSerializedMapper = wiringSerializedMapper;
 
             ClearRoutingEdges();
-            ClearDanglingEdges();
+            ClearOrphanInputs();
+            ClearCompositionEdges();
             ClearLayerNodes();
 
             for (int i = 0; i < layerNodes.Count; i++)
             {
                 var layerNodeView = new LayerNodeView(layerNodes[i], serializedObject, wiringSerializedMapper);
-                layerNodeView.SetPosition(new Rect(336f, 32f + (i * 240f), 280f, 180f));
+                layerNodeView.SetPosition(new Rect(336f, ContentTopMargin + (i * 240f), 280f, 180f));
                 _layerNodeViews.Add(layerNodeView);
                 AddElement(layerNodeView);
             }
@@ -131,10 +145,11 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
                 throw new ArgumentNullException(nameof(outputNodeData));
             }
 
+            ClearCompositionEdges();
             ClearOutputNode();
 
             _outputNodeView = new OutputNodeView(outputNodeData);
-            _outputNodeView.SetPosition(new Rect(672f, 32f, 320f, Mathf.Max(140f, 56f + (outputNodeData.OrderedLayers.Count * 24f))));
+            _outputNodeView.SetPosition(new Rect(672f, ContentTopMargin, 320f, Mathf.Max(140f, 56f + (outputNodeData.OrderedLayers.Count * 24f))));
             AddElement(_outputNodeView);
         }
 
@@ -184,28 +199,78 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             }
         }
 
-        public void SetDanglingEdges(IReadOnlyList<DanglingEdgeData> invalidEdges)
+        /// <summary>
+        /// 未解決（ソース未存在）の入力を、ドラッグ移動可能な孤立ノード＋読み取り専用エッジで描画する。
+        /// </summary>
+        public void SetInvalidInputs(IReadOnlyList<DanglingEdgeData> invalidInputs)
         {
-            if (invalidEdges == null)
+            if (invalidInputs == null)
             {
-                throw new ArgumentNullException(nameof(invalidEdges));
+                throw new ArgumentNullException(nameof(invalidInputs));
             }
 
-            ClearDanglingEdges();
+            ClearOrphanInputs();
 
-            for (int i = 0; i < invalidEdges.Count; i++)
+            for (int i = 0; i < invalidInputs.Count; i++)
             {
-                DanglingEdgeData edgeData = invalidEdges[i];
-                LayerNodeView layerNode = FindLayerNode(edgeData.LayerIndex);
+                DanglingEdgeData data = invalidInputs[i];
+                LayerNodeView layerNode = FindLayerNode(data.LayerIndex);
                 if (layerNode == null)
                 {
                     continue;
                 }
 
-                var edge = new DanglingEdge(layerNode.InputPort, edgeData);
-                _danglingEdges.Add(edge);
+                var orphanNode = new OrphanInputNodeView(data);
+                float y = ContentTopMargin + ((_sourceNodeViews.Count + i) * OrphanRowSpacing);
+                orphanNode.SetPosition(new Rect(OrphanColumnX, y, 220f, 80f));
+                _orphanInputNodes.Add(orphanNode);
+                AddElement(orphanNode);
+
+                Edge edge = CreateReadOnlyEdge(orphanNode.OutputPort, layerNode.InputPort);
+                _orphanInputEdges.Add(edge);
                 AddElement(edge);
             }
+        }
+
+        /// <summary>
+        /// 各レイヤーノードから Composite Output へ、ブレンドを示す読み取り専用エッジを引く。
+        /// </summary>
+        public void SetCompositionEdges()
+        {
+            ClearCompositionEdges();
+
+            if (_outputNodeView == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < _layerNodeViews.Count; i++)
+            {
+                LayerNodeView layerNode = _layerNodeViews[i];
+                Port outputPort = _outputNodeView.GetLayerInputPort(layerNode.LayerNodeData.LayerIndex);
+                if (outputPort == null)
+                {
+                    continue;
+                }
+
+                Edge edge = CreateReadOnlyEdge(layerNode.OutputPort, outputPort);
+                _compositionEdges.Add(edge);
+                AddElement(edge);
+            }
+        }
+
+        private static Edge CreateReadOnlyEdge(Port outputPort, Port inputPort)
+        {
+            var edge = new Edge
+            {
+                output = outputPort,
+                input = inputPort,
+            };
+            outputPort.Connect(edge);
+            inputPort.Connect(edge);
+            edge.capabilities &= ~(Capabilities.Selectable | Capabilities.Deletable | Capabilities.Copiable | Capabilities.Renamable);
+            edge.pickingMode = PickingMode.Ignore;
+            return edge;
         }
 
         private void ClearSourceNodes()
@@ -249,14 +314,31 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             _routingEdges.Clear();
         }
 
-        private void ClearDanglingEdges()
+        private void ClearOrphanInputs()
         {
-            for (int i = 0; i < _danglingEdges.Count; i++)
+            for (int i = 0; i < _orphanInputEdges.Count; i++)
             {
-                RemoveElement(_danglingEdges[i]);
+                RemoveElement(_orphanInputEdges[i]);
             }
 
-            _danglingEdges.Clear();
+            _orphanInputEdges.Clear();
+
+            for (int i = 0; i < _orphanInputNodes.Count; i++)
+            {
+                RemoveElement(_orphanInputNodes[i]);
+            }
+
+            _orphanInputNodes.Clear();
+        }
+
+        private void ClearCompositionEdges()
+        {
+            for (int i = 0; i < _compositionEdges.Count; i++)
+            {
+                RemoveElement(_compositionEdges[i]);
+            }
+
+            _compositionEdges.Clear();
         }
 
         private SourceNodeView FindSourceNode(string canonicalId)

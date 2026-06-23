@@ -65,7 +65,7 @@ namespace Hidano.FacialControl.Editor.Windows
             MergeIntoExisting
         }
 
-        [MenuItem("FacialControl/ARKit 検出ツール", false, 30)]
+        [MenuItem("Tools/FacialControl/ARKit 検出ツール", false, 30)]
         public static void ShowWindow()
         {
             var window = GetWindow<ARKitDetectorWindow>();

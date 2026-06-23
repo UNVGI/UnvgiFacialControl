@@ -19,6 +19,10 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
         public const string PriorityFieldName = "routing-layer-priority";
         public const string ExclusionModeFieldName = "routing-layer-exclusion-mode";
         public const string OverrideMaskFieldName = "routing-layer-override-mask";
+        public const string TypeBadgeName = "routing-layer-type-badge";
+        public const string TypeBadgeText = "レイヤー";
+        private static readonly UnityEngine.Color TitleBarColor = new UnityEngine.Color(0.16f, 0.21f, 0.33f, 1f);
+        private static readonly UnityEngine.Color TypeBadgeColor = new UnityEngine.Color(0.62f, 0.76f, 1f, 1f);
 
         private readonly SerializedObject _serializedObject;
         private readonly IWiringSerializedMapper _wiringSerializedMapper;
@@ -51,6 +55,14 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 
             capabilities &= ~(Capabilities.Deletable | Capabilities.Copiable | Capabilities.Renamable);
 
+            // レイヤーノードであることを一目で分かるようにタイトルバーを着色し「レイヤー」バッジを付与する。
+            titleContainer.style.backgroundColor = TitleBarColor;
+            TypeBadge = new Label(TypeBadgeText) { name = TypeBadgeName };
+            TypeBadge.style.color = TypeBadgeColor;
+            TypeBadge.style.unityFontStyleAndWeight = UnityEngine.FontStyle.Bold;
+            TypeBadge.style.marginRight = 6f;
+            titleButtonContainer.Add(TypeBadge);
+
             InputPort = InstantiatePort(
                 Orientation.Horizontal,
                 Direction.Input,
@@ -60,6 +72,17 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             InputPort.tooltip = $"Layer {LayerNodeData.LayerIndex}";
             InputPort.userData = LayerNodeData.LayerIndex;
             inputContainer.Add(InputPort);
+
+            // 合成出力（Composite Output）へブレンドされることを線で示すための出力ポート。
+            OutputPort = InstantiatePort(
+                Orientation.Horizontal,
+                Direction.Output,
+                Port.Capacity.Single,
+                typeof(float));
+            OutputPort.portName = "Blend";
+            OutputPort.tooltip = "Composite Output へ合成される";
+            OutputPort.userData = LayerNodeData.LayerIndex;
+            outputContainer.Add(OutputPort);
 
             NameField = new TextField("Name")
             {
@@ -126,6 +149,10 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
         public TextField OverrideMaskField { get; }
 
         public Port InputPort { get; }
+
+        public Port OutputPort { get; }
+
+        public Label TypeBadge { get; }
 
         private void ApplyLayerProperties(
             string layerName,

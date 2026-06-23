@@ -240,7 +240,6 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             var adapterTab = new Tab("Adapter Bindings") { name = TabAdapterBindingsName };
             OnBuildPreLayersSections(adapterTab.contentContainer);
-            BuildRoutingEditorLaunchSection(adapterTab.contentContainer);
             BuildAdapterBindingsSection(adapterTab.contentContainer);
             tabView.Add(adapterTab);
 
@@ -336,6 +335,20 @@ namespace Hidano.FacialControl.Editor.Inspector
             _saveStatusLabel.style.unityFontStyleAndWeight = FontStyle.Italic;
             _saveStatusLabel.style.color = new StyleColor(new Color(0.55f, 0.55f, 0.55f));
             bar.Add(_saveStatusLabel);
+
+            // ルーティング編集はレイヤー・配線・スロットを横断する操作のため、
+            // タブ内ではなく全タブ共通バーに常時表示する。
+            if (target is ScriptableObject routingProfile)
+            {
+                var routingButton = new Button(() => RoutingEditorWindow.Open(routingProfile))
+                {
+                    name = RoutingEditorOpenButtonName,
+                    text = "ルーティングを編集",
+                };
+                routingButton.AddToClassList(FacialControlStyles.ActionButton);
+                routingButton.style.marginRight = 4f;
+                bar.Add(routingButton);
+            }
 
             var forceExportButton = new Button(ForceSave)
             {
@@ -447,24 +460,6 @@ namespace Hidano.FacialControl.Editor.Inspector
         // ====================================================================
         // Section: Adapter Bindings（[SerializeReference] AdapterBindingBase list）
         // ====================================================================
-
-        private void BuildRoutingEditorLaunchSection(VisualElement root)
-        {
-            if (!(target is ScriptableObject profile))
-            {
-                return;
-            }
-
-            var button = new Button(() => RoutingEditorWindow.Open(profile))
-            {
-                name = RoutingEditorOpenButtonName,
-                text = "ルーティングを編集",
-            };
-            button.AddToClassList(FacialControlStyles.ActionButton);
-            button.style.alignSelf = Align.FlexStart;
-            button.style.marginBottom = 6f;
-            root.Add(button);
-        }
 
         private void BuildAdapterBindingsSection(VisualElement root)
         {
