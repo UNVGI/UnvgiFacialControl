@@ -7,12 +7,12 @@
             "exclusionMode": "lastWins",
             "inputSources": [
                 {
-                    "id": "input",
+                    "id": "input-system",
                     "weight": 1.0,
                     "options":{"maxStackDepth":4}
                 },
                 {
-                    "id": "input:analog-expression",
+                    "id": "input-system:analog-expression",
                     "weight": 1.0
                 }
             ]
@@ -23,7 +23,7 @@
             "exclusionMode": "lastWins",
             "inputSources": [
                 {
-                    "id": "input:overlay:blink",
+                    "id": "input-system:overlay:blink",
                     "weight": 1.0
                 }
             ]

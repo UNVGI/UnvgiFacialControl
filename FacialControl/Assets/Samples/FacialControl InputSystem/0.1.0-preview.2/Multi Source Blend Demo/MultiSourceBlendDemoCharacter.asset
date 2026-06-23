@@ -18,10 +18,10 @@ MonoBehaviour:
     priority: 0
     exclusionMode: 0
     inputSources:
-    - id: input
+    - id: input-system
       weight: 1
       optionsJson: '{"maxStackDepth":4}'
-    - id: input:analog-expression
+    - id: input-system:analog-expression
       weight: 1
       optionsJson: 
     layerOverrideMask:
@@ -30,7 +30,7 @@ MonoBehaviour:
     priority: 1
     exclusionMode: 0
     inputSources:
-    - id: input:overlay:blink
+    - id: input-system:overlay:blink
       weight: 1
       optionsJson: 
     layerOverrideMask: []
