@@ -62,7 +62,7 @@ namespace Hidano.FacialControl.Editor.Tools
         private Func<string, AnimationClip> _clipAssetLoader;
         private Action _assetDatabaseSaveAssets;
 
-        [MenuItem("FacialControl/Expression 作成", false, 20)]
+        [MenuItem("Tools/FacialControl/Expression 作成", false, 20)]
         public static void ShowWindow()
         {
             var window = GetWindow<ExpressionCreatorWindow>();

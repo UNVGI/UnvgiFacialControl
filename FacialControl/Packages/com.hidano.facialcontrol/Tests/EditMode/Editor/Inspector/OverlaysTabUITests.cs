@@ -176,11 +176,11 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
             _so = CreateProfileWithSlots(BlinkSlotName);
 
             var root = BuildInspectorRoot();
-            var adapterTab = root.Q<VisualElement>(FacialCharacterProfileSOInspector.TabAdapterBindingsName);
-            Assert.That(adapterTab, Is.Not.Null, "Adapter Bindings tab was not found.");
+            var saveStatusBar = root.Q<VisualElement>(FacialCharacterProfileSOInspector.SaveStatusBarName);
+            Assert.That(saveStatusBar, Is.Not.Null, "Save status bar was not found.");
 
-            var button = adapterTab.Q<Button>(FacialCharacterProfileSOInspector.RoutingEditorOpenButtonName);
-            Assert.That(button, Is.Not.Null, "Routing Editor launch button was not found.");
+            var button = saveStatusBar.Q<Button>(FacialCharacterProfileSOInspector.RoutingEditorOpenButtonName);
+            Assert.That(button, Is.Not.Null, "Routing Editor launch button was not found in the save status bar.");
             Assert.That(button.text, Is.EqualTo("ルーティングを編集"));
 
             ClickButton(button);

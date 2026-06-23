@@ -8,6 +8,7 @@ using Hidano.FacialControl.Editor.Windows.Routing.Logic;
 using Hidano.FacialControl.Tests.EditMode.Adapters.ScriptableObjectTests.AdapterBindings;
 using NUnit.Framework;
 using UnityEditor;
+using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -119,36 +120,56 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
         }
 
         [Test]
-        public void SetDanglingEdges_BuildsReadOnlyDanglingEdgeWithoutRepairButton()
+        public void SetInvalidInputs_BuildsMovableOrphanNodeConnectedToLayer()
         {
             RoutingGraphView graphView = CreateGraphView();
 
-            graphView.SetDanglingEdges(
+            graphView.SetInvalidInputs(
                 new[] { new DanglingEdgeData(0, 2, "ulipsync:a") });
 
-            Assert.That(graphView.DanglingEdges, Has.Count.EqualTo(1));
-            DanglingEdge edge = graphView.DanglingEdges[0];
-            Assert.That(edge.output, Is.Null);
+            Assert.That(graphView.OrphanInputNodes, Has.Count.EqualTo(1));
+            OrphanInputNodeView orphanNode = graphView.OrphanInputNodes[0];
+            Assert.That(orphanNode.Data.Id, Is.EqualTo("ulipsync:a"));
+            Assert.That(orphanNode.OutputPort, Is.Not.Null);
+            Assert.That(orphanNode.OutputPort.direction, Is.EqualTo(Direction.Output));
+            Assert.That((orphanNode.capabilities & Capabilities.Movable), Is.EqualTo(Capabilities.Movable));
+            Assert.That((orphanNode.capabilities & Capabilities.Deletable), Is.EqualTo((Capabilities)0));
+
+            Assert.That(graphView.OrphanInputEdges, Has.Count.EqualTo(1));
+            Edge edge = graphView.OrphanInputEdges[0];
+            Assert.That(edge.output, Is.SameAs(orphanNode.OutputPort));
             Assert.That(edge.input, Is.SameAs(graphView.LayerNodeViews[0].InputPort));
-            Assert.That(edge.IdBadge.text, Is.EqualTo("ulipsync:a"));
-            Assert.That(edge.CurrentWireColor.r, Is.EqualTo(1f).Within(0.001f));
-            Assert.That(edge.CurrentWireColor.g, Is.LessThan(0.35f));
-            Assert.That(edge.IsSelectable(), Is.False);
-            Assert.That(edge.Children().OfType<UnityEngine.UIElements.Button>().ToArray(), Is.Empty);
         }
 
         [Test]
-        public void SetDanglingEdges_RebuildsExistingDanglingEdges()
+        public void SetInvalidInputs_RebuildsExistingOrphanNodes()
         {
             RoutingGraphView graphView = CreateGraphView();
 
-            graphView.SetDanglingEdges(
+            graphView.SetInvalidInputs(
                 new[] { new DanglingEdgeData(0, 1, "legacy:a") });
-            graphView.SetDanglingEdges(
+            graphView.SetInvalidInputs(
                 new[] { new DanglingEdgeData(0, 3, "legacy:b") });
 
-            Assert.That(graphView.DanglingEdges, Has.Count.EqualTo(1));
-            Assert.That(graphView.DanglingEdges[0].IdBadge.text, Is.EqualTo("legacy:b"));
+            Assert.That(graphView.OrphanInputNodes, Has.Count.EqualTo(1));
+            Assert.That(graphView.OrphanInputNodes[0].Data.Id, Is.EqualTo("legacy:b"));
+        }
+
+        [Test]
+        public void SetCompositionEdges_ConnectsEachLayerToCompositeOutput()
+        {
+            RoutingGraphView graphView = CreateGraphView();
+            graphView.SetOutputNode(new OutputNodeData(new[]
+            {
+                new OutputLayerData(0, "overlay", 1, new string[0]),
+            }));
+
+            graphView.SetCompositionEdges();
+
+            Assert.That(graphView.CompositionEdges, Has.Count.EqualTo(1));
+            Edge edge = graphView.CompositionEdges[0];
+            Assert.That(edge.output, Is.SameAs(graphView.LayerNodeViews[0].OutputPort));
+            Assert.That(edge.input, Is.SameAs(graphView.OutputNodeView.GetLayerInputPort(0)));
         }
 
         private RoutingGraphView CreateGraphView()

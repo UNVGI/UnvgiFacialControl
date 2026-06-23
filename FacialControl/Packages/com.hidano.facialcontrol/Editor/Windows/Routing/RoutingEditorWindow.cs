@@ -32,12 +32,6 @@ namespace Hidano.FacialControl.Editor.Windows.Routing
         private int _lastObservedStateHash;
         private bool _isClosingForMissingProfile;
 
-        [MenuItem("Window/FacialControl/Routing Editor")]
-        private static void OpenEmptyWindow()
-        {
-            Open(null);
-        }
-
         public static RoutingEditorWindow Open(ScriptableObject profile)
         {
             if (!TryResolveProfile(profile, out FacialCharacterProfileSO facialProfile))
@@ -210,8 +204,9 @@ namespace Hidano.FacialControl.Editor.Windows.Routing
             _graphView.SetSourceNodes(model.SourceNodes, HandleAutoWireRequested);
             _graphView.SetLayerNodes(model.LayerNodes, _serializedObject, _wiringSerializedMapper);
             _graphView.SetOutputNode(model.OutputNode);
+            _graphView.SetCompositionEdges();
             _graphView.SetWiringEdges(model.Edges, _serializedObject, _wiringSerializedMapper);
-            _graphView.SetDanglingEdges(model.InvalidEdges);
+            _graphView.SetInvalidInputs(model.InvalidEdges);
             _lastObservedStateHash = CalculateObservedStateHash(_profile);
         }
 
