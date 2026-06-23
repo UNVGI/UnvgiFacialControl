@@ -1,6 +1,7 @@
 ---
 name: uloop-simulate-keyboard
-description: "Simulate keyboard key input in PlayMode via Input System. Use when you need to: (1) Press game control keys like WASD, Space, or Shift during PlayMode, (2) Hold keys down for continuous movement or actions, (3) Combine multiple held keys for complex input like Shift+W for sprint. Injects into Unity Input System (`Keyboard.current`); requires PlayMode and the New Input System."
+toolName: simulate-keyboard
+description: "Simulate keyboard input in PlayMode through Unity Input System. Use for key presses, holds, releases, and game controls such as WASD or Space."
 context: fork
 ---
 
@@ -36,6 +37,11 @@ uloop simulate-keyboard --action <action> --key <key> [options]
 | `Press` | KeyDown → wait → KeyUp | One-shot tap (jump, use item) |
 | `KeyDown` | KeyDown only (held until KeyUp) | Start continuous movement, hold sprint |
 | `KeyUp` | KeyUp only (release held key) | Stop movement, release sprint |
+
+Use `Press` for edge-triggered gameplay code such as `Keyboard.current.spaceKey.wasPressedThisFrame`.
+`KeyDown` emits one initial press edge, then only keeps the key held. It does not keep `wasPressedThisFrame` true while the key remains held.
+If a successful `Press` or `KeyDown` leaves `Keyboard.current.<key>.isPressed` true but the game state does not change, do not immediately rewrite the user's gameplay code to `isPressed`. First verify that the gameplay component is active during the command, that it polls input in the configured Input System update phase, and that a missed `KeyDown` edge is followed by `KeyUp` before retrying.
+Use `KeyDown` / `KeyUp` when the scenario intentionally needs a held key.
 
 ### KeyDown/KeyUp Rules
 
@@ -82,6 +88,6 @@ Returns JSON with:
 ## Prerequisites
 
 - Unity must be in **PlayMode**
-- **Input System package** (`com.unity.inputsystem`) must be installed
-- Active Input Handling must be set to **Input System Package (New)** or **Both** in Player Settings
+- **Input System package** must be installed (`com.unity.inputsystem`)
+- Use this only when the project already uses the New Input System.
 - Game code must read input via Input System API (e.g. `Keyboard.current[Key.W].isPressed`), not legacy `Input.GetKey()`

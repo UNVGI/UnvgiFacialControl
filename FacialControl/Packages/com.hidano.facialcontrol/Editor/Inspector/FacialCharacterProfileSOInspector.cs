@@ -12,6 +12,8 @@ using Hidano.FacialControl.Editor.AutoExport;
 using Hidano.FacialControl.Editor.Common;
 using Hidano.FacialControl.Editor.Inspector.AdapterBindings;
 using Hidano.FacialControl.Editor.Sampling;
+using Hidano.FacialControl.Editor.Windows.Routing;
+using Hidano.FacialControl.Editor.Windows.Routing.Logic;
 
 namespace Hidano.FacialControl.Editor.Inspector
 {
@@ -57,6 +59,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string DefaultOverlaysFoldoutName = "facial-character-default-overlays-foldout";
         public const string ExpressionLibraryFoldoutName = "facial-character-expression-library-foldout";
         public const string ExpressionLibraryAddButtonName = "facial-character-expression-library-add-button";
+        public const string RoutingEditorOpenButtonName = "facial-character-routing-editor-open-button";
         public const string ExpressionOverlaysSectionName = "expression-row-overlays-section";
         public const string ExpressionPhonemeOverlaysFoldoutName = "expression-row-phoneme-overlays-foldout";
         public const string ExpressionPhonemeOverlaysSummaryName = "expression-row-phoneme-overlays-summary";
@@ -170,6 +173,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         protected readonly List<string> _layerNameChoices = new List<string>();
         protected readonly List<string> _slotNameChoices = new List<string>();
+        private static readonly IPhonemeSlotInitializer s_phonemeSlotInitializer = new PhonemeSlotInitializer();
 
         protected IExpressionAnimationClipSampler _sampler;
         private bool _autoSavePending;
@@ -236,6 +240,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             var adapterTab = new Tab("Adapter Bindings") { name = TabAdapterBindingsName };
             OnBuildPreLayersSections(adapterTab.contentContainer);
+            BuildRoutingEditorLaunchSection(adapterTab.contentContainer);
             BuildAdapterBindingsSection(adapterTab.contentContainer);
             tabView.Add(adapterTab);
 
@@ -443,6 +448,24 @@ namespace Hidano.FacialControl.Editor.Inspector
         // Section: Adapter Bindings（[SerializeReference] AdapterBindingBase list）
         // ====================================================================
 
+        private void BuildRoutingEditorLaunchSection(VisualElement root)
+        {
+            if (!(target is ScriptableObject profile))
+            {
+                return;
+            }
+
+            var button = new Button(() => RoutingEditorWindow.Open(profile))
+            {
+                name = RoutingEditorOpenButtonName,
+                text = "ルーティングを編集",
+            };
+            button.AddToClassList(FacialControlStyles.ActionButton);
+            button.style.alignSelf = Align.FlexStart;
+            button.style.marginBottom = 6f;
+            root.Add(button);
+        }
+
         private void BuildAdapterBindingsSection(VisualElement root)
         {
             if (_adapterBindingsProperty == null) return;
@@ -591,28 +614,10 @@ namespace Hidano.FacialControl.Editor.Inspector
         {
             if (_slotsProperty == null) return;
 
-            serializedObject.Update();
-            bool changed = false;
-            foreach (var reservedSlot in PhonemeOverlaySlots.ReservedNames)
-            {
-                if (ContainsSlot(_slotsProperty, reservedSlot))
-                {
-                    continue;
-                }
-
-                int index = _slotsProperty.arraySize;
-                _slotsProperty.InsertArrayElementAtIndex(index);
-                var slotProp = _slotsProperty.GetArrayElementAtIndex(index);
-                if (slotProp != null)
-                {
-                    slotProp.stringValue = reservedSlot;
-                    changed = true;
-                }
-            }
+            bool changed = s_phonemeSlotInitializer.EnsureReservedSlots(serializedObject);
 
             if (!changed) return;
 
-            serializedObject.ApplyModifiedProperties();
             EditorUtility.SetDirty(target);
             OnSlotsPropertyChanged();
         }

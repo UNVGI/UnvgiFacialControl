@@ -1,6 +1,7 @@
 ---
 name: uloop-get-logs
-description: "Retrieve current Unity Console entries via uloop CLI. Use when you need to: (1) inspect errors, warnings, or logs after compile, tests, PlayMode, or dynamic code execution, (2) search current Console messages or stack traces, (3) confirm whether a recent Unity operation emitted logs. Prefer this over reading Editor.log or Unity log files for normal Console contents; use log files only for startup, crash, freeze, or uloop connection failures."
+toolName: get-logs
+description: "Read current Unity Console entries from a running Editor. Use during bug investigation after compile, tests, PlayMode, or dynamic code to inspect logs, warnings, errors, and stack traces."
 ---
 
 # uloop get-logs
@@ -20,9 +21,9 @@ uloop get-logs [options]
 | `--log-type` | string | `All` | Log type filter: `Error`, `Warning`, `Log`, `All` |
 | `--max-count` | integer | `100` | Maximum number of logs to retrieve |
 | `--search-text` | string | - | Text to search within logs |
-| `--include-stack-trace` | boolean | `false` | Include stack trace in output |
-| `--use-regex` | boolean | `false` | Use regex for search |
-| `--search-in-stack-trace` | boolean | `false` | Search within stack trace |
+| `--include-stack-trace` | flag | - | Include stack trace in output |
+| `--use-regex` | flag | - | Use regex for search |
+| `--search-in-stack-trace` | flag | - | Search within stack trace |
 
 ## Global Options
 

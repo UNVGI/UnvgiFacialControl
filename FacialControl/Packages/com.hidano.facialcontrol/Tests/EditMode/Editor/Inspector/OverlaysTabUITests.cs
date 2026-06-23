@@ -4,6 +4,7 @@ using System.Reflection;
 using Hidano.FacialControl.Adapters.Json.Dto;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Editor.Inspector;
+using Hidano.FacialControl.Editor.Windows.Routing;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -35,6 +36,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
                 CancelPendingAutoSave(_editor);
                 Object.DestroyImmediate(_editor);
                 _editor = null;
+            }
+
+            RoutingEditorWindow[] windows = Resources.FindObjectsOfTypeAll<RoutingEditorWindow>();
+            for (int i = 0; i < windows.Length; i++)
+            {
+                if (windows[i] != null)
+                {
+                    Object.DestroyImmediate(windows[i]);
+                }
             }
 
             for (int i = 0; i < _clips.Count; i++)
@@ -158,6 +168,25 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
                 layersTab.Q<RadioButtonGroup>(FacialCharacterProfileSOInspector.ExpressionOverlayStateRadioName),
                 Is.Null,
                 "Layers tab must not render Expression overlay controls.");
+        }
+
+        [Test]
+        public void Click_RoutingEditorOpenButton_OpensRoutingEditorWindow()
+        {
+            _so = CreateProfileWithSlots(BlinkSlotName);
+
+            var root = BuildInspectorRoot();
+            var adapterTab = root.Q<VisualElement>(FacialCharacterProfileSOInspector.TabAdapterBindingsName);
+            Assert.That(adapterTab, Is.Not.Null, "Adapter Bindings tab was not found.");
+
+            var button = adapterTab.Q<Button>(FacialCharacterProfileSOInspector.RoutingEditorOpenButtonName);
+            Assert.That(button, Is.Not.Null, "Routing Editor launch button was not found.");
+            Assert.That(button.text, Is.EqualTo("ルーティングを編集"));
+
+            ClickButton(button);
+
+            RoutingEditorWindow[] windows = Resources.FindObjectsOfTypeAll<RoutingEditorWindow>();
+            Assert.That(windows, Has.Length.EqualTo(1));
         }
 
         [Test]
@@ -535,6 +564,19 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Inspector
                 modifiers: null);
 
             Assert.That(method, Is.Not.Null, $"{methodName} が FacialCharacterProfileSOInspector に未実装です。");
+        }
+
+        private static void ClickButton(Button button)
+        {
+            Assert.That(button, Is.Not.Null);
+            var invoke = button.clickable.GetType().GetMethod(
+                "Invoke",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                types: new[] { typeof(EventBase) },
+                modifiers: null);
+            Assert.That(invoke, Is.Not.Null);
+            invoke.Invoke(button.clickable, new object[] { null });
         }
 
         private static FacialCharacterProfileSO CreateProfileWithSlots(params string[] slots)

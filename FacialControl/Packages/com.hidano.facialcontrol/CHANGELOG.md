@@ -1,16 +1,16 @@
 # Changelog
 
-## preview.1 リリースノート追補
+すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
+
+## 初回リリース
+
+本パッケージはこれが初回リリースです。
 
 ### Breaking Changes
 
-- **`AnimationEvent` 由来の遷移メタデータを撤去**: Expression の `transitionDuration` / `transitionCurvePreset` は `FacialCharacterProfileSO` Inspector の Expression 行だけで編集する方針に統一しました。AnimationClip 上の `AnimationEvent` (`FacialControlMeta_Set` など) は preview.1 以降の遷移メタデータとして扱いません。
-- **自動マイグレーション無し**: 過去 preview の AnimationClip に保存されていた遷移時間・遷移カーブは自動マイグレーションされません。必要な値はユーザーが `FacialCharacterProfileSO` / profile JSON 側へ手動で設定し直してください。
+- **`AnimationEvent` 由来の遷移メタデータを撤去**: Expression の `transitionDuration` / `transitionCurvePreset` は `FacialCharacterProfileSO` Inspector の Expression 行だけで編集する方針に統一しました。AnimationClip 上の `AnimationEvent` (`FacialControlMeta_Set` など) は遷移メタデータとして扱いません。
+- **自動マイグレーション無し**: 過去の AnimationClip に保存されていた遷移時間・遷移カーブは自動マイグレーションされません。必要な値はユーザーが `FacialCharacterProfileSO` / profile JSON 側へ手動で設定し直してください。
 - 根拠: spec `preview1-polish-pack` Req 2.6 / task 8.2。
-
-すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
-
-## [0.1.0-preview.2] - Unreleased
 
 ### Fixed
 
@@ -24,16 +24,16 @@
 ### Breaking changes
 
 - Overlay は旧 `(slot, expressionId)` 参照モデルを廃止し、`(slot, suppress, snapshot)` の 3 状態モデルへ破壊的に変更しました。`defaultOverlays[]` と `expressions[].snapshot.overlays[]` は `slot` / `suppress` / `snapshot` を保持し、`suppress=false && snapshot=null` は `FacialProfile.DefaultOverlays` への fallback、`suppress=true` は明示抑制、`snapshot` 指定時は個別 overlay override を表します。
-- `OverlaySlotBinding.ExpressionId` および ScriptableObject 側の `expressionId` フィールドは廃止しました。preview.2 では旧 JSON からの自動マイグレーションを提供せず、`defaultOverlays[]` または `expressions[].snapshot.overlays[]` に旧 `expressionId` が残っている場合は `SystemTextJsonParser` が field 名と path を含む `FormatException` で読み込みを拒否します。
+- `OverlaySlotBinding.ExpressionId` および ScriptableObject 側の `expressionId` フィールドは廃止しました。本リリースでは旧 JSON からの自動マイグレーションを提供せず、`defaultOverlays[]` または `expressions[].snapshot.overlays[]` に旧 `expressionId` が残っている場合は `SystemTextJsonParser` が field 名と path を含む `FormatException` で読み込みを拒否します。
 - `FacialProfile.Slots` / JSON ルート `slots[]` / `FacialCharacterProfileSO._slots` を overlay slot 識別子の唯一の宣言元として追加しました。`Expression.Overlays`、`FacialProfile.DefaultOverlays`、Adapter Bindings の `overlaySlot` は、この slots 宣言に存在しない値を不正参照として扱います。
 - GazeConfig は `InputSystemAdapterBinding._gazeConfigs` から `FacialCharacterProfileSO` ルート直下の `_gazeConfigs` へ昇格しました。InputSystem 側は入力結線のみを保持する構造に変わるため、既存 SO YAML は binding 内部の gaze configs を SO ルートへ移植する必要があります。
-- `profile.json` の `schemaVersion` は preview.1 リリース前段階のため `"1.0"` に統一しました。バージョンを別管理しないポリシーに従い、旧開発過程で出現した `"2.0"` / `"2.1"` の JSON は preview 段階の破壊的変更として migration なしで `"1.0"` への hand-edit が必要です。
+- `profile.json` の `schemaVersion` はバージョンを別管理しないポリシーに従い `"1.0"` に統一しました。旧開発過程で出現した `"2.0"` / `"2.1"` の JSON は migration なしで `"1.0"` への hand-edit が必要です。
 - `InputSourceId` の正規表現を `^[a-zA-Z0-9_.-]{1,64}$` から `^[a-zA-Z0-9_.\-:]{1,64}$` に拡張し、`slug:sub` 合成キー（例: `input:analog-expression`）を JSON 経路でも正しく受理するよう修正しました。`AdapterSlug` 自身の regex は `:` 不許可のまま維持。これにより `SystemTextJsonParser` が profile.json 内の `input:analog-expression` を弾いていた警告が解消されます。
-- `ExpressionSerializable.kind` (`ExpressionKind` enum: Digital/Analog) を撤廃し、`bool isGaze`（目線操作フラグ）に置換しました。Inspector の種別 dropdown は「目線操作」チェックボックスに統一され、目線操作以外の表情は「名前 / AnimationClip / 遷移時間」のみで設定可能になります。Layer 側の種別属性は元々存在しないため変更なし。preview.1 段階のため自動マイグレーションは提供しません。サンプル `.asset` の YAML 上の `kind: 0|1` を `isGaze: 0|1` に置換しています（`_schemaVersion` は preview ポリシーに従い `"1.0"` のまま据え置き）。
+- `ExpressionSerializable.kind` (`ExpressionKind` enum: Digital/Analog) を撤廃し、`bool isGaze`（目線操作フラグ）に置換しました。Inspector の種別 dropdown は「目線操作」チェックボックスに統一され、目線操作以外の表情は「名前 / AnimationClip / 遷移時間」のみで設定可能になります。Layer 側の種別属性は元々存在しないため変更なし。自動マイグレーションは提供しません。サンプル `.asset` の YAML 上の `kind: 0|1` を `isGaze: 0|1` に置換しています（`_schemaVersion` は `"1.0"` のまま据え置き）。
 
 ### ⚠ BREAKING CHANGES — Adapter Binding アーキテクチャ移行 (spec `adapter-binding-architecture`)
 
-> 本リリースは spec `adapter-binding-architecture` に基づく Adapter 結線モデルの全面刷新を含む。**v0.1.0-preview.2 以前の `FacialCharacterSO` / `*FacialControllerExtension` MonoBehaviour 経路 / reserved id (`controller-expr` / `keyboard-expr` / `osc` / `lipsync` / `input` 等) を前提とする scene / asset / JSON はロード・動作できない**。preview 段階のため自動マイグレーションは提供しない（Req 8.1, 8.3）。移行手順は [`Documentation~/migration-guide.md`](Documentation~/migration-guide.md) を参照（Req 8.2, 8.5）。
+> 本リリースは spec `adapter-binding-architecture` に基づく Adapter 結線モデルの全面刷新を含む。**旧バージョンの `FacialCharacterSO` / `*FacialControllerExtension` MonoBehaviour 経路 / reserved id (`controller-expr` / `keyboard-expr` / `osc` / `lipsync` / `input` 等) を前提とする scene / asset / JSON はロード・動作できない**。自動マイグレーションは提供しない（Req 8.1, 8.3）。移行手順は [`Documentation~/migration-guide.md`](Documentation~/migration-guide.md) を参照（Req 8.2, 8.5）。
 >
 > Phase 1 並走期（`_adapterBindings` と旧 `IFacialControllerExtension` の同時利用が runtime warning 付きで許容されていた期間）は本リリースで **終了** した。両経路の同時利用を検出する `Debug.LogWarning` および empty-list ゲートは撤去され、`FacialController.Initialize` は無条件で per-FC `LifetimeScope` を build する。
 
@@ -113,17 +113,17 @@
 - MultiSourceBlendDemo の sample JSON / SO asset を新 overlay schema へ移行し、旧 `blink_overlay` expressionId 参照は `smile` / `smile_closed_eye` の slot overlay snapshot または suppress として inline 化した。
 - `Adapters.Json.Dto.AnalogBindingEntryDto` に `scale: float` / `direction: string` を追加。旧スキーマ JSON は欠落フィールドを default 値 (`scale=1`, `direction="bipolar"`) で fallback する。
 - `Adapters.Json.AnalogInputBindingJsonLoader` で scale / direction の parse / serialize を追加。不正 direction 文字列は warning + Bipolar 扱い。
-- 表情遷移時間のデフォルト値を `0.25 秒` から `1/15 秒 (≒0.0667 秒)` に変更。`Domain.Models.Expression.DefaultTransitionDuration` を新設し、`Expression` / `ExpressionSnapshot` / `ExpressionSerializable` / `ExpressionSnapshotDto` / `ExpressionTriggerInputSourceBase.DefaultReleaseTransitionDuration` / `AnimationClipExpressionSampler.DefaultTransitionDuration` / `ARKitDetector` 既定生成 / `SystemTextJsonParser` snapshot 欠落フォールバック / `Templates/default_profile.json` がすべて参照する。preview 段階のため後方互換は持たない。
-- ExpressionTrigger 系 IInputSource の予約 ID を `controller-expr` / `keyboard-expr` の二系統から単一の `input` に統合。`InputSystem.Action` 名で device を抽象化する設計のため、コア側で device 種別ごとに ID を分ける必要がなくなった。`Domain.Models.InputSourceId.ReservedIds` から `controller-expr` / `keyboard-expr` を削除し、`input` を新規追加。InputSystem 連携の `ExpressionTriggerInputSource` も二系統 (Controller/Keyboard) のクラス分離を撤廃し、単一 `InputReservedId = "input"` に統一。preview 段階のため後方互換は持たない。既存プロファイル JSON / SO の `inputSources[].id` が `controller-expr` / `keyboard-expr` のままだと parse 時に warning + skip されるため、`input` (1 件) に書き換える必要がある。
+- 表情遷移時間のデフォルト値を `0.25 秒` から `1/15 秒 (≒0.0667 秒)` に変更。`Domain.Models.Expression.DefaultTransitionDuration` を新設し、`Expression` / `ExpressionSnapshot` / `ExpressionSerializable` / `ExpressionSnapshotDto` / `ExpressionTriggerInputSourceBase.DefaultReleaseTransitionDuration` / `AnimationClipExpressionSampler.DefaultTransitionDuration` / `ARKitDetector` 既定生成 / `SystemTextJsonParser` snapshot 欠落フォールバック / `Templates/default_profile.json` がすべて参照する。後方互換は持たない。
+- ExpressionTrigger 系 IInputSource の予約 ID を `controller-expr` / `keyboard-expr` の二系統から単一の `input` に統合。`InputSystem.Action` 名で device を抽象化する設計のため、コア側で device 種別ごとに ID を分ける必要がなくなった。`Domain.Models.InputSourceId.ReservedIds` から `controller-expr` / `keyboard-expr` を削除し、`input` を新規追加。InputSystem 連携の `ExpressionTriggerInputSource` も二系統 (Controller/Keyboard) のクラス分離を撤廃し、単一 `InputReservedId = "input"` に統一。後方互換は持たない。既存プロファイル JSON / SO の `inputSources[].id` が `controller-expr` / `keyboard-expr` のままだと parse 時に warning + skip されるため、`input` (1 件) に書き換える必要がある。
 
 
 ### ⚠ BREAKING CHANGES
 
-> 本リリースは spec `inspector-and-data-model-redesign` に基づく Domain モデル / 中間 JSON schema / InputSystem 連携の全面改修を含みます。**v0.1.0-preview.1 以前の `FacialCharacterSO` / JSON / Scene / Prefab はロードできません**。アップグレード前に必ず [`Migration Guide v0.x → v1.0`](../com.hidano.facialcontrol.inputsystem/Documentation~/MIGRATION-v0.x-to-v1.0.md) の手順で資産を変換してください（Req 10.1, 10.6）。
+> 本リリースは spec `inspector-and-data-model-redesign` に基づく Domain モデル / 中間 JSON schema / InputSystem 連携の全面改修を含みます。**旧バージョンの `FacialCharacterSO` / JSON / Scene / Prefab はロードできません**。アップグレード前に必ず [`Migration Guide v0.x → v1.0`](../com.hidano.facialcontrol.inputsystem/Documentation~/MIGRATION-v0.x-to-v1.0.md) の手順で資産を変換してください（Req 10.1, 10.6）。
 
 #### 中間 JSON schema 破壊
 
-- `schemaVersion` を `"1.0"` 固定としました（preview.1 リリース前段階でバージョンを別管理しないため）。`SystemTextJsonParser` は `schemaVersion != "1.0"` を `Debug.LogError` + `NotSupportedException` で拒否します
+- `schemaVersion` を `"1.0"` 固定としました（バージョンを別管理しないため）。`SystemTextJsonParser` は `schemaVersion != "1.0"` を `Debug.LogError` + `NotSupportedException` で拒否します
 - `expressions[]` を `id / name / layer / layerOverrideMask: List<string> / snapshot: ExpressionSnapshotDto` の snapshot table 形式に再構成。旧 `transitionDuration / transitionCurve / blendShapeValues / layerSlots` field を撤去
 - top-level `rendererPaths[]` を新設し、各 Expression snapshot の `rendererPaths[]` がそのサブセットであることを保証
 
@@ -176,9 +176,7 @@
 - `FacialProfile.BonePoses` プロパティ
 - 旧 `BonePoseDto` / `BonePoseEntryDto` / `LayerSlotDto` / `AnalogMappingFunctionSerializable`
 
-## [0.1.0-preview.1] - Unreleased
-
-初回プレリリース。3 パッケージ構成（コア + `com.hidano.facialcontrol.osc` + `com.hidano.facialcontrol.inputsystem`）で提供。
+初回リリースで提供する 3 パッケージ構成（コア + `com.hidano.facialcontrol.osc` + `com.hidano.facialcontrol.inputsystem`）。
 
 ### サブパッケージ構成
 
@@ -260,7 +258,7 @@
 - 全公開 API の XML コメント
 - クイックスタートガイド（`Documentation~/quickstart.md`）
 - JSON スキーマリファレンス（`Documentation~/json-schema.md`）
-- `README.md` に「既知の制限とロードマップ」節を新設（Addressables 対応方針 / preview.2 以降の `IProfileJsonLoader` 抽象化計画）
+- `README.md` に「既知の制限とロードマップ」節を新設（Addressables 対応方針 / 将来の `IProfileJsonLoader` 抽象化計画）
 
 ### Changed
 
@@ -288,7 +286,7 @@
 
 ### Breaking Changes
 
-> 本節の破壊的変更は preview 段階の破壊的変更ポリシー（`docs/requirements.md` の FR-001「表情プロファイル管理」内の「後方互換性: preview 段階では破壊的変更を許容」規定）に基づく。移行手順の詳細は [`docs/migration-guide.md`](../../../docs/migration-guide.md) を参照。
+> 本節の破壊的変更は破壊的変更ポリシー（`docs/requirements.md` の FR-001「表情プロファイル管理」内の「後方互換性: 開発段階では破壊的変更を許容」規定）に基づく。移行手順の詳細は [`docs/migration-guide.md`](../../../docs/migration-guide.md) を参照。
 
 - `InputSystemAdapter` を `MonoBehaviour` から純粋 C# クラス（`IDisposable`）へ変更
   - 移行方法: GameObject へのアタッチを止め、`new InputSystemAdapter(facialController)` でインスタンスを生成する
@@ -299,7 +297,7 @@
   - `inputSources` が欠落または空配列のレイヤーは `FormatException` でロードが失敗する
   - 予約 ID: `osc` / `lipsync` / `input` / `analog-blendshape` / `analog-bonepose`。サードパーティ拡張は `x-` プレフィックスを使用
   - 移行方法: 既存プロファイル JSON の各レイヤーに `"inputSources": [{ "id": "input", "weight": 1.0 }]` 等の配列を明示的に追記する（同梱サンプルの移行例は `docs/migration-guide.md` および `StreamingAssets/FacialControl/*_profile.json` を参照）
-  - 根拠: `docs/requirements.md` FR-001（preview 段階の破壊的変更許容）、および spec `layer-input-source-blending` の D-5 / R3.2 / R7.3 / R7.4
+  - 根拠: `docs/requirements.md` FR-001（開発段階の破壊的変更許容）、および spec `layer-input-source-blending` の D-5 / R3.2 / R7.3 / R7.4
 
 - 予約 ID `legacy` の廃止
   - 旧バージョンで `legacy` を用いて Expression パイプライン全体を 1 本の入力源として温存していた挙動は削除された

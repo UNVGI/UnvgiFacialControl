@@ -2,15 +2,17 @@
 
 すべての変更は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に準拠し、[セマンティックバージョニング](https://semver.org/lang/ja/) に従います。
 
-## [0.1.0-preview.2] - Unreleased
+## 初回リリース
+
+本パッケージはこれが初回リリースです。
 
 ### Breaking changes
 
-- `OscAdapterBinding` を `OscReceiverAdapterBinding` にリネームしました。Inspector の Add ドロップダウン display name も `"OSC"` から `"OSC Receiver"` に変更し、送信側 `OscSenderAdapterBinding` (`"OSC Sender"`) との対称性を確保しました。既存 Profile / Scene asset の `RefIds` 内 `class: OscAdapterBinding` 指定は preview 段階の方針に従い自動 migration を提供しないため、新クラス名で再アサインしてください。
+- `OscAdapterBinding` を `OscReceiverAdapterBinding` にリネームしました。Inspector の Add ドロップダウン display name も `"OSC"` から `"OSC Receiver"` に変更し、送信側 `OscSenderAdapterBinding` (`"OSC Sender"`) との対称性を確保しました。既存 Profile / Scene asset の `RefIds` 内 `class: OscAdapterBinding` 指定は自動 migration を提供しないため、新クラス名で再アサインしてください。
 - `OscSenderHost` MonoBehaviour を廃止し、`OscSender` に統合しました。AdapterBinding 経路は `OscSender.Configure(endpoint, port, mappings[, addressUtf8])` で起動し、`OscSender.OnDestroy` が同 GameObject 上の `uOscClient` を破棄します。
 - `OscSenderAdapterBinding` の public API `HelperHost` / `HelperHostCount` / `GetHelperHost(int)` を `HelperSender` / `HelperSenderCount` / `GetHelperSender(int)` にリネーム。戻り型も `OscSenderHost` から `OscSender` に変わります。
 - `OscSender.Address` プロパティを `OscSender.Endpoint` にリネームしました。SerializeField の `_address` も `_endpoint` に変更したため、Inspector で直接 `OscSender` を Add していたケースでは既存シリアライズ値が失われます (AdapterBinding 経路では影響なし)。
-- `OscReceiverAdapterBinding` の受信 mapping を BlendShape 専用の旧構造から、`OscMappingEntry` / `OscMappingMode` による mode 別 entry 構造へ破壊的に変更しました。既存の `OscReceiverAdapterBinding` Asset / Scene は preview 段階の方針に従い自動 migration を提供しないため、新しい `_mappings` に再設定してください。
+- `OscReceiverAdapterBinding` の受信 mapping を BlendShape 専用の旧構造から、`OscMappingEntry` / `OscMappingMode` による mode 別 entry 構造へ破壊的に変更しました。既存の `OscReceiverAdapterBinding` Asset / Scene は自動 migration を提供しないため、新しい `_mappings` に再設定してください。
 - Gaze 受信を `OscReceiverAdapterBinding` に統合し、`Gaze_VRChat_XY` と `Gaze_ARKit_8BS` の mode を追加しました。ARKit 8 BlendShape mode では `addressPattern` を無視し、固定の `/ARKit/eyeLook...` 8 アドレスから左右別 Vector2 を復元します。
 
 ### Added
@@ -27,9 +29,7 @@
 - README に OSC 送信、受信拡張、Gaze Vector2 受信、破壊的変更、サンプル導線を追記しました。
 - `Documentation~/osc-sender-options.md` と `Documentation~/osc-receiver-options.md` に JSON DTO の canonical field とサンプルを記載しました。
 
-## [0.1.0-preview.1] - Unreleased
-
-初回プレリリース。`com.hidano.facialcontrol` に OSC 受信アダプタを追加し、VRChat / ARKit 互換 OSC で BlendShape を受信できる構成として提供しました。
+初回リリースで `com.hidano.facialcontrol` に OSC 受信アダプタを追加し、VRChat / ARKit 互換 OSC で BlendShape を受信できる構成として提供します。
 
 ### Added
 

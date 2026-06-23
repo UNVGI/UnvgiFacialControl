@@ -208,6 +208,32 @@
 - **影響範囲**: `Editor/AdapterBindings/OscReceiverAdapterBindingDrawer.cs`、`OscReceiverAdapterBinding` の出自 runtime API、対応 EditMode (Editor) テスト
 - **関連**: `osc-receiver-auto-mapping` spec、M-19（Layer / InputSource / Adapter の関係視認性改善）
 
+### M-27: 入力源ルーティング・グラフエディタ（ノードグラフ UI で配線・slug 直書き廃止）
+- **出典**: 2026-06-07 設計セッション。spec 一式生成済み（[`.kiro/specs/input-source-routing-graph-editor/requirements.md`](../.kiro/specs/input-source-routing-graph-editor/requirements.md) / [`design.md`](../.kiro/specs/input-source-routing-graph-editor/design.md) / [`research.md`](../.kiro/specs/input-source-routing-graph-editor/research.md)。phase: design-generated, requirements approved）。
+- **背景**: 現状 `FacialCharacterProfileSO` のレイヤー入力源は `_layers[].inputSources[].id` の文字列 slug（例 `lipsync-overlay:a`）を Inspector で人間が手打ちする運用。この id は本来 binding が `GetDefaultLayerInputSources()` 等から算出できる確定値であり自由入力ではない。手打ち運用のため binding slug 形（`ulipsync:a`）と overlay 登録 prefix 形（`lipsync-overlay:a`）の取り違えが起き、`InputSourceRegistry.TryResolve` が無言で外れて音素欠落する事故が実際に発生した（HANDOVER / MEMORY の最有力真因）。
+- **内容**: id 文字列をソースノードの出力ポートが内部保持し、画面にはラベル（「あ」等）のみ表示。ユーザーはノード間に線（エッジ）を引くだけで配線し、エッジが canonical id を運ぶことで slug 不一致を **UI 操作レベルで物理的に発生不能** にする。確定済み設計判断:
+  - UI: パッチベイ/ノードグラフ形式（左=入力源 → 中=レイヤー → 右=合成出力）。配置は **専用エディタウィンドウ**（Inspector は併存）。技術基盤 **UnityEditor.Experimental.GraphView**（experimental リスクは描画薄層に封じ込め）。
+  - アーキ: 純粋ロジック層（id 列挙 / 配線↔SO 変換 / 無効 id 検証）＋ GraphView 薄描画層に分離。`SourcePortEnumerator` を id 列挙の**単一真実源**とし、既存 `AdapterBindingsListView.ResolveDefaultInputSources` / Inspector `AddMissingPhonemeSlots` を抽出共用（実装アプローチ A）。ロジック二重化＝slug 不一致再発の温床を設計で禁止。
+  - スコープ内: overlay レイヤーへの一括自動配線ボタン（slot 同時宣言含む）、無効 id の赤破線「宙ぶらりんエッジ」可視化。
+  - スコープ外: 無効 id のワンクリック自動修復ボタン、ランタイム UI、既存 Inspector 撤去、JSON 経路改修。
+  - ★ Editor 時点で `IInputSourceRegistry` は空（runtime populate）。ソースポート列挙に registry を使わず binding 宣言から静的算出する制約あり。
+- **⚠️ 着手前の再検証**: 本 spec の design / research は 2026-06-07 時点のコードベースを前提に書かれている。その後の緊急改修でコードが変わっているため、**着手時に design.md の前提（特に `FacialCharacterProfileSOInspector.cs` の入力源編集箇所・`AdapterBindingsListView.ResolveDefaultInputSources`・`LayerDefinitionSerializable`/`InputSourceDeclarationSerializable` の構造・GraphView 可用性）を現行コードと再照合してから tasks 生成に進むこと**。
+- **トリガ**: preview.2 以降の UX 整備フェーズ / 手打ち slug 起因の事故が再発したとき / ルーティング設定が複雑化して Inspector の一覧編集では関係が追えなくなったとき
+- **影響範囲**: 新規 `Editor/Windows/Routing/`（Graph 薄層 + Logic 純粋層一式）、`Editor/Inspector/AdapterBindings/AdapterBindingsListView.cs`（id 列挙ロジック抽出→ラッパ化）、`Editor/Inspector/FacialCharacterProfileSOInspector.cs`（slot 初期化ロジック抽出 + 「ルーティングを編集」ボタン追加）、対応 EditMode テスト一式
+- **関連**: M-19（Layer / InputSource / Adapter の関係視認性改善 — 同じ「関係が見えない」痛点の UI 解。本 spec はその抜本解にあたり、統合 or 棲み分けを着手時に判断）、S-8（slug 編集を candidate ドロップダウン + 手動 override に変更済み — 本 spec はさらに手入力自体を廃する方向）
+
+### M-28: MultiSourceBlendDemo サンプル資産の同期ずれ修復（SampleAssetsAreInSyncTests 4 件赤）
+- **出典**: 2026-06-21 `/kiro:spec-run input-source-routing-graph-editor` 完了後のフル EditMode 検証で検出。**本 spec とは無関係な pre-existing failure**（spec の 21 コミットがサンプル資産・`Samples~`・`StreamingAssets` を一切変更していないことを `git log 4b1f2cb..HEAD -- <sample paths>` が空であることで確認済み）。
+- **背景**: preview.2 移行の過程で `MultiSourceBlendDemo` のサンプル資産が 3 コピー（dev `Assets/StreamingAssets/`、package `Packages/com.hidano.facialcontrol.inputsystem/Samples~/`、imported `Assets/Samples/FacialControl InputSystem/0.1.0-preview.2/`）間で同期ずれを起こしており、`SampleAssetsAreInSyncTests` が 4 件赤のまま放置されている。フル EditMode スイートは 1736 件中 passed=1730 / failed=4 / skipped=2。
+- **赤の内訳**（いずれも `Tests/EditMode/Editor/Inspector/SampleAssetsAreInSyncTests.cs`）:
+  - (1) `MultiSourceBlendDemoCharacterAsset_DefaultOverlaysBlinkSnapshot_HasNonZeroMabataki` — サンプル asset の `_defaultOverlays[*].cachedSnapshot.blendShapes` に「まばたき」エントリ無し。preview.2 移行で旧 `blink_overlay` の snapshot が転写されていない疑い。
+  - (2) `MultiSourceBlendDemoCharacterAsset_YamlKeySetMatchesPackageSample_WhenPackageAssetExists` — dev サンプル asset と package `Samples~` asset で YAML キー構造がドリフト（一方は `_baseExpression.cachedSnapshot` 系、他方は `_defaultOverlays.cachedSnapshot.blendShapes.{name,rendererPath,value}` 系）。
+  - (3) `ProfileJson_DevStreamingAssetsAndPackageSample_AreByteIdentical` / (4) `ProfileJson_ImportedSampleStreamingAssets_AreByteIdenticalToDev` — `profile.json` が dev(12313B) と package/imported(10637B) で byte 非一致（index 38 で分岐）。
+- **方針**: 3 コピーの正本を 1 つに定め（dev `StreamingAssets` を正とするのが既存テストの前提）、package `Samples~` と imported コピーを再生成して byte 一致させる + blink overlay snapshot を再転写する。`overlay-clip-redesign` / preview.2 移行系の spec、または独立の sample-resync PR で対処。
+- **トリガ**: preview.2 移行の仕上げフェーズ / サンプル Import 経路の動作確認時 / これらの赤が他 spec の `spec-run` バッチで継続的にノイズ（保守的 FAIL 判定）になっているとき
+- **影響範囲**: `Assets/StreamingAssets/FacialControl/MultiSourceBlendDemoCharacter/profile.json`、`Packages/com.hidano.facialcontrol.inputsystem/Samples~/MultiSourceBlendDemo/`（asset + StreamingAssets）、`Assets/Samples/FacialControl InputSystem/0.1.0-preview.2/Multi Source Blend Demo/`、`Tests/EditMode/Editor/Inspector/SampleAssetsAreInSyncTests.cs`
+- **関連**: M-27（入力源ルーティング・グラフエディタ — 本件はその `spec-run` 検証中に顕在化したが原因は別系統）、`overlay-clip-redesign` / `phoneme-overlay-slots`（preview.2 overlay 移行系）
+
 ---
 
 ## 横断フォローアップ（実装着手時に再確認するメモ）
@@ -253,3 +279,5 @@
 - 2026-05-23: S-17 を spec `phoneme-overlay-slots`、S-9 を spec `lipsync-animationclip-rework` として独立化。それぞれ requirements / design / tasks 生成済み (tasks-generated)。本 backlog からは削除し、以降は spec 内で進行管理。
 - 2026-05-23: S-9 は `lipsync-animationclip-rework` spec で対応済みとして完了反映。候補 (b)「`AnimationUtility.GetCurveBindings` による Editor 事前検証 + runtime path 補正」は将来課題として M-24 に残置。
 - 2026-05-25: `OscOutputDemoSignalBinding` と `OscSenderAdapterBinding` の役割確認セッションで S-20（OscOutputDemo の動作確認完了後の `OscOutputDemoSignalBinding` 撤去）を追加。
+- 2026-06-09: 入力源 slug 直書き運用を廃する「入力源ルーティング・グラフエディタ」を M-27 として追加。spec 一式（requirements approved / design-generated）は 2026-06-07 セッションで `.kiro/specs/input-source-routing-graph-editor/` に生成済みだが、その後の緊急改修でコードベースが変化したため将来着手扱いとし、着手時に design 前提の再照合を必須とする注記を付した。
+- 2026-06-21: `/kiro:spec-run input-source-routing-graph-editor` で全 21 タスクを codex exec 実行（フォールバック 0）。完了後フル EditMode 検証で `SampleAssetsAreInSyncTests` 4 件赤を検出。git log でサンプル資産が本 spec の 21 コミットで未変更であることを確認し、preview.2 移行由来の pre-existing failure として M-28 を追加。本 spec 実装自体は自テスト緑。
