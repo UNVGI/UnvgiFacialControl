@@ -211,6 +211,11 @@ namespace Hidano.FacialControl.Editor.Windows.Routing
             _graphView.SetCompositionEdges();
             _graphView.SetWiringEdges(model.Edges, _serializedObject, _wiringSerializedMapper);
             _graphView.SetInvalidInputs(model.InvalidEdges);
+
+            // All ポート展開などで残ったドラッグ由来の一時エッジ（ゴースト）を掃除する。
+            // これがないと一括配線→Undo 後に All-Input 間の線が描画されたまま残る。
+            _graphView.PruneUntrackedEdges();
+
             _lastObservedStateHash = CalculateObservedStateHash(_profile);
         }
 

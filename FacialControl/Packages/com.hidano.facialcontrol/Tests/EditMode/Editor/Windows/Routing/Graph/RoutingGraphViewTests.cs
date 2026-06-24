@@ -245,7 +245,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
         }
 
         [Test]
-        public void GraphViewChanged_CompositionEdgeDeleted_ClearsLayerDeclarations()
+        public void CompositionEdge_IsNotDeletable_AndRemovalKeepsLayerDeclarations()
         {
             var graphView = new RoutingGraphView();
             graphView.SetAdapterNodes(new[]
@@ -287,16 +287,43 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
             graphView.SetCompositionEdges();
 
             Assert.That(graphView.CompositionEdges, Has.Count.EqualTo(1));
+            Edge compositionEdge = graphView.CompositionEdges[0];
 
+            // 合成エッジは削除不可（Layer→Composite Output は構造的に常に存在する）。
+            Assert.That(compositionEdge.capabilities & Capabilities.Deletable, Is.EqualTo((Capabilities)0));
+
+            // 仮に elementsToRemove に渡されても、そのレイヤーの入力配線は消さない。
             graphView.graphViewChanged(new GraphViewChange
             {
-                elementsToRemove = new List<GraphElement> { graphView.CompositionEdges[0] },
+                elementsToRemove = new List<GraphElement> { compositionEdge },
             });
 
-            Assert.That(_mapper.RemoveDeclarationCalls, Is.EqualTo(2));
-            CollectionAssert.AreEqual(
-                new[] { "Remove:0:lipsync-overlay:a", "Remove:0:lipsync-overlay:i" },
-                _mapper.Invocations);
+            Assert.That(_mapper.RemoveDeclarationCalls, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void PruneUntrackedEdges_RemovesGhostEdge_KeepsTrackedEdges()
+        {
+            RoutingGraphView graphView = CreateGraphView();
+            graphView.SetWiringEdges(
+                new[] { new WiringEdgeData(0, "lipsync-overlay:a", 1f) },
+                _serializedObject,
+                _mapper);
+
+            // All ポート展開で消費される一時エッジ（ゴースト）を模し、追跡されないエッジを直接追加する。
+            var ghost = new Edge
+            {
+                output = graphView.AdapterNodeViews[0].AllPort,
+                input = graphView.LayerNodeViews[0].InputPort,
+            };
+            graphView.AddElement(ghost);
+            CollectionAssert.Contains(graphView.edges.ToList(), ghost);
+
+            graphView.PruneUntrackedEdges();
+
+            List<Edge> remaining = graphView.edges.ToList();
+            CollectionAssert.DoesNotContain(remaining, ghost);
+            CollectionAssert.Contains(remaining, graphView.RoutingEdges[0]);
         }
 
         private RoutingGraphView CreateGraphView()

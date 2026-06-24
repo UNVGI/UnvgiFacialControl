@@ -249,7 +249,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 
         /// <summary>
         /// 各レイヤーノードから Composite Output へ、ブレンドを示すエッジを引く。
-        /// このエッジは選択・削除・端点ドラッグでの繋ぎ替えを許可する（合成順の編集／レイヤー入力の全消去）。
+        /// このエッジは選択・端点ドラッグでの繋ぎ替え（合成順の編集）を許可するが、削除は不可。
         /// </summary>
         public void SetCompositionEdges()
         {
@@ -275,6 +275,39 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             }
         }
 
+        /// <summary>
+        /// 追跡対象（routing / orphan / composition）外のエッジをビューから取り除く。
+        /// All ポート展開などでドラッグ由来の一時エッジ（ゴースト）がビューに残ることがあるため、
+        /// rebuild の最後に呼んで掃除する。返却リストに含めないだけでは Unity の EdgeDragHelper が
+        /// 一時エッジを残す場合があり、これがないと Undo 後も線が描画されたままになる。
+        /// </summary>
+        public void PruneUntrackedEdges()
+        {
+            List<Edge> currentEdges = edges.ToList();
+            for (int i = 0; i < currentEdges.Count; i++)
+            {
+                Edge edge = currentEdges[i];
+                if (IsTrackedEdge(edge))
+                {
+                    continue;
+                }
+
+                edge.output?.Disconnect(edge);
+                edge.input?.Disconnect(edge);
+                RemoveElement(edge);
+            }
+        }
+
+        private bool IsTrackedEdge(Edge edge)
+        {
+            if (edge is RoutingEdge routingEdge && _routingEdges.Contains(routingEdge))
+            {
+                return true;
+            }
+
+            return _orphanInputEdges.Contains(edge) || _compositionEdges.Contains(edge);
+        }
+
         private static Edge CreateReadOnlyEdge(Port outputPort, Port inputPort)
         {
             var edge = new Edge
@@ -290,8 +323,9 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
         }
 
         /// <summary>
-        /// レイヤー出力 → Composite Output スロットを結ぶエッジ。選択・削除・繋ぎ替えを許可する。
-        /// 繋ぎ替え＝合成順の入れ替え、単独削除＝そのレイヤーの入力配線を全消去（<see cref="OnGraphViewChanged"/>）。
+        /// レイヤー出力 → Composite Output スロットを結ぶエッジ。
+        /// 選択・端点ドラッグでの繋ぎ替え（合成順の入れ替え）を許可するが、削除は不可。
+        /// 各レイヤーは常に Composite Output へ合成されるため、この線は構造的に存在し続ける。
         /// </summary>
         private Edge CreateCompositionEdge(Port outputPort, Port inputPort)
         {
@@ -303,8 +337,8 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             outputPort.Connect(edge);
             inputPort.Connect(edge);
 
-            // 既定で Selectable / Deletable は有効。複製・改名のみ不可にする。
-            edge.capabilities &= ~(Capabilities.Copiable | Capabilities.Renamable);
+            // 選択・端点ドラッグでの繋ぎ替えは許可。削除・複製・改名は不可。
+            edge.capabilities &= ~(Capabilities.Deletable | Capabilities.Copiable | Capabilities.Renamable);
 
             StyleSheet styleSheet = FacialControlStyles.Load();
             if (styleSheet != null)
@@ -437,9 +471,8 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 
             bool compositionTouched = false;
 
-            // 1. 合成順の入れ替え（レイヤー出力 → 出力スロットの再配線）を先に判定する。
-            //    再配線か否かを確定させ、巻き添えの合成エッジ削除を「裸の削除」と誤認しないようにする。
-            bool hasCompositionReorder = false;
+            // 1. 合成順の入れ替え（レイヤー出力 → 出力スロットの再配線）を判定し、priority を入れ替える。
+            //    合成エッジは削除不可のため、ここで扱うのは端点ドラッグによる繋ぎ替えのみ。
             if (graphViewChange.edgesToCreate != null)
             {
                 foreach (Edge edge in graphViewChange.edgesToCreate)
@@ -450,7 +483,6 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
                     }
 
                     compositionTouched = true;
-                    hasCompositionReorder = true;
                     if (sourceLayerIndex != targetLayerIndex && _outputNodeView != null)
                     {
                         _outputNodeView.SwapLayerOrderByIndex(sourceLayerIndex, targetLayerIndex);
@@ -461,19 +493,12 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             // 2. 削除処理。
             //    アダプター配線の繋ぎ替えは「旧エッジ削除＋新エッジ作成」として同一 GraphViewChange で
             //    報告されるため、削除された配線の weight を canonical id で控え、同一 id の新規エッジへ引き継ぐ。
+            //    合成エッジ（レイヤー出力 → Composite Output）は削除不可のため、ここには現れない。
             Dictionary<string, float> removedWeights = null;
             if (graphViewChange.elementsToRemove != null && graphViewChange.elementsToRemove.Count > 0)
             {
                 removedWeights = CaptureRemovedWeights(graphViewChange.elementsToRemove);
                 RemoveDeletedDeclarations(graphViewChange.elementsToRemove);
-
-                // 合成エッジの単独削除＝そのレイヤーの入力配線を全消去。
-                // 再配線（hasCompositionReorder）に伴う巻き添え削除は対象外。
-                if (!hasCompositionReorder && HasCompositionEdge(graphViewChange.elementsToRemove))
-                {
-                    compositionTouched = true;
-                    ClearDeletedCompositionLayers(graphViewChange.elementsToRemove);
-                }
             }
 
             // 3. 生成処理（アダプター通常ポート＋All ポート展開。合成エッジは除外し再描画へ委ねる）。
@@ -643,49 +668,6 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             }
 
             return false;
-        }
-
-        private static bool HasCompositionEdge(IEnumerable<GraphElement> elements)
-        {
-            foreach (GraphElement element in elements)
-            {
-                if (element is Edge edge && IsCompositionEdge(edge, out _, out _))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// 削除された合成エッジの接続元レイヤーについて、入力配線（inputSources）を全消去する。
-        /// </summary>
-        private void ClearDeletedCompositionLayers(IEnumerable<GraphElement> elementsToRemove)
-        {
-            foreach (GraphElement element in elementsToRemove)
-            {
-                if (element is not Edge edge || !IsCompositionEdge(edge, out int sourceLayerIndex, out _))
-                {
-                    continue;
-                }
-
-                LayerNodeView layerNode = FindLayerNode(sourceLayerIndex);
-                if (layerNode == null)
-                {
-                    continue;
-                }
-
-                IReadOnlyList<LayerInputData> inputs = layerNode.LayerNodeData.Inputs;
-                for (int i = 0; i < inputs.Count; i++)
-                {
-                    string canonicalId = inputs[i].CanonicalId;
-                    if (!string.IsNullOrEmpty(canonicalId))
-                    {
-                        _wiringSerializedMapper.RemoveDeclaration(_serializedObject, sourceLayerIndex, canonicalId);
-                    }
-                }
-            }
         }
 
         private static bool IsCompatibleSourceLayerPair(Port startPort, Port candidatePort)

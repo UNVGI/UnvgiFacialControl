@@ -154,7 +154,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
         }
 
         [Test]
-        public void SetCompositionEdges_BuildsSelectableDeletableEdge()
+        public void SetCompositionEdges_BuildsSelectableNonDeletableEdge()
         {
             RoutingGraphView graphView = CreateGraphView();
             graphView.SetOutputNode(
@@ -168,8 +168,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
             graphView.SetCompositionEdges();
 
             Edge edge = graphView.CompositionEdges[0];
+            // 選択・端点ドラッグでの繋ぎ替えは許可するが、削除は不可。
             Assert.That(edge.IsSelectable(), Is.True);
-            Assert.That((edge.capabilities & Capabilities.Deletable), Is.EqualTo(Capabilities.Deletable));
+            Assert.That((edge.capabilities & Capabilities.Deletable), Is.EqualTo((Capabilities)0));
             Assert.That(edge.pickingMode, Is.Not.EqualTo(PickingMode.Ignore));
         }
 
