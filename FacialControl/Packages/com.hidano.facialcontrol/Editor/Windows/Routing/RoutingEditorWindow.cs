@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
-using Hidano.FacialControl.Domain.Adapters;
+using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.Windows.Routing.Graph;
 using Hidano.FacialControl.Editor.Windows.Routing.Logic;
 using UnityEditor;
@@ -23,7 +23,6 @@ namespace Hidano.FacialControl.Editor.Windows.Routing
 
         private readonly IRoutingGraphModelBuilder _graphModelBuilder = new RoutingGraphModelBuilder();
         private readonly IWiringSerializedMapper _wiringSerializedMapper = new WiringSerializedMapper();
-        private readonly IAutoWireService _autoWireService = new AutoWireService();
 
         private RoutingGraphView _graphView;
         private FacialCharacterProfileSO _profile;
@@ -200,8 +199,13 @@ namespace Hidano.FacialControl.Editor.Windows.Routing
             }
 
             _serializedObject.Update();
+
+            // 同一 priority の重複は表示順を正として distinct な値へ補正し SO へ書き戻す。
+            // 補正後の値でモデルを構築するため、ノード/エッジは常に整合した priority で描画される。
+            NormalizeLayerPrioritiesIfNeeded();
+
             RoutingGraphModel model = _graphModelBuilder.Build(_profile);
-            _graphView.SetAdapterNodes(model.AdapterNodes, HandleAutoWireRequested);
+            _graphView.SetAdapterNodes(model.AdapterNodes);
             _graphView.SetLayerNodes(model.LayerNodes, _serializedObject, _wiringSerializedMapper);
             _graphView.SetOutputNode(model.OutputNode, _serializedObject, _wiringSerializedMapper);
             _graphView.SetCompositionEdges();
@@ -210,63 +214,59 @@ namespace Hidano.FacialControl.Editor.Windows.Routing
             _lastObservedStateHash = CalculateObservedStateHash(_profile);
         }
 
-        private void HandleAutoWireRequested(string bindingSlug)
+        /// <summary>
+        /// レイヤーの priority に重複があれば、表示順（priority 昇順）を保ったまま distinct な値へ補正し、
+        /// SO へ書き戻す。補正は変更があった場合のみ行い、単一 Undo グループにまとめる。
+        /// </summary>
+        private void NormalizeLayerPrioritiesIfNeeded()
         {
-            if (_profile == null || _serializedObject == null)
+            IReadOnlyList<LayerDefinitionSerializable> layers = _profile.Layers;
+            if (layers == null || layers.Count == 0)
             {
                 return;
             }
 
-            AdapterBindingBase binding = FindBindingBySlug(_profile.AdapterBindings, bindingSlug);
-            if (binding == null)
-            {
-                return;
-            }
-
-            _autoWireService.AutoWire(_serializedObject, binding, CollectLayerNames(_profile.Layers));
-            RebuildGraphIfChanged(force: true);
-        }
-
-        private static AdapterBindingBase FindBindingBySlug(
-            IReadOnlyList<AdapterBindingBase> bindings,
-            string bindingSlug)
-        {
-            if (bindings == null || string.IsNullOrEmpty(bindingSlug))
-            {
-                return null;
-            }
-
-            for (int i = 0; i < bindings.Count; i++)
-            {
-                AdapterBindingBase binding = bindings[i];
-                if (binding != null
-                    && string.Equals(binding.Slug, bindingSlug, StringComparison.Ordinal))
-                {
-                    return binding;
-                }
-            }
-
-            return null;
-        }
-
-        private static List<string> CollectLayerNames(IReadOnlyList<LayerDefinitionSerializable> layers)
-        {
-            var layerNames = new List<string>();
-            if (layers == null)
-            {
-                return layerNames;
-            }
-
+            var priorities = new int[layers.Count];
             for (int i = 0; i < layers.Count; i++)
             {
-                string layerName = layers[i]?.name;
-                if (!string.IsNullOrEmpty(layerName))
-                {
-                    layerNames.Add(layerName);
-                }
+                priorities[i] = layers[i]?.priority ?? 0;
             }
 
-            return layerNames;
+            if (!LayerPriorityNormalizer.RequiresCorrection(priorities))
+            {
+                return;
+            }
+
+            int[] corrected = LayerPriorityNormalizer.Normalize(priorities);
+
+            Undo.IncrementCurrentGroup();
+            Undo.SetCurrentGroupName("Normalize Routing Priorities");
+            int undoGroup = Undo.GetCurrentGroup();
+            try
+            {
+                for (int i = 0; i < layers.Count; i++)
+                {
+                    if (corrected[i] == priorities[i])
+                    {
+                        continue;
+                    }
+
+                    LayerDefinitionSerializable layer = layers[i];
+                    _wiringSerializedMapper.SetLayerProperties(
+                        _serializedObject,
+                        i,
+                        layer?.name ?? string.Empty,
+                        corrected[i],
+                        layer?.exclusionMode ?? ExclusionMode.LastWins,
+                        layer?.layerOverrideMask);
+                }
+            }
+            finally
+            {
+                Undo.CollapseUndoOperations(undoGroup);
+            }
+
+            _serializedObject.Update();
         }
 
         private static bool TryResolveProfile(

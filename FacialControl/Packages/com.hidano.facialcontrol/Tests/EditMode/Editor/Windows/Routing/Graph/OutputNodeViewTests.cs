@@ -136,6 +136,84 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
                 Has.Count.EqualTo(2));
         }
 
+        [Test]
+        public void SwapLayerOrderByIndex_SwapsPrioritiesOfTwoLayers()
+        {
+            var view = new OutputNodeView(
+                new OutputNodeData(new[]
+                {
+                    new OutputLayerData(0, "overlay", 0, ExclusionMode.Blend, new string[0]),
+                    new OutputLayerData(1, "emotion", 5, ExclusionMode.LastWins, new string[0]),
+                }),
+                _serializedObject,
+                _mapper);
+
+            view.SwapLayerOrderByIndex(0, 1);
+
+            Assert.That(_mapper.SetLayerPropertiesCalls, Is.EqualTo(2));
+            CollectionAssert.AreEqual(
+                new[] { "0:5", "1:0" },
+                _mapper.LayerPriorityInvocations);
+        }
+
+        [Test]
+        public void ReorderButtons_AreDisabledAtListEnds()
+        {
+            var view = new OutputNodeView(
+                new OutputNodeData(new[]
+                {
+                    new OutputLayerData(0, "overlay", 0, ExclusionMode.Blend, new string[0]),
+                    new OutputLayerData(1, "emotion", 5, ExclusionMode.LastWins, new string[0]),
+                }),
+                _serializedObject,
+                _mapper);
+
+            List<Button> reorderButtons = view
+                .Query<Button>(className: OutputNodeView.ReorderButtonClassName)
+                .ToList();
+            List<Button> upButtons = reorderButtons
+                .Where(b => b.text == OutputNodeView.ReorderUpButtonText)
+                .ToList();
+            List<Button> downButtons = reorderButtons
+                .Where(b => b.text == OutputNodeView.ReorderDownButtonText)
+                .ToList();
+
+            Assert.That(upButtons, Has.Count.EqualTo(2));
+            Assert.That(downButtons, Has.Count.EqualTo(2));
+            // 先頭行の ▲ と末尾行の ▼ は無効。
+            Assert.That(upButtons[0].enabledSelf, Is.False);
+            Assert.That(downButtons[1].enabledSelf, Is.False);
+            Assert.That(upButtons[1].enabledSelf, Is.True);
+            Assert.That(downButtons[0].enabledSelf, Is.True);
+        }
+
+        [Test]
+        public void ClickMoveUpButton_SwapsPriorityWithLayerAbove()
+        {
+            var view = new OutputNodeView(
+                new OutputNodeData(new[]
+                {
+                    new OutputLayerData(0, "overlay", 0, ExclusionMode.Blend, new string[0]),
+                    new OutputLayerData(1, "emotion", 5, ExclusionMode.LastWins, new string[0]),
+                }),
+                _serializedObject,
+                _mapper);
+
+            Button secondRowUp = view
+                .Query<Button>(className: OutputNodeView.ReorderButtonClassName)
+                .ToList()
+                .Where(b => b.text == OutputNodeView.ReorderUpButtonText)
+                .ToList()[1];
+
+            InvokeButton(secondRowUp);
+
+            Assert.That(_mapper.SetLayerPropertiesCalls, Is.EqualTo(2));
+            // emotion(idx1) は overlay の priority 0 へ、overlay(idx0) は emotion の priority 5 へ。
+            CollectionAssert.AreEqual(
+                new[] { "1:0", "0:5" },
+                _mapper.LayerPriorityInvocations);
+        }
+
         private static void InvokeApplyLayer(
             OutputNodeView view,
             int layerIndex,
@@ -151,8 +229,23 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
             method.Invoke(view, new object[] { layerIndex, layerName, priority, exclusionMode, overrideMask });
         }
 
+        private static void InvokeButton(Button button)
+        {
+            Assert.That(button, Is.Not.Null);
+            MethodInfo invoke = button.clickable.GetType().GetMethod(
+                "Invoke",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                types: new[] { typeof(EventBase) },
+                modifiers: null);
+            Assert.That(invoke, Is.Not.Null);
+            invoke.Invoke(button.clickable, new object[] { null });
+        }
+
         private sealed class RecordingWiringSerializedMapper : IWiringSerializedMapper
         {
+            public List<string> LayerPriorityInvocations { get; } = new List<string>();
+
             public int SetLayerPropertiesCalls { get; private set; }
 
             public int LastLayerIndex { get; private set; }
@@ -191,6 +284,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
                 LastPriority = priority;
                 LastExclusionMode = exclusionMode;
                 LastOverrideMask = overrideMask;
+                LayerPriorityInvocations.Add($"{layerIndex}:{priority}");
             }
 
             public void BeginContinuousWeight(SerializedObject serializedObject, int layerIndex, string canonicalId)

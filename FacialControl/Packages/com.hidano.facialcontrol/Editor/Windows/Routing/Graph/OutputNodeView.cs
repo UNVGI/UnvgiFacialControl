@@ -21,6 +21,9 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
         public const string PriorityFieldClassName = "routing-output-priority";
         public const string ExclusionFieldClassName = "routing-output-exclusion";
         public const string MaskFieldClassName = "routing-output-mask";
+        public const string ReorderButtonClassName = "routing-output-reorder";
+        public const string ReorderUpButtonText = "▲";
+        public const string ReorderDownButtonText = "▼";
         private static readonly UnityEngine.Color TitleBarColor = new UnityEngine.Color(0.13f, 0.26f, 0.26f, 1f);
 
         private readonly SerializedObject _serializedObject;
@@ -92,7 +95,23 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             string layerName = string.IsNullOrWhiteSpace(layer.Name) ? $"Layer {layer.LayerIndex}" : layer.Name;
             var headerLabel = new Label($"{index + 1}. {layerName}");
             headerLabel.style.unityFontStyleAndWeight = UnityEngine.FontStyle.Bold;
+            headerLabel.style.flexGrow = 1f;
             headerRow.Add(headerLabel);
+
+            // 合成順（priority）を 1 段ずつ入れ替える ▲▼ ボタン。表示順の両端では無効化する。
+            int displayIndex = index;
+            Button moveUpButton = CreateReorderButton(
+                ReorderUpButtonText,
+                "1 つ上へ（合成順を前に）",
+                () => MoveLayer(displayIndex, displayIndex - 1));
+            moveUpButton.SetEnabled(index > 0);
+            Button moveDownButton = CreateReorderButton(
+                ReorderDownButtonText,
+                "1 つ下へ（合成順を後ろに）",
+                () => MoveLayer(displayIndex, displayIndex + 1));
+            moveDownButton.SetEnabled(index < OutputNodeData.OrderedLayers.Count - 1);
+            headerRow.Add(moveUpButton);
+            headerRow.Add(moveDownButton);
             row.Add(headerRow);
 
             var priorityField = new IntegerField("Priority")
@@ -156,6 +175,84 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
                 priority,
                 exclusionMode,
                 overrideMask);
+        }
+
+        /// <summary>
+        /// layerIndex 指定で 2 レイヤーの合成順（priority）を入れ替える。
+        /// レイヤー出力 → Composite Output スロットの再配線（順序入れ替え）から呼ばれる。
+        /// </summary>
+        public void SwapLayerOrderByIndex(int layerIndexA, int layerIndexB)
+        {
+            if (layerIndexA == layerIndexB)
+            {
+                return;
+            }
+
+            if (TryFindLayer(layerIndexA, out OutputLayerData a) && TryFindLayer(layerIndexB, out OutputLayerData b))
+            {
+                SwapPriority(a, b);
+            }
+        }
+
+        private static Button CreateReorderButton(string text, string tooltip, Action onClick)
+        {
+            var button = new Button(onClick)
+            {
+                text = text,
+                tooltip = tooltip,
+            };
+            button.AddToClassList(ReorderButtonClassName);
+            button.style.width = 22f;
+            button.style.marginLeft = 2f;
+            button.style.paddingLeft = 0f;
+            button.style.paddingRight = 0f;
+            return button;
+        }
+
+        private void MoveLayer(int fromDisplayIndex, int toDisplayIndex)
+        {
+            IReadOnlyList<OutputLayerData> layers = OutputNodeData.OrderedLayers;
+            if (fromDisplayIndex < 0 || fromDisplayIndex >= layers.Count
+                || toDisplayIndex < 0 || toDisplayIndex >= layers.Count
+                || fromDisplayIndex == toDisplayIndex)
+            {
+                return;
+            }
+
+            SwapPriority(layers[fromDisplayIndex], layers[toDisplayIndex]);
+        }
+
+        private void SwapPriority(OutputLayerData a, OutputLayerData b)
+        {
+            if (a.LayerIndex == b.LayerIndex)
+            {
+                return;
+            }
+
+            // 元の値を先に控えてから 2 回書く（2 回目が 1 回目の書き込みを読まないように）。
+            int priorityA = a.Priority;
+            int priorityB = b.Priority;
+
+            _wiringSerializedMapper.SetLayerProperties(
+                _serializedObject, a.LayerIndex, a.Name, priorityB, a.ExclusionMode, a.OverrideMask);
+            _wiringSerializedMapper.SetLayerProperties(
+                _serializedObject, b.LayerIndex, b.Name, priorityA, b.ExclusionMode, b.OverrideMask);
+        }
+
+        private bool TryFindLayer(int layerIndex, out OutputLayerData result)
+        {
+            IReadOnlyList<OutputLayerData> layers = OutputNodeData.OrderedLayers;
+            for (int i = 0; i < layers.Count; i++)
+            {
+                if (layers[i].LayerIndex == layerIndex)
+                {
+                    result = layers[i];
+                    return true;
+                }
+            }
+
+            result = default;
+            return false;
         }
 
         private static string FormatOverrideMask(IReadOnlyList<string> overrideMask)

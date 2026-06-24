@@ -8,6 +8,7 @@ using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
+using UnityEngine.UIElements;
 using Object = UnityEngine.Object;
 
 namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
@@ -152,6 +153,26 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
             Assert.That(edge.input, Is.SameAs(graphView.OutputNodeView.GetLayerInputPort(0)));
         }
 
+        [Test]
+        public void SetCompositionEdges_BuildsSelectableDeletableEdge()
+        {
+            RoutingGraphView graphView = CreateGraphView();
+            graphView.SetOutputNode(
+                new OutputNodeData(new[]
+                {
+                    new OutputLayerData(0, "overlay", 1, new string[0]),
+                }),
+                _serializedObject,
+                _mapper);
+
+            graphView.SetCompositionEdges();
+
+            Edge edge = graphView.CompositionEdges[0];
+            Assert.That(edge.IsSelectable(), Is.True);
+            Assert.That((edge.capabilities & Capabilities.Deletable), Is.EqualTo(Capabilities.Deletable));
+            Assert.That(edge.pickingMode, Is.Not.EqualTo(PickingMode.Ignore));
+        }
+
         private RoutingGraphView CreateGraphView()
         {
             var graphView = new RoutingGraphView();
@@ -163,8 +184,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
                         "ulipsync",
                         supportsAutoWire: true,
                         new[] { new AdapterOutputData("lipsync-overlay:a", "a") }),
-                },
-                _ => { });
+                });
             graphView.SetLayerNodes(
                 new[] { new LayerNodeData(0, "overlay", 1, ExclusionMode.Blend, new string[0]) },
                 _serializedObject,

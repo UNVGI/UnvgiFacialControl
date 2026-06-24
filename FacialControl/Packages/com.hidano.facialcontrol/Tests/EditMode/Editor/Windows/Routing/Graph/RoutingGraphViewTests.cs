@@ -71,6 +71,26 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
         }
 
         [Test]
+        public void GetCompatiblePorts_AllowsLayerOutputToCompositeSlotReconnection()
+        {
+            RoutingGraphView graphView = CreateGraphView();
+            graphView.SetOutputNode(
+                new OutputNodeData(new[]
+                {
+                    new OutputLayerData(0, "overlay", 1, ExclusionMode.Blend, new string[0]),
+                }),
+                _serializedObject,
+                _mapper);
+
+            List<Port> compatiblePorts = graphView.GetCompatiblePorts(
+                graphView.LayerNodeViews[0].OutputPort,
+                null);
+
+            Assert.That(compatiblePorts, Has.Count.EqualTo(1));
+            Assert.That(compatiblePorts[0], Is.SameAs(graphView.OutputNodeView.GetLayerInputPort(0)));
+        }
+
+        [Test]
         public void GraphViewChanged_CreateEdge_UsesCanonicalIdAndReplacesWithRoutingEdge()
         {
             RoutingGraphView graphView = CreateGraphView();
@@ -91,6 +111,46 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
             Assert.That(_mapper.LastWeight, Is.EqualTo(1f));
             Assert.That(change.edgesToCreate, Has.Count.EqualTo(1));
             Assert.That(change.edgesToCreate[0], Is.InstanceOf<RoutingEdge>());
+        }
+
+        [Test]
+        public void GraphViewChanged_AllPortEdge_ExpandsToEveryAdapterOutput()
+        {
+            var graphView = new RoutingGraphView();
+            graphView.SetAdapterNodes(new[]
+            {
+                new AdapterNodeData(
+                    "ulipsync",
+                    "ulipsync",
+                    supportsAutoWire: true,
+                    new[]
+                    {
+                        new AdapterOutputData("lipsync-overlay:a", "a"),
+                        new AdapterOutputData("lipsync-overlay:i", "i"),
+                    }),
+            });
+            graphView.SetLayerNodes(
+                new[] { new LayerNodeData(0, "overlay", 0, ExclusionMode.Blend, new string[0]) },
+                _serializedObject,
+                _mapper);
+
+            var edge = new Edge
+            {
+                output = graphView.AdapterNodeViews[0].AllPort,
+                input = graphView.LayerNodeViews[0].InputPort,
+            };
+
+            GraphViewChange change = graphView.graphViewChanged(new GraphViewChange
+            {
+                edgesToCreate = new List<Edge> { edge },
+            });
+
+            Assert.That(_mapper.AddDeclarationCalls, Is.EqualTo(2));
+            CollectionAssert.AreEqual(
+                new[] { "Add:0:lipsync-overlay:a:1", "Add:0:lipsync-overlay:i:1" },
+                _mapper.Invocations);
+            // All ポートの一時エッジは残さず、rebuild / 合成エッジの貼り直しに委ねる。
+            Assert.That(change.edgesToCreate, Is.Empty);
         }
 
         [Test]
@@ -124,8 +184,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
                         "ulipsync",
                         supportsAutoWire: true,
                         new[] { new AdapterOutputData("lipsync-overlay:a", "a") }),
-                },
-                _ => { });
+                });
             graphView.SetLayerNodes(
                 new[]
                 {
@@ -162,6 +221,84 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
                 _mapper.Invocations);
         }
 
+        [Test]
+        public void GraphViewChanged_CompositionReconnect_SwapsLayerPriorities()
+        {
+            RoutingGraphView graphView = CreateReorderableGraphView();
+
+            // レイヤー 0（priority 0）の Blend 出力を、レイヤー 1（priority 1）のスロットへ繋ぎ直す。
+            var edge = new Edge
+            {
+                output = graphView.LayerNodeViews[0].OutputPort,
+                input = graphView.OutputNodeView.GetLayerInputPort(1),
+            };
+
+            graphView.graphViewChanged(new GraphViewChange
+            {
+                edgesToCreate = new List<Edge> { edge },
+            });
+
+            Assert.That(_mapper.SetLayerPropertiesCalls, Is.EqualTo(2));
+            CollectionAssert.AreEqual(
+                new[] { "SetLayer:0:1", "SetLayer:1:0" },
+                _mapper.LayerPriorityInvocations);
+        }
+
+        [Test]
+        public void GraphViewChanged_CompositionEdgeDeleted_ClearsLayerDeclarations()
+        {
+            var graphView = new RoutingGraphView();
+            graphView.SetAdapterNodes(new[]
+            {
+                new AdapterNodeData(
+                    "ulipsync",
+                    "ulipsync",
+                    supportsAutoWire: true,
+                    new[]
+                    {
+                        new AdapterOutputData("lipsync-overlay:a", "a"),
+                        new AdapterOutputData("lipsync-overlay:i", "i"),
+                    }),
+            });
+            graphView.SetLayerNodes(
+                new[]
+                {
+                    new LayerNodeData(
+                        0,
+                        "overlay",
+                        0,
+                        ExclusionMode.Blend,
+                        new string[0],
+                        new[]
+                        {
+                            new LayerInputData("lipsync-overlay:a", "a", 1f),
+                            new LayerInputData("lipsync-overlay:i", "i", 0.5f),
+                        }),
+                },
+                _serializedObject,
+                _mapper);
+            graphView.SetOutputNode(
+                new OutputNodeData(new[]
+                {
+                    new OutputLayerData(0, "overlay", 0, ExclusionMode.Blend, new string[0]),
+                }),
+                _serializedObject,
+                _mapper);
+            graphView.SetCompositionEdges();
+
+            Assert.That(graphView.CompositionEdges, Has.Count.EqualTo(1));
+
+            graphView.graphViewChanged(new GraphViewChange
+            {
+                elementsToRemove = new List<GraphElement> { graphView.CompositionEdges[0] },
+            });
+
+            Assert.That(_mapper.RemoveDeclarationCalls, Is.EqualTo(2));
+            CollectionAssert.AreEqual(
+                new[] { "Remove:0:lipsync-overlay:a", "Remove:0:lipsync-overlay:i" },
+                _mapper.Invocations);
+        }
+
         private RoutingGraphView CreateGraphView()
         {
             var graphView = new RoutingGraphView();
@@ -173,10 +310,40 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
                         "ulipsync",
                         supportsAutoWire: true,
                         new[] { new AdapterOutputData("lipsync-overlay:a", "a") }),
-                },
-                _ => { });
+                });
             graphView.SetLayerNodes(
                 new[] { new LayerNodeData(0, "overlay", 1, ExclusionMode.Blend, new string[0]) },
+                _serializedObject,
+                _mapper);
+            return graphView;
+        }
+
+        private RoutingGraphView CreateReorderableGraphView()
+        {
+            var graphView = new RoutingGraphView();
+            graphView.SetAdapterNodes(
+                new[]
+                {
+                    new AdapterNodeData(
+                        "ulipsync",
+                        "ulipsync",
+                        supportsAutoWire: true,
+                        new[] { new AdapterOutputData("lipsync-overlay:a", "a") }),
+                });
+            graphView.SetLayerNodes(
+                new[]
+                {
+                    new LayerNodeData(0, "overlay", 0, ExclusionMode.Blend, new string[0]),
+                    new LayerNodeData(1, "emotion", 1, ExclusionMode.LastWins, new string[0]),
+                },
+                _serializedObject,
+                _mapper);
+            graphView.SetOutputNode(
+                new OutputNodeData(new[]
+                {
+                    new OutputLayerData(0, "overlay", 0, ExclusionMode.Blend, new string[0]),
+                    new OutputLayerData(1, "emotion", 1, ExclusionMode.LastWins, new string[0]),
+                }),
                 _serializedObject,
                 _mapper);
             return graphView;
@@ -186,9 +353,13 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
         {
             public List<string> Invocations { get; } = new List<string>();
 
+            public List<string> LayerPriorityInvocations { get; } = new List<string>();
+
             public int AddDeclarationCalls { get; private set; }
 
             public int RemoveDeclarationCalls { get; private set; }
+
+            public int SetLayerPropertiesCalls { get; private set; }
 
             public int LastLayerIndex { get; private set; }
 
@@ -225,6 +396,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
                 ExclusionMode exclusionMode,
                 IReadOnlyList<string> overrideMask)
             {
+                SetLayerPropertiesCalls++;
+                LayerPriorityInvocations.Add($"SetLayer:{layerIndex}:{priority}");
             }
 
             public void BeginContinuousWeight(SerializedObject serializedObject, int layerIndex, string canonicalId)

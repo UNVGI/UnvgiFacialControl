@@ -9,23 +9,22 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 {
     /// <summary>
     /// 1 つの AdapterBinding を表すノード。複数の入力源を名前付き出力ポートとして並べ、
-    /// 「アダプター」バッジで概念を明示する。
+    /// 「Adapter」バッジで概念を明示する。先頭の「All」ポートは、当該アダプターの全出力を
+    /// まとめて 1 本の線でレイヤーへ一括配線するためのメタ出力。
     /// </summary>
     public sealed class AdapterNodeView : Node
     {
-        public const string AutoWireButtonText = "overlay レイヤーへ一括配線";
+        public const string AllPortName = "All";
         public const string TypeBadgeName = "routing-adapter-type-badge";
-        public const string TypeBadgeText = "アダプター";
+        public const string TypeBadgeText = "Adapter";
         private static readonly UnityEngine.Color TitleBarColor = new UnityEngine.Color(0.20f, 0.18f, 0.30f, 1f);
         private static readonly UnityEngine.Color TypeBadgeColor = new UnityEngine.Color(0.80f, 0.74f, 1f, 1f);
 
-        private readonly Action<string> _onAutoWireRequested;
         private readonly Dictionary<string, Port> _outputPorts = new Dictionary<string, Port>(StringComparer.Ordinal);
 
-        public AdapterNodeView(AdapterNodeData data, Action<string> onAutoWireRequested)
+        public AdapterNodeView(AdapterNodeData data)
         {
             Data = data ?? throw new ArgumentNullException(nameof(data));
-            _onAutoWireRequested = onAutoWireRequested;
 
             name = $"routing-adapter-node-{Data.BindingSlug}";
             title = string.IsNullOrEmpty(Data.DisplayName) ? "Adapter" : Data.DisplayName;
@@ -38,7 +37,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 
             capabilities &= ~(Capabilities.Deletable | Capabilities.Copiable | Capabilities.Renamable);
 
-            // アダプターであることを一目で分かるようにタイトルバーを着色し「アダプター」バッジを付与する。
+            // アダプターであることを一目で分かるようにタイトルバーを着色し「Adapter」バッジを付与する。
             titleContainer.style.backgroundColor = TitleBarColor;
             TypeBadge = new Label(TypeBadgeText) { name = TypeBadgeName };
             TypeBadge.style.color = TypeBadgeColor;
@@ -46,16 +45,17 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             TypeBadge.style.marginRight = 6f;
             titleButtonContainer.Add(TypeBadge);
 
-            // 「overlay レイヤーへ一括配線」は default-layer-inputs 系 binding でのみ意味を持つ。
-            if (Data.SupportsAutoWire)
-            {
-                AutoWireButton = new Button(NotifyAutoWireRequested)
-                {
-                    text = AutoWireButtonText,
-                };
-                AutoWireButton.AddToClassList(FacialControlStyles.ActionButton);
-                titleButtonContainer.Add(AutoWireButton);
-            }
+            // 「All」は各出力と同列の出力ポート。ここから線を引いてレイヤーへ繋ぐと
+            // 当該アダプターの全出力をまとめて一括配線する。各出力の「上」に置く。
+            AllPort = InstantiatePort(
+                Orientation.Horizontal,
+                Direction.Output,
+                Port.Capacity.Multi,
+                typeof(float));
+            AllPort.portName = AllPortName;
+            AllPort.tooltip = "全出力をまとめてレイヤーへ一括配線する";
+            AllPort.userData = null;
+            outputContainer.Add(AllPort);
 
             for (int i = 0; i < Data.Outputs.Count; i++)
             {
@@ -78,7 +78,10 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 
         public AdapterNodeData Data { get; }
 
-        public Button AutoWireButton { get; }
+        /// <summary>
+        /// 全出力を一括配線するためのメタ出力ポート。個々の canonical id は持たない（userData は null）。
+        /// </summary>
+        public Port AllPort { get; }
 
         public Label TypeBadge { get; }
 
@@ -88,11 +91,6 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
         public Port GetOutputPort(string canonicalId)
         {
             return canonicalId != null && _outputPorts.TryGetValue(canonicalId, out Port port) ? port : null;
-        }
-
-        private void NotifyAutoWireRequested()
-        {
-            _onAutoWireRequested?.Invoke(Data.BindingSlug);
         }
     }
 }

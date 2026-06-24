@@ -21,7 +21,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
         public const string InputsHeaderText = "Inputs";
         public const string WeightFieldClassName = "routing-layer-input-weight";
         public const string TypeBadgeName = "routing-layer-type-badge";
-        public const string TypeBadgeText = "レイヤー";
+        public const string TypeBadgeText = "Layer";
         private static readonly UnityEngine.Color TitleBarColor = new UnityEngine.Color(0.16f, 0.21f, 0.33f, 1f);
         private static readonly UnityEngine.Color TypeBadgeColor = new UnityEngine.Color(0.62f, 0.76f, 1f, 1f);
 
@@ -56,7 +56,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 
             capabilities &= ~(Capabilities.Deletable | Capabilities.Copiable | Capabilities.Renamable);
 
-            // レイヤーノードであることを一目で分かるようにタイトルバーを着色し「レイヤー」バッジを付与する。
+            // レイヤーノードであることを一目で分かるようにタイトルバーを着色し「Layer」バッジを付与する。
             titleContainer.style.backgroundColor = TitleBarColor;
             TypeBadge = new Label(TypeBadgeText) { name = TypeBadgeName };
             TypeBadge.style.color = TypeBadgeColor;

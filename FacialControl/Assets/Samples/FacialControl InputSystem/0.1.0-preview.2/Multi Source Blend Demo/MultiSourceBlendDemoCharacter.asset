@@ -27,7 +27,7 @@ MonoBehaviour:
     layerOverrideMask:
     - emotion
   - name: overlay
-    priority: 1
+    priority: 2
     exclusionMode: 0
     inputSources:
     - id: input-system:overlay:blink

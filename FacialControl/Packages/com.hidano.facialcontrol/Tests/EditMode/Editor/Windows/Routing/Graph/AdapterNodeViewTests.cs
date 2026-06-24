@@ -1,4 +1,3 @@
-using System.Reflection;
 using Hidano.FacialControl.Editor.Windows.Routing.Graph;
 using Hidano.FacialControl.Editor.Windows.Routing.Logic;
 using NUnit.Framework;
@@ -24,11 +23,12 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
                     new AdapterOutputData("input-system:overlay:blink", "blink"),
                 });
 
-            var view = new AdapterNodeView(data, _ => { });
+            var view = new AdapterNodeView(data);
 
             Assert.That(view.title, Is.EqualTo("input-system"));
             Assert.That(view.TypeBadge, Is.Not.Null);
             Assert.That(view.TypeBadge.text, Is.EqualTo(AdapterNodeView.TypeBadgeText));
+            Assert.That(AdapterNodeView.TypeBadgeText, Is.EqualTo("Adapter"));
 
             Port analogPort = view.GetOutputPort("input-system:analog-expression");
             Assert.That(analogPort, Is.Not.Null);
@@ -41,35 +41,22 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
         }
 
         [Test]
-        public void Construct_HidesAutoWireButton_WhenBindingDoesNotSupportIt()
-        {
-            var data = new AdapterNodeData(
-                "input-system",
-                "input-system",
-                supportsAutoWire: false,
-                new[] { new AdapterOutputData("input-system", "input-system") });
-
-            var view = new AdapterNodeView(data, _ => { });
-
-            Assert.That(view.AutoWireButton, Is.Null);
-        }
-
-        [Test]
-        public void Click_AutoWireButton_InvokesCallbackWithBindingSlug()
+        public void Construct_AddsAllPortAsOutputWithoutCanonicalId()
         {
             var data = new AdapterNodeData(
                 "ulipsync",
                 "ulipsync",
                 supportsAutoWire: true,
                 new[] { new AdapterOutputData("lipsync-overlay:a", "a") });
-            string invokedSlug = null;
 
-            var view = new AdapterNodeView(data, slug => invokedSlug = slug);
+            var view = new AdapterNodeView(data);
 
-            Assert.That(view.AutoWireButton, Is.Not.Null);
-            InvokeButton(view.AutoWireButton);
-
-            Assert.That(invokedSlug, Is.EqualTo("ulipsync"));
+            Assert.That(view.AllPort, Is.Not.Null);
+            Assert.That(view.AllPort.direction, Is.EqualTo(Direction.Output));
+            Assert.That(view.AllPort.portName, Is.EqualTo(AdapterNodeView.AllPortName));
+            Assert.That(view.AllPort.userData, Is.Null);
+            // All ポートは個別 canonical id を持たないため GetOutputPort では引けない。
+            Assert.That(view.GetOutputPort("lipsync-overlay:a"), Is.Not.SameAs(view.AllPort));
         }
 
         [Test]
@@ -94,29 +81,15 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
                     }),
             };
 
-            graphView.SetAdapterNodes(adapterNodes, _ => { });
+            graphView.SetAdapterNodes(adapterNodes);
 
             Assert.That(graphView.AdapterNodeViews, Has.Count.EqualTo(2));
             Assert.That(graphView.Query<AdapterNodeView>().ToList(), Has.Count.EqualTo(2));
             Assert.That(graphView.AdapterNodeViews[0].GetOutputPort("lipsync-overlay:a"), Is.Not.Null);
+            Assert.That(graphView.AdapterNodeViews[0].AllPort, Is.Not.Null);
             Assert.That(
                 graphView.AdapterNodeViews[1].GetOutputPort("input-system:analog-expression").portName,
                 Is.EqualTo("analog-expression"));
-        }
-
-        private static void InvokeButton(Button button)
-        {
-            Assert.That(button, Is.Not.Null);
-            Assert.That(button.text, Is.EqualTo(AdapterNodeView.AutoWireButtonText));
-
-            MethodInfo invoke = button.clickable.GetType().GetMethod(
-                "Invoke",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                binder: null,
-                types: new[] { typeof(EventBase) },
-                modifiers: null);
-            Assert.That(invoke, Is.Not.Null);
-            invoke.Invoke(button.clickable, new object[] { null });
         }
     }
 }
