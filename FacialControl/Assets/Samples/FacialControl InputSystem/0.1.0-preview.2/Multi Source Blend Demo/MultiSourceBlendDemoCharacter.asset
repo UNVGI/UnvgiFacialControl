@@ -33,6 +33,21 @@ MonoBehaviour:
     - id: input-system:overlay:blink
       weight: 1
       optionsJson: 
+    - id: lipsync-overlay:a
+      weight: 1
+      optionsJson: 
+    - id: lipsync-overlay:i
+      weight: 1
+      optionsJson: 
+    - id: lipsync-overlay:u
+      weight: 1
+      optionsJson: 
+    - id: lipsync-overlay:e
+      weight: 1
+      optionsJson: 
+    - id: lipsync-overlay:o
+      weight: 1
+      optionsJson: 
     layerOverrideMask: []
   - name: lipsync
     priority: 2
@@ -350,6 +365,11 @@ MonoBehaviour:
     lookDownSamples: []
   _slots:
   - blink
+  - a
+  - i
+  - u
+  - e
+  - o
   _defaultOverlays:
   - slot: blink
     suppress: 0

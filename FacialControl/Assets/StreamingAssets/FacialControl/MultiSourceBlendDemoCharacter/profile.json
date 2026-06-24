@@ -25,6 +25,26 @@
                 {
                     "id": "input-system:overlay:blink",
                     "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:a",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:i",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:u",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:e",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:o",
+                    "weight": 1.0
                 }
             ]
         },
@@ -61,7 +81,12 @@
         }
     ],
     "slots": [
-        "blink"
+        "blink",
+        "a",
+        "i",
+        "u",
+        "e",
+        "o"
     ],
     "expressions": [
         {
