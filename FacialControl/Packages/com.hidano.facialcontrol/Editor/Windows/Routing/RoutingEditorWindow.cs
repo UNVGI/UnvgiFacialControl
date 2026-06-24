@@ -201,23 +201,23 @@ namespace Hidano.FacialControl.Editor.Windows.Routing
 
             _serializedObject.Update();
             RoutingGraphModel model = _graphModelBuilder.Build(_profile);
-            _graphView.SetSourceNodes(model.SourceNodes, HandleAutoWireRequested);
+            _graphView.SetAdapterNodes(model.AdapterNodes, HandleAutoWireRequested);
             _graphView.SetLayerNodes(model.LayerNodes, _serializedObject, _wiringSerializedMapper);
-            _graphView.SetOutputNode(model.OutputNode);
+            _graphView.SetOutputNode(model.OutputNode, _serializedObject, _wiringSerializedMapper);
             _graphView.SetCompositionEdges();
             _graphView.SetWiringEdges(model.Edges, _serializedObject, _wiringSerializedMapper);
             _graphView.SetInvalidInputs(model.InvalidEdges);
             _lastObservedStateHash = CalculateObservedStateHash(_profile);
         }
 
-        private void HandleAutoWireRequested(SourceNodeDescriptor descriptor)
+        private void HandleAutoWireRequested(string bindingSlug)
         {
             if (_profile == null || _serializedObject == null)
             {
                 return;
             }
 
-            AdapterBindingBase binding = FindBindingBySlug(_profile.AdapterBindings, descriptor.BindingSlug);
+            AdapterBindingBase binding = FindBindingBySlug(_profile.AdapterBindings, bindingSlug);
             if (binding == null)
             {
                 return;

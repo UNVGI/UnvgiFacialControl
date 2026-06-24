@@ -11,14 +11,15 @@ using UnityEngine.UIElements;
 namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 {
     /// <summary>
-    /// Renders a layer node and writes attribute edits back to the serialized profile.
+    /// レイヤーノード。名前の編集と、接続された入力源ごとのウェイト編集を担う。
+    /// レイヤー間のふるまい（priority / exclusion / mask）の編集は Composite Output 側へ移設した。
     /// </summary>
     public sealed class LayerNodeView : Node
     {
         public const string NameFieldName = "routing-layer-name";
-        public const string PriorityFieldName = "routing-layer-priority";
-        public const string ExclusionModeFieldName = "routing-layer-exclusion-mode";
-        public const string OverrideMaskFieldName = "routing-layer-override-mask";
+        public const string InputsHeaderName = "routing-layer-inputs-header";
+        public const string InputsHeaderText = "Inputs";
+        public const string WeightFieldClassName = "routing-layer-input-weight";
         public const string TypeBadgeName = "routing-layer-type-badge";
         public const string TypeBadgeText = "レイヤー";
         private static readonly UnityEngine.Color TitleBarColor = new UnityEngine.Color(0.16f, 0.21f, 0.33f, 1f);
@@ -27,9 +28,9 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
         private readonly SerializedObject _serializedObject;
         private readonly IWiringSerializedMapper _wiringSerializedMapper;
         private string _layerName;
-        private int _priority;
-        private ExclusionMode _exclusionMode;
-        private List<string> _overrideMask;
+        private readonly int _priority;
+        private readonly ExclusionMode _exclusionMode;
+        private readonly List<string> _overrideMask;
 
         public LayerNodeView(
             LayerNodeData layerNodeData,
@@ -88,51 +89,12 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             {
                 name = NameFieldName,
                 value = _layerName,
+                isDelayed = true,
             };
-            NameField.RegisterValueChangedCallback(evt => ApplyLayerProperties(
-                evt.newValue,
-                _priority,
-                _exclusionMode,
-                _overrideMask));
-
-            PriorityField = new IntegerField("Priority")
-            {
-                name = PriorityFieldName,
-                value = _priority,
-            };
-            PriorityField.RegisterValueChangedCallback(evt => ApplyLayerProperties(
-                _layerName,
-                evt.newValue,
-                _exclusionMode,
-                _overrideMask));
-
-            ExclusionModeField = new EnumField("Exclusion Mode", _exclusionMode)
-            {
-                name = ExclusionModeFieldName,
-            };
-            ExclusionModeField.RegisterValueChangedCallback(evt => ApplyLayerProperties(
-                _layerName,
-                _priority,
-                (ExclusionMode)evt.newValue,
-                _overrideMask));
-
-            OverrideMaskField = new TextField("Override Mask")
-            {
-                name = OverrideMaskFieldName,
-                multiline = true,
-                value = FormatOverrideMask(_overrideMask),
-            };
-            OverrideMaskField.RegisterValueChangedCallback(evt => ApplyLayerProperties(
-                _layerName,
-                _priority,
-                _exclusionMode,
-                ParseOverrideMask(evt.newValue)));
-            OverrideMaskField.tooltip = "Comma or newline separated layer names.";
-
+            NameField.RegisterValueChangedCallback(evt => ApplyLayerName(evt.newValue));
             extensionContainer.Add(NameField);
-            extensionContainer.Add(PriorityField);
-            extensionContainer.Add(ExclusionModeField);
-            extensionContainer.Add(OverrideMaskField);
+
+            BuildInputWeightRows();
 
             RefreshExpandedState();
             RefreshPorts();
@@ -142,29 +104,63 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 
         public TextField NameField { get; }
 
-        public IntegerField PriorityField { get; }
-
-        public EnumField ExclusionModeField { get; }
-
-        public TextField OverrideMaskField { get; }
-
         public Port InputPort { get; }
 
         public Port OutputPort { get; }
 
         public Label TypeBadge { get; }
 
-        private void ApplyLayerProperties(
-            string layerName,
-            int priority,
-            ExclusionMode exclusionMode,
-            IReadOnlyList<string> overrideMask)
+        private void BuildInputWeightRows()
+        {
+            IReadOnlyList<LayerInputData> inputs = LayerNodeData.Inputs;
+            if (inputs == null || inputs.Count == 0)
+            {
+                return;
+            }
+
+            var header = new Label(InputsHeaderText) { name = InputsHeaderName };
+            header.style.unityFontStyleAndWeight = UnityEngine.FontStyle.Bold;
+            header.style.marginTop = 4f;
+            extensionContainer.Add(header);
+
+            for (int i = 0; i < inputs.Count; i++)
+            {
+                extensionContainer.Add(CreateInputWeightRow(inputs[i]));
+            }
+        }
+
+        private VisualElement CreateInputWeightRow(LayerInputData input)
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+
+            var label = new Label(input.Label);
+            label.style.flexGrow = 1f;
+            label.style.marginRight = 6f;
+            row.Add(label);
+
+            var weightField = new FloatField
+            {
+                name = $"routing-layer-weight-{input.CanonicalId}",
+                value = input.Weight,
+                isDelayed = true,
+                userData = input.CanonicalId,
+            };
+            weightField.AddToClassList(WeightFieldClassName);
+            weightField.style.width = 60f;
+            weightField.RegisterValueChangedCallback(evt => ApplyInputWeight(input.CanonicalId, evt.newValue));
+            row.Add(weightField);
+
+            return row;
+        }
+
+        private void ApplyLayerName(string layerName)
         {
             _layerName = layerName ?? string.Empty;
-            _priority = priority;
-            _exclusionMode = exclusionMode;
-            _overrideMask = CopyOverrideMask(overrideMask);
 
+            // SetLayerProperties は name/priority/exclusion/mask を一括で書くため、
+            // この場で編集していない priority/exclusion/mask は構築時のスナップショットを保持して渡す。
             _wiringSerializedMapper.SetLayerProperties(
                 _serializedObject,
                 LayerNodeData.LayerIndex,
@@ -174,7 +170,15 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
                 _overrideMask);
 
             title = GetNodeTitle(_layerName, LayerNodeData.LayerIndex);
-            OverrideMaskField.SetValueWithoutNotify(FormatOverrideMask(_overrideMask));
+        }
+
+        private void ApplyInputWeight(string canonicalId, float weight)
+        {
+            _wiringSerializedMapper.SetWeight(
+                _serializedObject,
+                LayerNodeData.LayerIndex,
+                canonicalId,
+                UnityEngine.Mathf.Clamp01(weight));
         }
 
         private static string GetNodeTitle(string layerName, int layerIndex)
@@ -202,36 +206,6 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             }
 
             return copy;
-        }
-
-        private static string FormatOverrideMask(IReadOnlyList<string> overrideMask)
-        {
-            return overrideMask == null || overrideMask.Count == 0
-                ? string.Empty
-                : string.Join(", ", overrideMask);
-        }
-
-        private static List<string> ParseOverrideMask(string value)
-        {
-            var results = new List<string>();
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return results;
-            }
-
-            string[] tokens = value.Split(new[] { ',', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            for (int i = 0; i < tokens.Length; i++)
-            {
-                string token = tokens[i].Trim();
-                if (string.IsNullOrEmpty(token) || results.Contains(token))
-                {
-                    continue;
-                }
-
-                results.Add(token);
-            }
-
-            return results;
         }
     }
 }

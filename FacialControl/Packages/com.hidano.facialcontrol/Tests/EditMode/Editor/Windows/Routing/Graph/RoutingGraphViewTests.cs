@@ -63,7 +63,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
             RoutingGraphView graphView = CreateGraphView();
 
             List<Port> compatiblePorts = graphView.GetCompatiblePorts(
-                graphView.SourceNodeViews[0].OutputPort,
+                graphView.AdapterNodeViews[0].GetOutputPort("lipsync-overlay:a"),
                 null);
 
             Assert.That(compatiblePorts, Has.Count.EqualTo(1));
@@ -76,7 +76,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
             RoutingGraphView graphView = CreateGraphView();
             var edge = new Edge
             {
-                output = graphView.SourceNodeViews[0].OutputPort,
+                output = graphView.AdapterNodeViews[0].GetOutputPort("lipsync-overlay:a"),
                 input = graphView.LayerNodeViews[0].InputPort,
             };
 
@@ -112,11 +112,68 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
             Assert.That(_mapper.LastCanonicalId, Is.EqualTo("lipsync-overlay:a"));
         }
 
+        [Test]
+        public void GraphViewChanged_RewireEdge_RemovesOldThenAddsNewWithCarriedWeight()
+        {
+            var graphView = new RoutingGraphView();
+            graphView.SetAdapterNodes(
+                new[]
+                {
+                    new AdapterNodeData(
+                        "ulipsync",
+                        "ulipsync",
+                        supportsAutoWire: true,
+                        new[] { new AdapterOutputData("lipsync-overlay:a", "a") }),
+                },
+                _ => { });
+            graphView.SetLayerNodes(
+                new[]
+                {
+                    new LayerNodeData(0, "overlay", 1, ExclusionMode.Blend, new string[0]),
+                    new LayerNodeData(1, "emotion", 0, ExclusionMode.LastWins, new string[0]),
+                },
+                _serializedObject,
+                _mapper);
+            graphView.SetWiringEdges(
+                new[] { new WiringEdgeData(0, "lipsync-overlay:a", 0.4f) },
+                _serializedObject,
+                _mapper);
+
+            RoutingEdge oldEdge = graphView.RoutingEdges[0];
+            var newEdge = new Edge
+            {
+                output = graphView.AdapterNodeViews[0].GetOutputPort("lipsync-overlay:a"),
+                input = graphView.LayerNodeViews[1].InputPort,
+            };
+
+            graphView.graphViewChanged(new GraphViewChange
+            {
+                elementsToRemove = new List<GraphElement> { oldEdge },
+                edgesToCreate = new List<Edge> { newEdge },
+            });
+
+            Assert.That(_mapper.RemoveDeclarationCalls, Is.EqualTo(1));
+            Assert.That(_mapper.AddDeclarationCalls, Is.EqualTo(1));
+            Assert.That(_mapper.LastLayerIndex, Is.EqualTo(1));
+            Assert.That(_mapper.LastCanonicalId, Is.EqualTo("lipsync-overlay:a"));
+            Assert.That(_mapper.LastWeight, Is.EqualTo(0.4f));
+            CollectionAssert.AreEqual(
+                new[] { "Remove:0:lipsync-overlay:a", "Add:1:lipsync-overlay:a:0.4" },
+                _mapper.Invocations);
+        }
+
         private RoutingGraphView CreateGraphView()
         {
             var graphView = new RoutingGraphView();
-            graphView.SetSourceNodes(
-                new[] { new SourceNodeDescriptor("lipsync-overlay:a", "a", "ulipsync") },
+            graphView.SetAdapterNodes(
+                new[]
+                {
+                    new AdapterNodeData(
+                        "ulipsync",
+                        "ulipsync",
+                        supportsAutoWire: true,
+                        new[] { new AdapterOutputData("lipsync-overlay:a", "a") }),
+                },
                 _ => { });
             graphView.SetLayerNodes(
                 new[] { new LayerNodeData(0, "overlay", 1, ExclusionMode.Blend, new string[0]) },
@@ -127,6 +184,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
 
         private sealed class RecordingWiringSerializedMapper : IWiringSerializedMapper
         {
+            public List<string> Invocations { get; } = new List<string>();
+
             public int AddDeclarationCalls { get; private set; }
 
             public int RemoveDeclarationCalls { get; private set; }
@@ -143,6 +202,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
                 LastLayerIndex = layerIndex;
                 LastCanonicalId = canonicalId;
                 LastWeight = weight;
+                Invocations.Add($"Add:{layerIndex}:{canonicalId}:{weight}");
             }
 
             public void RemoveDeclaration(SerializedObject serializedObject, int layerIndex, string canonicalId)
@@ -150,6 +210,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Graph
                 RemoveDeclarationCalls++;
                 LastLayerIndex = layerIndex;
                 LastCanonicalId = canonicalId;
+                Invocations.Add($"Remove:{layerIndex}:{canonicalId}");
             }
 
             public void SetWeight(SerializedObject serializedObject, int layerIndex, string canonicalId, float weight)

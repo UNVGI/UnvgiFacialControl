@@ -51,13 +51,13 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Logic
             IReadOnlyList<InvalidDeclarationRef> invalidDeclarations =
                 _invalidIdValidator.Validate(profile, validCanonicalIds);
 
-            SourceNodeDescriptor[] sourceNodes = BuildSourceNodes(sourcePorts);
-            LayerNodeData[] layerNodes = BuildLayerNodes(layers);
+            AdapterNodeData[] adapterNodes = BuildAdapterNodes(sourcePorts, bindings);
             WiringEdgeData[] edges = BuildEdges(layers, invalidDeclarations);
+            LayerNodeData[] layerNodes = BuildLayerNodes(layers, edges, sourcePorts);
             DanglingEdgeData[] invalidEdges = BuildInvalidEdges(invalidDeclarations);
             OutputNodeData outputNode = BuildOutputNode(layerNodes);
 
-            return new RoutingGraphModel(sourceNodes, layerNodes, outputNode, edges, invalidEdges);
+            return new RoutingGraphModel(adapterNodes, layerNodes, outputNode, edges, invalidEdges);
         }
 
         private static string[] BuildLayerNames(IReadOnlyList<LayerDefinitionSerializable> layers)
@@ -76,31 +76,99 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Logic
             return layerNames;
         }
 
-        private static SourceNodeDescriptor[] BuildSourceNodes(IReadOnlyList<SourcePort> sourcePorts)
+        /// <summary>
+        /// SourcePort を BindingSlug 単位にグルーピングし、1 binding = 1 アダプターノードへ変換する。
+        /// グループ順は SourcePort の登場順（= binding 列挙順）を保つ。
+        /// </summary>
+        private static AdapterNodeData[] BuildAdapterNodes(
+            IReadOnlyList<SourcePort> sourcePorts,
+            IReadOnlyList<AdapterBindingBase> bindings)
         {
             if (sourcePorts == null || sourcePorts.Count == 0)
             {
-                return Array.Empty<SourceNodeDescriptor>();
+                return Array.Empty<AdapterNodeData>();
             }
 
-            var sourceNodes = new SourceNodeDescriptor[sourcePorts.Count];
+            Dictionary<string, bool> autoWireBySlug = BuildAutoWireSupportMap(bindings);
+
+            var orderedSlugs = new List<string>();
+            var outputsBySlug = new Dictionary<string, List<AdapterOutputData>>(StringComparer.Ordinal);
+
             for (int i = 0; i < sourcePorts.Count; i++)
             {
                 SourcePort sourcePort = sourcePorts[i];
-                sourceNodes[i] = new SourceNodeDescriptor(
-                    sourcePort.CanonicalId,
-                    sourcePort.Label,
-                    sourcePort.BindingSlug);
+                string slug = sourcePort.BindingSlug ?? string.Empty;
+                if (!outputsBySlug.TryGetValue(slug, out List<AdapterOutputData> outputs))
+                {
+                    outputs = new List<AdapterOutputData>();
+                    outputsBySlug.Add(slug, outputs);
+                    orderedSlugs.Add(slug);
+                }
+
+                outputs.Add(new AdapterOutputData(sourcePort.CanonicalId, sourcePort.Label));
             }
 
-            return sourceNodes;
+            var adapterNodes = new AdapterNodeData[orderedSlugs.Count];
+            for (int i = 0; i < orderedSlugs.Count; i++)
+            {
+                string slug = orderedSlugs[i];
+                bool supportsAutoWire = autoWireBySlug.TryGetValue(slug, out bool value) && value;
+                adapterNodes[i] = new AdapterNodeData(slug, slug, supportsAutoWire, outputsBySlug[slug]);
+            }
+
+            return adapterNodes;
         }
 
-        private static LayerNodeData[] BuildLayerNodes(IReadOnlyList<LayerDefinitionSerializable> layers)
+        private static Dictionary<string, bool> BuildAutoWireSupportMap(IReadOnlyList<AdapterBindingBase> bindings)
+        {
+            var map = new Dictionary<string, bool>(StringComparer.Ordinal);
+            if (bindings == null)
+            {
+                return map;
+            }
+
+            for (int i = 0; i < bindings.Count; i++)
+            {
+                AdapterBindingBase binding = bindings[i];
+                if (binding == null)
+                {
+                    continue;
+                }
+
+                string slug = binding.Slug ?? string.Empty;
+                bool supports = binding is IAdapterBindingDefaultLayerInputs;
+                map[slug] = map.TryGetValue(slug, out bool existing) ? existing || supports : supports;
+            }
+
+            return map;
+        }
+
+        private static LayerNodeData[] BuildLayerNodes(
+            IReadOnlyList<LayerDefinitionSerializable> layers,
+            IReadOnlyList<WiringEdgeData> edges,
+            IReadOnlyList<SourcePort> sourcePorts)
         {
             if (layers == null || layers.Count == 0)
             {
                 return Array.Empty<LayerNodeData>();
+            }
+
+            Dictionary<string, string> labelByCanonicalId = BuildLabelMap(sourcePorts);
+
+            var inputsByLayer = new List<LayerInputData>[layers.Count];
+            for (int i = 0; i < edges.Count; i++)
+            {
+                WiringEdgeData edge = edges[i];
+                if (edge.LayerIndex < 0 || edge.LayerIndex >= layers.Count)
+                {
+                    continue;
+                }
+
+                (inputsByLayer[edge.LayerIndex] ??= new List<LayerInputData>()).Add(
+                    new LayerInputData(
+                        edge.CanonicalId,
+                        ResolveLabel(labelByCanonicalId, edge.CanonicalId),
+                        edge.Weight));
             }
 
             var layerNodes = new LayerNodeData[layers.Count];
@@ -112,10 +180,46 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Logic
                     layer?.name ?? string.Empty,
                     layer?.priority ?? 0,
                     layer?.exclusionMode ?? 0,
-                    layer?.layerOverrideMask);
+                    layer?.layerOverrideMask,
+                    (IReadOnlyList<LayerInputData>)inputsByLayer[i] ?? Array.Empty<LayerInputData>());
             }
 
             return layerNodes;
+        }
+
+        private static Dictionary<string, string> BuildLabelMap(IReadOnlyList<SourcePort> sourcePorts)
+        {
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (sourcePorts == null)
+            {
+                return map;
+            }
+
+            for (int i = 0; i < sourcePorts.Count; i++)
+            {
+                SourcePort sourcePort = sourcePorts[i];
+                map[sourcePort.CanonicalId] = sourcePort.Label;
+            }
+
+            return map;
+        }
+
+        private static string ResolveLabel(Dictionary<string, string> labelByCanonicalId, string canonicalId)
+        {
+            if (labelByCanonicalId.TryGetValue(canonicalId, out string label) && !string.IsNullOrEmpty(label))
+            {
+                return label;
+            }
+
+            if (string.IsNullOrEmpty(canonicalId))
+            {
+                return string.Empty;
+            }
+
+            int separatorIndex = canonicalId.LastIndexOf(':');
+            return separatorIndex < 0 || separatorIndex >= canonicalId.Length - 1
+                ? canonicalId
+                : canonicalId.Substring(separatorIndex + 1);
         }
 
         private static WiringEdgeData[] BuildEdges(
@@ -193,6 +297,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Logic
                     layer.LayerIndex,
                     layer.Name,
                     layer.Priority,
+                    layer.ExclusionMode,
                     layer.OverrideMask));
             }
 

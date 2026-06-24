@@ -20,7 +20,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
         // 左上固定の MiniMap (16,16,200,140 → 下端 156) とノード/ダングリングバッジが
         // 重ならないよう、ノード行の開始 Y を MiniMap 下端より下に置く。
         private const float ContentTopMargin = 176f;
-        private readonly List<SourceNodeView> _sourceNodeViews = new List<SourceNodeView>();
+        private readonly List<AdapterNodeView> _adapterNodeViews = new List<AdapterNodeView>();
         private readonly List<LayerNodeView> _layerNodeViews = new List<LayerNodeView>();
         private const float OrphanColumnX = 32f;
         private const float OrphanRowSpacing = 120f;
@@ -62,7 +62,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             graphViewChanged = OnGraphViewChanged;
         }
 
-        public IReadOnlyList<SourceNodeView> SourceNodeViews => _sourceNodeViews;
+        public IReadOnlyList<AdapterNodeView> AdapterNodeViews => _adapterNodeViews;
 
         public IReadOnlyList<LayerNodeView> LayerNodeViews => _layerNodeViews;
 
@@ -78,26 +78,30 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
 
         public MiniMap MiniMap => _miniMap;
 
-        public void SetSourceNodes(
-            IReadOnlyList<SourceNodeDescriptor> sourceNodes,
-            Action<SourceNodeDescriptor> onAutoWireRequested)
+        public void SetAdapterNodes(
+            IReadOnlyList<AdapterNodeData> adapterNodes,
+            Action<string> onAutoWireRequested)
         {
-            if (sourceNodes == null)
+            if (adapterNodes == null)
             {
-                throw new ArgumentNullException(nameof(sourceNodes));
+                throw new ArgumentNullException(nameof(adapterNodes));
             }
 
             ClearRoutingEdges();
             ClearOrphanInputs();
             ClearCompositionEdges();
-            ClearSourceNodes();
+            ClearAdapterNodes();
 
-            for (int i = 0; i < sourceNodes.Count; i++)
+            float y = ContentTopMargin;
+            for (int i = 0; i < adapterNodes.Count; i++)
             {
-                var sourceNodeView = new SourceNodeView(sourceNodes[i], onAutoWireRequested);
-                sourceNodeView.SetPosition(new Rect(32f, ContentTopMargin + (i * 140f), 240f, 96f));
-                _sourceNodeViews.Add(sourceNodeView);
-                AddElement(sourceNodeView);
+                AdapterNodeData data = adapterNodes[i];
+                var adapterNodeView = new AdapterNodeView(data, onAutoWireRequested);
+                float height = Mathf.Max(140f, 56f + (Mathf.Max(1, data.Outputs.Count) * 24f));
+                adapterNodeView.SetPosition(new Rect(32f, y, 240f, height));
+                _adapterNodeViews.Add(adapterNodeView);
+                AddElement(adapterNodeView);
+                y += height + 24f;
             }
         }
 
@@ -138,18 +142,35 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             }
         }
 
-        public void SetOutputNode(OutputNodeData outputNodeData)
+        public void SetOutputNode(
+            OutputNodeData outputNodeData,
+            SerializedObject serializedObject,
+            IWiringSerializedMapper wiringSerializedMapper)
         {
             if (outputNodeData == null)
             {
                 throw new ArgumentNullException(nameof(outputNodeData));
             }
 
+            if (serializedObject == null)
+            {
+                throw new ArgumentNullException(nameof(serializedObject));
+            }
+
+            if (wiringSerializedMapper == null)
+            {
+                throw new ArgumentNullException(nameof(wiringSerializedMapper));
+            }
+
+            _serializedObject = serializedObject;
+            _wiringSerializedMapper = wiringSerializedMapper;
+
             ClearCompositionEdges();
             ClearOutputNode();
 
-            _outputNodeView = new OutputNodeView(outputNodeData);
-            _outputNodeView.SetPosition(new Rect(672f, ContentTopMargin, 320f, Mathf.Max(140f, 56f + (outputNodeData.OrderedLayers.Count * 24f))));
+            _outputNodeView = new OutputNodeView(outputNodeData, serializedObject, wiringSerializedMapper);
+            float height = Mathf.Max(160f, 64f + (outputNodeData.OrderedLayers.Count * 108f));
+            _outputNodeView.SetPosition(new Rect(672f, ContentTopMargin, 340f, height));
             AddElement(_outputNodeView);
         }
 
@@ -181,19 +202,14 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             for (int i = 0; i < edges.Count; i++)
             {
                 WiringEdgeData edgeData = edges[i];
-                SourceNodeView sourceNode = FindSourceNode(edgeData.CanonicalId);
+                Port sourcePort = FindOutputPort(edgeData.CanonicalId);
                 LayerNodeView layerNode = FindLayerNode(edgeData.LayerIndex);
-                if (sourceNode == null || layerNode == null)
+                if (sourcePort == null || layerNode == null)
                 {
                     continue;
                 }
 
-                var edge = new RoutingEdge(
-                    sourceNode.OutputPort,
-                    layerNode.InputPort,
-                    serializedObject,
-                    wiringSerializedMapper,
-                    edgeData);
+                var edge = new RoutingEdge(sourcePort, layerNode.InputPort, edgeData);
                 _routingEdges.Add(edge);
                 AddElement(edge);
             }
@@ -221,7 +237,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
                 }
 
                 var orphanNode = new OrphanInputNodeView(data);
-                float y = ContentTopMargin + ((_sourceNodeViews.Count + i) * OrphanRowSpacing);
+                float y = ContentTopMargin + ((_adapterNodeViews.Count + i) * OrphanRowSpacing);
                 orphanNode.SetPosition(new Rect(OrphanColumnX, y, 220f, 80f));
                 _orphanInputNodes.Add(orphanNode);
                 AddElement(orphanNode);
@@ -273,14 +289,14 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             return edge;
         }
 
-        private void ClearSourceNodes()
+        private void ClearAdapterNodes()
         {
-            for (int i = 0; i < _sourceNodeViews.Count; i++)
+            for (int i = 0; i < _adapterNodeViews.Count; i++)
             {
-                RemoveElement(_sourceNodeViews[i]);
+                RemoveElement(_adapterNodeViews[i]);
             }
 
-            _sourceNodeViews.Clear();
+            _adapterNodeViews.Clear();
         }
 
         private void ClearLayerNodes()
@@ -341,14 +357,14 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
             _compositionEdges.Clear();
         }
 
-        private SourceNodeView FindSourceNode(string canonicalId)
+        private Port FindOutputPort(string canonicalId)
         {
-            for (int i = 0; i < _sourceNodeViews.Count; i++)
+            for (int i = 0; i < _adapterNodeViews.Count; i++)
             {
-                SourceNodeView sourceNode = _sourceNodeViews[i];
-                if (string.Equals(sourceNode.Descriptor.CanonicalId, canonicalId, StringComparison.Ordinal))
+                Port port = _adapterNodeViews[i].GetOutputPort(canonicalId);
+                if (port != null)
                 {
-                    return sourceNode;
+                    return port;
                 }
             }
 
@@ -392,46 +408,68 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
                 return graphViewChange;
             }
 
-            if (graphViewChange.edgesToCreate != null && graphViewChange.edgesToCreate.Count > 0)
-            {
-                graphViewChange.edgesToCreate = ConvertCreatedEdges(graphViewChange.edgesToCreate);
-            }
-
+            // 繋ぎ替えは「旧エッジ削除（elementsToRemove）＋新エッジ作成（edgesToCreate）」として
+            // 同一 GraphViewChange で報告される。先に削除を処理し、削除された配線の weight を
+            // canonical id で控えておくことで、同一 canonical id の新規エッジへ weight を引き継ぐ。
+            Dictionary<string, float> removedWeights = null;
             if (graphViewChange.elementsToRemove != null && graphViewChange.elementsToRemove.Count > 0)
             {
+                removedWeights = CaptureRemovedWeights(graphViewChange.elementsToRemove);
                 RemoveDeletedDeclarations(graphViewChange.elementsToRemove);
+            }
+
+            if (graphViewChange.edgesToCreate != null && graphViewChange.edgesToCreate.Count > 0)
+            {
+                graphViewChange.edgesToCreate = ConvertCreatedEdges(graphViewChange.edgesToCreate, removedWeights);
             }
 
             return graphViewChange;
         }
 
-        private List<Edge> ConvertCreatedEdges(IEnumerable<Edge> edgesToCreate)
+        private static Dictionary<string, float> CaptureRemovedWeights(IEnumerable<GraphElement> elementsToRemove)
+        {
+            var map = new Dictionary<string, float>(StringComparer.Ordinal);
+            foreach (GraphElement element in elementsToRemove)
+            {
+                if (element is RoutingEdge routingEdge
+                    && !string.IsNullOrEmpty(routingEdge.EdgeData.CanonicalId))
+                {
+                    map[routingEdge.EdgeData.CanonicalId] = routingEdge.EdgeData.Weight;
+                }
+            }
+
+            return map;
+        }
+
+        private List<Edge> ConvertCreatedEdges(
+            IEnumerable<Edge> edgesToCreate,
+            Dictionary<string, float> removedWeights)
         {
             var replacementEdges = new List<Edge>();
 
             foreach (Edge edge in edgesToCreate)
             {
-                if (!TryGetConnectionData(edge, out SourceNodeView sourceNode, out LayerNodeView layerNode))
+                if (!TryGetConnectionData(edge, out string canonicalId, out LayerNodeView layerNode))
                 {
                     continue;
                 }
 
-                string canonicalId = sourceNode.Descriptor.CanonicalId;
+                float weight = DefaultDeclarationWeight;
+                if (removedWeights != null && removedWeights.TryGetValue(canonicalId, out float carriedWeight))
+                {
+                    weight = carriedWeight;
+                }
+
                 _wiringSerializedMapper.AddDeclaration(
                     _serializedObject,
                     layerNode.LayerNodeData.LayerIndex,
                     canonicalId,
-                    DefaultDeclarationWeight);
+                    weight);
 
                 replacementEdges.Add(new RoutingEdge(
-                    sourceNode.OutputPort,
-                    layerNode.InputPort,
-                    _serializedObject,
-                    _wiringSerializedMapper,
-                    new WiringEdgeData(
-                        layerNode.LayerNodeData.LayerIndex,
-                        canonicalId,
-                        DefaultDeclarationWeight)));
+                    edge.output,
+                    edge.input,
+                    new WiringEdgeData(layerNode.LayerNodeData.LayerIndex, canonicalId, weight)));
             }
 
             return replacementEdges;
@@ -446,7 +484,7 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
                     continue;
                 }
 
-                if (!TryGetConnectionData(edge, out SourceNodeView sourceNode, out LayerNodeView layerNode))
+                if (!TryGetConnectionData(edge, out string canonicalId, out LayerNodeView layerNode))
                 {
                     continue;
                 }
@@ -454,30 +492,32 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Graph
                 _wiringSerializedMapper.RemoveDeclaration(
                     _serializedObject,
                     layerNode.LayerNodeData.LayerIndex,
-                    sourceNode.Descriptor.CanonicalId);
+                    canonicalId);
             }
         }
 
         private static bool TryGetConnectionData(
             Edge edge,
-            out SourceNodeView sourceNode,
+            out string canonicalId,
             out LayerNodeView layerNode)
         {
-            sourceNode = edge?.output?.node as SourceNodeView;
+            canonicalId = edge?.output?.node is AdapterNodeView
+                ? edge.output.userData as string
+                : null;
             layerNode = edge?.input?.node as LayerNodeView;
-            return sourceNode != null && layerNode != null;
+            return !string.IsNullOrEmpty(canonicalId) && layerNode != null;
         }
 
         private static bool IsCompatibleSourceLayerPair(Port startPort, Port candidatePort)
         {
             return (startPort.direction == Direction.Output
                     && candidatePort.direction == Direction.Input
-                    && startPort.node is SourceNodeView
+                    && startPort.node is AdapterNodeView
                     && candidatePort.node is LayerNodeView)
                 || (startPort.direction == Direction.Input
                     && candidatePort.direction == Direction.Output
                     && startPort.node is LayerNodeView
-                    && candidatePort.node is SourceNodeView);
+                    && candidatePort.node is AdapterNodeView);
         }
     }
 }

@@ -66,8 +66,8 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Logic
             RoutingGraphModel second = _builder.Build(_profile);
 
             CollectionAssert.AreEqual(
-                first.SourceNodes.Select(node => node.CanonicalId).ToArray(),
-                second.SourceNodes.Select(node => node.CanonicalId).ToArray());
+                first.AdapterNodes.SelectMany(node => node.Outputs).Select(output => output.CanonicalId).ToArray(),
+                second.AdapterNodes.SelectMany(node => node.Outputs).Select(output => output.CanonicalId).ToArray());
             CollectionAssert.AreEqual(
                 first.LayerNodes.Select(node => node.Name).ToArray(),
                 second.LayerNodes.Select(node => node.Name).ToArray());
@@ -91,10 +91,32 @@ namespace Hidano.FacialControl.Tests.EditMode.Editor.Windows.Routing.Logic
                     "lipsync-overlay:o",
                     "ulipsync",
                 },
-                first.SourceNodes.Select(node => node.CanonicalId).ToArray());
+                first.AdapterNodes.SelectMany(node => node.Outputs).Select(output => output.CanonicalId).ToArray());
             CollectionAssert.AreEqual(
                 new[] { "emotion", "overlay" },
                 first.OutputNode.OrderedLayers.Select(layer => layer.Name).ToArray());
+
+            // 1 binding = 1 アダプターノードへグルーピングされる。
+            Assert.That(first.AdapterNodes.Count, Is.EqualTo(1));
+            Assert.That(first.AdapterNodes[0].BindingSlug, Is.EqualTo("ulipsync"));
+            Assert.That(first.AdapterNodes[0].DisplayName, Is.EqualTo("ulipsync"));
+            Assert.That(first.AdapterNodes[0].SupportsAutoWire, Is.True);
+
+            // レイヤーの接続入力源（ウェイト一覧用）が宣言順で詰まる。
+            CollectionAssert.AreEqual(
+                new[] { "lipsync-overlay:a", "lipsync-overlay:i" },
+                first.LayerNodes[0].Inputs.Select(input => input.CanonicalId).ToArray());
+            CollectionAssert.AreEqual(
+                new[] { 1f, 0.5f },
+                first.LayerNodes[0].Inputs.Select(input => input.Weight).ToArray());
+            CollectionAssert.AreEqual(
+                new[] { "ulipsync" },
+                first.LayerNodes[1].Inputs.Select(input => input.CanonicalId).ToArray());
+
+            // OutputNode の各行に ExclusionMode が転記される（priority 昇順: emotion=0, overlay=2）。
+            CollectionAssert.AreEqual(
+                new[] { ExclusionMode.LastWins, ExclusionMode.Blend },
+                first.OutputNode.OrderedLayers.Select(layer => layer.ExclusionMode).ToArray());
         }
 
         [Test]
