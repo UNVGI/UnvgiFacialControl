@@ -8,11 +8,14 @@
             "inputSources": [
                 {
                     "id": "input-system",
-                    "weight": 1.0,
-                    "options":{"maxStackDepth":4}
+                    "weight": 1.0
                 },
                 {
                     "id": "input-system:analog-expression",
+                    "weight": 1.0
+                },
+                {
+                    "id": "input-system:overlay:blink",
                     "weight": 1.0
                 }
             ]
@@ -22,10 +25,6 @@
             "priority": 2,
             "exclusionMode": "lastWins",
             "inputSources": [
-                {
-                    "id": "input-system:overlay:blink",
-                    "weight": 1.0
-                },
                 {
                     "id": "lipsync-overlay:a",
                     "weight": 1.0
@@ -45,12 +44,24 @@
                 {
                     "id": "lipsync-overlay:o",
                     "weight": 1.0
+                },
+                {
+                    "id": "input-system",
+                    "weight": 1.0
+                },
+                {
+                    "id": "input-system:analog-expression",
+                    "weight": 1.0
+                },
+                {
+                    "id": "input-system:overlay:blink",
+                    "weight": 1.0
                 }
             ]
         },
         {
             "name": "lipsync",
-            "priority": 2,
+            "priority": 3,
             "exclusionMode": "blend",
             "inputSources": [
                 {

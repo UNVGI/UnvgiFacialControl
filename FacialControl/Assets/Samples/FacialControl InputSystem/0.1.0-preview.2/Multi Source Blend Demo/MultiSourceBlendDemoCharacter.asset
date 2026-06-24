@@ -20,8 +20,11 @@ MonoBehaviour:
     inputSources:
     - id: input-system
       weight: 1
-      optionsJson: '{"maxStackDepth":4}'
+      optionsJson: 
     - id: input-system:analog-expression
+      weight: 1
+      optionsJson: 
+    - id: input-system:overlay:blink
       weight: 1
       optionsJson: 
     layerOverrideMask:
@@ -30,9 +33,6 @@ MonoBehaviour:
     priority: 2
     exclusionMode: 0
     inputSources:
-    - id: input-system:overlay:blink
-      weight: 1
-      optionsJson: 
     - id: lipsync-overlay:a
       weight: 1
       optionsJson: 
@@ -48,9 +48,18 @@ MonoBehaviour:
     - id: lipsync-overlay:o
       weight: 1
       optionsJson: 
+    - id: input-system
+      weight: 1
+      optionsJson: 
+    - id: input-system:analog-expression
+      weight: 1
+      optionsJson: 
+    - id: input-system:overlay:blink
+      weight: 1
+      optionsJson: 
     layerOverrideMask: []
   - name: lipsync
-    priority: 2
+    priority: 3
     exclusionMode: 1
     inputSources:
     - id: lipsync-overlay:a
