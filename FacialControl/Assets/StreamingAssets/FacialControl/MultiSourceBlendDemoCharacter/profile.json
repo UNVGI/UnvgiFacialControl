@@ -27,6 +27,37 @@
                     "weight": 1.0
                 }
             ]
+        },
+        {
+            "name": "lipsync",
+            "priority": 2,
+            "exclusionMode": "blend",
+            "inputSources": [
+                {
+                    "id": "lipsync-overlay:a",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:i",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:u",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:e",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:o",
+                    "weight": 1.0
+                },
+                {
+                    "id": "ulipsync",
+                    "weight": 1.0
+                }
+            ]
         }
     ],
     "slots": [

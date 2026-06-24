@@ -34,6 +34,29 @@ MonoBehaviour:
       weight: 1
       optionsJson: 
     layerOverrideMask: []
+  - name: lipsync
+    priority: 2
+    exclusionMode: 1
+    inputSources:
+    - id: lipsync-overlay:a
+      weight: 1
+      optionsJson: 
+    - id: lipsync-overlay:i
+      weight: 1
+      optionsJson: 
+    - id: lipsync-overlay:u
+      weight: 1
+      optionsJson: 
+    - id: lipsync-overlay:e
+      weight: 1
+      optionsJson: 
+    - id: lipsync-overlay:o
+      weight: 1
+      optionsJson: 
+    - id: ulipsync
+      weight: 1
+      optionsJson: 
+    layerOverrideMask: []
   _expressions:
   - id: smile
     name: Smile
@@ -339,10 +362,54 @@ MonoBehaviour:
       rendererPaths: []
   _adapterBindings:
   - rid: 8000000000000000001
+  - rid: 1000
   _referenceModel: {fileID: 0}
   references:
     version: 2
     RefIds:
+    - rid: 1000
+      type: {class: ULipSyncAdapterBinding, ns: Hidano.FacialControl.LipSync.Adapters, asm: Hidano.FacialControl.LipSync}
+      data:
+        Slug: ulipsync
+        _analyzerProfile: {fileID: 0}
+        _phonemeEntries:
+        - rid: 6182673163238244579
+        - rid: 6182673163238244580
+        - rid: 6182673163238244581
+        - rid: 6182673163238244582
+        - rid: 6182673163238244583
+        _targetMeshHint: 
+        _maxWeightScale: 1
+    - rid: 6182673163238244579
+      type: {class: ExpressionPhonemeEntry, ns: Hidano.FacialControl.LipSync.Adapters.PhonemeEntries, asm: Hidano.FacialControl.LipSync}
+      data:
+        PhonemeId: A
+        MaxWeight: 100
+        _expressionId: 
+    - rid: 6182673163238244580
+      type: {class: ExpressionPhonemeEntry, ns: Hidano.FacialControl.LipSync.Adapters.PhonemeEntries, asm: Hidano.FacialControl.LipSync}
+      data:
+        PhonemeId: I
+        MaxWeight: 100
+        _expressionId: 
+    - rid: 6182673163238244581
+      type: {class: ExpressionPhonemeEntry, ns: Hidano.FacialControl.LipSync.Adapters.PhonemeEntries, asm: Hidano.FacialControl.LipSync}
+      data:
+        PhonemeId: U
+        MaxWeight: 100
+        _expressionId: 
+    - rid: 6182673163238244582
+      type: {class: ExpressionPhonemeEntry, ns: Hidano.FacialControl.LipSync.Adapters.PhonemeEntries, asm: Hidano.FacialControl.LipSync}
+      data:
+        PhonemeId: E
+        MaxWeight: 100
+        _expressionId: 
+    - rid: 6182673163238244583
+      type: {class: ExpressionPhonemeEntry, ns: Hidano.FacialControl.LipSync.Adapters.PhonemeEntries, asm: Hidano.FacialControl.LipSync}
+      data:
+        PhonemeId: O
+        MaxWeight: 100
+        _expressionId: 
     - rid: 8000000000000000001
       type: {class: InputSystemAdapterBinding, ns: Hidano.FacialControl.Adapters.AdapterBindings.InputSystem, asm: Hidano.FacialControl.InputSystem}
       data:
