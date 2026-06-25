@@ -55,6 +55,28 @@ feature 名候補: burst-blendshape-output（または animationjob-blendshape-o
 |----|---------|------|------|--------|---------|
 | D-1 | 既存 PlayableGraph 資産の扱い | `FacialControlMixer` / `LayerPlayable` / 現行 `PlayableGraphBuilder` を撤去し、`AnimationScriptPlayable` ベースの新規グラフを新設する。旧経路との並走期間は設けない | デッドコードを残さず最小構成にする。preview 段階・破壊的変更許容のためハードカット可 | 中: 既存テスト/参照の撤去作業。旧経路に依存した検証資産の差し替えが必要 | Req 1.3, 1.4, 7.4 |
 | D-2 | Burst 化のスコープ | 出力経路（`AnimationScriptPlayable` + `IAnimationJob`）に加え、aggregate / blend / 遷移計算を **Job 内 Burst 化**する（フルスコープを維持）。Burst は本スペックの必須要件 | 同時 10 体制御の性能を最大化する判断。M-8 の「将来差し替え」ではなく本スペックで踏み込む。Burst が出力経路自体に必須ではない点（writer-only でも目的達成可）は確認したうえで、性能優先で B を選択 | 大: blend ロジックの struct 移植・`TransitionCurve` の Burst 内評価（LUT 等）など実装規模が大きい | Req 2 全体, Req 6.4 |
+| D-3 | Burst 数値カーネルの配置 | aggregate / blend / 遷移補間 / curve 評価の Burst 互換数値カーネル（`NativeArray` in/out・engine 非依存）を **Domain** に置く。`[BurstCompile]` 属性・`IAnimationJob`・`AnimationStream` 書込み・`PropertyStreamHandle` bind・`PlayableGraph` 構築は **Adapters**。Domain に engine 依存（`AnimationStream` / `SkinnedMeshRenderer` / Playable）は持ち込まない | Domain は既に `Unity.Collections` / `NativeArray` を使用済みで新規 framework 依存ゼロ。engine 依存を Adapters に閉じることで「Domain は engine 非依存」を維持。カーネルは 1 個に保ちロジック二重化を回避 | 中: Domain の blend ロジックを Burst 互換形（脱 `List` / `Dictionary` / `BitArray` / `string`）へ書き換える | Req 2.1, 2.3, 8.2 |
+| D-4 | main / Job 境界 | 境界を**深く**取る。main は trigger on/off と value 入力を native バッファに積むだけ。active 集合解決・表情→BlendShape 展開・遷移補間・集約・blend・`layerOverrideMask` / overlay 抑制・stream write を**全て Job 内**で行う（Req 2.2 の「Job 内完結」を active 解決・target 展開まで拡張） | メイン負荷を最小化し定常フレームの GC を根絶、同時 10 体の性能を最大化 | 大: ExpressionTrigger スタック挙動・表情→BS 展開・抑制計算を全て native 化。Expression の integer index 化と target 値テーブルの事前ベイクが前提 | Req 2.2, 3.x, 4.x, 7.1 |
+
+### 設計フェーズへ送る論点（Dig で未確定）
+D-2 / D-4 の方針確定に伴い、以下は design フェーズの研究・設計で詰める（要件 WHAT は確定済み、HOW は未確定）。
+
+- **Expression の native 表現**: integer index 化 + per-expression target 値テーブルを profile load 時に dense ベイクするか sparse のまま native 化するか。プリセット上限 512 × BlendShape 数 × 同時 10 体の**メモリ影響を要試算**（dense bake の feasibility）。
+- **入力の境界マーシャリング方式**: trigger on/off・value 入力の native 取り込みに、既存 `LayerInputSourceWeightBuffer` の SwapIfDirty 二重バッファパターンを踏襲するか。
+- **per-character の job スケジューリング単位**: 1 Animator = 1 `AnimationScriptPlayable` の graph 単位並列で足りるか、batched job にするか。
+- **TransitionCurve LUT のサンプル数 / 精度**: Req 6.5 の等価性とメモリのバランス。
+- **Burst 無効時のフォールバック**: Editor 等で Burst 無効でも結果が同一であること、Collections safety checks との整合。
+
+## Dig Summary
+
+- **実施ラウンド**: 3 ラウンド（① 既存 Graph 資産 + Burst 必要性の再確認、② Burst/Job 概念の共有、③ カーネル配置 + Job 境界の確定）
+- **確定した決定**: 4 件（D-1〜D-4）
+- **主要な発見**:
+  1. **Burst は PlayableGraph 出力の目的とは分離可能**で、目的（正統な AnimationStream 出力）達成には必須ではない（writer-only でも可）。性能優先で敢えてフルスコープ B を選択。
+  2. **Domain は既に `Unity.Collections` / `NativeArray` 依存済み**のため、数値カーネルを Domain に置いても新規 framework 依存はゼロ。engine 依存（`AnimationStream` 等）を Adapters に閉じることで「Domain は engine 非依存」を維持でき、ロジック二重化も回避できる。
+  3. **現行の毎フレーム GC 発生源を特定**（`ExpressionUseCase.GetActiveExpressions` の `List`、`LayerUseCase.GroupByLayer` の `Dictionary`）。Job 境界に関わらず native 化が必須。
+- **決定一覧**: 上記「Open Questions and Decisions (Dig)」表（D-1〜D-4）を参照。
+- **残存リスク（design フェーズへ）**: 「設計フェーズへ送る論点」節を参照。Expression の dense ベイクのメモリは概算約 4MB / 10 体（512 プリセット × BS 約 200）で feasibility 上の問題なしと評価済み。その他（入力マーシャリング方式・job スケジューリング単位・LUT 精度・Burst 無効フォールバック）は HOW のみ未確定で、要件 WHAT は確定。
 
 ## Requirements
 
