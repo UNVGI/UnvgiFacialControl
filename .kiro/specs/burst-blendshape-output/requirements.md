@@ -47,6 +47,15 @@ feature 名候補: burst-blendshape-output（または animationjob-blendshape-o
   - `AnimationScriptPlayable` ベースへ寄せることで、将来の Timeline 連携と矛盾しない構造を保つこと
   - backlog M-8 の方針「インターフェース設計で Jobs/Burst 差替え可能」を維持すること
 
+## Open Questions and Decisions (Dig)
+
+本セクションは dig 面談で確定した設計方向の決定を記録する。各決定は design フェーズの制約となる。
+
+| ID | トピック | 決定 | 根拠 | リスク | 関連要件 |
+|----|---------|------|------|--------|---------|
+| D-1 | 既存 PlayableGraph 資産の扱い | `FacialControlMixer` / `LayerPlayable` / 現行 `PlayableGraphBuilder` を撤去し、`AnimationScriptPlayable` ベースの新規グラフを新設する。旧経路との並走期間は設けない | デッドコードを残さず最小構成にする。preview 段階・破壊的変更許容のためハードカット可 | 中: 既存テスト/参照の撤去作業。旧経路に依存した検証資産の差し替えが必要 | Req 1.3, 1.4, 7.4 |
+| D-2 | Burst 化のスコープ | 出力経路（`AnimationScriptPlayable` + `IAnimationJob`）に加え、aggregate / blend / 遷移計算を **Job 内 Burst 化**する（フルスコープを維持）。Burst は本スペックの必須要件 | 同時 10 体制御の性能を最大化する判断。M-8 の「将来差し替え」ではなく本スペックで踏み込む。Burst が出力経路自体に必須ではない点（writer-only でも目的達成可）は確認したうえで、性能優先で B を選択 | 大: blend ロジックの struct 移植・`TransitionCurve` の Burst 内評価（LUT 等）など実装規模が大きい | Req 2 全体, Req 6.4 |
+
 ## Requirements
 
 ### Requirement 1: AnimationStream 経由の BlendShape 出力経路
