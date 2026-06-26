@@ -1,7 +1,7 @@
 # Requirements Document
 
 ## Project Description (Input)
-feature 名候補: burst-blendshape-output（**スコープ縮小に伴い実態は blendshape-output-cleanup / blendshape-output-refactor 相当。spec 名のリネーム要否は別途判断**）
+feature_name: blendshape-output-refactor（旧 burst-blendshape-output。2026-06-26 にリネーム。Burst フル作り直しから①GCゼロ+③デッドコード一掃/差し替え抽象へ縮小。経緯は下記「スコープ改訂メモ」を参照）
 
 ## スコープ改訂メモ（2026-06-25）
 当初の本スペックは「BlendShape 出力経路を `PlayableGraph` + `AnimationScriptPlayable` + `IAnimationJob`（Burst）へ全面作り直しし、同時 10 体の CPU スループットを最大化する」フルスコープ（工数 XL）であった。validate-gap 後の判断により、本スペックの目的を以下の 2 点に縮小する。
