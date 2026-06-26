@@ -329,6 +329,44 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
             Assert.AreEqual(3, active.Count);
         }
 
+        [Test]
+        public void CollectActiveExpressions_PopulatesProvidedBuffer()
+        {
+            var expr1 = CreateExpression("expr-1", "smile", "emotion");
+            var expr2 = CreateExpression("expr-2", "talk_a", "lipsync");
+
+            _useCase.Activate(expr1);
+            _useCase.Activate(expr2);
+
+            var buffer = new List<Expression>();
+
+            _useCase.CollectActiveExpressions(buffer);
+
+            Assert.AreEqual(2, buffer.Count);
+            Assert.AreEqual("expr-1", buffer[0].Id);
+            Assert.AreEqual("expr-2", buffer[1].Id);
+        }
+
+        [Test]
+        public void CollectActiveExpressions_ClearsAndReusesProvidedBuffer()
+        {
+            var expr = CreateExpression("expr-1", "smile", "emotion");
+            _useCase.Activate(expr);
+
+            var buffer = new List<Expression> { CreateExpression("stale", "stale", "eye") };
+
+            _useCase.CollectActiveExpressions(buffer);
+
+            Assert.AreEqual(1, buffer.Count);
+            Assert.AreEqual("expr-1", buffer[0].Id);
+        }
+
+        [Test]
+        public void CollectActiveExpressions_NullBuffer_Throws()
+        {
+            Assert.Throws<ArgumentNullException>(() => _useCase.CollectActiveExpressions(null));
+        }
+
         // --- SetProfile ---
 
         [Test]

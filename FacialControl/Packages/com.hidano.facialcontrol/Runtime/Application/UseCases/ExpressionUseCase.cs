@@ -105,11 +105,25 @@ namespace Hidano.FacialControl.Application.UseCases
         public List<Expression> GetActiveExpressions()
         {
             var result = new List<Expression>();
+            CollectActiveExpressions(result);
+            return result;
+        }
+
+        /// <summary>
+        /// 現在アクティブな全 Expression を、呼び出し側が用意したバッファへ収集する。
+        /// バッファは呼出開始時にクリアされ、新規 List は確保しない。
+        /// </summary>
+        /// <param name="buffer">収集先バッファ</param>
+        public void CollectActiveExpressions(List<Expression> buffer)
+        {
+            if (buffer == null)
+                throw new System.ArgumentNullException(nameof(buffer));
+
+            buffer.Clear();
             foreach (var layerExpressions in _activeByLayer.Values)
             {
-                result.AddRange(layerExpressions);
+                buffer.AddRange(layerExpressions);
             }
-            return result;
         }
 
         /// <inheritdoc />
