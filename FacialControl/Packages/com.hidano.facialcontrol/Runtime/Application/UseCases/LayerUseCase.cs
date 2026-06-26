@@ -482,10 +482,14 @@ namespace Hidano.FacialControl.Application.UseCases
             {
                 string effectiveLayer = _profile.GetEffectiveLayer(expressions[i]);
 
+                // 事前確保辞書（_groupedByLayer のキー = profile.Layers 名）に無い宣言外レイヤー名は
+                // 新規 List を確保せずスキップする（毎フレヒープ確保を避ける / 設計 OQ2）。
+                // GetEffectiveLayer は空レイヤー（Layers.Span.Length==0）時に expression.Layer＝宣言外名を
+                // 返し得るが、消費側（UpdateWeights 出力ループ）は profile.Layers をキーに走査するため、
+                // 宣言外レイヤー名の表情は元々下流で読まれず、ドロップしても結果は不変。
                 if (!_groupedByLayer.TryGetValue(effectiveLayer, out var list))
                 {
-                    list = new List<Expression>();
-                    _groupedByLayer[effectiveLayer] = list;
+                    continue;
                 }
                 if (list.Count == 0)
                 {

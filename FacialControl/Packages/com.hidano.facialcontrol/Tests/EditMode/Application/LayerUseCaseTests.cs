@@ -62,6 +62,27 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
             return (Dictionary<string, List<Expression>>)field.GetValue(useCase);
         }
 
+        private static List<string> GetActiveGroupedLayerKeys(LayerUseCase useCase)
+        {
+            var field = typeof(LayerUseCase).GetField(
+                "_activeGroupedLayerKeys",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            Assert.IsNotNull(field, "_activeGroupedLayerKeys field was not found.");
+            return (List<string>)field.GetValue(useCase);
+        }
+
+        private static Dictionary<string, List<Expression>> InvokeGroupByLayer(
+            LayerUseCase useCase, List<Expression> expressions)
+        {
+            var method = typeof(LayerUseCase).GetMethod(
+                "GroupByLayer",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            Assert.IsNotNull(method, "GroupByLayer method was not found.");
+            return (Dictionary<string, List<Expression>>)method.Invoke(useCase, new object[] { expressions });
+        }
+
         private LayerUseCase _useCase;
         private ExpressionUseCase _expressionUseCase;
         private FacialProfile _profile;
@@ -288,6 +309,38 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
             Assert.AreEqual(0, grouped["lipsync"].Count);
             Assert.AreEqual(0, grouped["eye"].Count);
             Assert.AreEqual(0, _useCase.GetBlendedOutput()[2], 0.001f);
+        }
+
+        [Test]
+        public void GroupByLayer_EffectiveLayerNotPreallocated_SkipsWithoutAddingKey()
+        {
+            // 事前確保辞書（_groupedByLayer = profile.Layers 名で確保）に存在しないレイヤー名が
+            // effectiveLayer として来ても、新規 List を確保・キー追加せずスキップする（設計 OQ2）。
+            // 実機では Layers.Span.Length==0 時に GetEffectiveLayer が宣言外名を返す経路に相当する。
+            var grouped = GetGroupedByLayerBuffer(_useCase);
+
+            // "eye" を事前確保辞書から取り除き「未確保レイヤー名」状況を作る。
+            // profile には "eye" 層が宣言されているため GetEffectiveLayer は "eye" を返すが、
+            // 辞書には "eye" キーが無い、というエッジを再現する。
+            grouped.Remove("eye");
+            GetActiveGroupedLayerKeys(_useCase).Clear();
+            int keyCountBefore = grouped.Count;
+
+            var eyeExpr = CreateExpression(
+                id: "eye-expr",
+                layer: "eye",
+                transitionDuration: 0f,
+                blendShapeValues: new[] { new BlendShapeMapping("bs_blink", 1.0f) });
+
+            var result = InvokeGroupByLayer(_useCase, new List<Expression> { eyeExpr });
+
+            Assert.AreSame(grouped, result);
+            Assert.IsFalse(
+                result.ContainsKey("eye"),
+                "未確保レイヤー名のキーが新規追加されてはならない（毎フレ確保の防止）。");
+            Assert.AreEqual(
+                keyCountBefore, result.Count,
+                "辞書のキー数が増えてはならない（新規 List を確保していないこと）。");
         }
 
         [Test]

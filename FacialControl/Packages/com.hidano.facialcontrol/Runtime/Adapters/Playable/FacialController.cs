@@ -19,10 +19,11 @@ namespace Hidano.FacialControl.Adapters.Playable
 {
     /// <summary>
     /// FacialControl のメインコンポーネント。
-    /// <see cref="FacialCharacterProfileSO"/> を参照して PlayableGraph を構築し、
+    /// <see cref="FacialCharacterProfileSO"/> を参照してレイヤー集約パイプラインを構築し、
+    /// 確定した BlendShape 出力を <see cref="IBlendShapeOutputWriter"/> 経由で反映しながら、
     /// Expression のアクティブ化・非アクティブ化を制御する。
     /// OnEnable で自動初期化、Initialize() で手動初期化が可能。
-    /// OnDisable で PlayableGraph と NativeArray を破棄する。
+    /// OnDisable で出力ライターと NativeArray を破棄する。
     /// </summary>
     [RequireComponent(typeof(Animator))]
     [AddComponentMenu("FacialControl/Facial Controller")]
@@ -119,7 +120,7 @@ namespace Hidano.FacialControl.Adapters.Playable
             // 各アダプタの TriggerOn/Off または WriteTick 経由で駆動される。
             _layerUseCase.UpdateWeights(Time.deltaTime);
 
-            // Aggregator 出力を BlendShape に転写。PlayableGraph の出力はバイパスする。
+            // Aggregator 出力（正規化済み 0..1）を出力ライター経由で BlendShape に転写する。
             var output = _layerUseCase.BlendedOutputSpan;
 
             _outputWriter?.Write(output);
@@ -132,7 +133,7 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         /// <summary>
         /// 手動初期化。<see cref="_characterSO"/> からプロファイルを読み込み、
-        /// PlayableGraph を構築する。SO 未設定の場合は何もしない。
+        /// レイヤー集約パイプラインと出力ライターを構築する。SO 未設定の場合は何もしない。
         /// </summary>
         public void Initialize()
         {
@@ -696,7 +697,7 @@ namespace Hidano.FacialControl.Adapters.Playable
         }
 
         /// <summary>
-        /// 統合キャラクター SO を切り替える。PlayableGraph を再構築する。
+        /// 統合キャラクター SO を切り替える。レイヤー集約パイプラインと出力ライターを再構築する。
         /// </summary>
         /// <param name="characterSO">新しい統合キャラクター SO。</param>
         public void LoadCharacter(FacialCharacterProfileSO characterSO)
@@ -725,7 +726,7 @@ namespace Hidano.FacialControl.Adapters.Playable
         }
 
         /// <summary>
-        /// 現在のプロファイルを再読み込みする。PlayableGraph を再構築する。
+        /// 現在のプロファイルを再読み込みする。レイヤー集約パイプラインと出力ライターを再構築する。
         /// </summary>
         public void ReloadProfile()
         {
