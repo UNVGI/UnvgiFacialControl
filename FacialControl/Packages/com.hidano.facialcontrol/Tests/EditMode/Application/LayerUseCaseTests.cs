@@ -278,6 +278,19 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
         }
 
         [Test]
+        public void UpdateWeights_GroupedByLayerBuffer_EmptyPreallocatedLayerDoesNotMarkLayerActive()
+        {
+            _useCase.UpdateWeights(0.001f);
+
+            var grouped = GetGroupedByLayerBuffer(_useCase);
+
+            Assert.AreEqual(0, grouped["emotion"].Count);
+            Assert.AreEqual(0, grouped["lipsync"].Count);
+            Assert.AreEqual(0, grouped["eye"].Count);
+            Assert.AreEqual(0, _useCase.GetBlendedOutput()[2], 0.001f);
+        }
+
+        [Test]
         public void UpdateWeights_WithActiveExpression_ProgressesTransition()
         {
             var blendShapes = new[]
