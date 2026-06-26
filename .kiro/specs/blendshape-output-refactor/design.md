@@ -392,7 +392,7 @@ public void CollectActiveExpressions(System.Collections.Generic.List<Expression>
 - 追加状態: `_activeBuffer`（再利用 `List<Expression>`）と `_groupedByLayer`（`Dictionary<string,List<Expression>>`、キーはプロファイルのレイヤー名で事前確保、値の各 `List` は再利用）。
 - 置換: `UpdateWeights` 先頭の `_expressionUseCase.GetActiveExpressions()` を `CollectActiveExpressions(_activeBuffer)` に、`GroupByLayer(activeExpressions)` を非確保版（`_groupedByLayer` の各 List を `Clear` してから振り分け）に置換。
 - 温存: layerOverrideMask 抑制（`_layer2ActiveBuffer` / `CollectActiveExpressionsFromAdditionalSources`）、`Aggregate`/`Blend` 呼出、`_finalOutput` の `Array.Clear`、フィルタロジック（`HasBeenActive`/`hasAdditional`/`suppressed`）は不変。
-- 不変条件: プロファイルのレイヤー集合は構築時固定 → 辞書キーは `BuildAggregatorPipeline` で確定。プロファイル切替時に再構築。`GetEffectiveLayer` が宣言外レイヤー名を返した場合のフォールバック（既存 `GroupByLayer` は動的にキー追加）に対し、事前確保辞書では「未知キーは対応 List が無い」ため、宣言レイヤー名に正規化されることを前提とする（`GetEffectiveLayer` は profile.Layers の名前を返す契約）。
+- 不変条件: プロファイルのレイヤー集合は構築時固定 → 辞書キーは `BuildAggregatorPipeline` で確定。プロファイル切替時に再構築。`GetEffectiveLayer` が宣言外レイヤー名を返した場合（既存 `GroupByLayer` は動的にキー追加）、事前確保辞書では「未知キーは対応 List が無い」ため当該表情はドロップされるが、**消費側保証により実害はない**：`UpdateWeights` の出力ループは `profile.Layers` をキーに走査するため、宣言外レイヤー名の表情は元々下流で読まれない（空レイヤー時は走査 0 回）。`GetEffectiveLayer` は空レイヤー（`Layers.Span.Length==0`）時に `expression.Layer`＝宣言外名を返し得るため「profile.Layers 名のみ返る契約」ではない点に注意（安全保証は消費側のキー走査に拠る。OQ2）。
 
 **Contracts**: Service [x] / State [x]
 
@@ -402,7 +402,7 @@ public void CollectActiveExpressions(System.Collections.Generic.List<Expression>
 - Concurrency strategy: `UpdateWeights` はメインスレッド単一呼出（既存前提）。
 
 **Implementation Notes**
-- Integration: `GetEffectiveLayer` が返すレイヤー名が `_groupedByLayer` のキー集合に含まれることを前提とする。万一未知キーが来た場合は当該表情をスキップ（現状の動的辞書とは「未宣言レイヤーへの表情」の扱いが変わり得るが、`GetEffectiveLayer` の契約上は profile.Layers の名前のみ返るため実害なし。実装時に契約を再確認する）。
+- Integration: 未知キー（`_groupedByLayer` に無いレイヤー名）が来た場合は当該表情をスキップ。これは**消費側保証で安全**：`UpdateWeights` の出力ループは `profile.Layers` をキーに走査するため、宣言外レイヤー名の表情は元々下流で読まれない（空レイヤー時は走査 0 回）。なお `GetEffectiveLayer` は空レイヤー時に `expression.Layer`＝宣言外名を返し得るので「profile.Layers 名のみ返る契約」という根拠は不正確であり、安全保証は消費側のキー走査に拠る（OQ2）。
 - Validation: GC ゼロ計測テスト（`UpdateWeights` を warmup 後 N フレーム、`ProfilerRecorder("GC.Alloc")==0`）。マルチソース集約・抑制・overlay・遷移の before/after 出力等価テスト（Req 2.x, 4.x, 6.4）。
 - Risks: 事前確保辞書がプロファイル切替に追従しないと stale。`BuildAggregatorPipeline` で必ず再構築する（research R4）。
 
@@ -468,6 +468,6 @@ graph LR
 ## Open Questions / Risks
 
 - **OQ1**: 撤去後に Adapters asmdef から `Unity.Animation` 参照を実際に外せるか（テスト asmdef の `UnityEngine.Playables`/`Unity.Animation` 参照残存有無を含む）。→ 実装フェーズのコンパイル確認で確定（research R3）。設計判断には影響しない。
-- **OQ2**: `LayerUseCase` の事前確保辞書で「`GetEffectiveLayer` が profile.Layers 外のレイヤー名を返す」エッジが現実に起きるか。→ 契約上は起きない想定。起きた場合の表情スキップ挙動が現状（動的辞書での暗黙追加）と差異を生むため、実装時に `GetEffectiveLayer` の契約を再確認し、必要なら正規化を入れる。
+- **OQ2**: `LayerUseCase` の事前確保辞書で「`GetEffectiveLayer` が profile.Layers 外のレイヤー名を返す」エッジ。→ コード照合で実害なしを確認済み。安全保証は `GetEffectiveLayer` の契約ではなく**消費側**にある：`UpdateWeights` の出力ループは `profile.Layers` をキーに走査し、空レイヤー（`Layers.Span.Length==0`）時は走査 0 回で grouping 結果を読まない。`GetEffectiveLayer` は空レイヤー時に `expression.Layer`（宣言外名）を返し得るため「profile.Layers 名のみ返る契約」は不正確だが、宣言外名の表情がドロップされても下流で読まれないため結果は不変。実装は事前確保辞書のキーを `profile.Layers` 名で構築すれば足り、追加の正規化は不要。
 - **R（既知・非回帰のみ保証）**: 「active 取得 2 系統分断」バグ（系1/系2）。本スペックは抑制・overlay の非回帰のみ保証し、修正はスコープ外。
 - **R（隣接デッドコード）**: runtime 未使用の `NativeArrayPool` / `AnimationClipCache` は撤去対象外として現状維持。将来の掃除は backlog 候補。
