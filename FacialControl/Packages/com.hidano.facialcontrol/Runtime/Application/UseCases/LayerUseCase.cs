@@ -23,6 +23,8 @@ namespace Hidano.FacialControl.Application.UseCases
         private string[] _blendShapeNames;
         private readonly Dictionary<string, float> _layerWeights;
         private IReadOnlyList<(int layerIdx, IInputSource source, float weight)> _additionalInputSources;
+        private readonly List<Expression> _activeBuffer = new List<Expression>();
+        private readonly Dictionary<string, List<Expression>> _groupedByLayer = new Dictionary<string, List<Expression>>();
         // layerOverrideMask 抑制計算用: 系2(ExpressionTriggerInputSource)から集約した active 表情の再利用バッファ（GC 回避）。
         private readonly List<Expression> _layer2ActiveBuffer = new List<Expression>();
 
@@ -127,8 +129,8 @@ namespace Hidano.FacialControl.Application.UseCases
             if (bsCount == 0 || _aggregator == null)
                 return;
 
-            var activeExpressions = _expressionUseCase.GetActiveExpressions();
-            var expressionsByLayer = GroupByLayer(activeExpressions);
+            _expressionUseCase.CollectActiveExpressions(_activeBuffer);
+            var expressionsByLayer = GroupByLayer(_activeBuffer);
 
             var layerSpan = _profile.Layers.Span;
 
@@ -375,6 +377,7 @@ namespace Hidano.FacialControl.Application.UseCases
 
             int bsCount = _blendShapeNames.Length;
             _finalOutput = new float[bsCount];
+            InitializeGroupedByLayerBuffer();
 
             int layerCount = _profile.Layers.Length;
             _layerPriorities = layerCount == 0 ? Array.Empty<int>() : new int[layerCount];
@@ -471,21 +474,40 @@ namespace Hidano.FacialControl.Application.UseCases
 
         private Dictionary<string, List<Expression>> GroupByLayer(List<Expression> expressions)
         {
-            var grouped = new Dictionary<string, List<Expression>>();
+            ClearGroupedByLayerBuffer();
 
             for (int i = 0; i < expressions.Count; i++)
             {
                 string effectiveLayer = _profile.GetEffectiveLayer(expressions[i]);
 
-                if (!grouped.TryGetValue(effectiveLayer, out var list))
+                if (!_groupedByLayer.TryGetValue(effectiveLayer, out var list))
                 {
                     list = new List<Expression>();
-                    grouped[effectiveLayer] = list;
+                    _groupedByLayer[effectiveLayer] = list;
                 }
                 list.Add(expressions[i]);
             }
 
-            return grouped;
+            return _groupedByLayer;
+        }
+
+        private void InitializeGroupedByLayerBuffer()
+        {
+            _groupedByLayer.Clear();
+
+            var layerSpan = _profile.Layers.Span;
+            for (int i = 0; i < layerSpan.Length; i++)
+            {
+                _groupedByLayer[layerSpan[i].Name] = new List<Expression>();
+            }
+        }
+
+        private void ClearGroupedByLayerBuffer()
+        {
+            foreach (var pair in _groupedByLayer)
+            {
+                pair.Value.Clear();
+            }
         }
 
         private static float Clamp01(float value)

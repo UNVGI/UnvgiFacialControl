@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
@@ -49,6 +50,16 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
                 "1.0",
                 layers ?? CreateDefaultLayers(),
                 expressions ?? Array.Empty<Expression>());
+        }
+
+        private static Dictionary<string, List<Expression>> GetGroupedByLayerBuffer(LayerUseCase useCase)
+        {
+            var field = typeof(LayerUseCase).GetField(
+                "_groupedByLayer",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            Assert.IsNotNull(field, "_groupedByLayer field was not found.");
+            return (Dictionary<string, List<Expression>>)field.GetValue(useCase);
         }
 
         private LayerUseCase _useCase;
@@ -227,6 +238,43 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
         public void UpdateWeights_NoActiveExpressions_DoesNotThrow()
         {
             Assert.DoesNotThrow(() => _useCase.UpdateWeights(0.016f));
+        }
+
+        [Test]
+        public void UpdateWeights_GroupedByLayerBuffer_ReusesAndClearsListsAcrossFrames()
+        {
+            var emotionExpr = CreateExpression(
+                id: "emotion-expr",
+                layer: "emotion",
+                transitionDuration: 0f,
+                blendShapeValues: new[] { new BlendShapeMapping("bs_smile", 1.0f) });
+            var eyeExpr = CreateExpression(
+                id: "eye-expr",
+                layer: "eye",
+                transitionDuration: 0f,
+                blendShapeValues: new[] { new BlendShapeMapping("bs_blink", 1.0f) });
+
+            _expressionUseCase.Activate(emotionExpr);
+            _useCase.UpdateWeights(0.001f);
+
+            var grouped = GetGroupedByLayerBuffer(_useCase);
+            var emotionList = grouped["emotion"];
+            var eyeList = grouped["eye"];
+
+            Assert.AreEqual(1, emotionList.Count);
+            Assert.AreEqual("emotion-expr", emotionList[0].Id);
+            Assert.AreEqual(0, eyeList.Count);
+
+            _expressionUseCase.Deactivate(emotionExpr);
+            _expressionUseCase.Activate(eyeExpr);
+            _useCase.UpdateWeights(0.001f);
+
+            Assert.AreSame(grouped, GetGroupedByLayerBuffer(_useCase));
+            Assert.AreSame(emotionList, grouped["emotion"]);
+            Assert.AreSame(eyeList, grouped["eye"]);
+            Assert.AreEqual(0, emotionList.Count);
+            Assert.AreEqual(1, eyeList.Count);
+            Assert.AreEqual("eye-expr", eyeList[0].Id);
         }
 
         [Test]
