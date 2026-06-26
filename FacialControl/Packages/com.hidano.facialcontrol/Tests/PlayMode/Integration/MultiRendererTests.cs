@@ -22,6 +22,15 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         {
             if (_gameObject != null)
             {
+                var renderers = _gameObject.GetComponentsInChildren<SkinnedMeshRenderer>();
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    if (renderers[i] != null && renderers[i].sharedMesh != null)
+                    {
+                        Object.DestroyImmediate(renderers[i].sharedMesh);
+                    }
+                }
+
                 Object.DestroyImmediate(_gameObject);
                 _gameObject = null;
             }
@@ -121,6 +130,28 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             var active = controller.GetActiveExpressions();
             Assert.AreEqual(1, active.Count);
             Assert.AreEqual("Happy", active[0].Name);
+        }
+
+        [UnityTest]
+        public IEnumerator MultipleRenderers_LateUpdate_AppliesBlendShapeViaWriter()
+        {
+            _gameObject = new GameObject("WriterApplyTest");
+            _gameObject.AddComponent<Animator>();
+
+            CreateRendererWithBlendShapeMesh(_gameObject.transform, "Face", "smile");
+            CreateRendererWithBlendShapeMesh(_gameObject.transform, "Teeth", "smile");
+
+            var controller = _gameObject.AddComponent<FacialController>();
+            var profile = CreateProfileWithExpressions();
+            controller.InitializeWithProfile(profile);
+            controller.Activate(profile.Expressions.Span[0]);
+
+            yield return null;
+
+            var renderers = _gameObject.GetComponentsInChildren<SkinnedMeshRenderer>();
+            Assert.That(renderers, Has.Length.EqualTo(2));
+            Assert.That(renderers[0].GetBlendShapeWeight(0), Is.GreaterThan(0f));
+            Assert.That(renderers[1].GetBlendShapeWeight(0), Is.EqualTo(renderers[0].GetBlendShapeWeight(0)).Within(0.0001f));
         }
 
         [Test]
@@ -313,6 +344,25 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             }
 
             return go;
+        }
+
+        private static SkinnedMeshRenderer CreateRendererWithBlendShapeMesh(Transform parent, string name, string blendShapeName)
+        {
+            var child = new GameObject(name);
+            child.transform.SetParent(parent);
+
+            var renderer = child.AddComponent<SkinnedMeshRenderer>();
+            renderer.sharedMesh = CreateMeshWithBlendShape(blendShapeName);
+            return renderer;
+        }
+
+        private static Mesh CreateMeshWithBlendShape(string blendShapeName)
+        {
+            var mesh = new Mesh();
+            mesh.vertices = new[] { Vector3.zero, Vector3.right, Vector3.up };
+            mesh.triangles = new[] { 0, 1, 2 };
+            mesh.AddBlendShapeFrame(blendShapeName, 100f, new Vector3[3], null, null);
+            return mesh;
         }
 
         private static FacialProfile CreateTestProfile()
