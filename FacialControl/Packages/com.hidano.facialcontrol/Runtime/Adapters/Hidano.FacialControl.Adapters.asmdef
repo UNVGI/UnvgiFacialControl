@@ -4,7 +4,6 @@
     "references": [
         "Hidano.FacialControl.Domain",
         "Hidano.FacialControl.Application",
-        "Unity.Animation",
         "Unity.Collections",
         "VContainer"
     ],
