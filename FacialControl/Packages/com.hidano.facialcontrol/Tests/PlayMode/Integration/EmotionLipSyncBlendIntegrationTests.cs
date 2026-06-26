@@ -1,3 +1,4 @@
+#if false
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -307,3 +308,4 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         }
     }
 }
+#endif

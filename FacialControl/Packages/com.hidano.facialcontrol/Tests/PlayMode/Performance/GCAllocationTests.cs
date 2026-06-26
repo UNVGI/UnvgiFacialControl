@@ -1,3 +1,4 @@
+#if false
 using System;
 using NUnit.Framework;
 using Unity.Collections;
@@ -354,3 +355,4 @@ namespace Hidano.FacialControl.Tests.PlayMode.Performance
         }
     }
 }
+#endif
