@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
@@ -49,6 +50,37 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
                 "1.0",
                 layers ?? CreateDefaultLayers(),
                 expressions ?? Array.Empty<Expression>());
+        }
+
+        private static Dictionary<string, List<Expression>> GetGroupedByLayerBuffer(LayerUseCase useCase)
+        {
+            var field = typeof(LayerUseCase).GetField(
+                "_groupedByLayer",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            Assert.IsNotNull(field, "_groupedByLayer field was not found.");
+            return (Dictionary<string, List<Expression>>)field.GetValue(useCase);
+        }
+
+        private static List<string> GetActiveGroupedLayerKeys(LayerUseCase useCase)
+        {
+            var field = typeof(LayerUseCase).GetField(
+                "_activeGroupedLayerKeys",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            Assert.IsNotNull(field, "_activeGroupedLayerKeys field was not found.");
+            return (List<string>)field.GetValue(useCase);
+        }
+
+        private static Dictionary<string, List<Expression>> InvokeGroupByLayer(
+            LayerUseCase useCase, List<Expression> expressions)
+        {
+            var method = typeof(LayerUseCase).GetMethod(
+                "GroupByLayer",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            Assert.IsNotNull(method, "GroupByLayer method was not found.");
+            return (Dictionary<string, List<Expression>>)method.Invoke(useCase, new object[] { expressions });
         }
 
         private LayerUseCase _useCase;
@@ -227,6 +259,88 @@ namespace Hidano.FacialControl.Tests.EditMode.Application
         public void UpdateWeights_NoActiveExpressions_DoesNotThrow()
         {
             Assert.DoesNotThrow(() => _useCase.UpdateWeights(0.016f));
+        }
+
+        [Test]
+        public void UpdateWeights_GroupedByLayerBuffer_ReusesAndClearsListsAcrossFrames()
+        {
+            var emotionExpr = CreateExpression(
+                id: "emotion-expr",
+                layer: "emotion",
+                transitionDuration: 0f,
+                blendShapeValues: new[] { new BlendShapeMapping("bs_smile", 1.0f) });
+            var eyeExpr = CreateExpression(
+                id: "eye-expr",
+                layer: "eye",
+                transitionDuration: 0f,
+                blendShapeValues: new[] { new BlendShapeMapping("bs_blink", 1.0f) });
+
+            _expressionUseCase.Activate(emotionExpr);
+            _useCase.UpdateWeights(0.001f);
+
+            var grouped = GetGroupedByLayerBuffer(_useCase);
+            var emotionList = grouped["emotion"];
+            var eyeList = grouped["eye"];
+
+            Assert.AreEqual(1, emotionList.Count);
+            Assert.AreEqual("emotion-expr", emotionList[0].Id);
+            Assert.AreEqual(0, eyeList.Count);
+
+            _expressionUseCase.Deactivate(emotionExpr);
+            _expressionUseCase.Activate(eyeExpr);
+            _useCase.UpdateWeights(0.001f);
+
+            Assert.AreSame(grouped, GetGroupedByLayerBuffer(_useCase));
+            Assert.AreSame(emotionList, grouped["emotion"]);
+            Assert.AreSame(eyeList, grouped["eye"]);
+            Assert.AreEqual(0, emotionList.Count);
+            Assert.AreEqual(1, eyeList.Count);
+            Assert.AreEqual("eye-expr", eyeList[0].Id);
+        }
+
+        [Test]
+        public void UpdateWeights_GroupedByLayerBuffer_EmptyPreallocatedLayerDoesNotMarkLayerActive()
+        {
+            _useCase.UpdateWeights(0.001f);
+
+            var grouped = GetGroupedByLayerBuffer(_useCase);
+
+            Assert.AreEqual(0, grouped["emotion"].Count);
+            Assert.AreEqual(0, grouped["lipsync"].Count);
+            Assert.AreEqual(0, grouped["eye"].Count);
+            Assert.AreEqual(0, _useCase.GetBlendedOutput()[2], 0.001f);
+        }
+
+        [Test]
+        public void GroupByLayer_EffectiveLayerNotPreallocated_SkipsWithoutAddingKey()
+        {
+            // 事前確保辞書（_groupedByLayer = profile.Layers 名で確保）に存在しないレイヤー名が
+            // effectiveLayer として来ても、新規 List を確保・キー追加せずスキップする（設計 OQ2）。
+            // 実機では Layers.Span.Length==0 時に GetEffectiveLayer が宣言外名を返す経路に相当する。
+            var grouped = GetGroupedByLayerBuffer(_useCase);
+
+            // "eye" を事前確保辞書から取り除き「未確保レイヤー名」状況を作る。
+            // profile には "eye" 層が宣言されているため GetEffectiveLayer は "eye" を返すが、
+            // 辞書には "eye" キーが無い、というエッジを再現する。
+            grouped.Remove("eye");
+            GetActiveGroupedLayerKeys(_useCase).Clear();
+            int keyCountBefore = grouped.Count;
+
+            var eyeExpr = CreateExpression(
+                id: "eye-expr",
+                layer: "eye",
+                transitionDuration: 0f,
+                blendShapeValues: new[] { new BlendShapeMapping("bs_blink", 1.0f) });
+
+            var result = InvokeGroupByLayer(_useCase, new List<Expression> { eyeExpr });
+
+            Assert.AreSame(grouped, result);
+            Assert.IsFalse(
+                result.ContainsKey("eye"),
+                "未確保レイヤー名のキーが新規追加されてはならない（毎フレ確保の防止）。");
+            Assert.AreEqual(
+                keyCountBefore, result.Count,
+                "辞書のキー数が増えてはならない（新規 List を確保していないこと）。");
         }
 
         [Test]

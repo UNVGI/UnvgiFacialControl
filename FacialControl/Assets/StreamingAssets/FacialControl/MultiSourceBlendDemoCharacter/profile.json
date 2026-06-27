@@ -7,30 +7,97 @@
             "exclusionMode": "lastWins",
             "inputSources": [
                 {
-                    "id": "input",
-                    "weight": 1.0,
-                    "options":{"maxStackDepth":4}
+                    "id": "input-system",
+                    "weight": 1.0
                 },
                 {
-                    "id": "input:analog-expression",
+                    "id": "input-system:analog-expression",
+                    "weight": 1.0
+                },
+                {
+                    "id": "input-system:overlay:blink",
                     "weight": 1.0
                 }
             ]
         },
         {
             "name": "overlay",
-            "priority": 1,
+            "priority": 2,
             "exclusionMode": "lastWins",
             "inputSources": [
                 {
-                    "id": "input:overlay:blink",
+                    "id": "lipsync-overlay:a",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:i",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:u",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:e",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:o",
+                    "weight": 1.0
+                },
+                {
+                    "id": "input-system",
+                    "weight": 1.0
+                },
+                {
+                    "id": "input-system:analog-expression",
+                    "weight": 1.0
+                },
+                {
+                    "id": "input-system:overlay:blink",
+                    "weight": 1.0
+                }
+            ]
+        },
+        {
+            "name": "lipsync",
+            "priority": 3,
+            "exclusionMode": "blend",
+            "inputSources": [
+                {
+                    "id": "lipsync-overlay:a",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:i",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:u",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:e",
+                    "weight": 1.0
+                },
+                {
+                    "id": "lipsync-overlay:o",
+                    "weight": 1.0
+                },
+                {
+                    "id": "ulipsync",
                     "weight": 1.0
                 }
             ]
         }
     ],
     "slots": [
-        "blink"
+        "blink",
+        "a",
+        "i",
+        "u",
+        "e",
+        "o"
     ],
     "expressions": [
         {

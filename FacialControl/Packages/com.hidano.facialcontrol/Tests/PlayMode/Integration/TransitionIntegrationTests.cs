@@ -1,436 +1,205 @@
-using System.Collections;
-using NUnit.Framework;
-using UnityEngine;
-using UnityEngine.Playables;
-using UnityEngine.TestTools;
-using Hidano.FacialControl.Adapters.Playable;
+using Hidano.FacialControl.Application.UseCases;
 using Hidano.FacialControl.Domain.Models;
+using NUnit.Framework;
 
 namespace Hidano.FacialControl.Tests.PlayMode.Integration
 {
     /// <summary>
-    /// P14-T02: 遷移 / 割込の統合テスト。
-    /// FacialController を通した Expression 遷移、LastWins / Blend クロスフェード、
-    /// 遷移割込を PlayableGraph 上で検証する。
+    /// 旧 PlayableGraph 直接テストを、現行のライブ更新経路
+    /// (ExpressionUseCase -> LayerUseCase.UpdateWeights -> BlendedOutputSpan)
+    /// へ付け替えた遷移補間の非回帰テスト。
     /// </summary>
     [TestFixture]
     public class TransitionIntegrationTests
     {
-        private GameObject _gameObject;
-        private PlayableGraph _graph;
-
-        [TearDown]
-        public void TearDown()
-        {
-            if (_graph.IsValid())
-            {
-                _graph.Destroy();
-            }
-            if (_gameObject != null)
-            {
-                Object.DestroyImmediate(_gameObject);
-                _gameObject = null;
-            }
-        }
-
-        // ================================================================
-        // LastWins 遷移の統合テスト
-        // ================================================================
+        private const float Tolerance = 0.01f;
 
         [Test]
         public void LastWins_ZeroDuration_ImmediateSwitch()
         {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "smile", "frown" };
-            var profile = CreateTestProfile(ExclusionMode.LastWins);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
+            using var harness = CreateHarness(
+                new[] { "smile", "frown" },
+                CreateExpression("happy", "emotion", 0f, TransitionCurve.Linear, ("smile", 1.0f)));
 
-            var emotionBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
-            var targetValues = new float[] { 1.0f, 0.0f };
-            emotionBehaviour.SetTargetExpression("happy", targetValues, 0f, TransitionCurve.Linear);
+            harness.ExpressionUseCase.Activate(harness.Profile.Expressions.Span[0]);
+            harness.LayerUseCase.UpdateWeights(0f);
 
-            Assert.IsFalse(emotionBehaviour.IsTransitioning);
-            Assert.AreEqual(1.0f, emotionBehaviour.OutputWeights[0], 0.001f);
-            Assert.AreEqual(0.0f, emotionBehaviour.OutputWeights[1], 0.001f);
-
-            result.Dispose();
+            AssertOutput(harness.LayerUseCase, 1.0f, 0.0f);
         }
 
         [Test]
         public void LastWins_LinearTransition_MidpointValues()
         {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "smile", "frown" };
-            var profile = CreateTestProfile(ExclusionMode.LastWins);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
+            using var harness = CreateHarness(
+                new[] { "smile", "frown" },
+                CreateExpression("happy", "emotion", 0.5f, TransitionCurve.Linear,
+                    ("smile", 1.0f),
+                    ("frown", 0.6f)));
 
-            var emotionBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
-            var targetValues = new float[] { 1.0f, 0.6f };
-            emotionBehaviour.SetTargetExpression("happy", targetValues, 0.5f, TransitionCurve.Linear);
+            harness.ExpressionUseCase.Activate(harness.Profile.Expressions.Span[0]);
+            harness.LayerUseCase.UpdateWeights(0f);
+            harness.LayerUseCase.UpdateWeights(0.25f);
 
-            // 半分進める → t = 0.5
-            emotionBehaviour.UpdateTransition(0.25f);
-
-            Assert.IsTrue(emotionBehaviour.IsTransitioning);
-            Assert.AreEqual(0.5f, emotionBehaviour.OutputWeights[0], 0.01f);
-            Assert.AreEqual(0.3f, emotionBehaviour.OutputWeights[1], 0.01f);
-
-            result.Dispose();
-        }
-
-        [Test]
-        public void LastWins_LinearTransition_CompleteTransition()
-        {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "smile", "frown" };
-            var profile = CreateTestProfile(ExclusionMode.LastWins);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
-
-            var emotionBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
-            var targetValues = new float[] { 0.8f, 0.4f };
-            emotionBehaviour.SetTargetExpression("happy", targetValues, 0.25f, TransitionCurve.Linear);
-
-            // 遷移完了まで進める
-            emotionBehaviour.UpdateTransition(0.25f);
-
-            Assert.IsFalse(emotionBehaviour.IsTransitioning);
-            Assert.AreEqual(0.8f, emotionBehaviour.OutputWeights[0], 0.001f);
-            Assert.AreEqual(0.4f, emotionBehaviour.OutputWeights[1], 0.001f);
-
-            result.Dispose();
+            AssertOutput(harness.LayerUseCase, 0.5f, 0.3f);
         }
 
         [Test]
         public void LastWins_SequentialExpressions_CrossfadesFromPrevious()
         {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "smile", "frown" };
-            var profile = CreateTestProfile(ExclusionMode.LastWins);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
+            using var harness = CreateHarness(
+                new[] { "smile", "frown" },
+                CreateExpression("happy", "emotion", 0f, TransitionCurve.Linear, ("smile", 1.0f)),
+                CreateExpression("sad", "emotion", 0.5f, TransitionCurve.Linear, ("frown", 1.0f)));
 
-            var emotionBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
+            harness.ExpressionUseCase.Activate(harness.Profile.Expressions.Span[0]);
+            harness.LayerUseCase.UpdateWeights(0f);
 
-            // 最初の表情を即座に適用
-            emotionBehaviour.SetTargetExpression("happy", new float[] { 1.0f, 0.0f }, 0f, TransitionCurve.Linear);
+            harness.ExpressionUseCase.Activate(harness.Profile.Expressions.Span[1]);
+            harness.LayerUseCase.UpdateWeights(0f);
+            harness.LayerUseCase.UpdateWeights(0.25f);
 
-            // 2 番目の表情へ遷移
-            emotionBehaviour.SetTargetExpression("sad", new float[] { 0.0f, 1.0f }, 0.5f, TransitionCurve.Linear);
-
-            // 半分進める → from=[1,0] to=[0,1] t=0.5
-            emotionBehaviour.UpdateTransition(0.25f);
-
-            Assert.AreEqual(0.5f, emotionBehaviour.OutputWeights[0], 0.01f);
-            Assert.AreEqual(0.5f, emotionBehaviour.OutputWeights[1], 0.01f);
-
-            result.Dispose();
+            AssertOutput(harness.LayerUseCase, 0.5f, 0.5f);
         }
-
-        // ================================================================
-        // 遷移割込テスト
-        // ================================================================
 
         [Test]
         public void TransitionInterrupt_DuringTransition_SnapshotsCurrentAndStartsNew()
         {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "smile", "frown" };
-            var profile = CreateTestProfile(ExclusionMode.LastWins);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
+            using var harness = CreateHarness(
+                new[] { "smile", "frown" },
+                CreateExpression("happy", "emotion", 1.0f, TransitionCurve.Linear, ("smile", 1.0f)),
+                CreateExpression("surprised", "emotion", 1.0f, TransitionCurve.Linear, ("frown", 1.0f)));
 
-            var emotionBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
+            harness.ExpressionUseCase.Activate(harness.Profile.Expressions.Span[0]);
+            harness.LayerUseCase.UpdateWeights(0f);
+            harness.LayerUseCase.UpdateWeights(0.5f);
 
-            // 最初の遷移: ゼロ → [1.0, 0.0]
-            emotionBehaviour.SetTargetExpression("happy", new float[] { 1.0f, 0.0f }, 1.0f, TransitionCurve.Linear);
+            harness.ExpressionUseCase.Activate(harness.Profile.Expressions.Span[1]);
+            harness.LayerUseCase.UpdateWeights(0f);
+            harness.LayerUseCase.UpdateWeights(0.5f);
 
-            // 0.5 秒進める → [0.5, 0.0]
-            emotionBehaviour.UpdateTransition(0.5f);
-
-            // 遷移割込: 新しい Expression
-            emotionBehaviour.SetTargetExpression("surprised", new float[] { 0.0f, 1.0f }, 1.0f, TransitionCurve.Linear);
-
-            Assert.IsTrue(emotionBehaviour.IsTransitioning);
-
-            // 割込後 0.5 秒進める → from=[0.5, 0.0] to=[0.0, 1.0] t=0.5
-            emotionBehaviour.UpdateTransition(0.5f);
-
-            Assert.AreEqual(0.25f, emotionBehaviour.OutputWeights[0], 0.01f);
-            Assert.AreEqual(0.5f, emotionBehaviour.OutputWeights[1], 0.01f);
-
-            result.Dispose();
+            AssertOutput(harness.LayerUseCase, 0.25f, 0.5f);
         }
 
         [Test]
-        public void TransitionInterrupt_MultipleInterrupts_EachSnapshotsCurrent()
+        public void TransitionCurve_EaseInOut_MidpointIsHalf()
         {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "blend" };
-            var profile = CreateTestProfile(ExclusionMode.LastWins);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
+            using var harness = CreateHarness(
+                new[] { "blend" },
+                CreateExpression("ease", "emotion", 1.0f, new TransitionCurve(TransitionCurveType.EaseInOut), ("blend", 1.0f)));
 
-            var emotionBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
+            harness.ExpressionUseCase.Activate(harness.Profile.Expressions.Span[0]);
+            harness.LayerUseCase.UpdateWeights(0f);
+            harness.LayerUseCase.UpdateWeights(0.5f);
 
-            // 遷移 1: 0 → 1.0 (1秒)
-            emotionBehaviour.SetTargetExpression("e1", new float[] { 1.0f }, 1.0f, TransitionCurve.Linear);
-            emotionBehaviour.UpdateTransition(0.5f); // → 0.5
-
-            // 割込 1: 0.5 → 0.0 (1秒)
-            emotionBehaviour.SetTargetExpression("e2", new float[] { 0.0f }, 1.0f, TransitionCurve.Linear);
-            emotionBehaviour.UpdateTransition(0.5f); // → lerp(0.5, 0.0, 0.5) = 0.25
-
-            // 割込 2: 0.25 → 1.0 (1秒)
-            emotionBehaviour.SetTargetExpression("e3", new float[] { 1.0f }, 1.0f, TransitionCurve.Linear);
-            emotionBehaviour.UpdateTransition(0.5f); // → lerp(0.25, 1.0, 0.5) = 0.625
-
-            Assert.AreEqual(0.625f, emotionBehaviour.OutputWeights[0], 0.01f);
-
-            result.Dispose();
-        }
-
-        // ================================================================
-        // EaseInOut カーブ遷移テスト
-        // ================================================================
-
-        [Test]
-        public void EaseInOut_TransitionMidpoint_ValueIs05()
-        {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "blend" };
-            var profile = CreateTestProfile(ExclusionMode.LastWins);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
-
-            var emotionBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
-            var curve = new TransitionCurve(TransitionCurveType.EaseInOut);
-            emotionBehaviour.SetTargetExpression("e1", new float[] { 1.0f }, 1.0f, curve);
-
-            // t=0.5 → EaseInOut(0.5) = 0.5
-            emotionBehaviour.UpdateTransition(0.5f);
-
-            Assert.AreEqual(0.5f, emotionBehaviour.OutputWeights[0], 0.01f);
-
-            result.Dispose();
+            AssertOutput(harness.LayerUseCase, 0.5f);
         }
 
         [Test]
-        public void EaseIn_TransitionMidpoint_ValueLessThan05()
+        public void TransitionCurve_EaseIn_MidpointIsBelowHalf()
         {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "blend" };
-            var profile = CreateTestProfile(ExclusionMode.LastWins);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
+            using var harness = CreateHarness(
+                new[] { "blend" },
+                CreateExpression("ease-in", "emotion", 1.0f, new TransitionCurve(TransitionCurveType.EaseIn), ("blend", 1.0f)));
 
-            var emotionBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
-            var curve = new TransitionCurve(TransitionCurveType.EaseIn);
-            emotionBehaviour.SetTargetExpression("e1", new float[] { 1.0f }, 1.0f, curve);
+            harness.ExpressionUseCase.Activate(harness.Profile.Expressions.Span[0]);
+            harness.LayerUseCase.UpdateWeights(0f);
+            harness.LayerUseCase.UpdateWeights(0.5f);
 
-            // t=0.5 → EaseIn は前半がゆるやか → 値 < 0.5
-            emotionBehaviour.UpdateTransition(0.5f);
-
-            Assert.Less(emotionBehaviour.OutputWeights[0], 0.5f);
-
-            result.Dispose();
+            Assert.Less(harness.LayerUseCase.BlendedOutputSpan[0], 0.5f);
         }
 
         [Test]
-        public void EaseOut_TransitionMidpoint_ValueGreaterThan05()
+        public void TransitionCurve_EaseOut_MidpointIsAboveHalf()
         {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "blend" };
-            var profile = CreateTestProfile(ExclusionMode.LastWins);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
+            using var harness = CreateHarness(
+                new[] { "blend" },
+                CreateExpression("ease-out", "emotion", 1.0f, new TransitionCurve(TransitionCurveType.EaseOut), ("blend", 1.0f)));
 
-            var emotionBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
-            var curve = new TransitionCurve(TransitionCurveType.EaseOut);
-            emotionBehaviour.SetTargetExpression("e1", new float[] { 1.0f }, 1.0f, curve);
+            harness.ExpressionUseCase.Activate(harness.Profile.Expressions.Span[0]);
+            harness.LayerUseCase.UpdateWeights(0f);
+            harness.LayerUseCase.UpdateWeights(0.5f);
 
-            // t=0.5 → EaseOut は前半が急 → 値 > 0.5
-            emotionBehaviour.UpdateTransition(0.5f);
-
-            Assert.Greater(emotionBehaviour.OutputWeights[0], 0.5f);
-
-            result.Dispose();
-        }
-
-        // ================================================================
-        // Blend モード遷移テスト
-        // ================================================================
-
-        [Test]
-        public void Blend_AddMultipleExpressions_ValuesAddedAndClamped()
-        {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "mouth_a", "mouth_o" };
-            var profile = CreateTestProfile(ExclusionMode.Blend);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
-
-            var lipsyncBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
-
-            lipsyncBehaviour.AddBlendExpression("lip-a", new float[] { 0.7f, 0.2f }, 1.0f);
-            lipsyncBehaviour.AddBlendExpression("lip-o", new float[] { 0.5f, 0.6f }, 1.0f);
-            lipsyncBehaviour.ComputeBlendOutput();
-
-            // 0.7 + 0.5 = 1.2 → clamped to 1.0
-            Assert.AreEqual(1.0f, lipsyncBehaviour.OutputWeights[0], 0.001f);
-            // 0.2 + 0.6 = 0.8
-            Assert.AreEqual(0.8f, lipsyncBehaviour.OutputWeights[1], 0.001f);
-
-            result.Dispose();
+            Assert.Greater(harness.LayerUseCase.BlendedOutputSpan[0], 0.5f);
         }
 
         [Test]
-        public void Blend_RemoveExpression_RecalculatesOutput()
+        public void TransitionDuration_QuarterSecond_CompletesAtConfiguredDuration()
         {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "mouth_a" };
-            var profile = CreateTestProfile(ExclusionMode.Blend);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
+            using var harness = CreateHarness(
+                new[] { "blend" },
+                CreateExpression("quarter", "emotion", 0.25f, TransitionCurve.Linear, ("blend", 1.0f)));
 
-            var lipsyncBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
+            harness.ExpressionUseCase.Activate(harness.Profile.Expressions.Span[0]);
+            harness.LayerUseCase.UpdateWeights(0f);
+            harness.LayerUseCase.UpdateWeights(0.125f);
+            Assert.That(harness.LayerUseCase.BlendedOutputSpan[0], Is.EqualTo(0.5f).Within(Tolerance));
 
-            lipsyncBehaviour.AddBlendExpression("lip-a", new float[] { 0.5f }, 1.0f);
-            lipsyncBehaviour.AddBlendExpression("lip-o", new float[] { 0.3f }, 1.0f);
-            lipsyncBehaviour.RemoveBlendExpression("lip-a");
-            lipsyncBehaviour.ComputeBlendOutput();
-
-            Assert.AreEqual(0.3f, lipsyncBehaviour.OutputWeights[0], 0.001f);
-
-            result.Dispose();
+            harness.LayerUseCase.UpdateWeights(0.125f);
+            AssertOutput(harness.LayerUseCase, 1.0f);
         }
 
-        // ================================================================
-        // Deactivate 遷移テスト
-        // ================================================================
-
-        [Test]
-        public void Deactivate_ZeroDuration_ImmediateReset()
+        private static void AssertOutput(LayerUseCase useCase, params float[] expected)
         {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "smile" };
-            var profile = CreateTestProfile(ExclusionMode.LastWins);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
+            var actual = useCase.BlendedOutputSpan;
+            Assert.That(actual.Length, Is.EqualTo(expected.Length));
 
-            var emotionBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
-            emotionBehaviour.SetTargetExpression("happy", new float[] { 1.0f }, 0f, TransitionCurve.Linear);
-
-            emotionBehaviour.Deactivate(0f);
-
-            Assert.IsFalse(emotionBehaviour.IsTransitioning);
-            Assert.AreEqual(0f, emotionBehaviour.OutputWeights[0], 0.001f);
-
-            result.Dispose();
-        }
-
-        [Test]
-        public void Deactivate_WithDuration_TransitionsToZero()
-        {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "smile" };
-            var profile = CreateTestProfile(ExclusionMode.LastWins);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
-
-            var emotionBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
-            emotionBehaviour.SetTargetExpression("happy", new float[] { 1.0f }, 0f, TransitionCurve.Linear);
-
-            emotionBehaviour.Deactivate(0.5f);
-            Assert.IsTrue(emotionBehaviour.IsTransitioning);
-
-            // 半分進める → from=1.0, to=0.0, t=0.5 → 0.5
-            emotionBehaviour.UpdateTransition(0.25f);
-            Assert.AreEqual(0.5f, emotionBehaviour.OutputWeights[0], 0.01f);
-
-            // 完了まで進める
-            emotionBehaviour.UpdateTransition(0.25f);
-            Assert.IsFalse(emotionBehaviour.IsTransitioning);
-            Assert.AreEqual(0f, emotionBehaviour.OutputWeights[0], 0.001f);
-
-            result.Dispose();
-        }
-
-        // ================================================================
-        // Mixer を通したレイヤーブレンド遷移テスト
-        // ================================================================
-
-        [Test]
-        public void MixerBlend_TwoLayersWithTransition_BlendedOutput()
-        {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "blend" };
-            var layers = new LayerDefinition[]
+            for (int i = 0; i < expected.Length; i++)
             {
-                new LayerDefinition("emotion", 0, ExclusionMode.LastWins),
-                new LayerDefinition("lipsync", 1, ExclusionMode.Blend)
-            };
-            var profile = new FacialProfile("1.0.0", layers);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
-
-            // emotion レイヤー: 即座に 0.8
-            var emotionBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
-            emotionBehaviour.SetTargetExpression("happy", new float[] { 0.8f }, 0f, TransitionCurve.Linear);
-
-            // lipsync レイヤー: 0.4 をブレンド追加
-            var lipsyncBehaviour = result.LayerPlayables["lipsync"].GetBehaviour();
-            lipsyncBehaviour.AddBlendExpression("lip-a", new float[] { 0.4f }, 1.0f);
-            lipsyncBehaviour.ComputeBlendOutput();
-
-            // Mixer で合成
-            var mixerBehaviour = result.Mixer.GetBehaviour();
-            mixerBehaviour.ComputeOutput();
-
-            // lipsync(priority=1, weight=1.0) が emotion(priority=0, weight=1.0) を上書き
-            // lerp(0.8, 0.4, 1.0) = 0.4
-            Assert.AreEqual(0.4f, mixerBehaviour.OutputWeights[0], 0.01f);
-
-            result.Dispose();
+                Assert.That(actual[i], Is.EqualTo(expected[i]).Within(Tolerance),
+                    $"BlendShape index {i} did not match.");
+            }
         }
 
-        [Test]
-        public void MixerBlend_PartialLayerWeight_InterpolatedOutput()
+        private static TestHarness CreateHarness(string[] blendShapeNames, params Expression[] expressions)
         {
-            SetUpGraph();
-            var blendShapeNames = new string[] { "blend" };
-            var layers = new LayerDefinition[]
+            var profile = new FacialProfile(
+                "1.0.0",
+                new[] { new LayerDefinition("emotion", 0, ExclusionMode.LastWins) },
+                expressions);
+            var expressionUseCase = new ExpressionUseCase(profile);
+            var layerUseCase = new LayerUseCase(profile, expressionUseCase, blendShapeNames);
+            return new TestHarness(profile, expressionUseCase, layerUseCase);
+        }
+
+        private static Expression CreateExpression(
+            string id,
+            string layer,
+            float duration,
+            TransitionCurve curve,
+            params (string name, float value)[] blendShapes)
+        {
+            var mappings = new BlendShapeMapping[blendShapes.Length];
+            for (int i = 0; i < blendShapes.Length; i++)
             {
-                new LayerDefinition("emotion", 0, ExclusionMode.LastWins),
-                new LayerDefinition("lipsync", 1, ExclusionMode.Blend)
-            };
-            var profile = new FacialProfile("1.0.0", layers);
-            var result = PlayableGraphBuilder.Build(_gameObject.GetComponent<Animator>(), profile, blendShapeNames);
+                mappings[i] = new BlendShapeMapping(blendShapes[i].name, blendShapes[i].value);
+            }
 
-            // emotion: 1.0
-            var emotionBehaviour = result.LayerPlayables["emotion"].GetBehaviour();
-            emotionBehaviour.SetTargetExpression("happy", new float[] { 1.0f }, 0f, TransitionCurve.Linear);
-
-            // lipsync: 0.0 (weight=0.5)
-            var lipsyncBehaviour = result.LayerPlayables["lipsync"].GetBehaviour();
-            lipsyncBehaviour.AddBlendExpression("lip-a", new float[] { 0.0f }, 1.0f);
-            lipsyncBehaviour.ComputeBlendOutput();
-
-            var mixerBehaviour = result.Mixer.GetBehaviour();
-            mixerBehaviour.SetLayerWeight("lipsync", 0.5f);
-            mixerBehaviour.ComputeOutput();
-
-            // lerp(1.0, 0.0, 0.5) = 0.5
-            Assert.AreEqual(0.5f, mixerBehaviour.OutputWeights[0], 0.01f);
-
-            result.Dispose();
+            return new Expression(
+                id,
+                id,
+                layer,
+                duration,
+                curve,
+                mappings);
         }
 
-        // ================================================================
-        // ヘルパー
-        // ================================================================
-
-        private void SetUpGraph()
+        private readonly struct TestHarness : System.IDisposable
         {
-            _gameObject = new GameObject("TransitionIntegrationTest");
-            _gameObject.AddComponent<Animator>();
-        }
-
-        private static FacialProfile CreateTestProfile(ExclusionMode mode)
-        {
-            var layers = new LayerDefinition[]
+            public TestHarness(FacialProfile profile, ExpressionUseCase expressionUseCase, LayerUseCase layerUseCase)
             {
-                new LayerDefinition("emotion", 0, mode)
-            };
-            return new FacialProfile("1.0.0", layers);
+                Profile = profile;
+                ExpressionUseCase = expressionUseCase;
+                LayerUseCase = layerUseCase;
+            }
+
+            public FacialProfile Profile { get; }
+            public ExpressionUseCase ExpressionUseCase { get; }
+            public LayerUseCase LayerUseCase { get; }
+
+            public void Dispose()
+            {
+                LayerUseCase?.Dispose();
+            }
         }
     }
 }

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
-using UnityEngine.Playables;
 using VContainer;
 using Hidano.FacialControl.Adapters.Bone;
 using Hidano.FacialControl.Adapters.DependencyInjection;
@@ -20,10 +19,11 @@ namespace Hidano.FacialControl.Adapters.Playable
 {
     /// <summary>
     /// FacialControl のメインコンポーネント。
-    /// <see cref="FacialCharacterProfileSO"/> を参照して PlayableGraph を構築し、
+    /// <see cref="FacialCharacterProfileSO"/> を参照してレイヤー集約パイプラインを構築し、
+    /// 確定した BlendShape 出力を <see cref="IBlendShapeOutputWriter"/> 経由で反映しながら、
     /// Expression のアクティブ化・非アクティブ化を制御する。
     /// OnEnable で自動初期化、Initialize() で手動初期化が可能。
-    /// OnDisable で PlayableGraph と NativeArray を破棄する。
+    /// OnDisable で出力ライターと NativeArray を破棄する。
     /// </summary>
     [RequireComponent(typeof(Animator))]
     [AddComponentMenu("FacialControl/Facial Controller")]
@@ -47,7 +47,6 @@ namespace Hidano.FacialControl.Adapters.Playable
         private SkinnedMeshRenderer[] _skinnedMeshRenderers;
 
         private Animator _animator;
-        private PlayableGraphBuilder.BuildResult _graphBuildResult;
         private ExpressionUseCase _expressionUseCase;
         // 系2(ExpressionTriggerInputSource)ベースの active provider。OverlayInputSource(overlay suppress)へ
         // 後期バインドで供給する（実機 InputSystem 経路の active 表情を解決するため）。
@@ -55,6 +54,7 @@ namespace Hidano.FacialControl.Adapters.Playable
         private LayerUseCase _layerUseCase;
         private FacialProfile? _currentProfile;
         private string[] _blendShapeNames;
+        private IBlendShapeOutputWriter _outputWriter;
         private bool _isInitialized;
         private BoneWriter _boneWriter;
         private FacialControllerLifetimeScope _childLifetimeScope;
@@ -62,24 +62,6 @@ namespace Hidano.FacialControl.Adapters.Playable
         private IInputSourceRegistry _inputSourceRegistry;
         private IReadOnlyList<GazeBindingConfig> _gazeConfigs = Array.Empty<GazeBindingConfig>();
         private GazeSnapshot[] _gazeSnapshotBuffer = Array.Empty<GazeSnapshot>();
-
-        // BlendShape 出力インデックス → (Renderer, Renderer 上の BS index) のマッピング
-        private BlendShapeTarget[][] _blendShapeTargets;
-
-        /// <summary>
-        /// BlendShape の出力先ターゲット情報。
-        /// </summary>
-        private struct BlendShapeTarget
-        {
-            public SkinnedMeshRenderer Renderer;
-            public int RendererBlendShapeIndex;
-
-            public BlendShapeTarget(SkinnedMeshRenderer renderer, int rendererBlendShapeIndex)
-            {
-                Renderer = renderer;
-                RendererBlendShapeIndex = rendererBlendShapeIndex;
-            }
-        }
 
         /// <summary>
         /// 初期化済みかどうか
@@ -129,7 +111,7 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         private void LateUpdate()
         {
-            if (!_isInitialized || _blendShapeTargets == null || _layerUseCase == null)
+            if (!_isInitialized || _layerUseCase == null)
                 return;
 
             // Aggregator パイプラインを 1 フレーム分進める。
@@ -138,23 +120,10 @@ namespace Hidano.FacialControl.Adapters.Playable
             // 各アダプタの TriggerOn/Off または WriteTick 経由で駆動される。
             _layerUseCase.UpdateWeights(Time.deltaTime);
 
-            // Aggregator 出力を BlendShape に転写。PlayableGraph の出力はバイパスする。
+            // Aggregator 出力（正規化済み 0..1）を出力ライター経由で BlendShape に転写する。
             var output = _layerUseCase.BlendedOutputSpan;
 
-            int count = Math.Min(output.Length, _blendShapeTargets.Length);
-            for (int i = 0; i < count; i++)
-            {
-                var targets = _blendShapeTargets[i];
-                if (targets == null)
-                    continue;
-
-                float weight = output[i] * 100f; // Unity は 0-100 スケール
-                for (int t = 0; t < targets.Length; t++)
-                {
-                    targets[t].Renderer.SetBlendShapeWeight(
-                        targets[t].RendererBlendShapeIndex, weight);
-                }
-            }
+            _outputWriter?.Write(output);
 
             // BoneWriter は LateUpdate 末尾で適用する（Animator → BlendShape → BoneWriter の順）。
             PublishFacialOutput(output);
@@ -164,7 +133,7 @@ namespace Hidano.FacialControl.Adapters.Playable
 
         /// <summary>
         /// 手動初期化。<see cref="_characterSO"/> からプロファイルを読み込み、
-        /// PlayableGraph を構築する。SO 未設定の場合は何もしない。
+        /// レイヤー集約パイプラインと出力ライターを構築する。SO 未設定の場合は何もしない。
         /// </summary>
         public void Initialize()
         {
@@ -232,6 +201,8 @@ namespace Hidano.FacialControl.Adapters.Playable
             _layer2Provider = new Layer2ActiveExpressionProvider(profile);
 
             var blendShapeNames = _blendShapeNames ?? Array.Empty<string>();
+            var renderers = _skinnedMeshRenderers ?? Array.Empty<SkinnedMeshRenderer>();
+            _outputWriter = new SkinnedMeshRendererBlendShapeWriter(renderers, blendShapeNames);
 
             // VContainer の per-FC child scope を無条件で build する。
             // 各 binding の OnStart は VContainer の IInitializable 経由で同期的に呼ばれ、
@@ -249,12 +220,6 @@ namespace Hidano.FacialControl.Adapters.Playable
             // LayerUseCase に組み立て済み IInputSource 列を注入し、
             // 内部で LayerInputSourceRegistry / LayerInputSourceWeightBuffer / LayerInputSourceAggregator を再構築させる。
             _layerUseCase = new LayerUseCase(profile, _expressionUseCase, blendShapeNames, additionalSources);
-
-            // PlayableGraph を構築
-            _graphBuildResult = PlayableGraphBuilder.Build(
-                _animator, profile, blendShapeNames);
-
-            _graphBuildResult.Graph.Play();
 
             // BoneWriter を生成・初期化。
             SetupBoneWriter(profile);
@@ -714,9 +679,6 @@ namespace Hidano.FacialControl.Adapters.Playable
             }
 
             _expressionUseCase.Activate(expression);
-
-            // PlayableGraph のレイヤーにも反映
-            ApplyExpressionToPlayable(expression);
         }
 
         /// <summary>
@@ -732,13 +694,10 @@ namespace Hidano.FacialControl.Adapters.Playable
             }
 
             _expressionUseCase.Deactivate(expression);
-
-            // PlayableGraph のレイヤーからも除去
-            RemoveExpressionFromPlayable(expression);
         }
 
         /// <summary>
-        /// 統合キャラクター SO を切り替える。PlayableGraph を再構築する。
+        /// 統合キャラクター SO を切り替える。レイヤー集約パイプラインと出力ライターを再構築する。
         /// </summary>
         /// <param name="characterSO">新しい統合キャラクター SO。</param>
         public void LoadCharacter(FacialCharacterProfileSO characterSO)
@@ -767,7 +726,7 @@ namespace Hidano.FacialControl.Adapters.Playable
         }
 
         /// <summary>
-        /// 現在のプロファイルを再読み込みする。PlayableGraph を再構築する。
+        /// 現在のプロファイルを再読み込みする。レイヤー集約パイプラインと出力ライターを再構築する。
         /// </summary>
         public void ReloadProfile()
         {
@@ -943,10 +902,6 @@ namespace Hidano.FacialControl.Adapters.Playable
         {
             var names = new List<string>();
             var nameSet = new HashSet<string>();
-            // 名前 → 出力インデックスの逆引き
-            var nameToIndex = new Dictionary<string, int>();
-            // 出力インデックス → ターゲットリスト（同名 BS が複数 Renderer に存在する場合）
-            var targetLists = new List<List<BlendShapeTarget>>();
 
             for (int i = 0; i < renderers.Length; i++)
             {
@@ -963,121 +918,13 @@ namespace Hidano.FacialControl.Adapters.Playable
 
                     if (nameSet.Add(bsName))
                     {
-                        int outputIndex = names.Count;
                         names.Add(bsName);
-                        nameToIndex[bsName] = outputIndex;
-
-                        var list = new List<BlendShapeTarget>();
-                        list.Add(new BlendShapeTarget(renderer, j));
-                        targetLists.Add(list);
-                    }
-                    else
-                    {
-                        // 同名 BS が別の Renderer にも存在する
-                        int outputIndex = nameToIndex[bsName];
-                        targetLists[outputIndex].Add(new BlendShapeTarget(renderer, j));
                     }
                 }
-            }
-
-            // ターゲットマッピングを配列に変換
-            _blendShapeTargets = new BlendShapeTarget[targetLists.Count][];
-            for (int i = 0; i < targetLists.Count; i++)
-            {
-                _blendShapeTargets[i] = targetLists[i].ToArray();
             }
 
             return names.ToArray();
         }
-
-        private void ApplyExpressionToPlayable(Expression expression)
-        {
-            if (_graphBuildResult == null || !_currentProfile.HasValue)
-                return;
-
-            var profile = _currentProfile.Value;
-            string effectiveLayer = profile.GetEffectiveLayer(expression);
-
-            if (!_graphBuildResult.LayerPlayables.TryGetValue(effectiveLayer, out var layerPlayable))
-                return;
-
-            var behaviour = layerPlayable.GetBehaviour();
-
-            if (behaviour.ExclusionMode == ExclusionMode.LastWins)
-            {
-                // BlendShape 値を名前ベースで展開
-                var targetValues = ExpandBlendShapeValues(expression);
-                behaviour.SetTargetExpression(
-                    expression.Id,
-                    targetValues,
-                    expression.TransitionDuration,
-                    expression.TransitionCurve);
-            }
-            else
-            {
-                // Blend モード
-                var values = ExpandBlendShapeValues(expression);
-                behaviour.AddBlendExpression(expression.Id, values, 1.0f);
-                behaviour.ComputeBlendOutput();
-            }
-        }
-
-        private void RemoveExpressionFromPlayable(Expression expression)
-        {
-            if (_graphBuildResult == null || !_currentProfile.HasValue)
-                return;
-
-            var profile = _currentProfile.Value;
-            string effectiveLayer = profile.GetEffectiveLayer(expression);
-
-            if (!_graphBuildResult.LayerPlayables.TryGetValue(effectiveLayer, out var layerPlayable))
-                return;
-
-            var behaviour = layerPlayable.GetBehaviour();
-
-            if (behaviour.ExclusionMode == ExclusionMode.LastWins)
-            {
-                behaviour.Deactivate(expression.TransitionDuration);
-            }
-            else
-            {
-                behaviour.RemoveBlendExpression(expression.Id);
-                behaviour.ComputeBlendOutput();
-            }
-        }
-
-        private float[] ExpandBlendShapeValues(Expression expression)
-        {
-            var bsNames = _blendShapeNames ?? Array.Empty<string>();
-            var values = new float[bsNames.Length];
-
-            var bsSpan = expression.BlendShapeValues.Span;
-            for (int i = 0; i < bsSpan.Length; i++)
-            {
-                int idx = FindBlendShapeIndex(bsSpan[i].Name);
-                if (idx >= 0)
-                {
-                    values[idx] = bsSpan[i].Value;
-                }
-            }
-
-            return values;
-        }
-
-        private int FindBlendShapeIndex(string name)
-        {
-            if (_blendShapeNames == null)
-                return -1;
-
-            for (int i = 0; i < _blendShapeNames.Length; i++)
-            {
-                if (_blendShapeNames[i] == name)
-                    return i;
-            }
-
-            return -1;
-        }
-
         private void Cleanup()
         {
             // child scope を build していた場合は最初に Dispose し、binding.Dispose を完了させる。
@@ -1093,17 +940,17 @@ namespace Hidano.FacialControl.Adapters.Playable
             _gazeConfigs = Array.Empty<GazeBindingConfig>();
             _gazeSnapshotBuffer = Array.Empty<GazeSnapshot>();
 
-            if (_graphBuildResult != null)
-            {
-                _graphBuildResult.Dispose();
-                _graphBuildResult = null;
-            }
-
             // プロファイル再ロード時は Registry / WeightBuffer を Dispose して再構築する。
             if (_layerUseCase != null)
             {
                 _layerUseCase.Dispose();
                 _layerUseCase = null;
+            }
+
+            if (_outputWriter != null)
+            {
+                _outputWriter.Dispose();
+                _outputWriter = null;
             }
 
             // BoneWriter は書込中だった bone の localRotation を初回書込み直前の値に戻してから Dispose する。

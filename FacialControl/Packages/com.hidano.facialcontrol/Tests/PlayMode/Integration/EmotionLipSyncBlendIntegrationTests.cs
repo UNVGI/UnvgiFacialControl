@@ -1,307 +1,229 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Hidano.FacialControl.Adapters.Json.Dto;
-using Hidano.FacialControl.Adapters.Playable;
-using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
+using System.Threading.Tasks;
+using Hidano.FacialControl.Application.UseCases;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Domain.Services;
 using NUnit.Framework;
-using UnityEngine;
-using UnityEngine.Animations;
-using UnityEngine.Playables;
 using UnityEngine.TestTools;
-using Object = UnityEngine.Object;
 
 namespace Hidano.FacialControl.Tests.PlayMode.Integration
 {
+    /// <summary>
+    /// 旧 per-layer playable / mixer 直叩きの回帰観点を、
+    /// ライブ経路 (ExpressionUseCase -> LayerUseCase.UpdateWeights -> BlendedOutputSpan)
+    /// に付け替えて検証する。
+    /// </summary>
     [TestFixture]
     public class EmotionLipSyncBlendIntegrationTests
     {
-        private const float Tolerance = 1e-6f;
+        private const float Tolerance = 0.0001f;
 
-        private readonly List<IDisposable> _disposables = new List<IDisposable>();
-        private readonly List<Object> _objects = new List<Object>();
-        private GameObject _gameObject;
-        private Animator _animator;
-        private PlayableGraph _graph;
-
-        [SetUp]
-        public void SetUp()
+        [Test]
+        public void EmotionAndLipSync_MixedSources_BlendByPriorityMaskAndWeightedSum()
         {
-            _gameObject = new GameObject("EmotionLipSyncBlendIntegrationTests");
-            _animator = _gameObject.AddComponent<Animator>();
-            _graph = PlayableGraph.Create("EmotionLipSyncBlendIntegrationTests");
-            _graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            if (_graph.IsValid())
-            {
-                _graph.Destroy();
-            }
-
-            for (int i = _disposables.Count - 1; i >= 0; i--)
-            {
-                _disposables[i].Dispose();
-            }
-            _disposables.Clear();
-
-            for (int i = _objects.Count - 1; i >= 0; i--)
-            {
-                if (_objects[i] != null)
-                {
-                    Object.DestroyImmediate(_objects[i]);
-                }
-            }
-            _objects.Clear();
-
-            if (_gameObject != null)
-            {
-                Object.DestroyImmediate(_gameObject);
-                _gameObject = null;
-                _animator = null;
-            }
-        }
-
-        [UnityTest]
-        public IEnumerator Evaluate_BaseExpressionFixedAngryFace_BlendsEmotionAndLipSyncByContributionMask()
-        {
-            string[] blendShapeNames =
+            var blendShapeNames = new[]
             {
                 "EyeBlinkLeft",
                 "BrowDownLeft",
                 "MouthSmileLeft",
                 "MouthA",
-                "CheekPuff"
+                "CheekPuff",
             };
 
-            var baseClip = Track(new AnimationClip { name = "BaseExpression_FixedAngryFace" });
-            var characterProfile = CreateCharacterProfile(
-                baseClip,
-                CreateSnapshot(
-                    ("EyeBlinkLeft", 0.10f),
-                    ("BrowDownLeft", 0.25f),
-                    ("MouthSmileLeft", 0.40f),
-                    ("MouthA", 0.05f),
-                    ("CheekPuff", 0.30f)));
-
-            var aggregator = CreateAggregator(
-                blendShapeNames.Length,
-                new MaskedValueSource(
-                    "emotion",
-                    InputSourceType.ExpressionTrigger,
-                    new[] { 0.70f, 0.60f, 0.20f, 1.00f, 1.00f },
-                    new[] { 0, 1, 2 }),
-                new MaskedValueSource(
-                    "lipsync",
-                    InputSourceType.ValueProvider,
-                    new[] { 1.00f, 1.00f, 0.10f, 0.90f, 1.00f },
-                    new[] { 2, 3 }));
-
-            var mixer = CreateMixer(blendShapeNames, characterProfile, aggregator);
-
-            _graph.Play();
-            _graph.Evaluate(0.016f);
-            yield return null;
-
-            AssertOutput(mixer, 0.70f, 0.60f, 0.10f, 0.90f, 0.30f);
-        }
-
-        [UnityTest]
-        public IEnumerator Evaluate_BaseExpressionEmpty_BlendsEmotionAndLipSyncWithZeroDefault()
-        {
-            string[] blendShapeNames =
-            {
-                "EyeBlinkLeft",
-                "BrowDownLeft",
-                "MouthSmileLeft",
-                "MouthA",
-                "CheekPuff"
-            };
-
-            var characterProfile = CreateCharacterProfile(
-                null,
-                BaseExpressionSerializable.CreateEmptySnapshot());
-
-            var aggregator = CreateAggregator(
-                blendShapeNames.Length,
-                new MaskedValueSource(
-                    "emotion",
-                    InputSourceType.ExpressionTrigger,
-                    new[] { 0.70f, 0.60f, 0.20f, 1.00f, 1.00f },
-                    new[] { 0, 1, 2 }),
-                new MaskedValueSource(
-                    "lipsync",
-                    InputSourceType.ValueProvider,
-                    new[] { 1.00f, 1.00f, 0.10f, 0.90f, 1.00f },
-                    new[] { 2, 3 }));
-
-            var mixer = CreateMixer(blendShapeNames, characterProfile, aggregator);
-
-            _graph.Play();
-            _graph.Evaluate(0.016f);
-            yield return null;
-
-            AssertOutput(mixer, 0.70f, 0.60f, 0.10f, 0.90f, 0.00f);
-        }
-
-        private FacialControlMixer CreateMixer(
-            string[] blendShapeNames,
-            TestCharacterProfileSO characterProfile,
-            LayerInputSourceAggregator aggregator)
-        {
-            var mixerPlayable = FacialControlMixer.Create(
-                _graph,
+            using var harness = CreateHarness(
                 blendShapeNames,
-                characterProfile,
-                aggregator,
-                new[] { 0, 1 },
-                new[] { 1.0f, 1.0f });
-            var output = AnimationPlayableOutput.Create(
-                _graph,
-                "EmotionLipSyncBlendIntegrationOutput",
-                _animator);
-            output.SetSourcePlayable(mixerPlayable);
-            return mixerPlayable.GetBehaviour();
-        }
-
-        private LayerInputSourceAggregator CreateAggregator(
-            int blendShapeCount,
-            IInputSource emotionSource,
-            IInputSource lipSyncSource)
-        {
-            var profile = CreateLayerProfile();
-            var bindings = new List<(int layerIdx, int sourceIdx, IInputSource source)>
-            {
-                (0, 0, emotionSource),
-                (1, 0, lipSyncSource),
-            };
-
-            var registry = new LayerInputSourceRegistry(profile, blendShapeCount, bindings);
-            var weightBuffer = new LayerInputSourceWeightBuffer(registry.LayerCount, registry.MaxSourcesPerLayer);
-            weightBuffer.SetWeight(0, 0, 1.0f);
-            weightBuffer.SetWeight(1, 0, 1.0f);
-
-            _disposables.Add(registry);
-            _disposables.Add(weightBuffer);
-
-            return new LayerInputSourceAggregator(registry, weightBuffer, blendShapeCount);
-        }
-
-        private static FacialProfile CreateLayerProfile()
-        {
-            return new FacialProfile(
-                "2.0",
                 new[]
                 {
-                    new LayerDefinition("emotion", priority: 0, ExclusionMode.LastWins),
-                    new LayerDefinition("lipsync", priority: 1, ExclusionMode.Blend),
+                    CreateExpression(
+                        "emotion-angry",
+                        "emotion",
+                        0f,
+                        TransitionCurve.Linear,
+                        ("EyeBlinkLeft", 0.70f),
+                        ("BrowDownLeft", 0.60f),
+                        ("MouthSmileLeft", 0.20f)),
+                },
+                new List<(int layerIdx, IInputSource source, float weight)>
+                {
+                    (1, new MaskedValueProviderSource(
+                        "lipsync-a",
+                        blendShapeNames.Length,
+                        new[] { 1f, 1f, 0.10f, 0.90f, 1f },
+                        new[] { 2, 3 }), 0.50f),
+                    (1, new MaskedValueProviderSource(
+                        "lipsync-b",
+                        blendShapeNames.Length,
+                        new[] { 1f, 1f, 0.60f, 0.80f, 1f },
+                        new[] { 2, 3 }), 0.75f),
                 });
+
+            harness.ExpressionUseCase.Activate(harness.Profile.Expressions.Span[0]);
+            harness.LayerUseCase.UpdateWeights(0f);
+
+            AssertOutput(harness.LayerUseCase,
+                0.70f,
+                0.60f,
+                0.50f,
+                1.00f,
+                0.00f);
         }
 
-        private TestCharacterProfileSO CreateCharacterProfile(
-            AnimationClip animationClip,
-            ExpressionSnapshotDto cachedSnapshot)
+        [UnityTest]
+        public IEnumerator LipSyncWeightUpdate_FromBackgroundThread_ObservedOnNextUpdate()
         {
-            var profile = Track(ScriptableObject.CreateInstance<TestCharacterProfileSO>());
-            profile.SetBaseExpression(new BaseExpressionSerializable
+            var blendShapeNames = new[]
             {
-                animationClip = animationClip,
-                cachedSnapshot = cachedSnapshot,
-            });
-            return profile;
-        }
-
-        private T Track<T>(T obj)
-            where T : Object
-        {
-            _objects.Add(obj);
-            return obj;
-        }
-
-        private static ExpressionSnapshotDto CreateSnapshot(params (string name, float value)[] values)
-        {
-            var snapshot = new ExpressionSnapshotDto
-            {
-                blendShapes = new List<BlendShapeSnapshotDto>(values.Length),
+                "EyeBlinkLeft",
+                "BrowDownLeft",
+                "MouthSmileLeft",
+                "MouthA",
             };
 
-            for (int i = 0; i < values.Length; i++)
-            {
-                snapshot.blendShapes.Add(new BlendShapeSnapshotDto
+            using var harness = CreateHarness(
+                blendShapeNames,
+                new[]
                 {
-                    rendererPath = "Face",
-                    name = values[i].name,
-                    value = values[i].value,
+                    CreateExpression(
+                        "emotion-angry",
+                        "emotion",
+                        0f,
+                        TransitionCurve.Linear,
+                        ("EyeBlinkLeft", 0.70f),
+                        ("BrowDownLeft", 0.60f),
+                        ("MouthSmileLeft", 0.20f)),
+                },
+                new List<(int layerIdx, IInputSource source, float weight)>
+                {
+                    (1, new MaskedValueProviderSource(
+                        "lipsync-a",
+                        blendShapeNames.Length,
+                        new[] { 1f, 1f, 0.40f, 0.90f },
+                        new[] { 2, 3 }), 0.00f),
                 });
-            }
 
-            return snapshot;
+            harness.ExpressionUseCase.Activate(harness.Profile.Expressions.Span[0]);
+            harness.LayerUseCase.UpdateWeights(0f);
+            AssertOutput(harness.LayerUseCase, 0.70f, 0.60f, 0.00f, 0.00f);
+
+            int mainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+            int? backgroundThreadId = null;
+            var task = Task.Run(() =>
+            {
+                backgroundThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                harness.LayerUseCase.SetInputSourceWeight(1, sourceIdx: 1, weight: 0.75f);
+            });
+            task.Wait();
+
+            Assert.That(backgroundThreadId.HasValue, Is.True);
+            Assert.That(backgroundThreadId.Value, Is.Not.EqualTo(mainThreadId));
+
+            yield return null;
+
+            harness.LayerUseCase.UpdateWeights(0.016f);
+            AssertOutput(harness.LayerUseCase, 0.70f, 0.60f, 0.30f, 0.675f);
         }
 
-        private static void AssertOutput(FacialControlMixer mixer, params float[] expected)
+        private static void AssertOutput(LayerUseCase useCase, params float[] expected)
         {
-            Assert.That(mixer.OutputWeights.Length, Is.EqualTo(expected.Length));
+            var actual = useCase.BlendedOutputSpan;
+            Assert.That(actual.Length, Is.EqualTo(expected.Length));
+
             for (int i = 0; i < expected.Length; i++)
             {
-                Assert.That(mixer.OutputWeights[i], Is.EqualTo(expected[i]).Within(Tolerance),
-                    $"BlendShape output at index {i} must match.");
+                Assert.That(actual[i], Is.EqualTo(expected[i]).Within(Tolerance),
+                    $"BlendShape index {i} did not match.");
             }
         }
 
-        private sealed class TestCharacterProfileSO : FacialCharacterProfileSO
+        private static TestHarness CreateHarness(
+            string[] blendShapeNames,
+            Expression[] expressions,
+            IReadOnlyList<(int layerIdx, IInputSource source, float weight)> additionalInputSources)
         {
-            public void SetBaseExpression(BaseExpressionSerializable baseExpression)
+            var profile = new FacialProfile(
+                "1.0.0",
+                new[]
+                {
+                    new LayerDefinition("emotion", 0, ExclusionMode.LastWins),
+                    new LayerDefinition("lipsync", 1, ExclusionMode.Blend),
+                },
+                expressions);
+            var expressionUseCase = new ExpressionUseCase(profile);
+            var layerUseCase = new LayerUseCase(profile, expressionUseCase, blendShapeNames, additionalInputSources);
+            return new TestHarness(profile, expressionUseCase, layerUseCase);
+        }
+
+        private static Expression CreateExpression(
+            string id,
+            string layer,
+            float duration,
+            TransitionCurve curve,
+            params (string name, float value)[] blendShapes)
+        {
+            var mappings = new BlendShapeMapping[blendShapes.Length];
+            for (int i = 0; i < blendShapes.Length; i++)
             {
-                _baseExpression = baseExpression;
+                mappings[i] = new BlendShapeMapping(blendShapes[i].name, blendShapes[i].value);
+            }
+
+            return new Expression(id, id, layer, duration, curve, mappings);
+        }
+
+        private readonly struct TestHarness : IDisposable
+        {
+            public TestHarness(FacialProfile profile, ExpressionUseCase expressionUseCase, LayerUseCase layerUseCase)
+            {
+                Profile = profile;
+                ExpressionUseCase = expressionUseCase;
+                LayerUseCase = layerUseCase;
+            }
+
+            public FacialProfile Profile { get; }
+            public ExpressionUseCase ExpressionUseCase { get; }
+            public LayerUseCase LayerUseCase { get; }
+
+            public void Dispose()
+            {
+                LayerUseCase?.Dispose();
             }
         }
 
-        private sealed class MaskedValueSource : IInputSource
+        private sealed class MaskedValueProviderSource : ValueProviderInputSourceBase
         {
             private readonly float[] _values;
 
-            public MaskedValueSource(
+            public MaskedValueProviderSource(
                 string id,
-                InputSourceType type,
+                int blendShapeCount,
                 float[] values,
                 int[] contributeIndices)
+                : base(InputSourceId.Parse(id), blendShapeCount)
             {
-                Id = id;
-                Type = type;
-                BlendShapeCount = values.Length;
-                _values = values;
-                ContributeMask = new BitArray(BlendShapeCount, false);
+                _values = values ?? throw new ArgumentNullException(nameof(values));
+                ContributeMask = new BitArray(blendShapeCount, false);
                 for (int i = 0; i < contributeIndices.Length; i++)
                 {
                     int index = contributeIndices[i];
-                    if ((uint)index < (uint)BlendShapeCount)
+                    if ((uint)index < (uint)blendShapeCount)
                     {
                         ContributeMask[index] = true;
                     }
                 }
             }
 
-            public string Id { get; }
-            public InputSourceType Type { get; }
-            public int BlendShapeCount { get; }
-            public BitArray ContributeMask { get; }
+            public override BitArray ContributeMask { get; }
 
-            public void Tick(float deltaTime)
-            {
-            }
-
-            public bool TryWriteValues(Span<float> output)
+            public override bool TryWriteValues(Span<float> output)
             {
                 int len = Math.Min(output.Length, _values.Length);
                 for (int i = 0; i < len; i++)
                 {
                     output[i] = _values[i];
                 }
+
                 return true;
             }
         }

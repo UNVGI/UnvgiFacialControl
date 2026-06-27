@@ -23,6 +23,9 @@ namespace Hidano.FacialControl.Application.UseCases
         private string[] _blendShapeNames;
         private readonly Dictionary<string, float> _layerWeights;
         private IReadOnlyList<(int layerIdx, IInputSource source, float weight)> _additionalInputSources;
+        private readonly List<Expression> _activeBuffer = new List<Expression>();
+        private readonly Dictionary<string, List<Expression>> _groupedByLayer = new Dictionary<string, List<Expression>>();
+        private readonly List<string> _activeGroupedLayerKeys = new List<string>();
         // layerOverrideMask 抑制計算用: 系2(ExpressionTriggerInputSource)から集約した active 表情の再利用バッファ（GC 回避）。
         private readonly List<Expression> _layer2ActiveBuffer = new List<Expression>();
 
@@ -127,8 +130,8 @@ namespace Hidano.FacialControl.Application.UseCases
             if (bsCount == 0 || _aggregator == null)
                 return;
 
-            var activeExpressions = _expressionUseCase.GetActiveExpressions();
-            var expressionsByLayer = GroupByLayer(activeExpressions);
+            _expressionUseCase.CollectActiveExpressions(_activeBuffer);
+            var expressionsByLayer = GroupByLayer(_activeBuffer);
 
             var layerSpan = _profile.Layers.Span;
 
@@ -173,7 +176,8 @@ namespace Hidano.FacialControl.Application.UseCases
                 // これがないと「全表情を Deactivate した直後」に LayerExpressionSource の _targetValues
                 // が直前 active の値で凍結し、別の表情が入るまで OFF にならない (Toggle/Hold いずれも
                 // latched に見える)。一度も active になっていないレイヤーは従来通り blend 集合から除外。
-                if (expressionsByLayer.TryGetValue(layerName, out var layerExpressions))
+                if (expressionsByLayer.TryGetValue(layerName, out var layerExpressions)
+                    && layerExpressions.Count > 0)
                 {
                     _layerSources[l].UpdateExpressions(layerExpressions, exclusionMode, _blendShapeNames);
                 }
@@ -375,6 +379,7 @@ namespace Hidano.FacialControl.Application.UseCases
 
             int bsCount = _blendShapeNames.Length;
             _finalOutput = new float[bsCount];
+            InitializeGroupedByLayerBuffer();
 
             int layerCount = _profile.Layers.Length;
             _layerPriorities = layerCount == 0 ? Array.Empty<int>() : new int[layerCount];
@@ -471,21 +476,53 @@ namespace Hidano.FacialControl.Application.UseCases
 
         private Dictionary<string, List<Expression>> GroupByLayer(List<Expression> expressions)
         {
-            var grouped = new Dictionary<string, List<Expression>>();
+            ClearGroupedByLayerBuffer();
 
             for (int i = 0; i < expressions.Count; i++)
             {
                 string effectiveLayer = _profile.GetEffectiveLayer(expressions[i]);
 
-                if (!grouped.TryGetValue(effectiveLayer, out var list))
+                // 事前確保辞書（_groupedByLayer のキー = profile.Layers 名）に無い宣言外レイヤー名は
+                // 新規 List を確保せずスキップする（毎フレヒープ確保を避ける / 設計 OQ2）。
+                // GetEffectiveLayer は空レイヤー（Layers.Span.Length==0）時に expression.Layer＝宣言外名を
+                // 返し得るが、消費側（UpdateWeights 出力ループ）は profile.Layers をキーに走査するため、
+                // 宣言外レイヤー名の表情は元々下流で読まれず、ドロップしても結果は不変。
+                if (!_groupedByLayer.TryGetValue(effectiveLayer, out var list))
                 {
-                    list = new List<Expression>();
-                    grouped[effectiveLayer] = list;
+                    continue;
+                }
+                if (list.Count == 0)
+                {
+                    _activeGroupedLayerKeys.Add(effectiveLayer);
                 }
                 list.Add(expressions[i]);
             }
 
-            return grouped;
+            return _groupedByLayer;
+        }
+
+        private void InitializeGroupedByLayerBuffer()
+        {
+            _groupedByLayer.Clear();
+
+            var layerSpan = _profile.Layers.Span;
+            for (int i = 0; i < layerSpan.Length; i++)
+            {
+                _groupedByLayer[layerSpan[i].Name] = new List<Expression>();
+            }
+        }
+
+        private void ClearGroupedByLayerBuffer()
+        {
+            for (int i = 0; i < _activeGroupedLayerKeys.Count; i++)
+            {
+                string layerName = _activeGroupedLayerKeys[i];
+                if (_groupedByLayer.TryGetValue(layerName, out var list))
+                {
+                    list.Clear();
+                }
+            }
+            _activeGroupedLayerKeys.Clear();
         }
 
         private static float Clamp01(float value)

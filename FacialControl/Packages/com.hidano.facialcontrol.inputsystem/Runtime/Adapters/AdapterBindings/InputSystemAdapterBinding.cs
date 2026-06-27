@@ -32,7 +32,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
     /// </remarks>
     [Serializable]
     [FacialAdapterBinding(displayName: "Input System")]
-    public sealed class InputSystemAdapterBinding : AdapterBindingBase
+    public sealed class InputSystemAdapterBinding : AdapterBindingBase, IAdapterBindingDeclaredInputs
     {
         [Tooltip("キーアサインを定義する InputActionAsset。Project ウィンドウで作成した .inputactions をここに割り当てる。")]
         [SerializeField]
@@ -108,6 +108,68 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings.InputSystem
                 ? new List<ExpressionBindingEntry>()
                 : new List<ExpressionBindingEntry>(expressionBindings);
             _injectedGazeConfigs = injectedGazeConfigs;
+        }
+
+        /// <summary>
+        /// この binding が OnStart でレジストリに登録する入力源 canonical id を静的に列挙する。
+        /// ルーティングエディタのソースポート描画に使われる（ランタイム登録キーと同じ文字列）。
+        /// </summary>
+        /// <remarks>
+        /// trigger sink は常に <c>&lt;slug&gt;</c> primary id で登録される。Analog エントリが 1 件でもあれば
+        /// <c>&lt;slug&gt;:analog-expression</c>、Overlay エントリは slot ごとに
+        /// <c>&lt;slug&gt;:overlay:&lt;slot&gt;</c> を公開する。
+        /// </remarks>
+        public IEnumerable<string> GetDeclaredInputSourceIds()
+        {
+            var ids = new List<string>();
+            string slug = Slug;
+            if (string.IsNullOrEmpty(slug))
+            {
+                return ids;
+            }
+
+            // trigger sink は OnStart で常に <slug> primary id として登録される。
+            ids.Add(slug);
+
+            if (_expressionBindings == null || _expressionBindings.Count == 0)
+            {
+                return ids;
+            }
+
+            bool hasAnalog = false;
+            var overlaySlots = new List<string>();
+            var seenSlots = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < _expressionBindings.Count; i++)
+            {
+                var entry = _expressionBindings[i];
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                if (entry.bindingMode == BindingMode.Analog)
+                {
+                    hasAnalog = true;
+                }
+                else if (entry.bindingMode == BindingMode.Overlay
+                    && !string.IsNullOrWhiteSpace(entry.overlaySlot)
+                    && seenSlots.Add(entry.overlaySlot))
+                {
+                    overlaySlots.Add(entry.overlaySlot);
+                }
+            }
+
+            if (hasAnalog)
+            {
+                ids.Add($"{slug}:{AnalogExpressionInputSource.ReservedId}");
+            }
+
+            for (int i = 0; i < overlaySlots.Count; i++)
+            {
+                ids.Add($"{slug}:{OverlayInputSource.ReservedIdPrefix}:{overlaySlots[i]}");
+            }
+
+            return ids;
         }
 
         /// <inheritdoc />

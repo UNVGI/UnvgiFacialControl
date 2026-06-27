@@ -101,38 +101,50 @@ namespace Hidano.FacialControl.Editor.Windows.Routing.Logic
                 throw new ArgumentNullException(nameof(binding));
             }
 
-            if (binding is not IAdapterBindingDefaultLayer defaultLayer)
-            {
-                return Array.Empty<SourcePort>();
-            }
-
             var ports = new List<SourcePort>();
             var seenCanonicalIds = new HashSet<string>(StringComparer.Ordinal);
 
-            if (binding is IAdapterBindingDefaultLayerInputs multipleInputs)
+            // 1) 自動 Layer 生成系（LipSync / iFacialMocap 等）が宣言する default 入力源。
+            if (binding is IAdapterBindingDefaultLayer defaultLayer)
             {
-                IReadOnlyList<string> evaluationLayerNames =
-                    BuildEvaluationLayerNames(defaultLayer.DefaultLayerName, allLayerNames);
-                for (int i = 0; i < evaluationLayerNames.Count; i++)
+                if (binding is IAdapterBindingDefaultLayerInputs multipleInputs)
                 {
-                    IEnumerable<(string id, float weight)> sources =
-                        multipleInputs.GetDefaultLayerInputSources(evaluationLayerNames[i]);
-                    if (sources == null)
+                    IReadOnlyList<string> evaluationLayerNames =
+                        BuildEvaluationLayerNames(defaultLayer.DefaultLayerName, allLayerNames);
+                    for (int i = 0; i < evaluationLayerNames.Count; i++)
                     {
-                        continue;
+                        IEnumerable<(string id, float weight)> sources =
+                            multipleInputs.GetDefaultLayerInputSources(evaluationLayerNames[i]);
+                        if (sources == null)
+                        {
+                            continue;
+                        }
+
+                        foreach ((string id, _) in sources)
+                        {
+                            TryAddPort(binding.Slug, id, seenCanonicalIds, ports);
+                        }
                     }
 
-                    foreach ((string id, _) in sources)
+                    TryAddPort(binding.Slug, defaultLayer.DefaultLayerInputSourceId, seenCanonicalIds, ports);
+                }
+                else
+                {
+                    TryAddPort(binding.Slug, defaultLayer.DefaultLayerInputSourceId, seenCanonicalIds, ports);
+                }
+            }
+
+            // 2) InputSystem のように設定済み入力源を動的に組む binding が静的宣言する canonical id。
+            if (binding is IAdapterBindingDeclaredInputs declaredInputs)
+            {
+                IEnumerable<string> declaredIds = declaredInputs.GetDeclaredInputSourceIds();
+                if (declaredIds != null)
+                {
+                    foreach (string id in declaredIds)
                     {
                         TryAddPort(binding.Slug, id, seenCanonicalIds, ports);
                     }
                 }
-
-                TryAddPort(binding.Slug, defaultLayer.DefaultLayerInputSourceId, seenCanonicalIds, ports);
-            }
-            else
-            {
-                TryAddPort(binding.Slug, defaultLayer.DefaultLayerInputSourceId, seenCanonicalIds, ports);
             }
 
             return ports;
