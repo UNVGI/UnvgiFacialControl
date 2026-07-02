@@ -6,6 +6,12 @@
 
 本パッケージはこれが初回リリースです。
 
+### Changed
+
+- `FacialCharacterProfileSO` Inspector の Expression List overlay 行で、Default / Suppress / Override の 3 状態選択を `RadioButtonGroup` から `DropdownField` に変更した（要素名 `expression-overlay-state-radio` → `expression-overlay-state-dropdown`）。あわせて Override 用 AnimationClip 欄の内部ラベルを撤去し、状態 dropdown のすぐ脇に表示するようにした（従来はラベル込みで flexGrow していたため欄が右端まで寄って見つけづらかった）。Default Overlays 行の AnimationClip 欄も同様に Slot dropdown 直後へ隣接配置した。
+- `FacialCharacterProfileSO` Inspector の選択タブと各 Foldout（セクション / Expression 行の Overlays / Phoneme Overlays）の展開状態を `SessionState` に保存し、domain reload や asset 再読み込みで Inspector が再構築されても直前の表示状態を復元するようにした（従来は毎回「表情ライブラリ」タブ先頭・既定の展開状態にリセットされていた）。Editor 再起動時はリセットされる。
+- 保存ステータスバーの「今すぐ書き出し」ボタンを削除した。profile.json のエクスポートはパラメータ変更時の自動保存（`ScheduleAutoSave`）と Play 突入 / ビルド時の `FacialCharacterProfileAutoExporter` で自動実行されるため、手動操作は不要になった。
+
 ### Breaking Changes
 
 - **`AnimationEvent` 由来の遷移メタデータを撤去**: Expression の `transitionDuration` / `transitionCurvePreset` は `FacialCharacterProfileSO` Inspector の Expression 行だけで編集する方針に統一しました。AnimationClip 上の `AnimationEvent` (`FacialControlMeta_Set` など) は遷移メタデータとして扱いません。
@@ -14,6 +20,7 @@
 
 ### Fixed
 
+- Overlay の Suppress / Override 編集直後に別オブジェクトを選択して Inspector が破棄されると、その編集が `.asset` / profile.json へ一度も保存されないまま残る不具合を修正。自動保存は `EditorApplication.delayCall` に予約されるが、発火前に Inspector (Editor) が破棄されると `FlushAutoSave` が `target == null` で何もせず終了し、編集はメモリ上の SO にだけ存在する状態（dirty・未保存）で放置されていた。この状態はエラーも警告も出ず、Editor の異常終了やアセット再読込でディスク上の旧状態（Default）へ巻き戻り得る。対策として (1) `FacialCharacterProfileSOInspector.OnDisable` が保留中の自動保存を破棄前に同期確定するようにし、(2) `FacialCharacterProfileAutoExporter.ExportAll`（Play 突入 / ビルド時）が各 SO のエクスポート前に `AssetDatabase.SaveAssetIfDirty` で未保存編集を `.asset` へ確定するようにした。
 - Overlay slot（blink 等）の解決結果（default / 表情別 override / suppress）が active 表情の切替時に 1 フレームで瞬時に切替わり、目パチ（パチパチした見た目のポップ）や一瞬のリセットに見える不具合を修正。`OverlayInputSource` が解決結果の切替を検出した際、旧出力値から新出力値へ表情側と同期したクロスフェード（切替先 active 表情の `transitionDuration` / `transitionCurve`、active 解除時は既定リリース `Expression.DefaultTransitionDuration` + Linear）で補間するようにした。遷移中の ContributeMask は from ∪ target の union を維持し、suppress への切替もフェードアウト完了後に無効ソース化する。フォニーム予約 slot（a/i/u/e/o）はリップシンク応答性の「1 フレーム切替」仕様を維持するためクロスフェード対象外。典型例: RT（overlay weight）押下中に override 付き表情を ON/OFF しても、専用閉じ目 ⇄ 既定閉じ目が滑らかに遷移する。
 - AnimationClip で登録した Expression の BlendShape weight が個別値を反映せず全て最大 (100) に飽和する不具合を修正。`AnimationClipExpressionSampler` が `blendShape.*` カーブ（Unity 標準 0..100 スケール）の値を正規化せず snapshot へ格納していたため、ドメイン / runtime apply 側の正規化 0..1 規約（`FacialController` の `×100`）と二重スケールになり、キーフレーム 30/40 が `×100` で 3000/4000 → 100 にクランプされていた。サンプラはカーブ値を `/100` して正規化 0..1 で格納し、`ExpressionClipBakery` は正規化 0..1 を `×100` して Unity 標準スケールでカーブへ書き込むよう統一した。これに伴い同梱 `MultiSourceBlendDemo` の `profile.json`（dev / Samples~ 両コピー）と SO `.asset` に残っていた 0..100 スケールの BlendShape 値を正規化 0..1 へ移行した（.anim カーブは元から 0..100 のため変更なし）。
 - `FacialCharacterProfileSO` Inspector の Expression List / Default Overlays で Overlay の Suppress / Override 切替および override clip 割当が確実に保存されない不具合を修正。これらのハンドラは `SerializedProperty` を経由せず managed モデルを直接書き換えて `serializedObject.Update()` のみで終えていたため、`TrackSerializedObjectValue` による自動保存監視が発火せず、`EditorUtility.SetDirty` 任せの「次回の手動保存時にたまたま保存される」挙動になっていた。各ハンドラから自動保存予約 `ScheduleAutoSave()` を明示的に呼び、profile.json エクスポートとアセット保存を確実に走らせるようにした。
