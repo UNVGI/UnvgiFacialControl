@@ -6,6 +6,7 @@ using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Hidano.FacialControl.Adapters.Playable;
+using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.Common;
 using Hidano.FacialControl.Editor.Sampling;
@@ -17,6 +18,10 @@ namespace Hidano.FacialControl.Editor.Tools
     /// BlendShape スライダーをリアルタイムプレビューしながら AnimationClip にベイクする。
     /// 既存 AnimationClip を割り当てると <see cref="IExpressionAnimationClipSampler.SampleSnapshot"/>
     /// 経由でスライダー値が復元される。
+    /// <para>
+    /// Clip の選択は「登録済み Expression から編集」「AnimationClip を作成・編集」の 2 タブから開始する。
+    /// 後者のタブでは既存 Clip の編集と新規 Clip の作成をボタンで選択する。
+    /// </para>
     /// </summary>
     public class ExpressionCreatorWindow : EditorWindow
     {
@@ -24,14 +29,46 @@ namespace Hidano.FacialControl.Editor.Tools
         private const float MinWindowWidth = 700f;
         private const float MinWindowHeight = 500f;
         private const int PreviewSize = 256;
+        // PNG 書き出し（単発保存 / 全 Expression 一括）の画像サイズ。画面上のプレビューとは独立。
+        private const int ExportImageSize = 512;
         private const float BakeButtonMinWidth = 140f;
+        // 通常ボタン(約20px)の2倍の高さ。潰れ対策。
+        private const float BakeButtonHeight = 40f;
+        // スライダー表示は SkinnedMeshRenderer Inspector に合わせた 0..100。内部値は正規化 0..1。
+        private const float BlendShapeDisplayScale = 100f;
+        private const string RendererFilterAllLabel = "すべて";
+
         private const string SavePreviewButtonName = "expression-creator-save-preview-png-button";
         private const string CreateNewClipButtonName = "expression-creator-create-new-clip-button";
+        private const string TrackTargetFieldName = "expression-creator-track-target-field";
+        private const string ClipTabViewName = "expression-creator-clip-tab-view";
+        private const string RegisteredTabName = "expression-creator-registered-tab";
+        private const string ClipEditTabName = "expression-creator-clip-edit-tab";
+        private const string RegisteredClipHelpBoxName = "expression-creator-registered-clip-help";
+        private const string EditProjectClipButtonName = "expression-creator-edit-project-clip-button";
+        private const string RegisteredClipDropdownName = "expression-creator-registered-clip-dropdown";
+        private const string ClipRowName = "expression-creator-clip-row";
+        private const string RendererFilterDropdownName = "expression-creator-renderer-filter-dropdown";
+        private const string MissingBlendShapeWarningName = "expression-creator-missing-blendshape-warning";
+        private const string DeleteMissingBlendShapeButtonName = "expression-creator-delete-missing-blendshape-button";
+        private const string ExportAllButtonName = "expression-creator-export-all-button";
+        private const string ExportAllContainerName = "expression-creator-export-all-container";
+
+        private const string BlendShapePropertyPrefix = "blendShape.";
+
+        /// <summary>
+        /// 全 Expression 書き出しの前回書き出し先フォルダを記憶する EditorPrefs キー。
+        /// プロジェクトデータに残すほどではないマシンローカルの利便設定のため EditorPrefs を使う。
+        /// </summary>
+        private const string LastExportFolderPrefsKey
+            = "Hidano.FacialControl.ExpressionCreatorWindow.LastExportFolder";
 
         // モデル参照
         private GameObject _targetObject;
         private SkinnedMeshRenderer[] _skinnedMeshRenderers;
         private ObjectField _modelField;
+        private ObjectField _trackTargetField;
+        private Transform _trackTarget;
         private string[] _availableBlendShapeNames = Array.Empty<string>();
         private HelpBox _blendShapeHelpBox;
 
@@ -44,23 +81,38 @@ namespace Hidano.FacialControl.Editor.Tools
         private ScrollView _blendShapeListView;
         private TextField _blendShapeSearchField;
         private string _blendShapeSearchText = "";
+        private DropdownField _rendererFilterDropdown;
+        private readonly List<int> _rendererFilterRendererIndices = new List<int>();
+        private int _rendererFilterIndex = -1;
+        private Label _missingBlendShapeWarningLabel;
+        private Button _deleteMissingBlendShapeButton;
+        private readonly List<(string rendererPath, string blendShapeName)> _missingBlendShapeKeys
+            = new List<(string rendererPath, string blendShapeName)>();
 
         // ベイク先 AnimationClip
         private ObjectField _clipField;
         private AnimationClip _targetClip;
+        private VisualElement _clipRow;
+        private HelpBox _registeredClipHelpBox;
+        private DropdownField _registeredClipDropdown;
+        private readonly List<(string label, AnimationClip clip)> _registeredClipChoices
+            = new List<(string label, AnimationClip clip)>();
 
-        // ステータス
-        private Label _statusLabel;
+        // 全 Expression プレビュー書き出し
+        private VisualElement _exportAllContainer;
+        private Button _exportAllButton;
 
         // 依存
         private IExpressionAnimationClipSampler _sampler;
-        private Func<string> _savePreviewPathProvider;
+        // 引数はダイアログのデフォルトファイル名
+        private Func<string, string> _savePreviewPathProvider;
         private Func<int, int, Texture2D> _previewTextureCapture;
         private Action<string, byte[]> _pngFileWriter;
         private Func<string> _createClipPathProvider;
         private Action<AnimationClip, string> _clipAssetCreator;
         private Func<string, AnimationClip> _clipAssetLoader;
         private Action _assetDatabaseSaveAssets;
+        private Func<string> _exportFolderProvider;
 
         [MenuItem("Tools/FacialControl/Expression 作成", false, 20)]
         public static void ShowWindow()
@@ -74,8 +126,10 @@ namespace Hidano.FacialControl.Editor.Tools
         {
             _sampler = new AnimationClipExpressionSampler();
             _previewWrapper = new PreviewRenderWrapper();
+            saveChangesMessage = "ベイクされていない編集内容があります。AnimationClip にベイクして保存しますか？";
             ConfigureSavePreviewDependencies();
             ConfigureCreateClipDependencies();
+            ConfigureExportAllDependencies();
         }
 
         private void OnDisable()
@@ -95,6 +149,8 @@ namespace Hidano.FacialControl.Editor.Tools
             var mainContainer = new VisualElement();
             mainContainer.style.flexDirection = FlexDirection.Row;
             mainContainer.style.flexGrow = 1;
+            // min-content 高さでベイク行を window 外へ押し出さないよう、縮小を許可する
+            mainContainer.style.minHeight = 0;
             root.Add(mainContainer);
 
             // ========================================
@@ -117,6 +173,17 @@ namespace Hidano.FacialControl.Editor.Tools
             };
             _modelField.RegisterValueChangedCallback(OnModelChanged);
             leftPanel.Add(_modelField);
+
+            _trackTargetField = new ObjectField("トラッキング対象")
+            {
+                name = TrackTargetFieldName,
+                objectType = typeof(Transform),
+                allowSceneObjects = true,
+                tooltip = "プレビューカメラが注視するジョイント。モデル設定時に Humanoid の Head ボーン → "
+                    + "head / neck 名のジョイントの順で自動解決される。誤検出時は手動で差し替え可能。"
+            };
+            _trackTargetField.RegisterValueChangedCallback(OnTrackTargetChanged);
+            leftPanel.Add(_trackTargetField);
 
             _blendShapeHelpBox = new HelpBox(
                 "モデルを設定するか、シーン上に FacialController を配置すると BlendShape スライダーが表示されます。",
@@ -142,6 +209,21 @@ namespace Hidano.FacialControl.Editor.Tools
             savePreviewButton.style.marginTop = 4;
             leftPanel.Add(savePreviewButton);
 
+            // 全 Expression プレビュー PNG 書き出し。
+            // 無効化時もホバーで理由を提示できるよう、コンテナ側にも tooltip を持たせる。
+            _exportAllContainer = new VisualElement();
+            _exportAllContainer.name = ExportAllContainerName;
+            leftPanel.Add(_exportAllContainer);
+
+            _exportAllButton = new Button(OnExportAllExpressionPreviewsClicked)
+            {
+                text = "全 Expression プレビューを PNG 書き出し"
+            };
+            _exportAllButton.name = ExportAllButtonName;
+            _exportAllButton.AddToClassList(FacialControlStyles.ActionButton);
+            _exportAllButton.style.marginTop = 4;
+            _exportAllContainer.Add(_exportAllButton);
+
             var resetButton = new Button(OnResetBlendShapes) { text = "全スライダーリセット" };
             resetButton.AddToClassList(FacialControlStyles.ActionButton);
             resetButton.style.marginTop = 4;
@@ -157,6 +239,66 @@ namespace Hidano.FacialControl.Editor.Tools
             rightPanel.style.paddingTop = 4;
             mainContainer.Add(rightPanel);
 
+            // Clip 選択（2 タブ: 登録済み Expression から編集 / AnimationClip を作成・編集）
+            var clipTabView = new TabView { name = ClipTabViewName };
+
+            var registeredTab = new Tab("登録済み Expression から編集") { name = RegisteredTabName };
+            clipTabView.Add(registeredTab);
+
+            // 登録済み Expression の Clip 選択ドロップダウン（登録が 1 件以上ある場合のみ表示）
+            _registeredClipDropdown = new DropdownField("登録済み Expression");
+            _registeredClipDropdown.name = RegisteredClipDropdownName;
+            _registeredClipDropdown.style.marginTop = 4;
+            _registeredClipDropdown.RegisterValueChangedCallback(
+                _ => ApplyRegisteredClipSelection(_registeredClipDropdown.index));
+            registeredTab.contentContainer.Add(_registeredClipDropdown);
+
+            _registeredClipHelpBox = new HelpBox(
+                "登録済みの Clip がありません。FacialController の FacialCharacterProfileSO に "
+                    + "AnimationClip 付きの Expression を登録してください。",
+                HelpBoxMessageType.Info);
+            _registeredClipHelpBox.name = RegisteredClipHelpBoxName;
+            _registeredClipHelpBox.style.marginTop = 4;
+            registeredTab.contentContainer.Add(_registeredClipHelpBox);
+
+            var clipEditTab = new Tab("AnimationClip を作成・編集") { name = ClipEditTabName };
+            clipTabView.Add(clipEditTab);
+
+            var clipEditButtonRow = new VisualElement();
+            clipEditButtonRow.style.flexDirection = FlexDirection.Row;
+            clipEditButtonRow.style.flexWrap = Wrap.Wrap;
+            clipEditButtonRow.style.marginTop = 4;
+            clipEditTab.contentContainer.Add(clipEditButtonRow);
+
+            var editProjectClipButton = new Button(OnEditProjectClipClicked)
+            {
+                text = "既存 Clip を編集",
+                tooltip = "Project 内の既存 AnimationClip をスロットに割り当てて編集します。"
+            };
+            editProjectClipButton.name = EditProjectClipButtonName;
+            editProjectClipButton.AddToClassList(FacialControlStyles.ActionButton);
+            clipEditButtonRow.Add(editProjectClipButton);
+
+            var createNewClipButton = new Button(OnCreateNewClipClicked)
+            {
+                text = "新規 Clip を作成",
+                tooltip = "新規 AnimationClip アセットを作成してスロットに割り当てます。"
+            };
+            createNewClipButton.name = CreateNewClipButtonName;
+            createNewClipButton.AddToClassList(FacialControlStyles.ActionButton);
+            createNewClipButton.style.marginLeft = 4;
+            clipEditButtonRow.Add(createNewClipButton);
+
+            // タブ切り替え時に登録済み Clip の選択肢を最新化する
+            clipTabView.activeTabChanged += (_, next) =>
+            {
+                if (next == registeredTab)
+                    RefreshRegisteredClipChoices();
+            };
+
+            rightPanel.Add(clipTabView);
+
+            // ベイク先 Clip スロット（いずれかのモードが選択されるまで非表示）
             _clipField = new ObjectField("AnimationClip")
             {
                 objectType = typeof(AnimationClip),
@@ -164,27 +306,54 @@ namespace Hidano.FacialControl.Editor.Tools
                 tooltip = "ベイク対象の AnimationClip。割り当てると現在の値がスライダーに復元される。"
             };
             _clipField.RegisterValueChangedCallback(OnClipFieldChanged);
-
-            var clipRow = new VisualElement();
-            clipRow.style.flexDirection = FlexDirection.Row;
-            clipRow.style.alignItems = Align.Center;
-            rightPanel.Add(clipRow);
-
             _clipField.style.flexGrow = 1;
-            clipRow.Add(_clipField);
 
-            var createNewClipButton = new Button(OnCreateNewClipClicked) { text = "新規作成" };
-            createNewClipButton.name = CreateNewClipButtonName;
-            createNewClipButton.AddToClassList(FacialControlStyles.ActionButton);
-            createNewClipButton.style.marginLeft = 4;
-            createNewClipButton.style.flexShrink = 0f;
-            clipRow.Add(createNewClipButton);
+            _clipRow = new VisualElement();
+            _clipRow.name = ClipRowName;
+            _clipRow.style.flexDirection = FlexDirection.Row;
+            _clipRow.style.alignItems = Align.Center;
+            _clipRow.style.marginTop = 4;
+            _clipRow.style.display = DisplayStyle.None;
+            _clipRow.Add(_clipField);
+            rightPanel.Add(_clipRow);
+
+            // SkinnedMeshRenderer フィルタ
+            _rendererFilterDropdown = new DropdownField("SkinnedMeshRenderer");
+            _rendererFilterDropdown.name = RendererFilterDropdownName;
+            _rendererFilterDropdown.choices = new List<string> { RendererFilterAllLabel };
+            _rendererFilterDropdown.SetValueWithoutNotify(RendererFilterAllLabel);
+            _rendererFilterDropdown.style.marginTop = 8;
+            _rendererFilterDropdown.RegisterValueChangedCallback(
+                _ => ApplyRendererFilter(_rendererFilterDropdown.index));
+            rightPanel.Add(_rendererFilterDropdown);
 
             // BlendShape 検索
             _blendShapeSearchField = new TextField("BlendShape 検索");
             _blendShapeSearchField.RegisterValueChangedCallback(OnBlendShapeSearchChanged);
-            _blendShapeSearchField.style.marginTop = 8;
+            _blendShapeSearchField.style.marginTop = 2;
             rightPanel.Add(_blendShapeSearchField);
+
+            // 設定中モデルに存在しない BlendShape の警告（黄色）
+            _missingBlendShapeWarningLabel = new Label();
+            _missingBlendShapeWarningLabel.name = MissingBlendShapeWarningName;
+            _missingBlendShapeWarningLabel.style.color = new Color(1f, 0.85f, 0.2f, 1f);
+            _missingBlendShapeWarningLabel.style.whiteSpace = WhiteSpace.Normal;
+            _missingBlendShapeWarningLabel.style.marginTop = 4;
+            _missingBlendShapeWarningLabel.style.display = DisplayStyle.None;
+            rightPanel.Add(_missingBlendShapeWarningLabel);
+
+            // 存在しない BlendShape のカーブを Clip から一括削除するボタン（警告表示中のみ表示）
+            _deleteMissingBlendShapeButton = new Button(OnDeleteMissingBlendShapesClicked)
+            {
+                text = "存在しない BlendShape を Clip から一括削除",
+                tooltip = "設定中のモデルに存在しない BlendShape のカーブを AnimationClip から削除します。"
+            };
+            _deleteMissingBlendShapeButton.name = DeleteMissingBlendShapeButtonName;
+            _deleteMissingBlendShapeButton.AddToClassList(FacialControlStyles.ActionButton);
+            _deleteMissingBlendShapeButton.style.marginTop = 2;
+            _deleteMissingBlendShapeButton.style.alignSelf = Align.FlexStart;
+            _deleteMissingBlendShapeButton.style.display = DisplayStyle.None;
+            rightPanel.Add(_deleteMissingBlendShapeButton);
 
             // BlendShape スライダーリスト
             _blendShapeListView = new ScrollView(ScrollViewMode.Vertical);
@@ -197,6 +366,7 @@ namespace Hidano.FacialControl.Editor.Tools
             // ========================================
             var bottomSection = new VisualElement();
             bottomSection.style.flexDirection = FlexDirection.Row;
+            bottomSection.style.flexShrink = 0f;
             bottomSection.style.paddingLeft = 4;
             bottomSection.style.paddingRight = 4;
             bottomSection.style.paddingBottom = 4;
@@ -208,17 +378,25 @@ namespace Hidano.FacialControl.Editor.Tools
             bakeButton.AddToClassList(FacialControlStyles.ActionButton);
             bakeButton.style.flexShrink = 0f;
             bakeButton.style.minWidth = BakeButtonMinWidth;
+            bakeButton.style.height = BakeButtonHeight;
             bottomSection.Add(bakeButton);
 
             root.Add(bottomSection);
 
-            _statusLabel = new Label();
-            _statusLabel.AddToClassList(FacialControlStyles.StatusLabel);
-            _statusLabel.style.paddingLeft = 4;
-            _statusLabel.style.paddingBottom = 4;
-            root.Add(_statusLabel);
-
+            RefreshRegisteredClipChoices();
+            RefreshExportAllButtonState();
             TryAutoResolveModelFromScene();
+
+            // domain reload 直後は CreateGUI 時点でシーンオブジェクトを解決できないことがあるため、
+            // 未解決の場合は 1 フレーム遅らせて再試行する。
+            if (_targetObject == null)
+            {
+                EditorApplication.delayCall += () =>
+                {
+                    if (this != null)
+                        TryAutoResolveModelFromScene();
+                };
+            }
         }
 
         // ========================================
@@ -227,12 +405,51 @@ namespace Hidano.FacialControl.Editor.Tools
 
         private void OnModelChanged(ChangeEvent<UnityEngine.Object> evt)
         {
-            _targetObject = evt.newValue as GameObject;
+            ApplyModelChange(evt.newValue as GameObject);
+        }
+
+        /// <summary>
+        /// モデル変更を適用する。panel 未接続でも動作するよう ChangeEvent に依存しない。
+        /// </summary>
+        private void ApplyModelChange(GameObject model)
+        {
+            _targetObject = model;
             CollectBlendShapes();
             RefreshBlendShapeNameChoices();
+            RefreshRendererFilterChoices();
+            AutoResolveTrackTarget();
             RebuildBlendShapeList();
             SetupPreview();
             RestoreSliderValuesFromTargetClip();
+            RefreshRegisteredClipChoices();
+            RefreshExportAllButtonState();
+        }
+
+        private void AutoResolveTrackTarget()
+        {
+            _trackTarget = _targetObject != null ? FaceTrackTargetResolver.Resolve(_targetObject) : null;
+            _trackTargetField?.SetValueWithoutNotify(_trackTarget);
+        }
+
+        private void OnTrackTargetChanged(ChangeEvent<UnityEngine.Object> evt)
+        {
+            _trackTarget = evt.newValue as Transform;
+            SetupPreview();
+        }
+
+        /// <summary>
+        /// トラッキング対象をモデルルートからの相対 Transform パスへ変換する。
+        /// 未設定・モデル階層外の場合は null（従来のカメラ配置にフォールバック）。
+        /// </summary>
+        private string ResolveTrackTargetPath()
+        {
+            if (_targetObject == null || _trackTarget == null)
+                return null;
+
+            if (!_trackTarget.IsChildOf(_targetObject.transform))
+                return null;
+
+            return AnimationUtility.CalculateTransformPath(_trackTarget, _targetObject.transform);
         }
 
         private void RefreshBlendShapeNameChoices()
@@ -299,8 +516,18 @@ namespace Hidano.FacialControl.Editor.Tools
             var controller = UnityEngine.Object.FindFirstObjectByType<FacialController>();
             if (controller != null)
             {
-                _modelField.value = controller.gameObject;
+                _modelField.SetValueWithoutNotify(controller.gameObject);
+                ApplyModelChange(controller.gameObject);
             }
+        }
+
+        private FacialCharacterProfileSO ResolveCharacterSO()
+        {
+            if (_targetObject == null)
+                return null;
+
+            var controller = _targetObject.GetComponentInChildren<FacialController>(true);
+            return controller != null ? controller.CharacterSO : null;
         }
 
         // ========================================
@@ -310,6 +537,45 @@ namespace Hidano.FacialControl.Editor.Tools
         private void OnBlendShapeSearchChanged(ChangeEvent<string> evt)
         {
             _blendShapeSearchText = evt.newValue ?? "";
+            RebuildBlendShapeList();
+        }
+
+        /// <summary>
+        /// SkinnedMeshRenderer フィルタの選択肢を再構築する。
+        /// 先頭は「すべて」、以降は BlendShape を持つレンダラーの階層パス。
+        /// </summary>
+        private void RefreshRendererFilterChoices()
+        {
+            _rendererFilterRendererIndices.Clear();
+            _rendererFilterIndex = -1;
+
+            var labels = new List<string> { RendererFilterAllLabel };
+            var seen = new HashSet<int>();
+            for (int i = 0; i < _blendShapeEntries.Count; i++)
+            {
+                var entry = _blendShapeEntries[i];
+                if (!seen.Add(entry.RendererIndex))
+                    continue;
+
+                labels.Add(string.IsNullOrEmpty(entry.RendererPath)
+                    ? entry.RendererName
+                    : entry.RendererPath);
+                _rendererFilterRendererIndices.Add(entry.RendererIndex);
+            }
+
+            if (_rendererFilterDropdown != null)
+            {
+                _rendererFilterDropdown.choices = labels;
+                _rendererFilterDropdown.SetValueWithoutNotify(RendererFilterAllLabel);
+            }
+        }
+
+        private void ApplyRendererFilter(int dropdownIndex)
+        {
+            int mappedIndex = dropdownIndex - 1;
+            _rendererFilterIndex = mappedIndex >= 0 && mappedIndex < _rendererFilterRendererIndices.Count
+                ? _rendererFilterRendererIndices[mappedIndex]
+                : -1;
             RebuildBlendShapeList();
         }
 
@@ -338,6 +604,9 @@ namespace Hidano.FacialControl.Editor.Tools
             for (int i = 0; i < _blendShapeEntries.Count; i++)
             {
                 var entry = _blendShapeEntries[i];
+
+                if (_rendererFilterIndex >= 0 && entry.RendererIndex != _rendererFilterIndex)
+                    continue;
 
                 if (!string.IsNullOrEmpty(_blendShapeSearchText)
                     && entry.BlendShapeName.IndexOf(_blendShapeSearchText, StringComparison.OrdinalIgnoreCase) < 0)
@@ -375,13 +644,14 @@ namespace Hidano.FacialControl.Editor.Tools
             nameLabel.style.unityTextAlign = TextAnchor.MiddleLeft;
             row.Add(nameLabel);
 
-            var slider = new Slider(0f, 1f);
-            slider.value = entry.Value;
+            // 表示スケールは SkinnedMeshRenderer Inspector と同じ 0..100。内部値は正規化 0..1。
+            var slider = new Slider(0f, BlendShapeDisplayScale);
+            slider.value = entry.Value * BlendShapeDisplayScale;
             slider.style.flexGrow = 1;
             slider.style.minWidth = 80;
 
             var valueField = new FloatField();
-            valueField.value = entry.Value;
+            valueField.value = entry.Value * BlendShapeDisplayScale;
             valueField.style.width = 55;
             valueField.style.marginLeft = 4;
 
@@ -389,18 +659,20 @@ namespace Hidano.FacialControl.Editor.Tools
 
             slider.RegisterValueChangedCallback(evt =>
             {
-                _blendShapeEntries[capturedIndex].Value = evt.newValue;
+                _blendShapeEntries[capturedIndex].Value = evt.newValue / BlendShapeDisplayScale;
                 valueField.SetValueWithoutNotify(evt.newValue);
                 ApplyBlendShapeToPreview(capturedIndex);
+                MarkUnsavedChanges();
             });
 
             valueField.RegisterValueChangedCallback(evt =>
             {
-                float clamped = Mathf.Clamp01(evt.newValue);
-                _blendShapeEntries[capturedIndex].Value = clamped;
+                float clamped = Mathf.Clamp(evt.newValue, 0f, BlendShapeDisplayScale);
+                _blendShapeEntries[capturedIndex].Value = clamped / BlendShapeDisplayScale;
                 slider.SetValueWithoutNotify(clamped);
                 valueField.SetValueWithoutNotify(clamped);
                 ApplyBlendShapeToPreview(capturedIndex);
+                MarkUnsavedChanges();
             });
 
             row.Add(slider);
@@ -418,6 +690,9 @@ namespace Hidano.FacialControl.Editor.Tools
 
             RebuildBlendShapeList();
             ApplyAllBlendShapesToPreview();
+
+            if (_blendShapeEntries.Count > 0)
+                MarkUnsavedChanges();
         }
 
         private void OnCameraReset()
@@ -428,16 +703,26 @@ namespace Hidano.FacialControl.Editor.Tools
 
         private void OnSavePreviewClicked()
         {
+            // どの Expression の画像か判別できるファイル名を組み立てられないため、
+            // Expression（AnimationClip）未選択時は保存せず警告する。
+            if (_targetClip == null)
+            {
+                Debug.LogWarning(
+                    "[ExpressionCreatorWindow] Expression が選択されていないため、プレビュー PNG を保存できません。"
+                        + "「登録済み Expression から編集」タブで Expression を選択するか、AnimationClip を設定してください。");
+                return;
+            }
+
             ConfigureSavePreviewDependencies();
 
-            var path = _savePreviewPathProvider();
+            var path = _savePreviewPathProvider(BuildSavePreviewDefaultFileName());
             if (string.IsNullOrEmpty(path))
                 return;
 
             Texture2D texture = null;
             try
             {
-                texture = _previewTextureCapture(PreviewSize, PreviewSize);
+                texture = _previewTextureCapture(ExportImageSize, ExportImageSize);
                 if (texture == null)
                 {
                     ShowStatus("PNG 保存用のプレビュー画像を取得できませんでした。", isError: true);
@@ -450,7 +735,6 @@ namespace Hidano.FacialControl.Editor.Tools
             }
             catch (Exception ex)
             {
-                ShowStatus($"プレビュー PNG 保存エラー: {ex.Message}", isError: true);
                 Debug.LogError($"[ExpressionCreatorWindow] プレビュー PNG 保存エラー: {ex}");
             }
             finally
@@ -461,12 +745,231 @@ namespace Hidano.FacialControl.Editor.Tools
         }
 
         // ========================================
+        // 全 Expression プレビュー PNG 書き出し
+        // ========================================
+
+        /// <summary>
+        /// 全 Expression 書き出しが実行できない理由を返す。実行可能な場合は null。
+        /// </summary>
+        private string GetExportAllDisabledReason()
+        {
+            if (_targetObject == null)
+                return "モデルが設定されていません。FacialController を持つモデルを設定してください。";
+
+            var controller = _targetObject.GetComponentInChildren<FacialController>(true);
+            if (controller == null)
+                return "モデルに FacialController コンポーネントが見つかりません。";
+
+            var so = controller.CharacterSO;
+            if (so == null)
+                return "FacialController に FacialCharacterProfileSO が設定されていません。";
+
+            var expressions = so.Expressions;
+            if (expressions != null)
+            {
+                for (int i = 0; i < expressions.Count; i++)
+                {
+                    if (expressions[i] != null && expressions[i].animationClip != null)
+                        return null;
+                }
+            }
+
+            return "FacialCharacterProfileSO に AnimationClip 付きの Expression が登録されていません。";
+        }
+
+        private void RefreshExportAllButtonState()
+        {
+            if (_exportAllButton == null)
+                return;
+
+            var reason = GetExportAllDisabledReason();
+            _exportAllButton.SetEnabled(reason == null);
+
+            var tooltip = reason ?? "FacialCharacterProfileSO の全 Expression のプレビューを PNG として書き出します。";
+            _exportAllButton.tooltip = tooltip;
+            if (_exportAllContainer != null)
+                _exportAllContainer.tooltip = tooltip;
+        }
+
+        private void OnExportAllExpressionPreviewsClicked()
+        {
+            var reason = GetExportAllDisabledReason();
+            if (reason != null)
+            {
+                ShowStatus(reason, isError: true);
+                return;
+            }
+
+            ConfigureSavePreviewDependencies();
+            ConfigureExportAllDependencies();
+
+            var folder = _exportFolderProvider();
+            if (string.IsNullOrEmpty(folder))
+                return;
+
+            var so = ResolveCharacterSO();
+            var expressions = so.Expressions;
+
+            // 書き出しのためにスライダー値を一時的に上書きするので退避する
+            var backupValues = new float[_blendShapeEntries.Count];
+            for (int i = 0; i < _blendShapeEntries.Count; i++)
+                backupValues[i] = _blendShapeEntries[i].Value;
+
+            try
+            {
+                int exported = 0;
+                var usedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                // GetExportAllDisabledReason で _targetObject 非 null は確認済み
+                var modelName = _targetObject.name;
+                var timestamp = BuildExportTimestamp();
+
+                for (int e = 0; e < expressions.Count; e++)
+                {
+                    var expression = expressions[e];
+                    if (expression == null || expression.animationClip == null)
+                        continue;
+
+                    var values = ExpressionClipBakery.LoadBlendShapeValues(expression.animationClip, _sampler);
+                    for (int i = 0; i < _blendShapeEntries.Count; i++)
+                    {
+                        var entry = _blendShapeEntries[i];
+                        var key = (entry.RendererPath ?? string.Empty, entry.BlendShapeName ?? string.Empty);
+                        entry.Value = values.TryGetValue(key, out var value) ? Mathf.Clamp01(value) : 0f;
+                    }
+
+                    ApplyAllBlendShapesToPreview();
+
+                    Texture2D texture = null;
+                    try
+                    {
+                        texture = _previewTextureCapture(ExportImageSize, ExportImageSize);
+                        if (texture == null)
+                        {
+                            ShowStatus("PNG 書き出し用のプレビュー画像を取得できませんでした。", isError: true);
+                            return;
+                        }
+
+                        var fileName = BuildExportFileName(modelName, expression, timestamp, usedFileNames);
+                        _pngFileWriter(Path.Combine(folder, fileName), texture.EncodeToPNG());
+                        exported++;
+                    }
+                    finally
+                    {
+                        if (texture != null)
+                            UnityEngine.Object.DestroyImmediate(texture);
+                    }
+                }
+
+                ShowStatus($"{exported} 件の Expression プレビューを PNG 書き出ししました: {folder}", isError: false);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ExpressionCreatorWindow] Expression プレビュー書き出しエラー: {ex}");
+            }
+            finally
+            {
+                for (int i = 0; i < _blendShapeEntries.Count; i++)
+                    _blendShapeEntries[i].Value = backupValues[i];
+                RebuildBlendShapeList();
+                ApplyAllBlendShapesToPreview();
+            }
+        }
+
+        /// <summary>
+        /// 単発プレビュー保存ダイアログのデフォルトファイル名
+        /// 「{モデル名}_{Expression 名}_{yyyyMMdd-HHmm}.png」を組み立てる。
+        /// Expression 名は編集中の Clip が登録済み Expression のものであればその名前、
+        /// そうでなければ Clip 名。<see cref="_targetClip"/> 非 null が呼び出し前提。
+        /// </summary>
+        private string BuildSavePreviewDefaultFileName()
+        {
+            var expressionName = ResolveExpressionNameForTargetClip();
+            if (string.IsNullOrWhiteSpace(expressionName))
+                expressionName = _targetClip.name;
+            if (string.IsNullOrWhiteSpace(expressionName))
+                expressionName = "expression";
+
+            var timestamp = BuildExportTimestamp();
+            var baseName = _targetObject != null
+                ? $"{_targetObject.name}_{expressionName}_{timestamp}"
+                : $"{expressionName}_{timestamp}";
+            return SanitizeFileName(baseName) + ".png";
+        }
+
+        private static string BuildExportTimestamp()
+        {
+            return DateTime.Now.ToString("yyyyMMdd-HHmm");
+        }
+
+        /// <summary>
+        /// <see cref="_targetClip"/> が登録済み Expression の Clip であれば、その Expression 名を返す。
+        /// 該当が無ければ null。
+        /// </summary>
+        private string ResolveExpressionNameForTargetClip()
+        {
+            var so = ResolveCharacterSO();
+            if (so == null || so.Expressions == null)
+                return null;
+
+            for (int i = 0; i < so.Expressions.Count; i++)
+            {
+                var expression = so.Expressions[i];
+                if (expression != null
+                    && expression.animationClip == _targetClip
+                    && !string.IsNullOrWhiteSpace(expression.name))
+                {
+                    return expression.name;
+                }
+            }
+
+            return null;
+        }
+
+        private static string SanitizeFileName(string name)
+        {
+            var invalidChars = Path.GetInvalidFileNameChars();
+            for (int i = 0; i < invalidChars.Length; i++)
+                name = name.Replace(invalidChars[i], '_');
+            return name;
+        }
+
+        /// <summary>
+        /// 一括書き出しの PNG ファイル名「{モデル名}_{Expression 名}_{yyyyMMdd-HHmm}.png」を組み立てる。
+        /// 同名衝突時は末尾に連番を付与する。
+        /// </summary>
+        private static string BuildExportFileName(
+            string modelName,
+            ExpressionSerializable expression,
+            string timestamp,
+            HashSet<string> usedFileNames)
+        {
+            var expressionName = !string.IsNullOrWhiteSpace(expression.name)
+                ? expression.name
+                : expression.animationClip.name;
+
+            if (string.IsNullOrWhiteSpace(expressionName))
+                expressionName = "expression";
+
+            var baseName = SanitizeFileName($"{modelName}_{expressionName}_{timestamp}");
+
+            var fileName = baseName + ".png";
+            int suffix = 1;
+            while (!usedFileNames.Add(fileName))
+            {
+                fileName = $"{baseName}_{suffix}.png";
+                suffix++;
+            }
+
+            return fileName;
+        }
+
+        // ========================================
         // プレビュー
         // ========================================
 
         private void SetupPreview()
         {
-            _previewWrapper.Setup(_targetObject);
+            _previewWrapper.Setup(_targetObject, ResolveTrackTargetPath());
 
             if (_previewWrapper.IsInitialized)
             {
@@ -543,13 +1046,82 @@ namespace Hidano.FacialControl.Editor.Tools
         }
 
         // ========================================
-        // AnimationClip ロード
+        // AnimationClip 選択モード
         // ========================================
 
         private void OnClipFieldChanged(ChangeEvent<UnityEngine.Object> evt)
         {
             _targetClip = evt.newValue as AnimationClip;
             RestoreSliderValuesFromTargetClip();
+        }
+
+        private void OnEditProjectClipClicked()
+        {
+            _clipRow.style.display = DisplayStyle.Flex;
+        }
+
+        /// <summary>
+        /// FacialCharacterProfileSO に登録された AnimationClip 付き Expression の選択肢を再構築する。
+        /// 選択肢が 0 件の場合はドロップダウンの代わりに案内 HelpBox を表示する。
+        /// </summary>
+        private void RefreshRegisteredClipChoices()
+        {
+            _registeredClipChoices.Clear();
+
+            var so = ResolveCharacterSO();
+            if (so != null && so.Expressions != null)
+            {
+                for (int i = 0; i < so.Expressions.Count; i++)
+                {
+                    var expression = so.Expressions[i];
+                    if (expression == null || expression.animationClip == null)
+                        continue;
+
+                    var displayName = string.IsNullOrWhiteSpace(expression.name)
+                        ? expression.animationClip.name
+                        : expression.name;
+                    _registeredClipChoices.Add(
+                        ($"{displayName} ({expression.animationClip.name})", expression.animationClip));
+                }
+            }
+
+            if (_registeredClipDropdown != null)
+            {
+                var labels = new List<string>(_registeredClipChoices.Count);
+                for (int i = 0; i < _registeredClipChoices.Count; i++)
+                    labels.Add(_registeredClipChoices[i].label);
+                _registeredClipDropdown.choices = labels;
+
+                if (_registeredClipChoices.Count == 0)
+                    _registeredClipDropdown.SetValueWithoutNotify(string.Empty);
+
+                _registeredClipDropdown.style.display = _registeredClipChoices.Count > 0
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+            }
+
+            if (_registeredClipHelpBox != null)
+            {
+                _registeredClipHelpBox.style.display = _registeredClipChoices.Count > 0
+                    ? DisplayStyle.None
+                    : DisplayStyle.Flex;
+            }
+        }
+
+        private void ApplyRegisteredClipSelection(int choiceIndex)
+        {
+            if (choiceIndex < 0 || choiceIndex >= _registeredClipChoices.Count)
+                return;
+
+            var clip = _registeredClipChoices[choiceIndex].clip;
+            _clipField.SetValueWithoutNotify(clip);
+            _clipRow.style.display = DisplayStyle.Flex;
+
+            if (_targetClip != clip)
+            {
+                _targetClip = clip;
+                RestoreSliderValuesFromTargetClip();
+            }
         }
 
         private void OnCreateNewClipClicked()
@@ -567,6 +1139,7 @@ namespace Hidano.FacialControl.Editor.Tools
                 _assetDatabaseSaveAssets();
 
                 var loadedClip = _clipAssetLoader(path) ?? clip;
+                _clipRow.style.display = DisplayStyle.Flex;
                 _clipField.value = loadedClip;
                 if (_targetClip != loadedClip)
                 {
@@ -578,7 +1151,6 @@ namespace Hidano.FacialControl.Editor.Tools
             }
             catch (Exception ex)
             {
-                ShowStatus($"AnimationClip 作成エラー: {ex.Message}", isError: true);
                 Debug.LogError($"[ExpressionCreatorWindow] AnimationClip 作成エラー: {ex}");
             }
         }
@@ -586,9 +1158,12 @@ namespace Hidano.FacialControl.Editor.Tools
         /// <summary>
         /// 現在の <see cref="_targetClip"/> から <see cref="IExpressionAnimationClipSampler"/> 経由で
         /// BlendShape 値を取得し、スライダーへ復元する。clip 未設定時は何もしない。
+        /// 設定中モデルに存在しない BlendShape が Clip に含まれる場合は警告を表示する。
         /// </summary>
         private void RestoreSliderValuesFromTargetClip()
         {
+            HideMissingBlendShapeWarning();
+
             if (_targetClip == null || _sampler == null || _blendShapeEntries.Count == 0)
                 return;
 
@@ -602,15 +1177,118 @@ namespace Hidano.FacialControl.Editor.Tools
                     entry.Value = values.TryGetValue(key, out var value) ? Mathf.Clamp01(value) : 0f;
                 }
 
+                UpdateMissingBlendShapeWarning(values);
                 RebuildBlendShapeList();
                 ApplyAllBlendShapesToPreview();
                 ShowStatus($"AnimationClip を読み込みました: {_targetClip.name}", isError: false);
+                hasUnsavedChanges = false;
             }
             catch (Exception ex)
             {
-                ShowStatus($"AnimationClip 読み込みエラー: {ex.Message}", isError: true);
                 Debug.LogError($"[ExpressionCreatorWindow] AnimationClip 読み込みエラー: {ex}");
             }
+        }
+
+        /// <summary>
+        /// Clip に含まれる BlendShape のうち設定中モデルに存在しないものを黄色の警告として表示し、
+        /// 一括削除ボタン用に (RendererPath, BlendShapeName) のキーを保持する。
+        /// </summary>
+        private void UpdateMissingBlendShapeWarning(
+            Dictionary<(string rendererPath, string blendShapeName), float> clipValues)
+        {
+            if (_missingBlendShapeWarningLabel == null)
+                return;
+
+            var known = new HashSet<(string, string)>();
+            for (int i = 0; i < _blendShapeEntries.Count; i++)
+            {
+                var entry = _blendShapeEntries[i];
+                known.Add((entry.RendererPath ?? string.Empty, entry.BlendShapeName ?? string.Empty));
+            }
+
+            _missingBlendShapeKeys.Clear();
+            List<string> missing = null;
+            foreach (var kv in clipValues)
+            {
+                if (known.Contains(kv.Key))
+                    continue;
+
+                _missingBlendShapeKeys.Add(kv.Key);
+                missing ??= new List<string>();
+                missing.Add(string.IsNullOrEmpty(kv.Key.rendererPath)
+                    ? kv.Key.blendShapeName
+                    : $"{kv.Key.rendererPath}/{kv.Key.blendShapeName}");
+            }
+
+            if (missing == null)
+            {
+                HideMissingBlendShapeWarning();
+                return;
+            }
+
+            missing.Sort(StringComparer.Ordinal);
+            _missingBlendShapeWarningLabel.text =
+                "設定中のモデルに存在しない BlendShape が Clip に含まれています: " + string.Join(", ", missing);
+            _missingBlendShapeWarningLabel.style.display = DisplayStyle.Flex;
+
+            if (_deleteMissingBlendShapeButton != null)
+                _deleteMissingBlendShapeButton.style.display = DisplayStyle.Flex;
+        }
+
+        private void HideMissingBlendShapeWarning()
+        {
+            _missingBlendShapeKeys.Clear();
+
+            if (_deleteMissingBlendShapeButton != null)
+                _deleteMissingBlendShapeButton.style.display = DisplayStyle.None;
+
+            if (_missingBlendShapeWarningLabel == null)
+                return;
+
+            _missingBlendShapeWarningLabel.text = string.Empty;
+            _missingBlendShapeWarningLabel.style.display = DisplayStyle.None;
+        }
+
+        /// <summary>
+        /// 検出済みの「設定中モデルに存在しない BlendShape」のカーブを
+        /// <see cref="_targetClip"/> から一括削除する。
+        /// 削除後はスライダーを再読み込みし、警告と本ボタンは非表示に戻る。
+        /// </summary>
+        private void OnDeleteMissingBlendShapesClicked()
+        {
+            if (_targetClip == null || _missingBlendShapeKeys.Count == 0)
+                return;
+
+            var missingSet = new HashSet<(string, string)>(_missingBlendShapeKeys);
+
+            Undo.RecordObject(_targetClip, "存在しない BlendShape カーブを削除");
+
+            int removed = 0;
+            var bindings = AnimationUtility.GetCurveBindings(_targetClip);
+            for (int i = 0; i < bindings.Length; i++)
+            {
+                var binding = bindings[i];
+                if (binding.type != typeof(SkinnedMeshRenderer)
+                    || binding.propertyName == null
+                    || !binding.propertyName.StartsWith(BlendShapePropertyPrefix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var key = (binding.path ?? string.Empty,
+                    binding.propertyName.Substring(BlendShapePropertyPrefix.Length));
+                if (!missingSet.Contains(key))
+                    continue;
+
+                AnimationUtility.SetEditorCurve(_targetClip, binding, null);
+                removed++;
+            }
+
+            EditorUtility.SetDirty(_targetClip);
+            AssetDatabase.SaveAssetIfDirty(_targetClip);
+
+            RestoreSliderValuesFromTargetClip();
+            ShowStatus($"存在しない BlendShape のカーブを {removed} 件削除しました: {_targetClip.name}", isError: false);
         }
 
         // ========================================
@@ -631,6 +1309,19 @@ namespace Hidano.FacialControl.Editor.Tools
                 return;
             }
 
+            try
+            {
+                BakeToTargetClip();
+                ShowStatus($"AnimationClip にベイクしました: {_targetClip.name}", isError: false);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ExpressionCreatorWindow] ベイクエラー: {ex}");
+            }
+        }
+
+        private void BakeToTargetClip()
+        {
             var entries = new List<ExpressionClipBakery.BlendShapeBakeEntry>(_blendShapeEntries.Count);
             for (int i = 0; i < _blendShapeEntries.Count; i++)
             {
@@ -645,47 +1336,70 @@ namespace Hidano.FacialControl.Editor.Tools
             var transitionDuration = Expression.DefaultTransitionDuration;
             var transitionCurvePreset = TransitionCurvePreset.Linear;
 
-            try
+            Undo.RecordObject(_targetClip, "Expression ベイク");
+            ExpressionClipBakery.Bake(_targetClip, entries, transitionDuration, transitionCurvePreset);
+            EditorUtility.SetDirty(_targetClip);
+            AssetDatabase.SaveAssetIfDirty(_targetClip);
+            hasUnsavedChanges = false;
+        }
+
+        /// <summary>
+        /// ウィンドウを閉じる際の未保存確認（<see cref="EditorWindow.hasUnsavedChanges"/>）から呼ばれる。
+        /// ベイク先 Clip 未設定の場合は作成ダイアログを開き、キャンセル時は例外でクローズを中断する。
+        /// </summary>
+        public override void SaveChanges()
+        {
+            if (_blendShapeEntries.Count > 0)
             {
-                Undo.RecordObject(_targetClip, "Expression ベイク");
-                ExpressionClipBakery.Bake(_targetClip, entries, transitionDuration, transitionCurvePreset);
-                EditorUtility.SetDirty(_targetClip);
-                AssetDatabase.SaveAssetIfDirty(_targetClip);
-                ShowStatus($"AnimationClip にベイクしました: {_targetClip.name}", isError: false);
+                if (_targetClip == null)
+                {
+                    ConfigureCreateClipDependencies();
+                    var path = _createClipPathProvider();
+                    if (string.IsNullOrEmpty(path))
+                        throw new InvalidOperationException("ベイク先 AnimationClip が未設定のため保存できませんでした。");
+
+                    var clip = new AnimationClip();
+                    _clipAssetCreator(clip, path);
+                    _assetDatabaseSaveAssets();
+                    _targetClip = _clipAssetLoader(path) ?? clip;
+                    _clipField?.SetValueWithoutNotify(_targetClip);
+                    if (_clipRow != null)
+                        _clipRow.style.display = DisplayStyle.Flex;
+                }
+
+                BakeToTargetClip();
             }
-            catch (Exception ex)
-            {
-                ShowStatus($"ベイクエラー: {ex.Message}", isError: true);
-                Debug.LogError($"[ExpressionCreatorWindow] ベイクエラー: {ex}");
-            }
+
+            base.SaveChanges();
         }
 
         // ========================================
         // ヘルパー
         // ========================================
 
-        private void ShowStatus(string message, bool isError)
+        private void MarkUnsavedChanges()
         {
-            if (_statusLabel == null)
-                return;
+            hasUnsavedChanges = true;
+        }
 
-            _statusLabel.text = message;
-
-            _statusLabel.RemoveFromClassList(FacialControlStyles.StatusError);
-            _statusLabel.RemoveFromClassList(FacialControlStyles.StatusSuccess);
-            _statusLabel.AddToClassList(isError
-                ? FacialControlStyles.StatusError
-                : FacialControlStyles.StatusSuccess);
-
-            _statusLabel.style.display = DisplayStyle.Flex;
+        /// <summary>
+        /// 実行結果・エラーを Console へ表示する。
+        /// ウィンドウ下部のステータスラベルはウィンドウ幅で見切れるため廃止した。
+        /// </summary>
+        private static void ShowStatus(string message, bool isError)
+        {
+            if (isError)
+                Debug.LogError($"[ExpressionCreatorWindow] {message}");
+            else
+                Debug.Log($"[ExpressionCreatorWindow] {message}");
         }
 
         private void ConfigureSavePreviewDependencies()
         {
-            _savePreviewPathProvider ??= () => EditorUtility.SaveFilePanel(
+            _savePreviewPathProvider ??= defaultFileName => EditorUtility.SaveFilePanel(
                 "プレビューを PNG として保存",
                 "",
-                "expression-preview.png",
+                defaultFileName,
                 "png");
             _previewTextureCapture ??= (width, height) => _previewWrapper?.CapturePreviewTexture(width, height);
             _pngFileWriter ??= File.WriteAllBytes;
@@ -701,6 +1415,35 @@ namespace Hidano.FacialControl.Editor.Tools
             _clipAssetCreator ??= AssetDatabase.CreateAsset;
             _clipAssetLoader ??= AssetDatabase.LoadAssetAtPath<AnimationClip>;
             _assetDatabaseSaveAssets ??= AssetDatabase.SaveAssets;
+        }
+
+        private void ConfigureExportAllDependencies()
+        {
+            _exportFolderProvider ??= () =>
+            {
+                var folder = EditorUtility.SaveFolderPanel(
+                    "Expression プレビュー PNG の書き出し先",
+                    LoadLastExportFolder(),
+                    "");
+                SaveLastExportFolder(folder);
+                return folder;
+            };
+        }
+
+        /// <summary>
+        /// 前回の書き出し先フォルダを返す。未記録またはディレクトリが既に存在しない場合は
+        /// 空文字（<see cref="EditorUtility.SaveFolderPanel"/> の既定位置）を返す。
+        /// </summary>
+        private static string LoadLastExportFolder()
+        {
+            var folder = EditorPrefs.GetString(LastExportFolderPrefsKey, string.Empty);
+            return !string.IsNullOrEmpty(folder) && Directory.Exists(folder) ? folder : string.Empty;
+        }
+
+        private static void SaveLastExportFolder(string folder)
+        {
+            if (!string.IsNullOrEmpty(folder))
+                EditorPrefs.SetString(LastExportFolderPrefsKey, folder);
         }
 
         private class BlendShapeEntry

@@ -9,6 +9,13 @@ namespace Hidano.FacialControl.Editor.Common
     public class PreviewRenderWrapper : IDisposable
     {
         public const float DefaultFov = 30f;
+
+        /// <summary>
+        /// トラッキング対象（顔ジョイント）が指定されたときの FoV。
+        /// カメラ位置は全身 bounds ベースのまま動かさず、FoV を下げることで顔のアップを実現する。
+        /// </summary>
+        public const float FaceTrackFov = 12f;
+
         public const float DefaultNearClip = 0.01f;
         public const float DefaultFarClip = 100f;
         public const float DefaultLightIntensity = 1.2f;
@@ -35,7 +42,25 @@ namespace Hidano.FacialControl.Editor.Common
 
         public GameObject PreviewInstance => _previewInstance;
 
+        /// <summary>
+        /// 現在のプレビューカメラ FoV。未初期化時は <see cref="DefaultFov"/> を返す。
+        /// </summary>
+        public float CameraFieldOfView
+            => _previewRenderUtility != null ? _previewRenderUtility.camera.fieldOfView : DefaultFov;
+
         public void Setup(GameObject sourceObject)
+        {
+            Setup(sourceObject, null);
+        }
+
+        /// <summary>
+        /// プレビューをセットアップする。
+        /// <paramref name="trackTargetPath"/> にソースルートからの相対 Transform パスを渡すと、
+        /// その位置をカメラの注視点にし FoV を <see cref="FaceTrackFov"/> へ下げる（顔アップ用途）。
+        /// null / 解決不能パスの場合は従来どおり bounds / Humanoid Head ベースの注視点と
+        /// <see cref="DefaultFov"/> を用いる。
+        /// </summary>
+        public void Setup(GameObject sourceObject, string trackTargetPath)
         {
             Cleanup();
 
@@ -60,8 +85,28 @@ namespace Hidano.FacialControl.Editor.Common
 
             _previewRenderUtility.AddSingleGO(_previewInstance);
 
+            // 同一エディタフレーム内で SetBlendShapeWeight → キャプチャを複数回行う一括書き出しでは、
+            // スキニング再計算がフレームあたり 1 回に間引かれ BlendShape 変更が描画に反映されない。
+            // プレビュー専用インスタンスなので毎レンダー再計算のコスト影響は無視できる。
+            var skinnedRenderers = _previewInstance.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            for (int i = 0; i < skinnedRenderers.Length; i++)
+            {
+                skinnedRenderers[i].forceMatrixRecalculationPerRender = true;
+            }
+
             var bounds = CalculateBounds(_previewInstance);
-            var pivotPoint = CalculatePivotPoint(_previewInstance, bounds);
+            var trackTarget = ResolveTrackTarget(_previewInstance.transform, trackTargetPath);
+            Vector3 pivotPoint;
+            if (trackTarget != null)
+            {
+                pivotPoint = trackTarget.position;
+                _previewRenderUtility.camera.fieldOfView = FaceTrackFov;
+            }
+            else
+            {
+                pivotPoint = CalculatePivotPoint(_previewInstance, bounds);
+            }
+
             var pivotDistance = bounds.extents.magnitude * 2f;
             var rotation = Quaternion.Euler(0f, 180f, 0f);
             var position = pivotPoint - rotation * Vector3.forward * pivotDistance;
@@ -116,6 +161,45 @@ namespace Hidano.FacialControl.Editor.Common
             var rect = new Rect(0f, 0f, width, height);
             var previousActive = RenderTexture.active;
 
+            // SRP(URP) では GUI コンテキスト外（ボタンクリック等）からの PreviewRenderUtility.Render()
+            // （camera.Render() 経由）が何も描画せず、EndPreview() は直前に画面へ描画された内容が
+            // 残った RenderTexture を返す。このため明示的な RenderRequest でオフスクリーン描画する。
+            var request = new UnityEngine.Rendering.RenderPipeline.StandardRequest();
+            if (UnityEngine.Rendering.RenderPipeline.SupportsRenderRequest(_previewRenderUtility.camera, request))
+            {
+                // MSAA 付き一時 RT は URP の最終 depth copy で resolve surface エラーになるため使わない
+                var renderTexture = RenderTexture.GetTemporary(
+                    width, height, 24, RenderTextureFormat.ARGB32);
+                try
+                {
+                    // BeginPreview / EndPreview でプレビューシーンのライティング設定を
+                    // on-screen 描画（Render(rect)）と揃える。
+                    _previewRenderUtility.BeginPreview(rect, GUIStyle.none);
+                    try
+                    {
+                        request.destination = renderTexture;
+                        UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(
+                            _previewRenderUtility.camera, request);
+                    }
+                    finally
+                    {
+                        _previewRenderUtility.EndPreview();
+                    }
+
+                    RenderTexture.active = renderTexture;
+                    var texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                    texture.ReadPixels(rect, 0, 0);
+                    texture.Apply();
+                    return texture;
+                }
+                finally
+                {
+                    RenderTexture.active = previousActive;
+                    RenderTexture.ReleaseTemporary(renderTexture);
+                }
+            }
+
+            // Built-in RP fallback: 従来どおり PreviewRenderUtility の描画結果を読み取る
             _previewRenderUtility.BeginPreview(rect, GUIStyle.none);
             try
             {
@@ -215,6 +299,21 @@ namespace Hidano.FacialControl.Editor.Common
         public void ResetCamera()
         {
             _state = _initialState;
+        }
+
+        /// <summary>
+        /// トラッキング対象パスをプレビューインスタンス内の Transform に解決する。
+        /// 空文字はルート自身、null / 不一致は null を返す。
+        /// </summary>
+        private static Transform ResolveTrackTarget(Transform instanceRoot, string trackTargetPath)
+        {
+            if (trackTargetPath == null)
+                return null;
+
+            if (trackTargetPath.Length == 0)
+                return instanceRoot;
+
+            return instanceRoot.Find(trackTargetPath);
         }
 
         public static Vector3 CalculatePivotPoint(GameObject go, Bounds fallbackBounds)
