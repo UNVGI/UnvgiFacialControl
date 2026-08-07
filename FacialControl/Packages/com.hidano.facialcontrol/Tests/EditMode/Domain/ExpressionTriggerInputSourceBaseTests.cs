@@ -28,6 +28,22 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
     [TestFixture]
     public class ExpressionTriggerInputSourceBaseTests
     {
+        private sealed class TestTriggerEventObserver : ITriggerEventObserver
+        {
+            public readonly List<(string sourceId, string expressionId)> OnEvents = new();
+            public readonly List<(string sourceId, string expressionId)> OffEvents = new();
+
+            public void OnTriggerOn(string sourceId, string expressionId)
+            {
+                OnEvents.Add((sourceId, expressionId));
+            }
+
+            public void OnTriggerOff(string sourceId, string expressionId)
+            {
+                OffEvents.Add((sourceId, expressionId));
+            }
+        }
+
         private sealed class TestExpressionTriggerSource : ExpressionTriggerInputSourceBase
         {
             public TestExpressionTriggerSource(
@@ -214,6 +230,277 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
 
             Assert.DoesNotThrow(() => source.TriggerOff("unknown-id"));
             Assert.AreEqual(1, source.ActiveIdsForTest.Count);
+        }
+
+        [Test]
+        public void TriggerOn_WithObserver_NotifiesObserverAfterStackUpdate()
+        {
+            var source = CreateSource("input");
+            var observer = new TestTriggerEventObserver();
+            source.SetTriggerEventObserver(observer);
+
+            source.TriggerOn("smile");
+
+            Assert.AreEqual(1, source.ActiveIdsForTest.Count);
+            Assert.AreEqual("smile", source.ActiveIdsForTest[0]);
+            Assert.AreEqual(1, observer.OnEvents.Count);
+            Assert.AreEqual(("input", "smile"), observer.OnEvents[0]);
+            Assert.AreEqual(0, observer.OffEvents.Count);
+        }
+
+        [Test]
+        public void TriggerOff_WithObserver_NotifiesObserverOnlyWhenRemovalSucceeds()
+        {
+            var source = CreateSource("input");
+            var observer = new TestTriggerEventObserver();
+            source.SetTriggerEventObserver(observer);
+            source.TriggerOn("smile");
+
+            observer.OnEvents.Clear();
+
+            source.TriggerOff("smile");
+            source.TriggerOff("unknown-id");
+
+            Assert.AreEqual(0, source.ActiveIdsForTest.Count);
+            Assert.AreEqual(0, observer.OnEvents.Count);
+            Assert.AreEqual(1, observer.OffEvents.Count);
+            Assert.AreEqual(("input", "smile"), observer.OffEvents[0]);
+        }
+
+        [Test]
+        public void TriggerOn_WithoutObserver_KeepsExistingBehavior()
+        {
+            var source = CreateSource("input");
+
+            Assert.DoesNotThrow(() => source.TriggerOn("smile"));
+
+            Assert.AreEqual(1, source.ActiveIdsForTest.Count);
+            Assert.AreEqual("smile", source.ActiveIdsForTest[0]);
+        }
+
+        [Test]
+        public void ResetToExpressionStack_AppliesFinalStateWithoutObserverNotification()
+        {
+            var source = CreateSource("input");
+            var observer = new TestTriggerEventObserver();
+            source.SetTriggerEventObserver(observer);
+
+            source.ResetToExpressionStack(new[] { "smile", "angry" });
+
+            var buffer = new float[BlendShapeNames.Length];
+            bool wrote = source.TryWriteValues(buffer);
+
+            Assert.IsTrue(wrote);
+            Assert.AreEqual(2, source.ActiveIdsForTest.Count);
+            Assert.AreEqual("smile", source.ActiveIdsForTest[0]);
+            Assert.AreEqual("angry", source.ActiveIdsForTest[1]);
+            Assert.AreEqual(0f, buffer[0], 1e-5f);
+            Assert.AreEqual(1f, buffer[1], 1e-5f);
+            Assert.AreEqual(0, observer.OnEvents.Count);
+            Assert.AreEqual(0, observer.OffEvents.Count);
+        }
+
+        [Test]
+        public void ResetToExpressionStack_EmptyStackClearsImmediately()
+        {
+            var source = CreateSource();
+            source.TriggerOn("smile");
+            source.Tick(1.0f);
+
+            source.ResetToExpressionStack(Array.Empty<string>());
+
+            var buffer = new float[BlendShapeNames.Length];
+            bool wrote = source.TryWriteValues(buffer);
+
+            Assert.IsFalse(wrote);
+            Assert.AreEqual(0, source.ActiveIdsForTest.Count);
+            AssertMaskBits(source.ContributeMask, false, false, false, false);
+        }
+
+        [Test]
+        public void ResetToExpressionStack_BlendModeAccumulatesWithoutTransition()
+        {
+            var source = CreateSource(exclusionMode: ExclusionMode.Blend);
+
+            source.ResetToExpressionStack(new[] { "smile", "angry" });
+            source.Tick(0.1f);
+
+            var buffer = new float[BlendShapeNames.Length];
+            bool wrote = source.TryWriteValues(buffer);
+
+            Assert.IsTrue(wrote);
+            Assert.AreEqual(1f, buffer[0], 1e-5f);
+            Assert.AreEqual(1f, buffer[1], 1e-5f);
+            AssertMaskBits(source.ContributeMask, true, true, false, false);
+        }
+
+        [Test]
+        public void ResetToExpressionStack_ExcessDepthKeepsNewestEntries()
+        {
+            var source = CreateSource(maxStackDepth: 2);
+
+            source.ResetToExpressionStack(new[] { "smile", "angry", "sad" });
+
+            Assert.AreEqual(2, source.ActiveIdsForTest.Count);
+            Assert.AreEqual("angry", source.ActiveIdsForTest[0]);
+            Assert.AreEqual("sad", source.ActiveIdsForTest[1]);
+        }
+
+        [Test]
+        public void SuspendTriggerInput_WhenNotSuspended_ReturnsTrueAndSuspends()
+        {
+            var source = CreateSource();
+
+            Assert.IsFalse(source.IsTriggerInputSuspended);
+
+            bool suspended = source.SuspendTriggerInput();
+
+            Assert.IsTrue(suspended);
+            Assert.IsTrue(source.IsTriggerInputSuspended);
+        }
+
+        [Test]
+        public void SuspendTriggerInput_WhenAlreadySuspended_ReturnsFalseWithoutStateChange()
+        {
+            var source = CreateSource();
+            source.SuspendTriggerInput();
+
+            bool suspendedAgain = source.SuspendTriggerInput();
+
+            Assert.IsFalse(suspendedAgain);
+            Assert.IsTrue(source.IsTriggerInputSuspended);
+
+            bool resumed = source.ResumeTriggerInput();
+
+            Assert.IsTrue(resumed);
+            Assert.IsFalse(source.IsTriggerInputSuspended);
+        }
+
+        [Test]
+        public void ResumeTriggerInput_WhenNotSuspended_ReturnsFalseWithoutStateChange()
+        {
+            var source = CreateSource();
+
+            bool resumed = source.ResumeTriggerInput();
+
+            Assert.IsFalse(resumed);
+            Assert.IsFalse(source.IsTriggerInputSuspended);
+        }
+
+        [Test]
+        public void TriggerOn_WhenSuspended_IgnoresStackMutationAndObserverNotification()
+        {
+            var source = CreateSource("input");
+            var observer = new TestTriggerEventObserver();
+            source.SetTriggerEventObserver(observer);
+            source.SuspendTriggerInput();
+
+            source.TriggerOn("smile");
+
+            Assert.AreEqual(0, source.ActiveIdsForTest.Count);
+            Assert.AreEqual(0, observer.OnEvents.Count);
+            Assert.AreEqual(0, observer.OffEvents.Count);
+            Assert.IsFalse(source.TryWriteValues(new float[BlendShapeNames.Length]));
+        }
+
+        [Test]
+        public void TriggerOff_WhenSuspended_IgnoresStackMutationAndObserverNotification()
+        {
+            var source = CreateSource("input");
+            var observer = new TestTriggerEventObserver();
+            source.SetTriggerEventObserver(observer);
+            source.TriggerOn("smile");
+            source.Tick(1.0f);
+            observer.OnEvents.Clear();
+            source.SuspendTriggerInput();
+
+            source.TriggerOff("smile");
+
+            Assert.AreEqual(1, source.ActiveIdsForTest.Count);
+            Assert.AreEqual("smile", source.ActiveIdsForTest[0]);
+            Assert.AreEqual(0, observer.OnEvents.Count);
+            Assert.AreEqual(0, observer.OffEvents.Count);
+        }
+
+        [Test]
+        public void InjectTriggerOn_WhenSuspended_MutatesStackAndNotifiesObserver()
+        {
+            var source = CreateSource("input");
+            var observer = new TestTriggerEventObserver();
+            source.SetTriggerEventObserver(observer);
+            source.SuspendTriggerInput();
+
+            source.InjectTriggerOn("smile");
+
+            Assert.AreEqual(1, source.ActiveIdsForTest.Count);
+            Assert.AreEqual("smile", source.ActiveIdsForTest[0]);
+            Assert.AreEqual(1, observer.OnEvents.Count);
+            Assert.AreEqual(("input", "smile"), observer.OnEvents[0]);
+            Assert.AreEqual(0, observer.OffEvents.Count);
+        }
+
+        [Test]
+        public void InjectTriggerOff_WhenSuspended_RemovesStackAndNotifiesObserver()
+        {
+            var source = CreateSource("input");
+            var observer = new TestTriggerEventObserver();
+            source.SetTriggerEventObserver(observer);
+            source.InjectTriggerOn("smile");
+            source.Tick(1.0f);
+            observer.OnEvents.Clear();
+            source.SuspendTriggerInput();
+
+            source.InjectTriggerOff("smile");
+
+            Assert.AreEqual(0, source.ActiveIdsForTest.Count);
+            Assert.AreEqual(0, observer.OnEvents.Count);
+            Assert.AreEqual(1, observer.OffEvents.Count);
+            Assert.AreEqual(("input", "smile"), observer.OffEvents[0]);
+        }
+
+        [Test]
+        public void ResumeTriggerInput_WhenInjectedDuringSuspension_PreservesInjectedState()
+        {
+            var source = CreateSource("input");
+            source.SuspendTriggerInput();
+
+            source.InjectTriggerOn("smile");
+            source.ResumeTriggerInput();
+
+            var buffer = new float[BlendShapeNames.Length];
+            source.Tick(1.0f);
+            bool wrote = source.TryWriteValues(buffer);
+
+            Assert.IsTrue(wrote);
+            Assert.IsFalse(source.IsTriggerInputSuspended);
+            Assert.AreEqual(1, source.ActiveIdsForTest.Count);
+            Assert.AreEqual("smile", source.ActiveIdsForTest[0]);
+            Assert.AreEqual(1f, buffer[0], 1e-5f);
+            Assert.AreEqual(0f, buffer[1], 1e-5f);
+        }
+
+        [Test]
+        public void ResetToExpressionStack_WhenSuspended_AppliesRequestedState()
+        {
+            var source = CreateSource("input");
+            var observer = new TestTriggerEventObserver();
+            source.SetTriggerEventObserver(observer);
+            source.TriggerOn("smile");
+            source.Tick(1.0f);
+            source.SuspendTriggerInput();
+
+            source.ResetToExpressionStack(new[] { "angry" });
+
+            var buffer = new float[BlendShapeNames.Length];
+            bool wrote = source.TryWriteValues(buffer);
+
+            Assert.IsTrue(wrote);
+            Assert.AreEqual(1, source.ActiveIdsForTest.Count);
+            Assert.AreEqual("angry", source.ActiveIdsForTest[0]);
+            Assert.AreEqual(0f, buffer[0], 1e-5f);
+            Assert.AreEqual(1f, buffer[1], 1e-5f);
+            Assert.AreEqual(1, observer.OnEvents.Count);
+            Assert.AreEqual(0, observer.OffEvents.Count);
         }
 
         [Test]
@@ -423,6 +710,22 @@ namespace Hidano.FacialControl.Tests.EditMode.Domain
             var source = CreateSource();
 
             Assert.Throws<ArgumentNullException>(() => source.TriggerOff(null));
+        }
+
+        [Test]
+        public void InjectTriggerOn_Null_Throws()
+        {
+            var source = CreateSource();
+
+            Assert.Throws<ArgumentNullException>(() => source.InjectTriggerOn(null));
+        }
+
+        [Test]
+        public void InjectTriggerOff_Null_Throws()
+        {
+            var source = CreateSource();
+
+            Assert.Throws<ArgumentNullException>(() => source.InjectTriggerOff(null));
         }
 
         [Test]

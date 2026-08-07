@@ -72,6 +72,8 @@ namespace Hidano.FacialControl.Domain.Services
         private TransitionCurve _curve;
         private bool _isComplete;
         private bool _hasWarnedStackDepthExceeded;
+        private bool _isTriggerInputSuspended;
+        private ITriggerEventObserver _triggerEventObserver;
 
         /// <summary>
         /// 現在アクティブな Expression の ID リストを読取専用で公開する (診断/HUD/テスト用)。
@@ -82,9 +84,55 @@ namespace Hidano.FacialControl.Domain.Services
         public IReadOnlyList<string> ActiveExpressionIds => _activeExpressionIds;
 
         /// <summary>
+        /// ライブ TriggerOn/TriggerOff 入力が遮断中かを返す。ResetToExpressionStack などの
+        /// 明示同期 API には影響しない。
+        /// </summary>
+        public bool IsTriggerInputSuspended => _isTriggerInputSuspended;
+
+        /// <summary>
         /// 現在の補間済み BlendShape 値 (長さ <see cref="BlendShapeCount"/>)。診断/テスト用。
         /// </summary>
         protected ReadOnlySpan<float> CurrentValues => _currentValues;
+
+        /// <summary>
+        /// トリガー on/off 観測者を設定する。null は解除として扱う。
+        /// </summary>
+        public void SetTriggerEventObserver(ITriggerEventObserver observer)
+        {
+            _triggerEventObserver = observer;
+        }
+
+        /// <summary>
+        /// ライブ TriggerOn/TriggerOff 入力の受け付けを遮断する。
+        /// 既に遮断中の場合は状態を変更せず false を返す (冪等)。
+        /// </summary>
+        /// <returns>遮断状態へ遷移した場合 true、既に遮断中なら false。</returns>
+        public bool SuspendTriggerInput()
+        {
+            if (_isTriggerInputSuspended)
+            {
+                return false;
+            }
+
+            _isTriggerInputSuspended = true;
+            return true;
+        }
+
+        /// <summary>
+        /// ライブ TriggerOn/TriggerOff 入力の遮断を解除する。
+        /// 遮断されていない場合は状態を変更せず false を返す (冪等)。
+        /// </summary>
+        /// <returns>遮断を解除した場合 true、遮断されていなければ false。</returns>
+        public bool ResumeTriggerInput()
+        {
+            if (!_isTriggerInputSuspended)
+            {
+                return false;
+            }
+
+            _isTriggerInputSuspended = false;
+            return true;
+        }
 
         /// <summary>
         /// Expression トリガー型の基底を構築する。
@@ -171,19 +219,12 @@ namespace Hidano.FacialControl.Domain.Services
                 throw new ArgumentNullException(nameof(expressionId));
             }
 
-            BitArray outgoingMask = _activeMaskRef;
-
-            _activeExpressionIds.Remove(expressionId);
-
-            while (_activeExpressionIds.Count >= MaxStackDepth)
+            if (IsTriggerInputSuspended)
             {
-                OnStackDepthExceeded();
-                WarnStackDepthExceededOnce();
-                _activeExpressionIds.RemoveAt(0);
+                return;
             }
 
-            _activeExpressionIds.Add(expressionId);
-            StartTransition(outgoingMask);
+            TriggerOnCore(expressionId);
         }
 
         /// <summary>
@@ -200,12 +241,107 @@ namespace Hidano.FacialControl.Domain.Services
                 throw new ArgumentNullException(nameof(expressionId));
             }
 
-            BitArray outgoingMask = _activeMaskRef;
-
-            if (_activeExpressionIds.Remove(expressionId))
+            if (IsTriggerInputSuspended)
             {
-                StartTransition(outgoingMask);
+                return;
             }
+
+            TriggerOffCore(expressionId);
+        }
+
+        /// <summary>
+        /// 再生駆動の注入面。ライブ入力の遮断状態に関係なく TriggerOn と同一のスタック更新と観測者通知を適用する。
+        /// </summary>
+        /// <param name="expressionId">push する Expression の ID。</param>
+        /// <exception cref="ArgumentNullException"><paramref name="expressionId"/> が null の場合。</exception>
+        public void InjectTriggerOn(string expressionId)
+        {
+            if (expressionId == null)
+            {
+                throw new ArgumentNullException(nameof(expressionId));
+            }
+
+            TriggerOnCore(expressionId);
+        }
+
+        /// <summary>
+        /// 再生駆動の注入面。ライブ入力の遮断状態に関係なく TriggerOff と同一のスタック更新と観測者通知を適用する。
+        /// </summary>
+        /// <param name="expressionId">remove する Expression の ID。</param>
+        /// <exception cref="ArgumentNullException"><paramref name="expressionId"/> が null の場合。</exception>
+        public void InjectTriggerOff(string expressionId)
+        {
+            if (expressionId == null)
+            {
+                throw new ArgumentNullException(nameof(expressionId));
+            }
+
+            TriggerOffCore(expressionId);
+        }
+
+        /// <summary>
+        /// 指定した Expression スタックで現在状態を即時に確立する。
+        /// 遷移は開始せず、観測フックにも通知しない。
+        /// </summary>
+        /// <param name="expressionIds">古い→新しい順の Expression ID 列。空列は全解除。</param>
+        /// <exception cref="ArgumentNullException"><paramref name="expressionIds"/> が null の場合。</exception>
+        public void ResetToExpressionStack(IReadOnlyList<string> expressionIds)
+        {
+            if (expressionIds == null)
+            {
+                throw new ArgumentNullException(nameof(expressionIds));
+            }
+
+            _activeExpressionIds.Clear();
+
+            int startIndex = expressionIds.Count > MaxStackDepth
+                ? expressionIds.Count - MaxStackDepth
+                : 0;
+
+            for (int i = startIndex; i < expressionIds.Count; i++)
+            {
+                string expressionId = expressionIds[i];
+                if (expressionId == null)
+                {
+                    continue;
+                }
+
+                _activeExpressionIds.Remove(expressionId);
+                _activeExpressionIds.Add(expressionId);
+            }
+
+            Array.Clear(_targetValues, 0, BlendShapeCount);
+            ComposeTargetValues(_targetValues);
+            Array.Copy(_targetValues, _snapshotValues, BlendShapeCount);
+            Array.Copy(_targetValues, _currentValues, BlendShapeCount);
+
+            _elapsedTime = 0f;
+            _duration = 0f;
+            _curve = TransitionCurve.Linear;
+            _isComplete = true;
+            _targetMaskUsesUnionBuffer = false;
+
+            if (_activeExpressionIds.Count == 0)
+            {
+                _activeMaskRef = _emptyMask;
+                _targetMaskRef = _emptyMask;
+                _unionMask.SetAll(false);
+                return;
+            }
+
+            if (ShouldUseActiveUnionTargetMask())
+            {
+                _unionMask.SetAll(false);
+                OrActiveExpressionMasksInto(_unionMask);
+                _activeMaskRef = _unionMask;
+                _targetMaskRef = _unionMask;
+                return;
+            }
+
+            BitArray targetMask = ResolveSingleTargetMask();
+            _activeMaskRef = targetMask;
+            _targetMaskRef = targetMask;
+            _unionMask.SetAll(false);
         }
 
         /// <summary>
@@ -273,6 +409,35 @@ namespace Hidano.FacialControl.Domain.Services
             // 基底では no-op。警告ログは WarnStackDepthExceededOnce が担う。
         }
 
+        private void TriggerOnCore(string expressionId)
+        {
+            BitArray outgoingMask = _activeMaskRef;
+
+            _activeExpressionIds.Remove(expressionId);
+
+            while (_activeExpressionIds.Count >= MaxStackDepth)
+            {
+                OnStackDepthExceeded();
+                WarnStackDepthExceededOnce();
+                _activeExpressionIds.RemoveAt(0);
+            }
+
+            _activeExpressionIds.Add(expressionId);
+            StartTransition(outgoingMask);
+            _triggerEventObserver?.OnTriggerOn(Id, expressionId);
+        }
+
+        private void TriggerOffCore(string expressionId)
+        {
+            BitArray outgoingMask = _activeMaskRef;
+
+            if (_activeExpressionIds.Remove(expressionId))
+            {
+                StartTransition(outgoingMask);
+                _triggerEventObserver?.OnTriggerOff(Id, expressionId);
+            }
+        }
+
         private void WarnStackDepthExceededOnce()
         {
             if (_hasWarnedStackDepthExceeded)
@@ -291,40 +456,7 @@ namespace Hidano.FacialControl.Domain.Services
             Array.Copy(_currentValues, _snapshotValues, BlendShapeCount);
             Array.Clear(_targetValues, 0, BlendShapeCount);
             PrepareTargetMask(outgoingMask);
-
-            if (_activeExpressionIds.Count == 0)
-            {
-                _duration = DefaultReleaseTransitionDuration;
-                _curve = TransitionCurve.Linear;
-                _elapsedTime = 0f;
-                _isComplete = false;
-                return;
-            }
-
-            Expression? lastExpression = null;
-            int lastIdx = _activeExpressionIds.Count - 1;
-
-            if (ExclusionMode == ExclusionMode.LastWins)
-            {
-                string lastId = _activeExpressionIds[lastIdx];
-                lastExpression = _profile.FindExpressionById(lastId);
-                if (lastExpression.HasValue)
-                {
-                    MapBlendShapeValues(lastExpression.Value, _targetValues);
-                }
-            }
-            else
-            {
-                for (int i = 0; i < _activeExpressionIds.Count; i++)
-                {
-                    var expr = _profile.FindExpressionById(_activeExpressionIds[i]);
-                    if (expr.HasValue)
-                    {
-                        MapBlendShapeValuesAdditive(expr.Value, _targetValues);
-                    }
-                }
-                lastExpression = _profile.FindExpressionById(_activeExpressionIds[lastIdx]);
-            }
+            Expression? lastExpression = ComposeTargetValues(_targetValues);
 
             if (lastExpression.HasValue)
             {
@@ -339,6 +471,40 @@ namespace Hidano.FacialControl.Domain.Services
 
             _elapsedTime = 0f;
             _isComplete = false;
+        }
+
+        private Expression? ComposeTargetValues(float[] target)
+        {
+            if (_activeExpressionIds.Count == 0)
+            {
+                return null;
+            }
+
+            Expression? lastExpression = null;
+            int lastIdx = _activeExpressionIds.Count - 1;
+
+            if (ExclusionMode == ExclusionMode.LastWins)
+            {
+                string lastId = _activeExpressionIds[lastIdx];
+                lastExpression = _profile.FindExpressionById(lastId);
+                if (lastExpression.HasValue)
+                {
+                    MapBlendShapeValues(lastExpression.Value, target);
+                }
+
+                return lastExpression;
+            }
+
+            for (int i = 0; i < _activeExpressionIds.Count; i++)
+            {
+                var expr = _profile.FindExpressionById(_activeExpressionIds[i]);
+                if (expr.HasValue)
+                {
+                    MapBlendShapeValuesAdditive(expr.Value, target);
+                }
+            }
+
+            return _profile.FindExpressionById(_activeExpressionIds[lastIdx]);
         }
 
         private void PrepareTargetMask(BitArray outgoingMask)
