@@ -1,6 +1,6 @@
 {
   "name": "jp.co.unvgi.facialcontrol.ifacialmocap",
-  "version": "0.1.0-preview.2",
+  "version": "0.1.0-preview.3",
   "displayName": "FacialControl iFacialMocap",
   "description": "FacialControl の iFacialMocap 受信アダプタ。iFacialMocap (iOS) の UDP テキストプロトコルを受信し、ARKit 互換 BlendShape・視線 (Gaze Vector2)・頭部ポーズを `IFacialMocapReceiverAdapterBinding` 経由で FacialCharacterProfileSO の AdapterBindings に取り込む。受信値パイプラインは com.hidano.facialcontrol.osc の OscDoubleBuffer / OscInputSource / GazeVector2InputSource を再利用する。",
   "unity": "6000.3",
@@ -9,8 +9,8 @@
     "name": "UNVGI Inc."
   },
   "dependencies": {
-    "jp.co.unvgi.facialcontrol": "0.1.0-preview.41",
-    "jp.co.unvgi.facialcontrol.osc": "0.1.0-preview.10"
+    "jp.co.unvgi.facialcontrol": "0.1.0-preview.48",
+    "jp.co.unvgi.facialcontrol.osc": "0.1.0-preview.15"
   },
   "samples": [
     {
