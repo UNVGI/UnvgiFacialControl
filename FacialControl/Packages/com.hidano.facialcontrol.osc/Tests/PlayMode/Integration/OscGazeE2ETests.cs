@@ -1,3 +1,4 @@
+#if FACIALCONTROL_HAS_INPUTSYSTEM_MODULE && FACIALCONTROL_HAS_UNITY_INPUTSYSTEM
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -101,16 +102,8 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             int port = AllocatePort();
             var expected = new Vector2(0.64f, -0.37f);
 
-            OscReceiverAdapterBinding receiver = CreateReceiver(
-                "vrchat-gaze-receiver",
-                port,
-                new OscMappingEntry
-                {
-                    mode = OscMappingMode.Gaze_VRChat_XY,
-                    expressionId = ExpressionId,
-                    addressPattern = OscAddressFormatter.VRChatParameterPrefix + ExpressionId,
-                    leftRightIndependent = false,
-                });
+            // 手動 mapping は空。送信側の初回 heartbeat に同乗する広告だけで route を生成する。
+            OscReceiverAdapterBinding receiver = CreateReceiver("vrchat-gaze-receiver", port);
 
             OscSenderAdapterBinding sender = CreateSender(
                 "vrchat-gaze-sender",
@@ -141,15 +134,8 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             int port = AllocatePort();
             var expected = new Vector2(-0.42f, 0.58f);
 
-            OscReceiverAdapterBinding receiver = CreateReceiver(
-                "arkit-gaze-receiver",
-                port,
-                new OscMappingEntry
-                {
-                    mode = OscMappingMode.Gaze_ARKit_8BS,
-                    expressionId = ExpressionId,
-                    leftRightIndependent = false,
-                });
+            // 手動 mapping は空。広告受信後に ARKit の左右 source が自動生成される。
+            OscReceiverAdapterBinding receiver = CreateReceiver("arkit-gaze-receiver", port);
 
             OscSenderAdapterBinding sender = CreateSender(
                 "arkit-gaze-sender",
@@ -207,6 +193,193 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
                 expectedLeft,
                 expectedRight,
                 () => sender.SendAll(values));
+        }
+
+        [Test]
+        public void OldReceiverEquivalent_UnknownGazeAdvertisement_IsIgnoredWithoutLogs()
+        {
+            GameObject receiverObject = CreateGameObject("OscGazeE2E_OldReceiver");
+            OscReceiver receiver = receiverObject.AddComponent<OscReceiver>();
+            var buffer = new OscDoubleBuffer(0);
+            try
+            {
+                receiver.Initialize(buffer, Array.Empty<OscMapping>());
+
+                // 旧 receiver は広告 route を知らないが、通常の未知アドレスとして無警告で読み飛ばす。
+                receiver.HandleOscMessage(new uOSC.Message(
+                    OscReceiverAdapterBinding.GazeAdvertisementAddress,
+                    ExpressionId,
+                    GazeAdvertisementResolver.VrChatXyFormat));
+                LogAssert.NoUnexpectedReceived();
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator GazeAdvertisement_SameContentTwice_ReusesSources()
+        {
+            int port = AllocatePort();
+            OscReceiverAdapterBinding receiver = CreateReceiver("gaze-reuse-receiver", port);
+            OscSenderAdapterBinding sender = CreateSender("gaze-reuse-sender", port, AddressPresetKind.VRChat);
+
+            StartBinding(receiver, CreateContext(CreateGameObject("OscGazeE2E_ReuseReceiver")));
+            StartBinding(sender, CreateContext(CreateGameObject("OscGazeE2E_ReuseSender")));
+
+            yield return new WaitForSecondsRealtime(0.2f);
+            yield return SendGazeUntilProcessed(receiver, sender, ExpressionId);
+
+            Assert.That(receiver.GazeSources.Count, Is.EqualTo(1));
+            GazeVector2InputSource original = receiver.GazeSources[0];
+            uint originalHash = receiver.LastGazeAdvertisementHash;
+
+            yield return SendGazeUntilProcessed(receiver, sender, ExpressionId);
+
+            Assert.That(receiver.LastGazeAdvertisementHash, Is.EqualTo(originalHash));
+            Assert.That(receiver.GazeSources.Count, Is.EqualTo(1));
+            Assert.That(receiver.GazeSources[0], Is.SameAs(original));
+        }
+
+        [UnityTest]
+        public IEnumerator GazeAdvertisement_ContentChanged_RebuildsAndUnregistersRemovedId()
+        {
+            int port = AllocatePort();
+            OscReceiverAdapterBinding receiver = CreateReceiver("gaze-change-receiver", port);
+            OscSenderAdapterBinding firstSender = CreateSender("gaze-change-sender-a", port, AddressPresetKind.VRChat);
+            StartBinding(receiver, CreateContext(CreateGameObject("OscGazeE2E_ChangeReceiver")));
+            StartBinding(firstSender, CreateContext(CreateGameObject("OscGazeE2E_ChangeSenderA")));
+
+            yield return new WaitForSecondsRealtime(0.2f);
+            yield return SendGazeUntilProcessed(receiver, firstSender, ExpressionId);
+            Assert.That(_registry.TryResolve("gaze-change-receiver:" + ExpressionId, out IInputSource removed), Is.True);
+
+            firstSender.Dispose();
+            OscSenderAdapterBinding secondSender = CreateSenderWithIds(
+                "gaze-change-sender-b", port, AddressPresetKind.VRChat, "eye-look-new");
+            StartBinding(secondSender, CreateContext(CreateGameObject("OscGazeE2E_ChangeSenderB")));
+
+            yield return SendGazeUntilProcessed(receiver, secondSender, "eye-look-new");
+
+            Assert.That(receiver.AutoGazeSourceIds, Does.Contain("gaze-change-receiver:eye-look-new"));
+            Assert.That(receiver.AutoGazeSourceIds, Does.Not.Contain("gaze-change-receiver:" + ExpressionId));
+            Assert.That(_registry.TryResolve("gaze-change-receiver:" + ExpressionId, out _), Is.False);
+            Assert.That(removed, Is.Not.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator GazeAdvertisement_Stops_PreservesRoutesAndSources()
+        {
+            int port = AllocatePort();
+            OscReceiverAdapterBinding receiver = CreateReceiver("gaze-stop-receiver", port);
+            OscSenderAdapterBinding sender = CreateSender("gaze-stop-sender", port, AddressPresetKind.VRChat);
+            StartBinding(receiver, CreateContext(CreateGameObject("OscGazeE2E_StopReceiver")));
+            StartBinding(sender, CreateContext(CreateGameObject("OscGazeE2E_StopSender")));
+
+            yield return new WaitForSecondsRealtime(0.2f);
+            yield return SendGazeUntilProcessed(receiver, sender, ExpressionId);
+            GazeVector2InputSource source = receiver.GazeSources[0];
+
+            sender.Dispose();
+            for (int i = 0; i < 4; i++)
+            {
+                receiver.OnFixedTick(0.02f);
+                yield return null;
+            }
+
+            Assert.That(receiver.HasAutoGazeRoutes, Is.True);
+            Assert.That(receiver.GazeSources[0], Is.SameAs(source));
+            Assert.That(_registry.TryResolve("gaze-stop-receiver:" + ExpressionId, out IInputSource retained), Is.True);
+            Assert.That(retained, Is.SameAs(source));
+        }
+
+        [UnityTest]
+        public IEnumerator GazeAdvertisement_ManualSameId_ManualMappingWinsWithoutError()
+        {
+            int port = AllocatePort();
+            OscReceiverAdapterBinding receiver = CreateReceiver(
+                "gaze-manual-receiver",
+                port,
+                new OscMappingEntry
+                {
+                    mode = OscMappingMode.Gaze_VRChat_XY,
+                    expressionId = ExpressionId,
+                    addressPattern = OscAddressFormatter.VRChatParameterPrefix + ExpressionId,
+                });
+            OscSenderAdapterBinding sender = CreateSender("gaze-manual-sender", port, AddressPresetKind.VRChat);
+            StartBinding(receiver, CreateContext(CreateGameObject("OscGazeE2E_ManualReceiver")));
+            StartBinding(sender, CreateContext(CreateGameObject("OscGazeE2E_ManualSender")));
+
+            yield return new WaitForSecondsRealtime(0.2f);
+            yield return SendGazeUntilProcessed(receiver, sender, ExpressionId);
+
+            Assert.That(receiver.AutoGazeSourceIds, Is.Empty);
+            Assert.That(receiver.GazeSources.Count, Is.EqualTo(1));
+            Assert.That(receiver.GazeSources[0].Id, Is.EqualTo("gaze-manual-receiver:" + ExpressionId));
+        }
+
+        [UnityTest]
+        public IEnumerator GazeAdvertisement_GazeConfigMatch_IsAcceptedForLateBoneConnection()
+        {
+            int port = AllocatePort();
+            OscReceiverAdapterBinding receiver = CreateReceiver("gaze-config-receiver", port);
+            receiver.Configure(new[] { new GazeBindingConfig { expressionId = ExpressionId } });
+            OscSenderAdapterBinding sender = CreateSender("gaze-config-sender", port, AddressPresetKind.VRChat);
+            StartBinding(receiver, CreateContext(CreateGameObject("OscGazeE2E_ConfigReceiver")));
+            StartBinding(sender, CreateContext(CreateGameObject("OscGazeE2E_ConfigSender")));
+
+            yield return new WaitForSecondsRealtime(0.2f);
+            yield return SendGazeUntilProcessed(receiver, sender, ExpressionId);
+
+            Assert.That(receiver.AutoGazeSourceIds, Does.Contain("gaze-config-receiver:" + ExpressionId));
+        }
+
+        [Test]
+        public void NoAdvertisementNoManual_NoRoutesNoErrorLog()
+        {
+            OscReceiverAdapterBinding receiver = CreateReceiver("gaze-empty-receiver", AllocatePort());
+            StartBinding(receiver, CreateContext(CreateGameObject("OscGazeE2E_EmptyReceiver")));
+
+            Assert.That(receiver.GazeSources, Is.Empty);
+            Assert.That(receiver.HasAutoGazeRoutes, Is.False);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        private IEnumerator SendGazeUntilProcessed(
+            OscReceiverAdapterBinding receiver,
+            OscSenderAdapterBinding sender,
+            string expressionId)
+        {
+            for (int attempt = 0; attempt < 20; attempt++)
+            {
+                _outputBus.Publish(
+                    Array.Empty<float>(),
+                    new[] { new GazeSnapshot(expressionId, 0.2f, -0.1f) });
+                sender.OnLateTick(0.016f);
+                yield return new WaitForSecondsRealtime(0.05f);
+                receiver.OnFixedTick(0.02f);
+                if (receiver.LastGazeAdvertisementHash != 0u ||
+                    HasSourceId(receiver.AutoGazeSourceIds, receiver.Slug + ":" + expressionId))
+                {
+                    yield break;
+                }
+            }
+
+            Assert.Fail("gaze advertisement was not processed");
+        }
+
+        private static bool HasSourceId(IReadOnlyList<string> sourceIds, string expected)
+        {
+            for (int i = 0; i < sourceIds.Count; i++)
+            {
+                if (string.Equals(sourceIds[i], expected, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         [UnityTest]
@@ -329,7 +502,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         private OscReceiverAdapterBinding CreateReceiver(
             string slug,
             int port,
-            OscMappingEntry entry)
+            params OscMappingEntry[] entries)
         {
             return new OscReceiverAdapterBinding
             {
@@ -337,7 +510,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
                 Endpoint = Endpoint,
                 Port = port,
                 BundleMode = BundleInterpretationMode.AtomicSwap,
-                Mappings = new List<OscMappingEntry> { entry },
+                Mappings = new List<OscMappingEntry>(entries ?? Array.Empty<OscMappingEntry>()),
             };
         }
 
@@ -345,6 +518,15 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
             string slug,
             int port,
             AddressPresetKind preset)
+        {
+            return CreateSenderWithIds(slug, port, preset, ExpressionId);
+        }
+
+        private OscSenderAdapterBinding CreateSenderWithIds(
+            string slug,
+            int port,
+            AddressPresetKind preset,
+            params string[] gazeExpressionIds)
         {
             var binding = new OscSenderAdapterBinding
             {
@@ -358,7 +540,7 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
                     new OscSenderEndpointConfig(Endpoint, port, true, preset)
                 },
                 Array.Empty<string>());
-            binding.ConfigureGazeExpressionIds(new[] { ExpressionId });
+            binding.ConfigureGazeExpressionIds(gazeExpressionIds);
             return binding;
         }
 
@@ -508,3 +690,4 @@ namespace Hidano.FacialControl.Tests.PlayMode.Integration
         }
     }
 }
+#endif

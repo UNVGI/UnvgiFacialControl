@@ -68,6 +68,10 @@ namespace Hidano.FacialControl.Adapters.Playable
             new Dictionary<string, ExpressionTriggerInputSourceBase>(StringComparer.Ordinal);
         private readonly HashSet<string> _gazeSubscriptionIds =
             new HashSet<string>(StringComparer.Ordinal);
+        // 規約解決の gaze source が binding 起動後に登録される場合に備え、
+        // child scope 構築時点の有効 binding slug を runtime で保持する。
+        private readonly HashSet<string> _activeBindingSlugs =
+            new HashSet<string>(StringComparer.Ordinal);
         // 目線(gaze)の目ボーン適用を集約する provider。各入力 binding(OSC/InputSystem/iFacialMocap)が
         // registry に登録した gaze 入力源を GazeBindingConfigResolver 経由で解決し、単一 provider で適用する。
         private GazeBonePoseProvider _gazeBoneProvider;
@@ -267,6 +271,8 @@ namespace Hidano.FacialControl.Adapters.Playable
                 _characterSO != null && _characterSO.GazeConfigs != null
                     ? _characterSO.GazeConfigs
                     : Array.Empty<GazeBindingConfig>();
+
+            CacheActiveBindingSlugs(bindings);
 
             _facialOutputBus = null;
             _inputObservationBus = null;
@@ -553,41 +559,13 @@ namespace Hidano.FacialControl.Adapters.Playable
                 return false;
             }
 
-            if (!TryReadGazeInput(sources.LeftSource, out float x, out float y)
-                && !TryReadGazeInput(sources.RightSource, out x, out y))
+            if (!GazeInputReader.TryReadXY(sources.LeftSource, out float x, out float y)
+                && !GazeInputReader.TryReadXY(sources.RightSource, out x, out y))
             {
                 return false;
             }
 
             snapshot = new GazeSnapshot(config.expressionId, x, y);
-            return true;
-        }
-
-        private static bool TryReadGazeInput(
-            IAnalogInputSource source,
-            out float x,
-            out float y)
-        {
-            x = default;
-            y = default;
-            if (source == null || !source.IsValid)
-            {
-                return false;
-            }
-
-            bool hasValue = source.AxisCount >= 2
-                ? source.TryReadVector2(out x, out y)
-                : source.TryReadScalar(out x);
-
-            if (!hasValue)
-            {
-                x = default;
-                y = default;
-                return false;
-            }
-
-            x = Mathf.Clamp(x, -1f, 1f);
-            y = Mathf.Clamp(y, -1f, 1f);
             return true;
         }
 
@@ -781,6 +759,24 @@ namespace Hidano.FacialControl.Adapters.Playable
             }
         }
 
+        private void CacheActiveBindingSlugs(IReadOnlyList<AdapterBindingBase> bindings)
+        {
+            _activeBindingSlugs.Clear();
+            if (bindings == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < bindings.Count; i++)
+            {
+                AdapterBindingBase binding = bindings[i];
+                if (binding != null && !string.IsNullOrWhiteSpace(binding.Slug))
+                {
+                    _activeBindingSlugs.Add(binding.Slug);
+                }
+            }
+        }
+
         private void WireTriggerObserversForResolvedSources(
             IReadOnlyList<(int layerIdx, IInputSource source, float weight)> additionalSources)
         {
@@ -868,13 +864,21 @@ namespace Hidano.FacialControl.Adapters.Playable
                     continue;
                 }
 
-                if (GazeBindingConfigResolver.TryResolve(
-                        config,
-                        _inputSourceRegistry,
-                        out ResolvedGazeInputSources resolved))
+                // 解決済み source だけを購読すると、binding が FacialController の
+                // 初期化後に登録される構成（iFacialMocap 等）を取り逃がす。
+                // 現在登録されているかどうかに依存せず、全 binding slug について
+                // 規約上の3候補を先読み購読する。
+                foreach (string slug in _activeBindingSlugs)
                 {
-                    AddGazeSubscriptionId(resolved.LeftSourceId);
-                    AddGazeSubscriptionId(resolved.RightSourceId);
+                    AddGazeSubscriptionId(
+                        GazeBindingConfigResolver.ComposeSourceId(
+                            slug, config.expressionId, GazeSide.Shared));
+                    AddGazeSubscriptionId(
+                        GazeBindingConfigResolver.ComposeSourceId(
+                            slug, config.expressionId, GazeSide.Left));
+                    AddGazeSubscriptionId(
+                        GazeBindingConfigResolver.ComposeSourceId(
+                            slug, config.expressionId, GazeSide.Right));
                 }
             }
         }
@@ -924,6 +928,7 @@ namespace Hidano.FacialControl.Adapters.Playable
 
             _observedTriggerSources.Clear();
             _gazeSubscriptionIds.Clear();
+            _activeBindingSlugs.Clear();
         }
 
         // ================================================================

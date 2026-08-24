@@ -96,6 +96,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         private bool _subscribed;
 
         [NonSerialized]
+        private bool _warnedCustomGazeAdvertisement;
+
+        [NonSerialized]
         private bool _started;
 
         /// <summary>
@@ -334,7 +337,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                         addressUtf8,
                         sourceBlendShapeIndices,
                         heartbeatBlendShapeNames,
-                        gazeExpressionIds));
+                        gazeExpressionIds,
+                        BuildGazeAdvertisementPairs(endpoint.preset, gazeExpressionIds)));
                 }
                 catch (Exception ex)
                 {
@@ -402,30 +406,19 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
                 if (sendHeartbeat)
                 {
-                    if (_sendPreset)
-                    {
-                        slot.Sender.SendBundle(
-                            _identityUuidBytes,
-                            _identityStartedAtUnixMs,
-                            slot.ScratchAddressUtf8,
-                            slot.ScratchFloatValues,
-                            _hasPublishedFrame ? slot.ScratchFloatCount : 0,
+                    slot.Sender.SendBundle(
+                        _identityUuidBytes,
+                        _identityStartedAtUnixMs,
+                        slot.ScratchAddressUtf8,
+                        slot.ScratchFloatValues,
+                        _hasPublishedFrame ? slot.ScratchFloatCount : 0,
+                        new OscHeartbeatPayload(
                             slot.HeartbeatBlendShapeNames,
                             slot.HeartbeatBlendShapeNames.Length,
-                            ToPresetName(slot.Preset),
-                            customPrefix: null);
-                    }
-                    else
-                    {
-                        slot.Sender.SendBundle(
-                            _identityUuidBytes,
-                            _identityStartedAtUnixMs,
-                            slot.ScratchAddressUtf8,
-                            slot.ScratchFloatValues,
-                            _hasPublishedFrame ? slot.ScratchFloatCount : 0,
-                            slot.HeartbeatBlendShapeNames,
-                            slot.HeartbeatBlendShapeNames.Length);
-                    }
+                            _sendPreset ? ToPresetName(slot.Preset) : null,
+                            null,
+                            slot.GazeAdvertisementPairs,
+                            slot.GazeAdvertisementPairCount));
                 }
                 else
                 {
@@ -489,6 +482,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _sendHeartbeatOnNextTick = false;
             _hasPublishedFrame = false;
             _effectiveSettings = null;
+            _warnedCustomGazeAdvertisement = false;
             _started = false;
         }
 
@@ -799,7 +793,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 }
             }
 
-            AppendGazeMappings(preset, resolvedGazeExpressionIds, mappingList, addressBytesList, gazeExpressionIdList);
+            AppendGazeMappingsSafely(
+                preset,
+                resolvedGazeExpressionIds,
+                mappingList,
+                addressBytesList,
+                gazeExpressionIdList);
 
             mappings = mappingList.ToArray();
             addressUtf8 = addressBytesList.ToArray();
@@ -807,6 +806,38 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             heartbeatBlendShapeNames = heartbeatNameList.ToArray();
             gazeExpressionIds = gazeExpressionIdList.ToArray();
             return mappings.Length > 0;
+        }
+
+        private void AppendGazeMappingsSafely(
+            AddressPresetKind preset,
+            IReadOnlyList<string> resolvedGazeExpressionIds,
+            List<OscMapping> mappingList,
+            List<byte[]> addressBytesList,
+            List<string> gazeExpressionIdList)
+        {
+            int mappingStart = mappingList.Count;
+            int addressStart = addressBytesList.Count;
+            int gazeExpressionIdStart = gazeExpressionIdList.Count;
+
+            try
+            {
+                AppendGazeMappings(
+                    preset,
+                    resolvedGazeExpressionIds,
+                    mappingList,
+                    addressBytesList,
+                    gazeExpressionIdList);
+            }
+            catch (NotSupportedException ex)
+            {
+                mappingList.RemoveRange(mappingStart, mappingList.Count - mappingStart);
+                addressBytesList.RemoveRange(addressStart, addressBytesList.Count - addressStart);
+                gazeExpressionIdList.RemoveRange(
+                    gazeExpressionIdStart,
+                    gazeExpressionIdList.Count - gazeExpressionIdStart);
+                Debug.LogWarning(
+                    $"[OscSenderAdapterBinding] {ex.Message} Gaze output was skipped for this endpoint.");
+            }
         }
 
         private void AppendGazeMappings(
@@ -818,6 +849,18 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         {
             if (resolvedGazeExpressionIds == null)
             {
+                return;
+            }
+
+            if (preset == AddressPresetKind.Custom)
+            {
+                if (resolvedGazeExpressionIds.Count > 0 && !_warnedCustomGazeAdvertisement)
+                {
+                    Debug.LogWarning(
+                        "[OscSenderAdapterBinding] Custom preset は形式識別子を確定できないため gaze 広告を送出しません。");
+                    _warnedCustomGazeAdvertisement = true;
+                }
+
                 return;
             }
 
@@ -1061,6 +1104,39 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
         }
 
+        private static string ToGazeFormatName(AddressPresetKind preset)
+        {
+            switch (preset)
+            {
+                case AddressPresetKind.VRChat:
+                    return "VRChat_XY";
+                case AddressPresetKind.ARKit:
+                    return "ARKit_8BS";
+                default:
+                    return null;
+            }
+        }
+
+        private static string[] BuildGazeAdvertisementPairs(
+            AddressPresetKind preset,
+            string[] gazeExpressionIds)
+        {
+            string formatName = ToGazeFormatName(preset);
+            if (formatName == null || gazeExpressionIds == null || gazeExpressionIds.Length == 0)
+            {
+                return null;
+            }
+
+            var pairs = new string[gazeExpressionIds.Length * 2];
+            for (int i = 0; i < gazeExpressionIds.Length; i++)
+            {
+                pairs[i * 2] = gazeExpressionIds[i];
+                pairs[i * 2 + 1] = formatName;
+            }
+
+            return pairs;
+        }
+
         private sealed class SendSlot
         {
             public readonly OscSender Sender;
@@ -1069,6 +1145,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             public readonly int[] SourceBlendShapeIndices;
             public readonly string[] HeartbeatBlendShapeNames;
             public readonly string[] GazeExpressionIds;
+            public readonly string[] GazeAdvertisementPairs;
+            public readonly int GazeAdvertisementPairCount;
             public readonly int GazeMessageCount;
             public byte[][] ScratchAddressUtf8;
             public float[] ScratchFloatValues;
@@ -1080,7 +1158,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 byte[][] configuredAddressUtf8,
                 int[] sourceBlendShapeIndices,
                 string[] heartbeatBlendShapeNames,
-                string[] gazeExpressionIds)
+                string[] gazeExpressionIds,
+                string[] gazeAdvertisementPairs)
             {
                 Sender = sender;
                 Preset = preset;
@@ -1088,6 +1167,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 SourceBlendShapeIndices = sourceBlendShapeIndices ?? Array.Empty<int>();
                 HeartbeatBlendShapeNames = heartbeatBlendShapeNames ?? Array.Empty<string>();
                 GazeExpressionIds = gazeExpressionIds ?? Array.Empty<string>();
+                GazeAdvertisementPairs = gazeAdvertisementPairs;
+                GazeAdvertisementPairCount = gazeAdvertisementPairs == null
+                    ? 0
+                    : gazeAdvertisementPairs.Length / 2;
                 GazeMessageCount = GetGazeMessageCount(preset);
                 int scratchCapacity = SourceBlendShapeIndices.Length + (GazeExpressionIds.Length * GazeMessageCount);
                 ScratchAddressUtf8 = scratchCapacity == 0
