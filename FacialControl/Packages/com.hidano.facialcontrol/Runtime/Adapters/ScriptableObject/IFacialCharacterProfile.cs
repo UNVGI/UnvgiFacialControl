@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using Hidano.FacialControl.Domain.Models;
-using GazeBindingConfig = Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig;
+using GazeChannel = Hidano.FacialControl.Adapters.ScriptableObject.GazeChannel;
 
 namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
 {
@@ -21,7 +21,10 @@ namespace Hidano.FacialControl.Adapters.ScriptableObject.Serializable
         /// <summary>
         /// キャラ / モデル固有の gaze 設定。入力源結線とは独立した SO ルートの設定として公開する。
         /// </summary>
-        IReadOnlyList<GazeBindingConfig> GazeConfigs { get; }
+        IReadOnlyList<GazeChannel> GazeChannels { get; }
+
+        /// <summary>旧依存側の移行期間用。後続タスクで削除する。</summary>
+        [System.Obsolete("GazeChannels を使用してください。")]
 
         /// <summary>
         /// JSON ファイルが見つからない場合に Inspector でシリアライズされた

@@ -59,7 +59,7 @@ namespace Hidano.FacialControl.Adapters.Json
             return ParseProfileSnapshotV2Internal(json, out _);
         }
 
-        private static ProfileSnapshotDto ParseProfileSnapshotV2Internal(string json, out string preprocessed)
+        private ProfileSnapshotDto ParseProfileSnapshotV2Internal(string json, out string preprocessed)
         {
             if (json == null)
                 throw new ArgumentNullException(nameof(json));
@@ -67,7 +67,8 @@ namespace Hidano.FacialControl.Adapters.Json
                 throw new ArgumentException("JSON 文字列を空にすることはできません。", nameof(json));
 
             LegacyOverlayFieldDetector.RejectLegacyExpressionIdInOverlays(json);
-            preprocessed = PreprocessInputSourceOptions(PreprocessGazeConfigsKey(json));
+            WarnIfLegacyGazeConfigsKey(json);
+            preprocessed = PreprocessInputSourceOptions(json);
 
             ProfileSnapshotDto dto;
             try
@@ -111,8 +112,13 @@ namespace Hidano.FacialControl.Adapters.Json
                 dto.slots = new List<string>();
             if (dto.rendererPaths == null)
                 dto.rendererPaths = new List<string>();
-            if (dto.gazeConfigs == null)
-                dto.gazeConfigs = new List<GazeBindingConfigDto>();
+            // gaze は新スキーマのセクションとして常に利用可能な形にする。
+            // JSON にセクションまたは channels がない場合も、後段の Converter が
+            // 既定チャネルを補完できるよう null をここで空コレクションへ正規化する。
+            if (dto.gaze == null)
+                dto.gaze = new GazeSectionDto();
+            if (dto.gaze.channels == null)
+                dto.gaze.channels = new List<GazeChannelDto>();
             if (dto.defaultOverlays == null)
                 dto.defaultOverlays = new List<OverlaySlotBindingDto>();
             NormalizeOverlaySlotBindingDtos(dto.defaultOverlays);
@@ -298,7 +304,7 @@ namespace Hidano.FacialControl.Adapters.Json
             var dto = ConvertToProfileSnapshotDto(profile);
             NormalizeProfileSnapshotDto(dto);
             var raw = JsonUtility.ToJson(dto, true);
-            return PostprocessInputSourceOptions(PostprocessGazeConfigsKey(raw));
+            return PostprocessInputSourceOptions(raw);
         }
 
         /// <summary>
@@ -315,7 +321,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 dto.schemaVersion = SchemaVersionV2;
             NormalizeProfileSnapshotDto(dto);
             var raw = JsonUtility.ToJson(dto, true);
-            return PostprocessInputSourceOptions(PostprocessGazeConfigsKey(raw));
+            return PostprocessInputSourceOptions(raw);
         }
 
         /// <inheritdoc/>
@@ -422,18 +428,29 @@ namespace Hidano.FacialControl.Adapters.Json
             return sb.ToString();
         }
 
-        private static string PreprocessGazeConfigsKey(string json)
+        private bool _legacyGazeWarningIssued;
+
+        private void WarnIfLegacyGazeConfigsKey(string json)
         {
-            return string.IsNullOrEmpty(json)
-                ? json
-                : json.Replace("\"gaze_configs\"", "\"gazeConfigs\"");
+            if (_legacyGazeWarningIssued || !ContainsJsonKey(json, "gaze_configs"))
+                return;
+
+            _legacyGazeWarningIssued = true;
+            Debug.LogWarning("[FacialControl] 旧 profile.json の gaze データを検出しました。新しい gaze.channels スキーマへ移行してください。");
         }
 
-        private static string PostprocessGazeConfigsKey(string json)
+        private static bool ContainsJsonKey(string json, string key)
         {
-            return string.IsNullOrEmpty(json)
-                ? json
-                : json.Replace("\"gazeConfigs\"", "\"gaze_configs\"");
+            string quotedKey = "\"" + key + "\"";
+            int cursor = 0;
+            while ((cursor = json.IndexOf(quotedKey, cursor, StringComparison.Ordinal)) >= 0)
+            {
+                int after = cursor + quotedKey.Length;
+                while (after < json.Length && char.IsWhiteSpace(json[after])) after++;
+                if (after < json.Length && json[after] == ':') return true;
+                cursor = after;
+            }
+            return false;
         }
 
         private static int FindMatchingBrace(string json, int openIndex)
@@ -678,6 +695,8 @@ namespace Hidano.FacialControl.Adapters.Json
             var layerInputSources = ConvertLayerInputSources(inputSourceDtos);
             var defaultOverlays = ConvertOverlaySlotBindings(dto.defaultOverlays);
             var slots = ConvertStringList(dto.slots);
+            // ベース表情は bake 済み BlendShape 値のみを運ぶ（AnimationClip 参照は JSON に載らない）。
+            var baseExpression = ConvertBlendShapeSnapshots(dto.baseExpression?.blendShapes);
             return new FacialProfile(
                 dto.schemaVersion,
                 layers,
@@ -685,7 +704,8 @@ namespace Hidano.FacialControl.Adapters.Json
                 rendererPaths,
                 layerInputSources,
                 defaultOverlays,
-                slots: slots);
+                slots: slots,
+                baseExpression: baseExpression);
         }
 
         private static OverlaySlotBinding[] ConvertOverlaySlotBindings(List<OverlaySlotBindingDto> dtos)
@@ -1032,7 +1052,7 @@ namespace Hidano.FacialControl.Adapters.Json
                 layers = new List<LayerDefinitionDto>(),
                 expressions = new List<ExpressionDto>(),
                 rendererPaths = new List<string>(),
-                gazeConfigs = new List<GazeBindingConfigDto>(),
+                gaze = new GazeSectionDto { channels = new List<GazeChannelDto>() },
                 defaultOverlays = BuildOverlaySlotBindingDtoList(profile.DefaultOverlays.Span),
                 slots = new List<string>(),
             };
@@ -1066,6 +1086,45 @@ namespace Hidano.FacialControl.Adapters.Json
             for (int i = 0; i < exprSpan.Length; i++)
             {
                 dto.expressions.Add(ConvertToExpressionDto(exprSpan[i]));
+            }
+
+            dto.baseExpression = BuildBaseExpressionSnapshotDto(profile.BaseExpression.Span);
+
+            return dto;
+        }
+
+        /// <summary>
+        /// ベース表情 (<see cref="FacialProfile.BaseExpression"/>) を JSON DTO へ変換する。
+        /// 通常 Expression と同じ <see cref="ExpressionSnapshotDto"/> を流用するが、
+        /// 遷移メタ / bones / overlays は持たず blendShapes と rendererPaths のみを出力する。
+        /// </summary>
+        private static ExpressionSnapshotDto BuildBaseExpressionSnapshotDto(
+            ReadOnlySpan<BlendShapeSnapshot> blendShapes)
+        {
+            var dto = new ExpressionSnapshotDto
+            {
+                transitionDuration = 0f,
+                transitionCurvePreset = SerializeTransitionCurvePreset(TransitionCurvePreset.Linear),
+                blendShapes = new List<BlendShapeSnapshotDto>(blendShapes.Length),
+                bones = new List<BoneSnapshotDto>(),
+                rendererPaths = new List<string>(),
+            };
+
+            for (int i = 0; i < blendShapes.Length; i++)
+            {
+                var snapshot = blendShapes[i];
+                dto.blendShapes.Add(new BlendShapeSnapshotDto
+                {
+                    rendererPath = snapshot.RendererPath,
+                    name = snapshot.Name,
+                    value = snapshot.Value,
+                });
+
+                if (!string.IsNullOrEmpty(snapshot.RendererPath)
+                    && !dto.rendererPaths.Contains(snapshot.RendererPath))
+                {
+                    dto.rendererPaths.Add(snapshot.RendererPath);
+                }
             }
 
             return dto;

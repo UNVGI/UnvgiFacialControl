@@ -155,9 +155,9 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                 ""layers"": [],
                 ""expressions"": [],
                 ""rendererPaths"": [],
-                ""gaze_configs"": [
+                ""gaze"": { ""channels"": [
                     {
-                        ""expressionId"": ""eye_look"",
+                        ""id"": ""eye_look"",
                         ""useDistinctLeftRight"": true,
                         ""sourceIdLeft"": ""input:eye_look.left"",
                         ""sourceIdRight"": ""osc:eye_look.right"",
@@ -174,14 +174,14 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
                         ""outerYawAngle"": 17,
                         ""innerYawAngle"": 7
                     }
-                ]
+                ] }
             }";
 
             var dto = _parser.ParseProfileSnapshotV2(json);
 
-            Assert.AreEqual(1, dto.gazeConfigs.Count);
-            var cfg = dto.gazeConfigs[0];
-            Assert.AreEqual("eye_look", cfg.expressionId);
+            Assert.AreEqual(1, dto.gaze.channels.Count);
+            var cfg = dto.gaze.channels[0];
+            Assert.AreEqual("eye_look", cfg.id);
             Assert.AreEqual(true, cfg.useDistinctLeftRight);
             Assert.AreEqual("input:eye_look.left", cfg.sourceIdLeft);
             Assert.AreEqual("osc:eye_look.right", cfg.sourceIdRight);
@@ -193,6 +193,67 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.Json
             Assert.AreEqual(8f, cfg.lookDownAngle);
             Assert.AreEqual(17f, cfg.outerYawAngle);
             Assert.AreEqual(7f, cfg.innerYawAngle);
+        }
+
+        [Test]
+        public void ParseProfileSnapshotV2_GazeChannels_PreservesNewSchemaValues()
+        {
+            var json = @"{
+                ""schemaVersion"": ""1.0"",
+                ""layers"": [],
+                ""expressions"": [],
+                ""rendererPaths"": [],
+                ""gaze"": { ""channels"": [{
+                    ""id"": ""gaze"",
+                    ""providerSlug"": ""osc"",
+                    ""useDistinctLeftRight"": true,
+                    ""sourceIdLeft"": ""osc:gaze.left"",
+                    ""sourceIdRight"": ""osc:gaze.right"",
+                    ""leftEyeBonePath"": ""Head/LeftEye"",
+                    ""rightEyeBonePath"": ""Head/RightEye"",
+                    ""lookUpAngle"": 21,
+                    ""lookDownAngle"": 11
+                }] }
+            }";
+
+            var dto = _parser.ParseProfileSnapshotV2(json);
+
+            Assert.That(dto.gaze, Is.Not.Null);
+            Assert.That(dto.gaze.channels, Has.Count.EqualTo(1));
+            Assert.That(dto.gaze.channels[0].id, Is.EqualTo("gaze"));
+            Assert.That(dto.gaze.channels[0].providerSlug, Is.EqualTo("osc"));
+            Assert.That(dto.gaze.channels[0].sourceIdLeft, Is.EqualTo("osc:gaze.left"));
+            Assert.That(dto.gaze.channels[0].sourceIdRight, Is.EqualTo("osc:gaze.right"));
+            Assert.That(dto.gaze.channels[0].lookUpAngle, Is.EqualTo(21f));
+            Assert.That(dto.gaze.channels[0].lookDownAngle, Is.EqualTo(11f));
+        }
+
+        [Test]
+        public void ParseProfileSnapshotV2_MissingGaze_NormalizesSectionAndChannels()
+        {
+            var dto = _parser.ParseProfileSnapshotV2(@"{
+                ""schemaVersion"": ""1.0"",
+                ""layers"": [], ""expressions"": [], ""rendererPaths"": []
+            }");
+
+            Assert.That(dto.gaze, Is.Not.Null);
+            Assert.That(dto.gaze.channels, Is.Not.Null);
+            Assert.That(dto.gaze.channels, Is.Empty);
+        }
+
+        [Test]
+        public void ParseProfileSnapshotV2_LegacyGazeConfigsKey_WarnsOnlyOnce()
+        {
+            var json = @"{
+                ""schemaVersion"": ""1.0"",
+                ""layers"": [], ""expressions"": [], ""rendererPaths"": [],
+                ""gaze_configs"": []
+            }";
+
+            LogAssert.Expect(LogType.Warning, new Regex("旧 profile.json の gaze データを検出しました"));
+            _parser.ParseProfileSnapshotV2(json);
+            _parser.ParseProfileSnapshotV2(json);
+            LogAssert.NoUnexpectedReceived();
         }
 
         // ================================================================

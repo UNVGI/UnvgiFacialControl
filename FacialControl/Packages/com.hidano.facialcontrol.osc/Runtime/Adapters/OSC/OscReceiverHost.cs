@@ -12,7 +12,6 @@ namespace Hidano.FacialControl.Adapters.OSC
     /// </summary>
     /// <remarks>
     /// <para>
-    /// 既存 <see cref="OscReceiver"/> + <c>uOSC.uOscServer</c> をホスト GameObject 上に
     /// AddComponent して bind し、binding 経由の <see cref="Configure"/> 呼び出しで
     /// <see cref="OscDoubleBuffer"/> に受信値を流し込む。
     /// </para>
@@ -22,13 +21,11 @@ namespace Hidano.FacialControl.Adapters.OSC
     /// </para>
     /// <para>
     /// <see cref="OnDestroy"/> で同 GameObject 上に追加した <see cref="OscReceiver"/> および
-    /// <c>uOSC.uOscServer</c> も破棄する（socket close を保証）。
     /// </para>
     /// </remarks>
     public sealed class OscReceiverHost : MonoBehaviour
     {
         private OscReceiver _receiver;
-        private uOSC.uOscServer _server;
         private OscDoubleBuffer _buffer;
         private OscBundleAccumulator _bundleAccumulator;
         private OscMapping[] _mappings;
@@ -71,6 +68,23 @@ namespace Hidano.FacialControl.Adapters.OSC
             BundleInterpretationMode bundleMode = BundleInterpretationMode.IndividualMessage,
             ITimeProvider timeProvider = null)
         {
+            Configure(endpoint, port, buffer, mappings, bundleAccumulator, bundleMode, timeProvider,
+                OscReceiveOptions.Default);
+        }
+
+        /// <summary>
+        /// OSC 受信器をリング設定込みで初期化・開始する。
+        /// </summary>
+        public void Configure(
+            string endpoint,
+            int port,
+            OscDoubleBuffer buffer,
+            OscMapping[] mappings,
+            OscBundleAccumulator bundleAccumulator,
+            BundleInterpretationMode bundleMode,
+            ITimeProvider timeProvider,
+            OscReceiveOptions receiveOptions)
+        {
             if (buffer == null) throw new ArgumentNullException(nameof(buffer));
             if (mappings == null) throw new ArgumentNullException(nameof(mappings));
 
@@ -87,10 +101,9 @@ namespace Hidano.FacialControl.Adapters.OSC
                 _receiver = gameObject.AddComponent<OscReceiver>();
             }
             _receiver.Port = port;
+            _receiver.ReceiveOptions = receiveOptions;
             _receiver.Initialize(buffer, mappings, bundleAccumulator, bundleMode, timeProvider);
             _receiver.StartReceiving();
-
-            _server = _receiver.GetComponent<uOSC.uOscServer>();
             _configured = true;
         }
 
@@ -135,7 +148,6 @@ namespace Hidano.FacialControl.Adapters.OSC
 
         private void OnDestroy()
         {
-            // helper を Destroy したら同 GO 上の OscReceiver / uOscServer も同期して破棄し、
             // socket を確実に close する。
             if (_receiver != null)
             {
@@ -156,19 +168,6 @@ namespace Hidano.FacialControl.Adapters.OSC
                     UnityEngine.Object.DestroyImmediate(_receiver);
                 }
                 _receiver = null;
-            }
-
-            if (_server != null)
-            {
-                if (UnityEngine.Application.isPlaying)
-                {
-                    UnityEngine.Object.Destroy(_server);
-                }
-                else
-                {
-                    UnityEngine.Object.DestroyImmediate(_server);
-                }
-                _server = null;
             }
 
             _configured = false;

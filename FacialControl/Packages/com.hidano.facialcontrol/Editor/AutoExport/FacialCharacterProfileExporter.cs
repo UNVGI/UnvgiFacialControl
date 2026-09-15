@@ -8,7 +8,6 @@ using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.Sampling;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
-using GazeBindingConfig = Hidano.FacialControl.Adapters.ScriptableObject.GazeBindingConfig;
 
 namespace Hidano.FacialControl.Editor.AutoExport
 {
@@ -198,8 +197,14 @@ namespace Hidano.FacialControl.Editor.AutoExport
                 layers = new List<LayerDefinitionDto>(),
                 expressions = new List<ExpressionDto>(),
                 rendererPaths = new List<string>(),
-                gazeConfigs = ConvertGazeConfigsToDto(so.GazeConfigs),
+                gaze = new GazeSectionDto
+                {
+                    channels = FacialCharacterProfileConverter.ToGazeChannelDtos(so.GazeChannels),
+                },
                 defaultOverlays = BuildOverlaySlotBindingDtoList(so.DefaultOverlays),
+                // ベース表情は bake 済み snapshot をそのまま JSON へ載せる
+                // （AnimationClip 参照は SO 内のみで JSON には含めない）。
+                baseExpression = so.BaseExpression.EnsureCachedSnapshot(),
             };
 
             LogSlotDiagnostics(so);
@@ -272,6 +277,9 @@ namespace Hidano.FacialControl.Editor.AutoExport
                     dto.expressions.Add(exprDto);
                 }
             }
+
+            // ベース表情 snapshot の rendererPaths も top-level set にマージする。
+            MergeRendererPaths(dto.baseExpression, rendererPathSet, dto.rendererPaths);
 
             MergeOverlayRendererPaths(dto.defaultOverlays, rendererPathSet, dto.rendererPaths);
             return dto;
@@ -390,11 +398,6 @@ namespace Hidano.FacialControl.Editor.AutoExport
             }
 
             return false;
-        }
-
-        private static List<GazeBindingConfigDto> ConvertGazeConfigsToDto(IReadOnlyList<GazeBindingConfig> configs)
-        {
-            return FacialCharacterProfileConverter.ToGazeConfigDtos(configs);
         }
 
         private static ExpressionSnapshotDto ConvertSnapshotToDto(ExpressionSnapshot snapshot)

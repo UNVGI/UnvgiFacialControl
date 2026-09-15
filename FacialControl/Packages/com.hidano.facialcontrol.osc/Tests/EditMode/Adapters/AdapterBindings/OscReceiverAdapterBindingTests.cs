@@ -71,6 +71,78 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         }
 
         [Test]
+        public void Type_ImplementsResolvedMessageHandler_ForStructViewDispatch()
+        {
+            Assert.That(
+                typeof(IOscResolvedMessageHandler).IsAssignableFrom(typeof(OscReceiverAdapterBinding)),
+                Is.True,
+                "binding は resolved struct view handler を実装する必要があります。");
+        }
+
+        [Test]
+        public void GazeAtomicSwap_CompletedFramesReusePool_AndClearReturnsAllFrames()
+        {
+            var binding = new OscReceiverAdapterBinding();
+            var bindingType = typeof(OscReceiverAdapterBinding);
+            var initialize = bindingType.GetMethod(
+                "InitializeGazeBundleState",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            initialize.Invoke(binding, null);
+
+            var poolField = bindingType.GetField(
+                "_gazeFramePool",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var currentField = bindingType.GetField(
+                "_currentGazeBundleValues",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var complete = bindingType.GetMethod(
+                "CompleteCurrentGazeBundleLocked",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var flush = bindingType.GetMethod(
+                "FlushBufferedGazeMessages",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var clear = bindingType.GetMethod(
+                "ClearGazeBundleState",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var hasCurrentField = bindingType.GetField(
+                "_hasCurrentGazeBundle",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+            var sampleType = bindingType.GetNestedType(
+                "GazeSample",
+                System.Reflection.BindingFlags.NonPublic);
+            var runtimeType = bindingType.GetNestedType(
+                "GazeRuntimeEntry",
+                System.Reflection.BindingFlags.NonPublic);
+            object runtime = Activator.CreateInstance(
+                runtimeType,
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic,
+                null,
+                new object[] { OscMappingMode.Gaze_VRChat_XY },
+                null);
+            object sample = Activator.CreateInstance(
+                sampleType,
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic,
+                null,
+                new object[] { runtime, 0, 0f },
+                null);
+            var current = (System.Collections.IList)currentField.GetValue(binding);
+            current.Add(sample);
+            hasCurrentField.SetValue(binding, true);
+
+            complete.Invoke(binding, null);
+            Assert.That(((System.Collections.ICollection)poolField.GetValue(binding)).Count, Is.EqualTo(1));
+            flush.Invoke(binding, new object[] { 1d });
+            Assert.That(((System.Collections.ICollection)poolField.GetValue(binding)).Count, Is.EqualTo(2));
+            clear.Invoke(binding, null);
+            Assert.That(((System.Collections.ICollection)poolField.GetValue(binding)).Count, Is.EqualTo(2));
+        }
+
+        [Test]
         public void Type_IsConcreteSealedClass()
         {
             Type type = typeof(OscReceiverAdapterBinding);
@@ -235,6 +307,34 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
         }
 
         [Test]
+        public void Type_ImplementsGazeProviderAndConsumerContracts()
+        {
+            Assert.That(typeof(IGazeChannelConsumer).IsAssignableFrom(typeof(OscReceiverAdapterBinding)), Is.True);
+            Assert.That(typeof(IGazeSourceProvider).IsAssignableFrom(typeof(OscReceiverAdapterBinding)), Is.True);
+        }
+
+        [Test]
+        public void GazeSourceDeclarations_IncludeManualEntryAndAdvertisementWildcard()
+        {
+            var binding = new OscReceiverAdapterBinding
+            {
+                Mappings = new List<OscMappingEntry>
+                {
+                    new OscMappingEntry
+                    {
+                        mode = OscMappingMode.Gaze_ARKit_8BS,
+                        expressionId = "eye"
+                    }
+                }
+            };
+
+            List<GazeSourceDeclaration> declarations = binding.GetGazeSourceDeclarations().ToList();
+
+            Assert.That(declarations.Count(d => d.ChannelId == null && d.ProvidesLeftRightPair), Is.EqualTo(1));
+            Assert.That(declarations.Count(d => d.ChannelId == "eye" && d.ProvidesLeftRightPair), Is.EqualTo(1));
+        }
+
+        [Test]
         public void OnStart_EmptyMappings_StartsSocketWithoutRegisteringPrimaryInputSource()
         {
             var registry = new InputSourceRegistry();
@@ -279,7 +379,7 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
                 new OscMappingEntry
                 {
                     mode = OscMappingMode.Gaze_VRChat_XY,
-                    expressionId = "eye",
+                    expressionId = "gaze",
                     addressPattern = "/avatar/parameters/eye",
                     leftRightIndependent = false,
                 }
@@ -294,14 +394,14 @@ namespace Hidano.FacialControl.Tests.EditMode.Adapters.AdapterBindings
 
                 Assert.That(binding.IsStarted, Is.True);
                 Assert.That(binding.GazeSources.Count, Is.EqualTo(1));
-                Assert.That(registry.TryResolve("osc:eye", out IInputSource inputSource), Is.True);
+                Assert.That(registry.TryResolve("osc:gaze", out IInputSource inputSource), Is.True);
                 var gazeSource = inputSource as GazeVector2InputSource;
                 Assert.That(gazeSource, Is.Not.Null);
 
                 gazeSource.Publish(0.25f, -0.5f);
-                var config = new GazeBindingConfig { expressionId = "eye" };
+                var config = new GazeChannel { id = "gaze" };
 
-                bool resolved = GazeBindingConfigResolver.TryResolve(
+                bool resolved = GazeChannelResolver.TryResolve(
                     config,
                     registry,
                     out ResolvedGazeInputSources sources);

@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using Hidano.FacialControl.Adapters.ScriptableObject;
 using Hidano.FacialControl.Adapters.ScriptableObject.Serializable;
+using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Models;
 using Hidano.FacialControl.Editor.AutoExport;
 using Hidano.FacialControl.Editor.Common;
@@ -43,6 +44,10 @@ namespace Hidano.FacialControl.Editor.Inspector
         public const string BaseExpressionUnsetHelpName = "facial-character-base-expression-unset-help";
         public const string GazeConfigsFoldoutName = "facial-character-gaze-configs-foldout";
         public const string DebugFoldoutName = "facial-character-debug-foldout";
+        /// <summary>
+        /// Adapter Bindings セクションのルート要素名。折りたたみは廃止したため
+        /// <see cref="Foldout"/> ではなく素の <see cref="VisualElement"/> に付く（名前は互換のため据え置き）。
+        /// </summary>
         public const string AdapterBindingsFoldoutName = "facial-character-adapter-bindings-foldout";
 
         public const string TabViewName = "facial-character-tabview";
@@ -94,30 +99,32 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         public const string ExpressionRowNameFieldName = "expression-row-name-field";
         public const string ExpressionRowLayerDropdownName = "expression-row-layer-dropdown";
-        public const string ExpressionRowIsGazeToggleName = "expression-row-is-gaze-toggle";
         public const string ExpressionRowClipFieldName = "expression-row-clip-field";
         public const string ExpressionRowRendererSummaryName = "expression-row-renderer-summary";
         public const string ExpressionRowValidationHelpName = "expression-row-validation-help";
         public const string ExpressionRowTransitionDurationFieldName = "expression-row-transition-duration-field";
-        public const string ExpressionRowGazeAutoAssignButtonName = "expression-row-gaze-auto-assign-button";
-        public const string GazeConfigAddDropdownName = "gaze-config-add-dropdown";
-        public const string GazeConfigBulkResolveButtonName = "gaze-config-bulk-resolve-button";
-        public const string GazeConfigBulkRegenerateButtonName = "gaze-config-bulk-regenerate-button";
-        public const string GazeConfigNoCandidatesLabel = "追加できる目線操作の表情はありません";
-        public const string GazeConfigRowName = "gaze-config-row";
-        public const string GazeConfigExpressionNameLabelName = "gaze-config-expression-name";
-        public const string GazeConfigLeftBonePathFieldName = "gaze-config-left-bone-path";
-        public const string GazeConfigRightBonePathFieldName = "gaze-config-right-bone-path";
+        public const string GazeInputSourceDropdownName = "gaze-input-source-dropdown";
+        public const string GazeLegacyHelpName = "facial-character-gaze-legacy-help";
+        public const string GazeLegacyClearButtonName = "facial-character-gaze-legacy-clear-button";
+        public const string GazeChannelsListName = "facial-character-gaze-channels-list";
+        public const string GazeChannelRowName = "facial-character-gaze-channel-row";
+        public const string GazeChannelIdFieldName = "facial-character-gaze-channel-id";
+        public const string GazeChannelProviderDropdownName = "facial-character-gaze-channel-provider";
+        public const string GazeChannelAdvancedFoldoutName = "facial-character-gaze-channel-advanced";
+        public const string GazeChannelAddButtonName = "facial-character-gaze-channel-add-button";
+        public const string GazeChannelIdValidationName = "facial-character-gaze-channel-id-validation";
+        public const string GazeChannelDistinctToggleName = "facial-character-gaze-channel-distinct";
+        public const string GazeChannelSourceIdLeftName = "facial-character-gaze-channel-source-left";
+        public const string GazeChannelSourceIdRightName = "facial-character-gaze-channel-source-right";
+        public const string GazeChannelLeftBonePathName = "facial-character-gaze-channel-left-bone";
+        public const string GazeChannelRightBonePathName = "facial-character-gaze-channel-right-bone";
+        public const string GazeChannelAutoAssignButtonName = "facial-character-gaze-channel-auto-assign";
+        public const string GazeChannelBoneResolutionHelpName = "facial-character-gaze-channel-bone-resolution";
+        public const string GazeConfigRemoveButtonName = "gaze-config-remove-button";
         public const string GazeConfigLookUpAngleFieldName = "gaze-config-look-up-angle";
         public const string GazeConfigLookDownAngleFieldName = "gaze-config-look-down-angle";
         public const string GazeConfigOuterYawAngleFieldName = "gaze-config-outer-yaw-angle";
         public const string GazeConfigInnerYawAngleFieldName = "gaze-config-inner-yaw-angle";
-        public const string GazeConfigLookLeftClipFieldName = "gaze-config-look-left-clip";
-        public const string GazeConfigLookRightClipFieldName = "gaze-config-look-right-clip";
-        public const string GazeConfigLookUpClipFieldName = "gaze-config-look-up-clip";
-        public const string GazeConfigLookDownClipFieldName = "gaze-config-look-down-clip";
-        public const string GazeConfigAutoAssignButtonName = "gaze-config-auto-assign-button";
-        public const string GazeConfigRemoveButtonName = "gaze-config-remove-button";
 
         // ====================================================================
         // 共通スタイル定数
@@ -137,13 +144,11 @@ namespace Hidano.FacialControl.Editor.Inspector
         protected SerializedProperty _adapterBindingsProperty;
         protected SerializedProperty _slotsProperty;
         protected SerializedProperty _defaultOverlaysProperty;
+        protected SerializedProperty _gazeChannelsProperty;
 
 #if UNITY_EDITOR
         protected SerializedProperty _referenceModelProperty;
 #endif
-
-        /// <summary>SO ルート直下の <c>_gazeConfigs</c> SerializedProperty。</summary>
-        protected SerializedProperty _rootGazeConfigsProperty;
 
         // ====================================================================
         // VisualElement キャッシュ
@@ -158,7 +163,6 @@ namespace Hidano.FacialControl.Editor.Inspector
         private Label _saveStatusLabel;
         private VisualElement _layersContainer;
         private VisualElement _expressionLibraryContainer;
-        private VisualElement _gazeConfigsContainer;
         private Tab _gazeTab;
         // CreateInspectorGUI が返すルート要素。overlay 編集を bind 更新サイクルと衝突させないよう
         // 次ティックへ遅延実行する際の schedule / panel 判定に使用する。
@@ -189,6 +193,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             new List<(Foldout foldout, string key)>();
 #if UNITY_EDITOR
         private GameObject _lastReferenceModel;
+        private bool _isAutoAssigningGazeBones;
 #endif
 
         // ====================================================================
@@ -264,7 +269,7 @@ namespace Hidano.FacialControl.Editor.Inspector
         {
             ResolveSerializedProperties();
             OnResolveDerivedSerializedProperties();
-            _rootGazeConfigsProperty = serializedObject.FindProperty("_gazeConfigs");
+            _gazeChannelsProperty = serializedObject.FindProperty("_gazeChannels");
             _sampler = new AnimationClipExpressionSampler();
 
             var root = new VisualElement();
@@ -627,8 +632,9 @@ namespace Hidano.FacialControl.Editor.Inspector
         {
             if (_adapterBindingsProperty == null) return;
 
-            var foldout = MakeSectionFoldout(AdapterBindingsFoldoutName, "Adapter Bindings", open: true);
-            foldout.Add(MakeHelpBox(
+            // タブ直下に 1 つしかないセクションのため折りたたみは設けず、内容を直接並べる。
+            var section = new VisualElement { name = AdapterBindingsFoldoutName };
+            section.Add(MakeHelpBox(
                 "入力源（OSC / Input System / ARKit など）の Adapter Binding を登録します。"
                 + "Add ボタンから利用可能な binding を追加し、各 binding は SO 内に直接保存されます。"));
 
@@ -641,9 +647,9 @@ namespace Hidano.FacialControl.Editor.Inspector
                 UpdateValidation();
             };
             listView.Bind(serializedObject);
-            foldout.Add(listView);
+            section.Add(listView);
 
-            root.Add(foldout);
+            root.Add(section);
         }
 
         // ====================================================================
@@ -1112,7 +1118,7 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             var addExpressionButton = new Button(() =>
             {
-                AddExpressionForLayer(ResolveDefaultExpressionLayer(), isGaze: false);
+                AddExpressionForLayer(ResolveDefaultExpressionLayer());
             })
             {
                 name = ExpressionLibraryAddButtonName,
@@ -1169,454 +1175,301 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         private void BuildGazeConfigsSection(VisualElement root)
         {
-            var foldout = MakeSectionFoldout(GazeConfigsFoldoutName, "GazeConfigs", open: true);
+            var section = MakeSectionFoldout(GazeConfigsFoldoutName, "Gaze", open: true);
+            var profile = target as FacialCharacterProfileSO;
+            bool legacy = profile != null && profile.HasLegacyGazeConfigs;
+            var help = MakeHelpBox("旧 gaze_configs を検出しました。目線チャネルを確認し、旧データをクリアしてください。", HelpBoxMessageType.Warning);
+            help.name = GazeLegacyHelpName;
+            help.style.display = legacy ? DisplayStyle.Flex : DisplayStyle.None;
+            section.Add(help);
+            var clear = new Button(() => ClearLegacyGazeConfigs(help)) { name = GazeLegacyClearButtonName, text = "旧データをクリア" };
+            clear.style.display = legacy ? DisplayStyle.Flex : DisplayStyle.None;
+            clear.style.alignSelf = Align.FlexStart;
+            section.Add(clear);
 
-            _gazeConfigsContainer = new VisualElement();
-            _gazeConfigsContainer.style.flexDirection = FlexDirection.Column;
-            foldout.Add(_gazeConfigsContainer);
-
-            RebuildGazeConfigsUI();
-
-            root.Add(foldout);
+            var channels = new VisualElement { name = GazeChannelsListName };
+            channels.style.flexDirection = FlexDirection.Column;
+            section.Add(channels);
+            RebuildGazeChannelsUI(channels);
+            var advanced = new Foldout { name = GazeChannelAdvancedFoldoutName, text = "上級設定", value = false };
+            var add = new Button(() => AddGazeChannel(channels)) { name = GazeChannelAddButtonName, text = "チャネルを追加" };
+            advanced.Add(add);
+            section.Add(advanced);
+            root.Add(section);
         }
 
-        private void RebuildGazeConfigsUI()
+        private void BuildGazeProviderDropdowns(VisualElement root)
         {
-            if (_gazeConfigsContainer == null) return;
+            if (_gazeChannelsProperty == null || !_gazeChannelsProperty.isArray) return;
 
-            _gazeConfigsContainer.Clear();
-
-            if (_rootGazeConfigsProperty == null)
+            var bindings = new List<AdapterBindingBase>();
+            SerializedProperty bindingsProperty = serializedObject.FindProperty("_adapterBindings");
+            if (bindingsProperty != null && bindingsProperty.isArray)
             {
-                _gazeConfigsContainer.Add(MakeHelpBox("GazeConfig の保存先が見つかりません。", HelpBoxMessageType.Warning));
-                return;
-            }
-
-            serializedObject.Update();
-
-            // GazeConfig はアナログ表情の追加に紐付けて自動生成する想定のため、
-            // Inspector からの手動追加 dropdown は UI 上は表示しない（ユーザー要望 2026-05-09）。
-            // ただし候補列挙ロジックや既存テストへの後方互換のため要素自体は構築しておく。
-            VisualElement addDropdown = BuildGazeConfigAddDropdown();
-            addDropdown.style.display = DisplayStyle.None;
-            _gazeConfigsContainer.Add(addDropdown);
-
-            var bulkRegenerateButton = new Button(BulkRegenerateGazeConfigs)
-            {
-                name = GazeConfigBulkRegenerateButtonName,
-                text = "GazeConfig を一括再生成",
-            };
-            bulkRegenerateButton.style.marginBottom = 6;
-            _gazeConfigsContainer.Add(bulkRegenerateButton);
-
-            for (int i = 0; i < _rootGazeConfigsProperty.arraySize; i++)
-            {
-                int configIndex = i;
-                _gazeConfigsContainer.Add(BuildGazeConfigRow(configIndex));
-            }
-        }
-
-        private VisualElement BuildGazeConfigAddDropdown()
-        {
-            var candidates = CollectAddableGazeConfigCandidates();
-            if (candidates.Count == 0)
-            {
-                var disabledDropdown = new DropdownField("+ GazeConfig を追加")
+                for (int i = 0; i < bindingsProperty.arraySize; i++)
                 {
-                    name = GazeConfigAddDropdownName,
-                    choices = new List<string> { GazeConfigNoCandidatesLabel },
+                    AdapterBindingBase binding = bindingsProperty.GetArrayElementAtIndex(i).managedReferenceValue as AdapterBindingBase;
+                    if (binding != null) bindings.Add(binding);
+                }
+            }
+
+            var enumerator = new GazeProviderEnumerator();
+            for (int i = 0; i < _gazeChannelsProperty.arraySize; i++)
+            {
+                int channelIndex = i;
+                SerializedProperty channelProperty = _gazeChannelsProperty.GetArrayElementAtIndex(i);
+                SerializedProperty idProperty = channelProperty.FindPropertyRelative("id");
+                SerializedProperty providerProperty = channelProperty.FindPropertyRelative("providerSlug");
+                if (idProperty == null || providerProperty == null) continue;
+
+                IReadOnlyList<GazeProviderOption> options = enumerator.Enumerate(bindings, idProperty.stringValue);
+                var choices = new List<string>(options.Count);
+                int selectedIndex = 0;
+                for (int optionIndex = 0; optionIndex < options.Count; optionIndex++)
+                {
+                    choices.Add(options[optionIndex].DisplayName);
+                    if (string.Equals(options[optionIndex].Slug, providerProperty.stringValue, StringComparison.Ordinal))
+                        selectedIndex = optionIndex;
+                }
+
+                var dropdown = new DropdownField("入力ソース", choices, selectedIndex)
+                {
+                    name = channelIndex == 0
+                        ? GazeInputSourceDropdownName
+                        : GazeInputSourceDropdownName + "-" + channelIndex,
                 };
-                disabledDropdown.SetValueWithoutNotify(GazeConfigNoCandidatesLabel);
-                disabledDropdown.SetEnabled(false);
-                disabledDropdown.style.marginBottom = 6;
-                return disabledDropdown;
+                dropdown.RegisterValueChangedCallback(evt =>
+                {
+                    int index = choices.IndexOf(evt.newValue);
+                    if (index < 0 || index >= options.Count || serializedObject == null) return;
+                    serializedObject.Update();
+                    SerializedProperty current = serializedObject.FindProperty("_gazeChannels")
+                        ?.GetArrayElementAtIndex(channelIndex)?.FindPropertyRelative("providerSlug");
+                    if (current == null) return;
+                    Undo.RecordObject(target, "Gaze 入力ソース変更");
+                    current.stringValue = options[index].Slug;
+                    serializedObject.ApplyModifiedProperties();
+                });
+                root.Add(dropdown);
             }
-
-            var choices = new List<string>(candidates.Count);
-            for (int i = 0; i < candidates.Count; i++)
-            {
-                choices.Add(candidates[i].MenuLabel);
-            }
-
-            var dropdown = new DropdownField("+ GazeConfig を追加")
-            {
-                name = GazeConfigAddDropdownName,
-                choices = choices,
-            };
-            dropdown.SetValueWithoutNotify(null);
-            dropdown.index = -1;
-            dropdown.style.marginBottom = 6;
-            dropdown.RegisterValueChangedCallback(evt =>
-            {
-                int selectedIndex = choices.IndexOf(evt.newValue);
-                if (selectedIndex < 0) return;
-
-                AddGazeConfigFromCandidate(candidates[selectedIndex].ExpressionId);
-            });
-            return dropdown;
         }
 
-        private VisualElement BuildGazeConfigRow(int configIndex)
+        private void RebuildGazeChannelsUI(VisualElement container)
         {
-            var cfgProp = _rootGazeConfigsProperty.GetArrayElementAtIndex(configIndex);
-            var expressionIdProp = cfgProp.FindPropertyRelative("expressionId");
-            string expressionId = expressionIdProp != null ? expressionIdProp.stringValue : string.Empty;
+            if (container == null || _gazeChannelsProperty == null || !_gazeChannelsProperty.isArray) return;
+            container.Clear();
+            serializedObject.Update();
+            for (int i = 0; i < _gazeChannelsProperty.arraySize; i++)
+                container.Add(BuildGazeChannelRow(i, container));
+        }
 
-            var row = new VisualElement
-            {
-                name = GazeConfigRowName,
-                userData = expressionId,
-            };
+        private VisualElement BuildGazeChannelRow(int index, VisualElement container)
+        {
+            var row = new VisualElement { name = GazeChannelRowName + "-" + index };
             row.style.flexDirection = FlexDirection.Column;
-            row.style.marginBottom = 6;
-            row.style.paddingLeft = 6;
-            row.style.paddingRight = 4;
-            row.style.paddingTop = 4;
-            row.style.paddingBottom = 4;
-            row.style.borderLeftColor = new StyleColor(new Color(0.4f, 0.65f, 0.9f));
-            row.style.borderLeftWidth = 2;
-
+            row.style.marginBottom = 8;
+            var channel = _gazeChannelsProperty.GetArrayElementAtIndex(index);
             var header = new VisualElement();
             header.style.flexDirection = FlexDirection.Row;
-            header.style.alignItems = Align.Center;
-            header.style.marginBottom = 4;
-
-            string resolvedName = FindExpressionNameById(expressionId);
-            string headerLabelText = string.IsNullOrEmpty(resolvedName)
-                ? "Expression 名: <未設定>"
-                : $"Expression 名: {resolvedName}";
-            var expressionNameLabel = new Label(headerLabelText)
+            var id = channel.FindPropertyRelative("id");
+            var idField = new TextField(index == 0 ? "既定チャネル (gaze)" : "チャネル ID") { name = GazeChannelIdFieldName + "-" + index };
+            idField.style.flexGrow = 1f;
+            idField.BindProperty(id);
+            if (index == 0) idField.SetEnabled(false);
+            else idField.RegisterValueChangedCallback(_ => UpdateGazeChannelIdValidation(row));
+            header.Add(idField);
+            if (index > 0)
             {
-                name = GazeConfigExpressionNameLabelName,
-                tooltip = expressionId,
-            };
-            expressionNameLabel.style.flexGrow = 1f;
-            expressionNameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            header.Add(expressionNameLabel);
-
-            var autoAssignButton = new Button(() => ResolveGazeConfigFromReferenceModel(configIndex))
-            {
-                name = GazeConfigAutoAssignButtonName,
-                text = "参照モデルから自動設定",
-                tooltip = "現在の参照モデルからこの GazeConfig を再解決し、既存値を上書きします。",
-            };
-            autoAssignButton.SetEnabled(HasReferenceModel());
-            autoAssignButton.style.marginLeft = 4;
-            header.Add(autoAssignButton);
-
-            var removeButton = new Button(() => RemoveGazeConfigAt(configIndex))
-            {
-                name = GazeConfigRemoveButtonName,
-                text = "削除",
-            };
-            removeButton.style.marginLeft = 4;
-            header.Add(removeButton);
-
+                var remove = new Button(() => RemoveGazeChannel(index, container)) { name = GazeConfigRemoveButtonName + "-" + index, text = "削除" };
+                header.Add(remove);
+            }
             row.Add(header);
-
-            AddBoundTextField(row, cfgProp, "leftEyeBonePath", "左目ボーン", GazeConfigLeftBonePathFieldName);
-            AddBoundTextField(row, cfgProp, "rightEyeBonePath", "右目ボーン", GazeConfigRightBonePathFieldName);
-
-            AddBoundFloatField(row, cfgProp, "lookUpAngle", "上方向角度", GazeConfigLookUpAngleFieldName);
-            AddBoundFloatField(row, cfgProp, "lookDownAngle", "下方向角度", GazeConfigLookDownAngleFieldName);
-            AddBoundFloatField(row, cfgProp, "outerYawAngle", "外側角度", GazeConfigOuterYawAngleFieldName);
-            AddBoundFloatField(row, cfgProp, "innerYawAngle", "内側角度", GazeConfigInnerYawAngleFieldName);
-
-            AddBoundClipField(row, cfgProp, "lookLeftClip", "左 Clip", GazeConfigLookLeftClipFieldName);
-            AddBoundClipField(row, cfgProp, "lookRightClip", "右 Clip", GazeConfigLookRightClipFieldName);
-            AddBoundClipField(row, cfgProp, "lookUpClip", "上 Clip", GazeConfigLookUpClipFieldName);
-            AddBoundClipField(row, cfgProp, "lookDownClip", "下 Clip", GazeConfigLookDownClipFieldName);
-
+            AddGazeProviderDropdown(row, index, channel);
+            AddGazeChannelBoneResolutionControls(row, index, channel);
+            AddGazeChannelProperty(row, channel, "leftEyeBonePath", "左目ボーン", GazeChannelLeftBonePathName);
+            AddGazeChannelProperty(row, channel, "rightEyeBonePath", "右目ボーン", GazeChannelRightBonePathName);
+            AddGazeChannelProperty(row, channel, "lookUpAngle", "上方向角度", GazeConfigLookUpAngleFieldName);
+            AddGazeChannelProperty(row, channel, "lookDownAngle", "下方向角度", GazeConfigLookDownAngleFieldName);
+            AddGazeChannelProperty(row, channel, "outerYawAngle", "外側角度", GazeConfigOuterYawAngleFieldName);
+            AddGazeChannelProperty(row, channel, "innerYawAngle", "内側角度", GazeConfigInnerYawAngleFieldName);
+            var advanced = new Foldout { name = GazeChannelAdvancedFoldoutName + "-" + index, text = "上級設定", value = false };
+            AddGazeChannelProperty(advanced, channel, "useDistinctLeftRight", "左右を個別指定", GazeChannelDistinctToggleName);
+            AddGazeChannelProperty(advanced, channel, "sourceIdLeft", "左入力 source ID", GazeChannelSourceIdLeftName);
+            AddGazeChannelProperty(advanced, channel, "sourceIdRight", "右入力 source ID", GazeChannelSourceIdRightName);
+            AddGazeChannelProperty(advanced, channel, "leftEyeInitialRotation", "左初期回転", null);
+            AddGazeChannelProperty(advanced, channel, "rightEyeInitialRotation", "右初期回転", null);
+            AddGazeChannelProperty(advanced, channel, "leftEyeYawAxisLocal", "左 yaw 軸", null);
+            AddGazeChannelProperty(advanced, channel, "leftEyePitchAxisLocal", "左 pitch 軸", null);
+            AddGazeChannelProperty(advanced, channel, "rightEyeYawAxisLocal", "右 yaw 軸", null);
+            AddGazeChannelProperty(advanced, channel, "rightEyePitchAxisLocal", "右 pitch 軸", null);
+            row.Add(advanced);
+            UpdateGazeChannelIdValidation(row);
             return row;
         }
 
-        private void AddBoundTextField(
-            VisualElement row,
-            SerializedProperty cfgProp,
-            string propertyName,
-            string label,
-            string elementName)
+        private void AddGazeChannelBoneResolutionControls(VisualElement row, int index, SerializedProperty channel)
         {
-            var prop = cfgProp.FindPropertyRelative(propertyName);
-            if (prop == null) return;
-
-            var field = new TextField(label)
+            var button = new Button(() => ResolveGazeChannelFromReferenceModel(index))
             {
-                name = elementName,
+                name = GazeChannelAutoAssignButtonName + "-" + index,
+                text = "参照モデルから目ボーンを自動解決",
+                tooltip = "空欄の目ボーンだけを参照モデルから解決します。"
             };
-            field.BindProperty(prop);
-            row.Add(field);
+            button.SetEnabled(HasReferenceModel());
+            row.Add(button);
+            var help = MakeHelpBox(string.Empty, HelpBoxMessageType.Warning);
+            help.name = GazeChannelBoneResolutionHelpName + "-" + index;
+            UpdateGazeChannelBoneResolutionHelp(help, channel);
+            row.Add(help);
         }
 
-        private void AddBoundFloatField(
-            VisualElement row,
-            SerializedProperty cfgProp,
-            string propertyName,
-            string label,
-            string elementName)
+        private void ResolveGazeChannelFromReferenceModel(int channelIndex)
         {
-            var prop = cfgProp.FindPropertyRelative(propertyName);
-            if (prop == null) return;
-
-            var field = new FloatField(label)
-            {
-                name = elementName,
-            };
-            field.BindProperty(prop);
-            row.Add(field);
-        }
-
-        private void AddBoundClipField(
-            VisualElement row,
-            SerializedProperty cfgProp,
-            string propertyName,
-            string label,
-            string elementName)
-        {
-            var prop = cfgProp.FindPropertyRelative(propertyName);
-            if (prop == null) return;
-
-            var field = new ObjectField(label)
-            {
-                name = elementName,
-                objectType = typeof(AnimationClip),
-                allowSceneObjects = false,
-            };
-            field.BindProperty(prop);
-            row.Add(field);
-        }
-
-        private List<GazeConfigCandidate> CollectAddableGazeConfigCandidates()
-        {
-            var candidates = new List<GazeConfigCandidate>();
-            if (_expressionsProperty == null || _rootGazeConfigsProperty == null) return candidates;
-
-            var configuredIds = new HashSet<string>(StringComparer.Ordinal);
-            for (int i = 0; i < _rootGazeConfigsProperty.arraySize; i++)
-            {
-                var cfg = _rootGazeConfigsProperty.GetArrayElementAtIndex(i);
-                var idProp = cfg.FindPropertyRelative("expressionId");
-                if (idProp != null && !string.IsNullOrEmpty(idProp.stringValue))
-                {
-                    configuredIds.Add(idProp.stringValue);
-                }
-            }
-
-            for (int i = 0; i < _expressionsProperty.arraySize; i++)
-            {
-                var expr = _expressionsProperty.GetArrayElementAtIndex(i);
-                var isGazeProp = expr.FindPropertyRelative("isGaze");
-                if (isGazeProp == null || !isGazeProp.boolValue) continue;
-
-                var idProp = expr.FindPropertyRelative("id");
-                string expressionId = idProp != null ? idProp.stringValue : string.Empty;
-                if (string.IsNullOrEmpty(expressionId) || configuredIds.Contains(expressionId)) continue;
-
-                string expressionName = ReadStringProperty(expr, "name");
-                candidates.Add(new GazeConfigCandidate(
-                    expressionId,
-                    BuildExpressionMenuLabel(expressionName, expressionId)));
-            }
-
-            return candidates;
-        }
-
-        private void BulkRegenerateGazeConfigs()
-        {
-            if (_expressionsProperty == null || _rootGazeConfigsProperty == null) return;
-
-            serializedObject.Update();
-
-            var configuredIds = new HashSet<string>(StringComparer.Ordinal);
-            for (int i = 0; i < _rootGazeConfigsProperty.arraySize; i++)
-            {
-                var cfg = _rootGazeConfigsProperty.GetArrayElementAtIndex(i);
-                var idProp = cfg.FindPropertyRelative("expressionId");
-                if (idProp != null && !string.IsNullOrEmpty(idProp.stringValue))
-                {
-                    configuredIds.Add(idProp.stringValue);
-                }
-            }
-
-            var missingExpressionIds = new List<string>();
-            for (int i = 0; i < _expressionsProperty.arraySize; i++)
-            {
-                var expr = _expressionsProperty.GetArrayElementAtIndex(i);
-                var isGazeProp = expr.FindPropertyRelative("isGaze");
-                if (isGazeProp == null || !isGazeProp.boolValue) continue;
-
-                var idProp = expr.FindPropertyRelative("id");
-                string expressionId = idProp != null ? idProp.stringValue : string.Empty;
-                if (string.IsNullOrEmpty(expressionId) || configuredIds.Contains(expressionId)) continue;
-
-                configuredIds.Add(expressionId);
-                missingExpressionIds.Add(expressionId);
-            }
-
-            if (missingExpressionIds.Count == 0)
-            {
-                RebuildGazeConfigsUI();
+            if (_gazeChannelsProperty == null || channelIndex < 0 || channelIndex >= _gazeChannelsProperty.arraySize)
                 return;
-            }
-
-            int undoGroup = BeginUndoGroup("Bulk Regenerate GazeConfigs");
-            Undo.RecordObject(target, "Bulk Regenerate GazeConfigs");
-            for (int i = 0; i < missingExpressionIds.Count; i++)
-            {
-                int newIndex = _rootGazeConfigsProperty.arraySize;
-                _rootGazeConfigsProperty.InsertArrayElementAtIndex(newIndex);
-                var cfg = _rootGazeConfigsProperty.GetArrayElementAtIndex(newIndex);
-                ResetGazeConfigToDefaults(cfg);
-
-                var idProp = cfg.FindPropertyRelative("expressionId");
-                if (idProp != null) idProp.stringValue = missingExpressionIds[i];
-            }
-
-            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
-            RebuildGazeConfigsUI();
-            UpdateValidation();
-        }
-
-        private void AddGazeConfigFromCandidate(string expressionId)
-        {
-            if (string.IsNullOrEmpty(expressionId) || _rootGazeConfigsProperty == null) return;
-
             serializedObject.Update();
-            if (FindRootGazeConfigIndex(expressionId) >= 0)
-            {
-                RebuildGazeConfigsUI();
+            if (!EditorUtility.DisplayDialog("目ボーンを再解決", "既存の目ボーン設定を参照モデルで上書きしますか？", "再解決", "キャンセル"))
                 return;
-            }
-
-            int undoGroup = BeginUndoGroup("Add GazeConfig");
-            int newIndex = _rootGazeConfigsProperty.arraySize;
-            _rootGazeConfigsProperty.InsertArrayElementAtIndex(newIndex);
-            var cfg = _rootGazeConfigsProperty.GetArrayElementAtIndex(newIndex);
-            ResetGazeConfigToDefaults(cfg);
-
-            var idProp = cfg.FindPropertyRelative("expressionId");
-            if (idProp != null) idProp.stringValue = expressionId;
-
-            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
-            RebuildGazeConfigsUI();
+            Undo.RecordObject(target, "目ボーンを参照モデルから再解決");
+            AutoAssignGazeBonesForChannel(_gazeChannelsProperty.GetArrayElementAtIndex(channelIndex), overwrite: true);
+            serializedObject.ApplyModifiedProperties();
+            RebuildGazeChannelsUI(_rootElement?.Q<VisualElement>(GazeChannelsListName));
             UpdateValidation();
         }
 
-        private void RemoveGazeConfigAt(int configIndex)
+        private void AutoAssignGazeBonesForChannels()
         {
-            if (_rootGazeConfigsProperty == null) return;
-
-            serializedObject.Update();
-            if (configIndex < 0 || configIndex >= _rootGazeConfigsProperty.arraySize) return;
-
-            int undoGroup = BeginUndoGroup("Remove GazeConfig");
-            ValidateGazeConfigDeletionTrigger(GazeConfigDeletionTrigger.ExplicitUserRemoval);
-            Undo.RecordObject(target, "Remove GazeConfig");
-            _rootGazeConfigsProperty.DeleteArrayElementAtIndex(configIndex);
-            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
-            RebuildGazeConfigsUI();
-            UpdateValidation();
-        }
-
-        private static void ResetGazeConfigToDefaults(SerializedProperty cfg)
-        {
-            SetString(cfg, "expressionId", string.Empty);
-            SetString(cfg, "leftEyeBonePath", string.Empty);
-            SetString(cfg, "rightEyeBonePath", string.Empty);
-            SetVector3(cfg, "leftEyeInitialRotation", Vector3.zero);
-            SetVector3(cfg, "rightEyeInitialRotation", Vector3.zero);
-            SetVector3(cfg, "leftEyeYawAxisLocal", Vector3.up);
-            SetVector3(cfg, "rightEyeYawAxisLocal", Vector3.up);
-            SetVector3(cfg, "leftEyePitchAxisLocal", Vector3.right);
-            SetVector3(cfg, "rightEyePitchAxisLocal", Vector3.right);
-            SetFloat(cfg, "lookUpAngle", 15f);
-            SetFloat(cfg, "lookDownAngle", 9f);
-            SetFloat(cfg, "outerYawAngle", 15f);
-            SetFloat(cfg, "innerYawAngle", 18f);
-            SetObject(cfg, "lookLeftClip", null);
-            SetObject(cfg, "lookRightClip", null);
-            SetObject(cfg, "lookUpClip", null);
-            SetObject(cfg, "lookDownClip", null);
-            ClearArray(cfg, "lookLeftSamples");
-            ClearArray(cfg, "lookRightSamples");
-            ClearArray(cfg, "lookUpSamples");
-            ClearArray(cfg, "lookDownSamples");
-        }
-
-        private string FindExpressionNameById(string expressionId)
-        {
-            if (_expressionsProperty == null || string.IsNullOrEmpty(expressionId)) return "(Expression 不明)";
-
-            for (int i = 0; i < _expressionsProperty.arraySize; i++)
+            if (_isAutoAssigningGazeBones || _gazeChannelsProperty == null || !HasReferenceModel()) return;
+            _isAutoAssigningGazeBones = true;
+            try
             {
-                var expr = _expressionsProperty.GetArrayElementAtIndex(i);
-                var idProp = expr.FindPropertyRelative("id");
-                if (idProp == null || !string.Equals(idProp.stringValue, expressionId, StringComparison.Ordinal)) continue;
-
-                string expressionName = ReadStringProperty(expr, "name");
-                return string.IsNullOrWhiteSpace(expressionName) ? expressionId : expressionName;
+                serializedObject.Update();
+                Undo.RecordObject(target, "参照モデル変更時の目ボーン自動解決");
+                for (int i = 0; i < _gazeChannelsProperty.arraySize; i++)
+                    AutoAssignGazeBonesForChannel(_gazeChannelsProperty.GetArrayElementAtIndex(i));
+                serializedObject.ApplyModifiedProperties();
+                RebuildGazeChannelsUI(_rootElement?.Q<VisualElement>(GazeChannelsListName));
+                UpdateValidation();
             }
-
-            return $"(Expression 不明: {expressionId})";
+            finally { _isAutoAssigningGazeBones = false; }
         }
 
-        private static string BuildExpressionMenuLabel(string expressionName, string expressionId)
+        private void AutoAssignGazeBonesForChannel(SerializedProperty channel, bool overwrite = false)
         {
-            if (string.IsNullOrWhiteSpace(expressionName)) return expressionId ?? string.Empty;
-            return $"{expressionName} [{expressionId}]";
+            if (channel == null) return;
+            AutoAssignGazeBonesFromReferenceModel(
+                channel.FindPropertyRelative("leftEyeBonePath"), channel.FindPropertyRelative("leftEyeInitialRotation"),
+                channel.FindPropertyRelative("rightEyeBonePath"), channel.FindPropertyRelative("rightEyeInitialRotation"),
+                channel.FindPropertyRelative("leftEyeYawAxisLocal"), channel.FindPropertyRelative("leftEyePitchAxisLocal"),
+                channel.FindPropertyRelative("rightEyeYawAxisLocal"), channel.FindPropertyRelative("rightEyePitchAxisLocal"), overwrite);
         }
 
-        private static string ReadStringProperty(SerializedProperty owner, string propertyName)
+        private static void UpdateGazeChannelBoneResolutionHelp(HelpBox help, SerializedProperty channel)
         {
-            var prop = owner.FindPropertyRelative(propertyName);
-            return prop != null ? prop.stringValue : string.Empty;
+            if (help == null || channel == null) return;
+            bool leftMissing = string.IsNullOrWhiteSpace(channel.FindPropertyRelative("leftEyeBonePath")?.stringValue);
+            bool rightMissing = string.IsNullOrWhiteSpace(channel.FindPropertyRelative("rightEyeBonePath")?.stringValue);
+            bool missing = leftMissing || rightMissing;
+            help.text = missing ? "目ボーンを解決できない側があります。Humanoid マッピングを確認するか、ボーン path を手動入力してください。" : string.Empty;
+            help.style.display = missing ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
-        private static void SetString(SerializedProperty owner, string propertyName, string value)
+        private void AddGazeProviderDropdown(VisualElement row, int index, SerializedProperty channel)
         {
-            var prop = owner.FindPropertyRelative(propertyName);
-            if (prop != null) prop.stringValue = value;
+            var bindings = new List<AdapterBindingBase>();
+            var bp = serializedObject.FindProperty("_adapterBindings");
+            if (bp != null && bp.isArray)
+                for (int i = 0; i < bp.arraySize; i++)
+                    if (bp.GetArrayElementAtIndex(i).managedReferenceValue is AdapterBindingBase b) bindings.Add(b);
+            string channelId = channel.FindPropertyRelative("id")?.stringValue ?? string.Empty;
+            var options = new GazeProviderEnumerator().Enumerate(bindings, channelId);
+            var choices = new List<string>();
+            int selected = 0;
+            string current = channel.FindPropertyRelative("providerSlug")?.stringValue ?? string.Empty;
+            for (int i = 0; i < options.Count; i++) { choices.Add(options[i].DisplayName); if (options[i].Slug == current) selected = i; }
+            var dropdown = new DropdownField("入力ソース", choices, selected) { name = GazeChannelProviderDropdownName + "-" + index };
+            dropdown.RegisterValueChangedCallback(e =>
+            {
+                int selectedIndex = choices.IndexOf(e.newValue);
+                if (selectedIndex < 0) return;
+                serializedObject.Update();
+                var p = serializedObject.FindProperty("_gazeChannels").GetArrayElementAtIndex(index).FindPropertyRelative("providerSlug");
+                Undo.RecordObject(target, "Gaze 入力ソース変更");
+                p.stringValue = options[selectedIndex].Slug;
+                serializedObject.ApplyModifiedProperties();
+            });
+            row.Add(dropdown);
         }
 
-        private static void SetVector3(SerializedProperty owner, string propertyName, Vector3 value)
+        private static void AddGazeChannelProperty(VisualElement parent, SerializedProperty channel, string propertyName, string label, string elementName)
         {
-            var prop = owner.FindPropertyRelative(propertyName);
-            if (prop != null) prop.vector3Value = value;
+            var property = channel.FindPropertyRelative(propertyName);
+            if (property == null) return;
+            IBindable bindable = property.propertyType == SerializedPropertyType.Boolean ? (IBindable)new Toggle(label) :
+                property.propertyType == SerializedPropertyType.Float ? new FloatField(label) :
+                property.propertyType == SerializedPropertyType.Vector3 ? new Vector3Field(label) : new TextField(label);
+            var field = bindable as VisualElement;
+            if (!string.IsNullOrEmpty(elementName)) field.name = elementName;
+            bindable.BindProperty(property);
+            parent.Add(field);
         }
 
-        private static void SetFloat(SerializedProperty owner, string propertyName, float value)
+        private void UpdateGazeChannelIdValidation(VisualElement row)
         {
-            var prop = owner.FindPropertyRelative(propertyName);
-            if (prop != null) prop.floatValue = value;
+            if (row == null || _gazeChannelsProperty == null) return;
+            var field = row.Q<TextField>(GazeChannelIdFieldName + "-" + row.name.Substring(row.name.LastIndexOf('-') + 1));
+            if (field == null) return;
+            string id = field.value ?? string.Empty;
+            bool valid = GazeSourceIdConvention.IsValidChannelId(id);
+            int current = _gazeChannelsProperty.arraySize;
+            for (int i = 1; valid && i < current; i++)
+            {
+                var p = _gazeChannelsProperty.GetArrayElementAtIndex(i).FindPropertyRelative("id");
+                if (p != null && p.stringValue == id && p.stringValue != string.Empty && !row.name.EndsWith("-" + i, StringComparison.Ordinal)) valid = false;
+            }
+            var help = row.Q<HelpBox>(GazeChannelIdValidationName);
+            if (help == null) { help = MakeHelpBox(string.Empty, HelpBoxMessageType.Error); help.name = GazeChannelIdValidationName; row.Add(help); }
+            help.text = valid ? string.Empty : "チャネル ID は有効な形式で、重複しない値を指定してください。";
+            help.style.display = valid ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
-        private static void SetObject(SerializedProperty owner, string propertyName, UnityEngine.Object value)
+        private void AddGazeChannel(VisualElement container)
         {
-            var prop = owner.FindPropertyRelative(propertyName);
-            if (prop != null) prop.objectReferenceValue = value;
-        }
-
-        private static void ClearArray(SerializedProperty owner, string propertyName)
-        {
-            var prop = owner.FindPropertyRelative(propertyName);
-            if (prop != null && prop.isArray) prop.ClearArray();
-        }
-
-        private void ResolveGazeConfigFromReferenceModel(int configIndex)
-        {
-            if (!HasReferenceModel() || _rootGazeConfigsProperty == null) return;
-
             serializedObject.Update();
-            if (configIndex < 0 || configIndex >= _rootGazeConfigsProperty.arraySize) return;
-
-            AssignGazeConfigFromReferenceModel(
-                _rootGazeConfigsProperty.GetArrayElementAtIndex(configIndex),
-                resetRangesToDefaults: true);
-            RebuildGazeConfigsUI();
-            UpdateValidation();
+            int index = _gazeChannelsProperty.arraySize;
+            _gazeChannelsProperty.InsertArrayElementAtIndex(index);
+            var p = _gazeChannelsProperty.GetArrayElementAtIndex(index);
+            p.FindPropertyRelative("id").stringValue = "channel-" + index;
+            p.FindPropertyRelative("providerSlug").stringValue = string.Empty;
+            Undo.RecordObject(target, "Gaze チャネル追加");
+            serializedObject.ApplyModifiedProperties();
+            RebuildGazeChannelsUI(container);
         }
 
-#if UNITY_EDITOR
+        private void RemoveGazeChannel(int index, VisualElement container)
+        {
+            if (index <= 0 || _gazeChannelsProperty == null || index >= _gazeChannelsProperty.arraySize) return;
+            serializedObject.Update();
+            Undo.RecordObject(target, "Gaze チャネル削除");
+            _gazeChannelsProperty.DeleteArrayElementAtIndex(index);
+            serializedObject.ApplyModifiedProperties();
+            RebuildGazeChannelsUI(container);
+        }
+
+        private void ClearLegacyGazeConfigs(HelpBox help)
+        {
+            serializedObject.Update();
+            var legacy = serializedObject.FindProperty("_legacyGazeConfigs");
+            if (legacy != null && legacy.isArray)
+            {
+                Undo.RecordObject(target, "旧 Gaze データをクリア");
+                legacy.ClearArray();
+                serializedObject.ApplyModifiedProperties();
+            }
+            if (help != null) help.style.display = DisplayStyle.None;
+            _rootElement?.Q<Button>(GazeLegacyClearButtonName)?.SetEnabled(false);
+        }
+
         private void TrackReferenceModelChanges(VisualElement root)
         {
             if (root == null || _referenceModelProperty == null) return;
@@ -1631,7 +1484,7 @@ namespace Hidano.FacialControl.Editor.Inspector
             var currentReferenceModel = GetReferenceModel();
             _lastReferenceModel = currentReferenceModel;
 
-            UpdateGazeConfigResolveButtonStates();
+
 
             // 参照モデルが切り替わった/設定されたら、目線タブ名にアスタリスクを付けて
             // 「ボーンパスを確認しろ」というユーザー注意を促す。
@@ -1639,11 +1492,9 @@ namespace Hidano.FacialControl.Editor.Inspector
             // ユーザーが明示的に GazeConfig 行の「参照モデルから自動設定」ボタンで埋める想定）。
             if (currentReferenceModel != null && currentReferenceModel != previousReferenceModel)
             {
-                MarkGazeTabNeedsAttention();
+                AutoAssignGazeBonesForChannels();
             }
         }
-#endif
-
         private void MarkGazeTabNeedsAttention()
         {
             if (_gazeTab == null) return;
@@ -1662,51 +1513,14 @@ namespace Hidano.FacialControl.Editor.Inspector
             }
         }
 
-        private void AssignGazeConfigFromReferenceModel(
-            SerializedProperty cfg,
-            bool resetRangesToDefaults)
-        {
-            if (cfg == null) return;
-
-            AutoAssignGazeBonesFromReferenceModel(
-                cfg.FindPropertyRelative("leftEyeBonePath"),
-                cfg.FindPropertyRelative("leftEyeInitialRotation"),
-                cfg.FindPropertyRelative("rightEyeBonePath"),
-                cfg.FindPropertyRelative("rightEyeInitialRotation"),
-                cfg.FindPropertyRelative("leftEyeYawAxisLocal"),
-                cfg.FindPropertyRelative("leftEyePitchAxisLocal"),
-                cfg.FindPropertyRelative("rightEyeYawAxisLocal"),
-                cfg.FindPropertyRelative("rightEyePitchAxisLocal"));
-
-            if (!resetRangesToDefaults) return;
-
-            SetDefaultGazeConfigRanges(cfg);
-            serializedObject.ApplyModifiedProperties();
-        }
-
-        private static void SetDefaultGazeConfigRanges(SerializedProperty cfg)
-        {
-            SetFloat(cfg, "lookUpAngle", 15f);
-            SetFloat(cfg, "lookDownAngle", 9f);
-            SetFloat(cfg, "outerYawAngle", 15f);
-            SetFloat(cfg, "innerYawAngle", 18f);
-        }
-
-        private void UpdateGazeConfigResolveButtonStates()
-        {
-            bool hasReferenceModel = HasReferenceModel();
-            if (_gazeConfigsContainer != null)
-            {
-                _gazeConfigsContainer.Query<Button>(GazeConfigAutoAssignButtonName).ForEach(
-                    button => button.SetEnabled(hasReferenceModel));
-            }
-            if (_expressionLibraryContainer != null)
-            {
-                _expressionLibraryContainer.Query<Button>(ExpressionRowGazeAutoAssignButtonName).ForEach(
-                    button => button.SetEnabled(hasReferenceModel));
-            }
-        }
-
+        /// <summary>
+        /// 参照モデルから目線ボーン名・初期角度・回転軸を <paramref name="cfg"/> に書き込む。
+        /// </summary>
+        /// <param name="resetRangesToDefaults">
+        /// 可動範囲（lookUp / lookDown / outerYaw / innerYaw）を既定値へ戻すか。
+        /// 新規作成した GazeConfig の初期化時のみ true。既存 GazeConfig の再解決では
+        /// ユーザーが数値入力した調整値を失わないよう false を指定する。
+        /// </param>
         private bool HasReferenceModel()
         {
             return GetReferenceModel() != null;
@@ -1728,16 +1542,28 @@ namespace Hidano.FacialControl.Editor.Inspector
             return prop == null || string.IsNullOrEmpty(prop.stringValue);
         }
 
-        private struct GazeConfigCandidate
+        private void RunOverlayEditDeferredOrImmediate(Action editCore)
         {
-            public readonly string ExpressionId;
-            public readonly string MenuLabel;
+            editCore?.Invoke();
+        }
 
-            public GazeConfigCandidate(string expressionId, string menuLabel)
-            {
-                ExpressionId = expressionId;
-                MenuLabel = menuLabel;
-            }
+        private static int BeginUndoGroup(string groupName)
+        {
+            Undo.IncrementCurrentGroup();
+            Undo.SetCurrentGroupName(groupName);
+            return Undo.GetCurrentGroup();
+        }
+
+        private void ApplyModifiedPropertiesAndCollapseUndo(int undoGroup)
+        {
+            serializedObject.ApplyModifiedProperties();
+            Undo.CollapseUndoOperations(undoGroup);
+        }
+
+        private static string ReadStringProperty(SerializedProperty owner, string propertyName)
+        {
+            var prop = owner.FindPropertyRelative(propertyName);
+            return prop != null ? prop.stringValue : string.Empty;
         }
 
         // ====================================================================
@@ -1794,7 +1620,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             RefreshLayerNameChoices();
             RebuildLayersUI();
             RebuildExpressionLibraryUI();
-            RebuildGazeConfigsUI();
             UpdateValidation();
         }
 
@@ -1986,9 +1811,6 @@ namespace Hidano.FacialControl.Editor.Inspector
                     var idProp = exprElem.FindPropertyRelative("id");
                     if (idProp != null)
                     {
-                        CleanupRootGazeConfigsForRemovedExpression(
-                            idProp.stringValue,
-                            GazeConfigDeletionTrigger.ExpressionDeletion);
                     }
                     _expressionsProperty.DeleteArrayElementAtIndex(i);
                 }
@@ -2000,11 +1822,10 @@ namespace Hidano.FacialControl.Editor.Inspector
             RefreshLayerNameChoices();
             RebuildLayersUI();
             RebuildExpressionLibraryUI();
-            RebuildGazeConfigsUI();
             UpdateValidation();
         }
 
-        private void AddExpressionForLayer(string layerName, bool isGaze)
+        private void AddExpressionForLayer(string layerName)
         {
             serializedObject.Update();
             int newIndex = _expressionsProperty.arraySize;
@@ -2014,19 +1835,16 @@ namespace Hidano.FacialControl.Editor.Inspector
             var idProp = entryProp.FindPropertyRelative("id");
             var nameProp = entryProp.FindPropertyRelative("name");
             var layerProp = entryProp.FindPropertyRelative("layer");
-            var isGazeProp = entryProp.FindPropertyRelative("isGaze");
 
             string newId = Guid.NewGuid().ToString("N");
             if (idProp != null) idProp.stringValue = newId;
-            if (nameProp != null) nameProp.stringValue = isGaze ? "目線操作" : "新規表情";
+            if (nameProp != null) nameProp.stringValue = "新規表情";
             if (layerProp != null) layerProp.stringValue = layerName ?? string.Empty;
-            if (isGazeProp != null) isGazeProp.boolValue = isGaze;
 
             serializedObject.ApplyModifiedProperties();
 
             RebuildLayersUI();
             RebuildExpressionLibraryUI();
-            RebuildGazeConfigsUI();
             RebuildExpressionIdMapping();
             UpdateValidation();
         }
@@ -2065,7 +1883,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             var idProp = entryProp.FindPropertyRelative("id");
             var nameProp = entryProp.FindPropertyRelative("name");
             var layerProp = entryProp.FindPropertyRelative("layer");
-            var isGazeProp = entryProp.FindPropertyRelative("isGaze");
             var transitionDurationProp = entryProp.FindPropertyRelative("transitionDuration");
 
             // Id 自動採番
@@ -2088,8 +1905,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             headerRow.style.flexDirection = FlexDirection.Row;
             headerRow.style.alignItems = Align.Center;
             headerRow.style.justifyContent = Justify.FlexEnd;
-
-            bool currentIsGaze = isGazeProp != null && isGazeProp.boolValue;
 
             var removeButton = new Button(() => RemoveExpression(exprIndex))
             {
@@ -2153,8 +1968,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             {
                 transitionDurationField.BindProperty(transitionDurationProp);
             }
-            transitionDurationField.style.display =
-                currentIsGaze ? DisplayStyle.None : DisplayStyle.Flex;
             row.Add(transitionDurationField);
 
             // GazeConfig は専用セクションで opt-in 編集するため、Expression 行では共通 clip のみ表示する。
@@ -2172,19 +1985,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             validationHelp.style.fontSize = HelpBoxFontSize;
             validationHelp.style.display = DisplayStyle.None;
             row.Add(validationHelp);
-
-            // 目線操作の表情で GazeConfig が未作成、または参照モデルから再解決したい時のためのボタン。
-            // 表示制御は UpdateRowValidation 側で警告表示と連動させる（目線タブの行にあるボタンと同じ動作）。
-            var gazeAutoAssignButton = new Button(() => AutoAssignGazeConfigForExpression(exprIndex))
-            {
-                name = ExpressionRowGazeAutoAssignButtonName,
-                text = "参照モデルから自動設定",
-                tooltip = "現在の参照モデルからこの表情の GazeConfig を作成 / 再解決します。既存値は上書きされます。",
-            };
-            gazeAutoAssignButton.style.alignSelf = Align.FlexStart;
-            gazeAutoAssignButton.style.marginTop = 2;
-            gazeAutoAssignButton.style.display = DisplayStyle.None;
-            row.Add(gazeAutoAssignButton);
 
             UpdateRowValidation(row, exprIndex);
 
@@ -2655,99 +2455,10 @@ namespace Hidano.FacialControl.Editor.Inspector
             return null;
         }
 
-        private void AutoAssignGazeConfigForExpression(int exprIndex)
-        {
-            if (_expressionsProperty == null || _rootGazeConfigsProperty == null) return;
-            if (exprIndex < 0 || exprIndex >= _expressionsProperty.arraySize) return;
-            if (!HasReferenceModel())
-            {
-                Debug.LogWarning(
-                    "[FacialCharacterProfileSOInspector] 参照モデルが未割り当てのため、目線設定の自動入力を skip します。"
-                    + " Inspector の「参照モデル」セクションで GameObject を割り当ててから再実行してください。");
-                return;
-            }
-
-            serializedObject.Update();
-            var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
-            var idProp = entryProp.FindPropertyRelative("id");
-            var isGazeProp = entryProp.FindPropertyRelative("isGaze");
-            string expressionId = idProp != null ? idProp.stringValue : string.Empty;
-            if (string.IsNullOrEmpty(expressionId)) return;
-
-            int undoGroup = BeginUndoGroup("Auto-Assign GazeConfig from Reference Model");
-            // isGaze が OFF の場合は ON に切替えて GazeConfig 駆動に統一する。
-            if (isGazeProp != null && !isGazeProp.boolValue)
-            {
-                isGazeProp.boolValue = true;
-            }
-
-            int cfgIndex = FindRootGazeConfigIndex(expressionId);
-            if (cfgIndex < 0)
-            {
-                cfgIndex = _rootGazeConfigsProperty.arraySize;
-                _rootGazeConfigsProperty.InsertArrayElementAtIndex(cfgIndex);
-                var cfg = _rootGazeConfigsProperty.GetArrayElementAtIndex(cfgIndex);
-                ResetGazeConfigToDefaults(cfg);
-                var newIdProp = cfg.FindPropertyRelative("expressionId");
-                if (newIdProp != null) newIdProp.stringValue = expressionId;
-            }
-
-            AssignGazeConfigFromReferenceModel(
-                _rootGazeConfigsProperty.GetArrayElementAtIndex(cfgIndex),
-                resetRangesToDefaults: true);
-
-            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
-
-            RebuildLayersUI();
-            RebuildExpressionLibraryUI();
-            RebuildGazeConfigsUI();
-            RebuildExpressionIdMapping();
-            UpdateValidation();
-
-            // 表情タブから目線設定を自動入力した場合、目線タブの「未確認」アスタリスクは
-            // ユーザーがすでに参照モデルに紐づく設定を当てはめた状態を表すため除去する。
-            // (アスタリスクは「目線タブを開いて値を確認しろ」という注意マーカーであり、
-            //  自動入力で値を当てはめた以上は確認済みとみなす)
-            ClearGazeTabAttention();
-        }
-
-        private void ChangeExpressionIsGaze(int exprIndex, bool newIsGaze)
-        {
-            serializedObject.Update();
-            if (exprIndex < 0 || exprIndex >= _expressionsProperty.arraySize) return;
-
-            var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
-            var isGazeProp = entryProp.FindPropertyRelative("isGaze");
-            if (isGazeProp == null) return;
-
-            bool previousIsGaze = isGazeProp.boolValue;
-            if (previousIsGaze == newIsGaze) return;
-
-            int undoGroup = BeginUndoGroup("Change Expression IsGaze");
-            isGazeProp.boolValue = newIsGaze;
-
-            if (previousIsGaze && !newIsGaze)
-            {
-                var idProp = entryProp.FindPropertyRelative("id");
-                CleanupRootGazeConfigsForRemovedExpression(
-                    idProp != null ? idProp.stringValue : string.Empty,
-                    GazeConfigDeletionTrigger.AnalogToNonAnalogKindTransition);
-            }
-
-            ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
-            RebuildLayersUI();
-            RebuildExpressionLibraryUI();
-            RebuildGazeConfigsUI();
-            RebuildExpressionIdMapping();
-            UpdateValidation();
-        }
-
         private void BuildAnimationClipFields(VisualElement row, int exprIndex)
         {
             var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
             var clipProp = entryProp.FindPropertyRelative("animationClip");
-            var isGazeProp = entryProp.FindPropertyRelative("isGaze");
-            bool currentIsGazeForClip = isGazeProp != null && isGazeProp.boolValue;
 
             var clipField = new ExpressionClipObjectField
             {
@@ -2769,25 +2480,7 @@ namespace Hidano.FacialControl.Editor.Inspector
                 };
                 clipField.RefreshDisplayLabel();
             }
-            clipField.style.display = currentIsGazeForClip ? DisplayStyle.None : DisplayStyle.Flex;
             row.Add(clipField);
-
-            // AnimationClip スロットの直下に「目線操作」Toggle を配置する。
-            // ON にすると GazeConfig（目線設定）駆動、OFF だと AnimationClip + 遷移時間。
-            bool currentIsGaze = isGazeProp != null && isGazeProp.boolValue;
-            var isGazeToggle = new Toggle("目線操作")
-            {
-                name = ExpressionRowIsGazeToggleName,
-                tooltip = "ON にするとこの表情は GazeConfig（目線設定）で駆動されます。OFF の通常表情では AnimationClip と遷移時間が使われます。",
-            };
-            isGazeToggle.SetValueWithoutNotify(currentIsGaze);
-            isGazeToggle.style.marginTop = 2;
-            isGazeToggle.RegisterValueChangedCallback(evt =>
-            {
-                clipField.style.display = evt.newValue ? DisplayStyle.None : DisplayStyle.Flex;
-                ChangeExpressionIsGaze(exprIndex, evt.newValue);
-            });
-            row.Add(isGazeToggle);
 
             var rendererSummary = new ListView
             {
@@ -2816,14 +2509,12 @@ namespace Hidano.FacialControl.Editor.Inspector
             var idProp = entryProp.FindPropertyRelative("id");
             string id = idProp != null ? idProp.stringValue : string.Empty;
 
-            int undoGroup = BeginUndoGroup("Remove Expression with GazeConfig");
-            CleanupRootGazeConfigsForRemovedExpression(id, GazeConfigDeletionTrigger.ExpressionDeletion);
+            int undoGroup = BeginUndoGroup("Remove Expression");
             _expressionsProperty.DeleteArrayElementAtIndex(exprIndex);
             ApplyModifiedPropertiesAndCollapseUndo(undoGroup);
 
             RebuildLayersUI();
             RebuildExpressionLibraryUI();
-            RebuildGazeConfigsUI();
             RebuildExpressionIdMapping();
             UpdateValidation();
         }
@@ -2831,110 +2522,6 @@ namespace Hidano.FacialControl.Editor.Inspector
         // ====================================================================
         // GazeConfig ヘルパー
         // ====================================================================
-
-        private enum GazeConfigDeletionTrigger
-        {
-            ExplicitUserRemoval,
-            ExpressionDeletion,
-            AnalogToNonAnalogKindTransition,
-        }
-
-        /// <summary>
-        /// overlay 編集（SerializedProperty 構造変更 + ApplyModifiedProperties）を、
-        /// UI Toolkit の bind 更新サイクルと衝突させないよう実行する。
-        ///
-        /// ラジオ / ObjectField の値変更コールバックは Panel の bindings 更新フェーズ中に発火しうる。
-        /// その最中に bound な配列（_expressions 以下の overlays）を InsertArrayElementAtIndex で
-        /// 構造変更したり ApplyModifiedProperties で確定すると、bound UI の再 bind が再入的に走り、
-        /// BaseVisualTreeHierarchyTrackerUpdater が整合性 Assert（Assertion failed）に引っかかる。
-        ///
-        /// ライブ Panel に attach 済み（実機 Inspector）の場合は次ティックへ遅延実行して衝突を避ける。
-        /// Panel 未 attach（EditMode テスト等、スケジューラが回らない環境）の場合は同期実行する。
-        /// いずれの場合も <paramref name="editCore"/> 内で ApplyModifiedProperties + ScheduleAutoSave まで確定する。
-        /// </summary>
-        private void RunOverlayEditDeferredOrImmediate(Action editCore)
-        {
-            if (editCore == null) return;
-
-            if (_rootElement != null && _rootElement.panel != null)
-            {
-                // 遅延ティックが来る前に Play 突入した場合に備え、保留リストへ積む。
-                // ExitingEditMode / OnDisable で FlushPendingOverlayEdits により確定され、取りこぼしを防ぐ。
-                _pendingOverlayEdits.Add(editCore);
-                _rootElement.schedule.Execute(() =>
-                {
-                    // 遅延実行時点で target / serializedObject が破棄されていないか再検証する。
-                    if (this == null || target == null || serializedObject == null) return;
-                    // 既に ExitingEditMode 等でフラッシュ済みなら二重実行しない。
-                    if (!_pendingOverlayEdits.Remove(editCore)) return;
-                    editCore();
-                });
-                return;
-            }
-
-            editCore();
-        }
-
-        private static int BeginUndoGroup(string groupName)
-        {
-            Undo.IncrementCurrentGroup();
-            Undo.SetCurrentGroupName(groupName);
-            return Undo.GetCurrentGroup();
-        }
-
-        private void ApplyModifiedPropertiesAndCollapseUndo(int undoGroup)
-        {
-            serializedObject.ApplyModifiedProperties();
-            Undo.CollapseUndoOperations(undoGroup);
-        }
-
-        private int FindRootGazeConfigIndex(string expressionId)
-        {
-            if (_rootGazeConfigsProperty == null || string.IsNullOrEmpty(expressionId)) return -1;
-            for (int i = 0; i < _rootGazeConfigsProperty.arraySize; i++)
-            {
-                var cfg = _rootGazeConfigsProperty.GetArrayElementAtIndex(i);
-                var idP = cfg.FindPropertyRelative("expressionId");
-                if (idP != null && string.Equals(idP.stringValue, expressionId, StringComparison.Ordinal))
-                {
-                    return i;
-                }
-            }
-            return -1;
-        }
-
-        private static void ValidateGazeConfigDeletionTrigger(GazeConfigDeletionTrigger trigger)
-        {
-            switch (trigger)
-            {
-                case GazeConfigDeletionTrigger.ExplicitUserRemoval:
-                case GazeConfigDeletionTrigger.ExpressionDeletion:
-                case GazeConfigDeletionTrigger.AnalogToNonAnalogKindTransition:
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(trigger), trigger, null);
-            }
-        }
-
-        private int CleanupRootGazeConfigsForRemovedExpression(string expressionId, GazeConfigDeletionTrigger trigger)
-        {
-            ValidateGazeConfigDeletionTrigger(trigger);
-
-            if (_rootGazeConfigsProperty == null || string.IsNullOrEmpty(expressionId)) return 0;
-
-            int removedCount = 0;
-            for (int i = _rootGazeConfigsProperty.arraySize - 1; i >= 0; i--)
-            {
-                var cfg = _rootGazeConfigsProperty.GetArrayElementAtIndex(i);
-                var idP = cfg.FindPropertyRelative("expressionId");
-                if (idP != null && string.Equals(idP.stringValue, expressionId, StringComparison.Ordinal))
-                {
-                    _rootGazeConfigsProperty.DeleteArrayElementAtIndex(i);
-                    removedCount++;
-                }
-            }
-            return removedCount;
-        }
 
         // ====================================================================
         // 目線ボーン: 参照モデルからの自動設定
@@ -2953,7 +2540,8 @@ namespace Hidano.FacialControl.Editor.Inspector
             SerializedProperty leftYawAxisProp,
             SerializedProperty leftPitchAxisProp,
             SerializedProperty rightYawAxisProp,
-            SerializedProperty rightPitchAxisProp)
+            SerializedProperty rightPitchAxisProp,
+            bool overwrite = false)
         {
             if (_referenceModelProperty == null)
             {
@@ -2971,6 +2559,8 @@ namespace Hidano.FacialControl.Editor.Inspector
             }
 
             var animator = referenceModel.GetComponentInChildren<Animator>(includeInactive: true);
+            if (animator == null)
+                Debug.LogWarning("[FacialControl] 参照モデルに Animator がないため、参照モデル root 起点で目ボーン path を保存します。");
 
             Transform leftEye = null;
             Transform rightEye = null;
@@ -2989,10 +2579,14 @@ namespace Hidano.FacialControl.Editor.Inspector
             int assigned = 0;
             if (leftEye != null)
             {
-                if (leftBonePathProp != null) leftBonePathProp.stringValue = leftEye.name;
-                if (leftInitRotProp != null) leftInitRotProp.vector3Value = leftEye.localEulerAngles;
-                AssignParentLocalAxes(leftEye, leftYawAxisProp, leftPitchAxisProp);
-                assigned++;
+                string path = GetBonePath(animator, referenceModel.transform, leftEye);
+                if ((overwrite || string.IsNullOrWhiteSpace(leftBonePathProp?.stringValue)) && !string.IsNullOrEmpty(path))
+                {
+                    leftBonePathProp.stringValue = path;
+                    if (leftInitRotProp != null) leftInitRotProp.vector3Value = leftEye.localEulerAngles;
+                    AssignParentLocalAxes(leftEye, leftYawAxisProp, leftPitchAxisProp);
+                    assigned++;
+                }
             }
             else
             {
@@ -3001,10 +2595,14 @@ namespace Hidano.FacialControl.Editor.Inspector
 
             if (rightEye != null)
             {
-                if (rightBonePathProp != null) rightBonePathProp.stringValue = rightEye.name;
-                if (rightInitRotProp != null) rightInitRotProp.vector3Value = rightEye.localEulerAngles;
-                AssignParentLocalAxes(rightEye, rightYawAxisProp, rightPitchAxisProp);
-                assigned++;
+                string path = GetBonePath(animator, referenceModel.transform, rightEye);
+                if ((overwrite || string.IsNullOrWhiteSpace(rightBonePathProp?.stringValue)) && !string.IsNullOrEmpty(path))
+                {
+                    rightBonePathProp.stringValue = path;
+                    if (rightInitRotProp != null) rightInitRotProp.vector3Value = rightEye.localEulerAngles;
+                    AssignParentLocalAxes(rightEye, rightYawAxisProp, rightPitchAxisProp);
+                    assigned++;
+                }
             }
             else
             {
@@ -3018,6 +2616,22 @@ namespace Hidano.FacialControl.Editor.Inspector
                     $"[FacialCharacterProfileSOInspector] 参照モデル '{referenceModel.name}' から目ボーンを自動設定しました"
                     + $" (Left: {(leftEye != null ? leftEye.name : "(skip)")}, Right: {(rightEye != null ? rightEye.name : "(skip)")}).");
             }
+        }
+
+        private static string GetBonePath(Animator animator, Transform referenceRoot, Transform bone)
+        {
+            if (bone == null) return null;
+            var names = new List<string>();
+            var current = bone;
+            var origin = animator != null ? animator.transform : referenceRoot;
+            while (current != null && current != origin)
+            {
+                names.Add(current.name);
+                current = current.parent;
+            }
+            if (current != origin) return null;
+            names.Reverse();
+            return string.Join("/", names);
         }
 
         private static void AssignParentLocalAxes(
@@ -3203,11 +2817,6 @@ namespace Hidano.FacialControl.Editor.Inspector
         private VisualElement BuildExpressionIdMappingRow(SerializedProperty expr)
         {
             string kindLabel = "通常";
-            var isGazeProp = expr.FindPropertyRelative("isGaze");
-            if (isGazeProp != null && isGazeProp.boolValue)
-            {
-                kindLabel = "目線";
-            }
 
             var row = BuildExpressionIdMappingRowContainer();
             row.Add(BuildExpressionIdMappingCell(
@@ -3284,9 +2893,6 @@ namespace Hidano.FacialControl.Editor.Inspector
             for (int i = 0; i < _expressionsProperty.arraySize; i++)
             {
                 var elem = _expressionsProperty.GetArrayElementAtIndex(i);
-                var isGazeP = elem.FindPropertyRelative("isGaze");
-                bool isGaze = isGazeP != null && isGazeP.boolValue;
-                if (isGaze) continue;
                 var clipP = elem.FindPropertyRelative("animationClip");
                 if (clipP != null && clipP.objectReferenceValue == null) nullClipCount++;
             }
@@ -3331,92 +2937,19 @@ namespace Hidano.FacialControl.Editor.Inspector
 
         private void UpdateRowValidation(VisualElement rowElement, int exprIndex)
         {
-            if (rowElement == null) return;
+            if (rowElement == null || _expressionsProperty == null) return;
             var help = rowElement.Q<HelpBox>(ExpressionRowValidationHelpName);
             if (help == null) return;
-
             var entryProp = _expressionsProperty.GetArrayElementAtIndex(exprIndex);
-            var isGazeProp = entryProp.FindPropertyRelative("isGaze");
             var clipProp = entryProp.FindPropertyRelative("animationClip");
-            var idProp = entryProp.FindPropertyRelative("id");
-
-            bool isGaze = isGazeProp != null && isGazeProp.boolValue;
-
             var messages = new List<string>();
-            if (!isGaze)
-            {
-                if (clipProp == null || clipProp.objectReferenceValue == null)
-                {
-                    messages.Add("AnimationClip が未割り当てです。");
-                }
-                var mismatchMessage = BuildRendererPathMismatchMessage(clipProp != null ? clipProp.objectReferenceValue as AnimationClip : null);
-                if (!string.IsNullOrEmpty(mismatchMessage)) messages.Add(mismatchMessage);
-            }
-            else
-            {
-                // _rootGazeConfigsProperty を持たない派生 (GazeBinding 機能なし) では gaze 個別検証は省略する。
-                if (_rootGazeConfigsProperty != null)
-                {
-                    int cfgIndex = FindRootGazeConfigIndex(idProp != null ? idProp.stringValue : string.Empty);
-                    if (cfgIndex < 0)
-                    {
-                        messages.Add("目線操作の設定が見つかりません。");
-                    }
-                    else
-                    {
-                        var cfgProp = _rootGazeConfigsProperty.GetArrayElementAtIndex(cfgIndex);
-                        var gazeMessages = ValidateGazeExpression(cfgProp);
-                        if (gazeMessages != null) messages.AddRange(gazeMessages);
-
-                        bool anyBone = false;
-                        foreach (var fname in new[] { "leftEyeBonePath", "rightEyeBonePath" })
-                        {
-                            var p = cfgProp.FindPropertyRelative(fname);
-                            if (p != null && !string.IsNullOrWhiteSpace(p.stringValue)) { anyBone = true; break; }
-                        }
-                        bool anyBs = false;
-                        foreach (var fname in new[] { "lookLeftClip", "lookRightClip", "lookUpClip", "lookDownClip" })
-                        {
-                            var p = cfgProp.FindPropertyRelative(fname);
-                            if (p != null && p.objectReferenceValue != null) { anyBs = true; break; }
-                        }
-                        if (!anyBone && !anyBs)
-                        {
-                            messages.Add("目線ボーンまたは BlendShape のいずれかを 1 つ以上設定してください。");
-                        }
-                    }
-                }
-            }
-
-            if (messages.Count == 0)
-            {
-                help.text = string.Empty;
-                help.style.display = DisplayStyle.None;
-            }
-            else
-            {
-                help.text = string.Join("\n", messages);
-                help.style.display = DisplayStyle.Flex;
-            }
-
-            // 目線操作の表情で警告が出ている場合のみ「参照モデルから自動設定」ボタンを表示する。
-            // 参照モデル未割り当て時はクリック不可にする。
-            var gazeAutoAssignButton = rowElement.Q<Button>(ExpressionRowGazeAutoAssignButtonName);
-            if (gazeAutoAssignButton != null)
-            {
-                bool showButton = isGaze && messages.Count > 0;
-                gazeAutoAssignButton.style.display = showButton ? DisplayStyle.Flex : DisplayStyle.None;
-                gazeAutoAssignButton.SetEnabled(HasReferenceModel());
-            }
+            if (clipProp == null || clipProp.objectReferenceValue == null)
+                messages.Add("AnimationClip が未割り当てです。");
+            var mismatchMessage = BuildRendererPathMismatchMessage(clipProp != null ? clipProp.objectReferenceValue as AnimationClip : null);
+            if (!string.IsNullOrEmpty(mismatchMessage)) messages.Add(mismatchMessage);
+            help.text = string.Join("\n", messages);
+            help.style.display = messages.Count == 0 ? DisplayStyle.None : DisplayStyle.Flex;
         }
-
-        /// <summary>
-        /// 派生クラスが目線操作の表情に対する追加バリデーションメッセージを返すフック。
-        /// 既定は空配列。例: InputActionReference 未割り当てチェックなど。
-        /// </summary>
-        protected virtual IReadOnlyList<string> ValidateGazeExpression(SerializedProperty gazeConfigProperty)
-            => Array.Empty<string>();
-
         private void OnClipChanged(int index, AnimationClip newClip, VisualElement rowElement)
         {
             if (_expressionsProperty == null

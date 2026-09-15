@@ -54,7 +54,6 @@ MonoBehaviour:
   - id: smile
     name: Smile
     layer: overlay
-    isGaze: 0
     animationClip: {fileID: 0}
     transitionDuration: 0.06666667
     transitionCurve:
@@ -95,7 +94,7 @@ MonoBehaviour:
       overlays: []
   _rendererPaths:
   - Face
-  _gazeConfigs: []
+  _legacyGazeConfigs: []
   _slots:
   - a
   - i

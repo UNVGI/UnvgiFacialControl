@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 using Hidano.FacialControl.Adapters.InputSources;
 using Hidano.FacialControl.Adapters.OSC;
@@ -8,7 +9,6 @@ using Hidano.FacialControl.Adapters.RuntimeSettings;
 using Hidano.FacialControl.Domain.Adapters;
 using Hidano.FacialControl.Domain.Interfaces;
 using Hidano.FacialControl.Domain.Models;
-using Hidano.FacialControl.Adapters.ScriptableObject;
 using UnityEngine;
 
 namespace Hidano.FacialControl.Adapters.AdapterBindings
@@ -33,7 +33,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
     /// </remarks>
     [Serializable]
     [FacialAdapterBinding(displayName: "OSC Receiver")]
-    public sealed class OscReceiverAdapterBinding : AdapterBindingBase
+    public sealed class OscReceiverAdapterBinding : AdapterBindingBase, IGazeChannelConsumer, IGazeSourceProvider, IOscResolvedMessageHandler
     {
         public enum MappingOrigin
         {
@@ -46,7 +46,16 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         public const string PresetAddress = "/_facialcontrol/preset";
         public const string GazeAdvertisementAddress = "/_facialcontrol/gaze";
 
+        [NonSerialized]
+        public OscReceiveOptions ReceiveOptions = OscReceiveOptions.Default;
+
         private const int MaxCachedBundleSenderDecisions = 32;
+        private const int HeartbeatScratchBytes = 32 * 1024;
+        private const int HeartbeatScratchNames = 1024;
+        private const int GazeAdvertisementScratchBytes = 8 * 1024;
+        private const int GazeAdvertisementScratchValues = 256 * 2;
+        private const int PresetScratchBytes = 256;
+        private const int InitialGazeFramePoolCapacity = 4;
 
         /// <summary>
         /// 環境/運用依存の Receiver 設定を保持する SettingsSO (sub-asset)。
@@ -104,6 +113,12 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         private Dictionary<string, List<GazeRoute>> _gazeRoutes;
 
         [NonSerialized]
+        private List<GazeRoute>[] _gazeRouteSets;
+
+        [NonSerialized]
+        private string[] _gazeRouteAddresses;
+
+        [NonSerialized]
         private Dictionary<string, List<GazeRoute>> _manualGazeRoutes;
 
         [NonSerialized]
@@ -129,7 +144,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         /// expressionId。広告由来 source の突合診断だけに使用し、設定自体は変更しない。
         /// </summary>
         [NonSerialized]
-        private List<string> _receiverGazeConfigExpressionIds;
+        private HashSet<string> _injectedGazeChannelIds;
+
+        [NonSerialized]
+        private bool _hasInjectedGazeChannels;
 
         [NonSerialized]
         private HashSet<string> _warnedUnmatchedGazeConfigIds;
@@ -157,6 +175,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         [NonSerialized]
         private Queue<List<GazeSample>> _readyGazeFrames;
+
+        [NonSerialized]
+        private Stack<List<GazeSample>> _gazeFramePool;
 
         [NonSerialized]
         private List<GazeSample> _currentGazeBundleValues;
@@ -219,6 +240,20 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         [NonSerialized]
         private bool _heartbeatAccumulating;
 
+        [NonSerialized] private byte[] _heartbeatScratchBytes;
+        [NonSerialized] private int[] _heartbeatScratchOffsets;
+        [NonSerialized] private int _heartbeatScratchByteCount;
+        [NonSerialized] private int _heartbeatScratchNameCount;
+        [NonSerialized] private uint _lastHeartbeatBytesHash;
+        [NonSerialized] private bool _hasProcessedHeartbeatBytes;
+        [NonSerialized] private bool _warnedHeartbeatScratchOverflow;
+
+        [NonSerialized] private byte[] _presetBytes;
+        [NonSerialized] private byte[] _customPrefixBytes;
+        [NonSerialized] private int _presetByteCount;
+        [NonSerialized] private int _customPrefixByteCount;
+        [NonSerialized] private bool _hasCustomPrefixBytes;
+
         [NonSerialized]
         private List<string> _gazeAdScratch;
 
@@ -233,6 +268,14 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
         [NonSerialized]
         private bool _gazeAdAccumulating;
+
+        [NonSerialized] private byte[] _gazeAdScratchBytes;
+        [NonSerialized] private int[] _gazeAdScratchOffsets;
+        [NonSerialized] private int _gazeAdScratchByteCount;
+        [NonSerialized] private int _gazeAdScratchValueCount;
+        [NonSerialized] private uint _lastGazeAdvertisementBytesHash;
+        [NonSerialized] private bool _hasProcessedGazeAdvertisementBytes;
+        [NonSerialized] private bool _warnedGazeAdvertisementScratchOverflow;
 
         [NonSerialized]
         private bool _warnedOnEmptyHeartbeatIntersection;
@@ -428,22 +471,23 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         /// FacialController の GazeConfigs を受け取るリフレクション注入契約。
         /// GazeConfig の自動補完は行わず、expressionId の突合診断にのみ利用する。
         /// </summary>
-        public void Configure(IReadOnlyList<GazeBindingConfig> gazeConfigs)
+        public void ConfigureGazeChannels(IReadOnlyList<string> channelIds)
         {
-            if (_receiverGazeConfigExpressionIds == null)
+            if (_injectedGazeChannelIds == null)
             {
-                _receiverGazeConfigExpressionIds = new List<string>();
+                _injectedGazeChannelIds = new HashSet<string>(StringComparer.Ordinal);
             }
 
-            _receiverGazeConfigExpressionIds.Clear();
-            if (gazeConfigs != null)
+            _injectedGazeChannelIds.Clear();
+            _hasInjectedGazeChannels = true;
+            if (channelIds != null)
             {
-                for (int i = 0; i < gazeConfigs.Count; i++)
+                for (int i = 0; i < channelIds.Count; i++)
                 {
-                    GazeBindingConfig config = gazeConfigs[i];
-                    if (config != null && !string.IsNullOrEmpty(config.expressionId))
+                    string channelId = channelIds[i];
+                    if (!string.IsNullOrEmpty(channelId))
                     {
-                        _receiverGazeConfigExpressionIds.Add(config.expressionId);
+                        _injectedGazeChannelIds.Add(channelId);
                     }
                 }
             }
@@ -456,6 +500,30 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             if (_hasProcessedGazeAdvertisement && _autoGazeRuntimeEntriesById != null)
             {
                 WarnForUnmatchedGazeConfigs(_autoGazeRuntimeEntriesById);
+            }
+        }
+
+        /// <summary>手動 gaze mapping と広告駆動のワイルドカードを宣言する。</summary>
+        public IEnumerable<GazeSourceDeclaration> GetGazeSourceDeclarations()
+        {
+            yield return new GazeSourceDeclaration(null, true);
+            if (_mappings == null)
+            {
+                yield break;
+            }
+
+            for (int i = 0; i < _mappings.Count; i++)
+            {
+                OscMappingEntry entry = _mappings[i];
+                if (entry == null || !IsGazeMode(entry.mode) ||
+                    !GazeSourceIdConvention.IsValidChannelId(entry.expressionId))
+                {
+                    continue;
+                }
+
+                yield return new GazeSourceDeclaration(
+                    entry.expressionId,
+                    entry.mode == OscMappingMode.Gaze_ARKit_8BS || entry.leftRightIndependent);
             }
         }
 
@@ -606,6 +674,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 return;
             }
 
+            _helperHost?.Receiver?.Diagnostics?.IncrementFixedTicks();
+
             // 受信スレッドが write バッファに積んだ値を read バッファに切り替える。
             // OscReceiver の Update / 個別タイマに依存せず binding 自前 tick で進める。
             if (_helperHost != null)
@@ -627,6 +697,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             {
                 if (_helperHost.Receiver != null)
                 {
+                    _helperHost.Receiver.SetResolvedMessageHandler(null);
                     _helperHost.Receiver.SetMessageFilter(null);
                 }
 
@@ -654,7 +725,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _gazeAdNormalizedScratch = null;
             _autoGazeSourcesById = null;
             _autoGazeRuntimeEntriesById = null;
-            _receiverGazeConfigExpressionIds = null;
+            _injectedGazeChannelIds = null;
+            _hasInjectedGazeChannels = false;
             _warnedUnmatchedGazeConfigIds = null;
             _lastGazeAdvertisementHash = 0u;
             _hasProcessedGazeAdvertisement = false;
@@ -682,6 +754,25 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _hasProcessedHeartbeat = false;
             _heartbeatAccumulationTimestamp = 0u;
             _heartbeatAccumulating = false;
+            _heartbeatScratchBytes = null;
+            _heartbeatScratchOffsets = null;
+            _heartbeatScratchByteCount = 0;
+            _heartbeatScratchNameCount = 0;
+            _lastHeartbeatBytesHash = 0u;
+            _hasProcessedHeartbeatBytes = false;
+            _warnedHeartbeatScratchOverflow = false;
+            _presetBytes = null;
+            _customPrefixBytes = null;
+            _presetByteCount = 0;
+            _customPrefixByteCount = 0;
+            _hasCustomPrefixBytes = false;
+            _gazeAdScratchBytes = null;
+            _gazeAdScratchOffsets = null;
+            _gazeAdScratchByteCount = 0;
+            _gazeAdScratchValueCount = 0;
+            _lastGazeAdvertisementBytesHash = 0u;
+            _hasProcessedGazeAdvertisementBytes = false;
+            _warnedGazeAdvertisementScratchOverflow = false;
             _gazeAdScratch = null;
             _gazeAdSync = null;
             _gazeAdDirty = 0;
@@ -777,12 +868,19 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _lastAcceptedPacketTime = ctx.TimeProvider.UnscaledTimeSeconds;
             _failSafeActive = false;
             _zombiePolicy = new ZombieEvictionPolicy();
-            _bundleSenderDecisions = new Dictionary<ulong, bool>();
-            _bundleSenderDecisionOrder = new Queue<ulong>();
+            // 上限 +1 で事前確保し、bundle タイムスタンプが増えても定常で再確保しない（GC ゲート対策）
+            _bundleSenderDecisions = new Dictionary<ulong, bool>(MaxCachedBundleSenderDecisions + 1);
+            _bundleSenderDecisionOrder = new Queue<ulong>(MaxCachedBundleSenderDecisions + 1);
             _heartbeatScratch = new List<string>();
             _heartbeatProcessingScratch = new List<string>();
             _heartbeatSync = new object();
+            _heartbeatScratchBytes = new byte[HeartbeatScratchBytes];
+            _heartbeatScratchOffsets = new int[HeartbeatScratchNames + 1];
             _gazeAdScratch = new List<string>();
+            _gazeAdScratchBytes = new byte[GazeAdvertisementScratchBytes];
+            _gazeAdScratchOffsets = new int[GazeAdvertisementScratchValues + 1];
+            _presetBytes = new byte[PresetScratchBytes];
+            _customPrefixBytes = new byte[PresetScratchBytes];
             _gazeAdSync = new object();
             _gazeAdProcessingScratch = new List<string>();
             _gazeAdPlan = new List<GazeAdvertisementResolver.GazeAdvertisement>();
@@ -790,7 +888,9 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _gazeAdNormalizedScratch = new List<GazeAdvertisementResolver.GazeAdvertisement>();
             _autoGazeSourcesById = new Dictionary<string, GazeVector2InputSource>(StringComparer.Ordinal);
             _autoGazeRuntimeEntriesById = new Dictionary<string, GazeRuntimeEntry>(StringComparer.Ordinal);
-            _receiverGazeConfigExpressionIds ??= new List<string>();
+            // ConfigureGazeChannels is normally called by FacialController before OnStart.
+            // Keep the unset state distinct so advertisement matching can be skipped for
+            // standalone receiver use (see WarnForUnmatchedGazeConfigs).
             _warnedUnmatchedGazeConfigIds ??= new HashSet<string>(StringComparer.Ordinal);
             _gazeAdDirty = 0;
             _gazeAdAccumulationTimestamp = 0u;
@@ -813,11 +913,13 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 runtimeMappings,
                 settings.BundleMode == BundleInterpretationMode.AtomicSwap ? _bundleAccumulator : null,
                 settings.BundleMode,
-                ctx.TimeProvider);
+                ctx.TimeProvider,
+                ReceiveOptions);
 
             if (_helperHost.Receiver != null)
             {
-                _helperHost.Receiver.SetMessageFilter(HandleIncomingOscMessage);
+                _helperHost.Receiver.SetResolvedMessageHandler(this);
+                PublishGazeRoutesToReceiver();
             }
         }
 
@@ -899,7 +1001,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             for (int i = 0; i < mappings.Count; i++)
             {
                 OscMappingEntry entry = mappings[i];
-                if (entry == null || !IsGazeMode(entry.mode) || string.IsNullOrEmpty(entry.expressionId))
+                if (entry == null || !IsGazeMode(entry.mode) ||
+                    !GazeSourceIdConvention.IsValidChannelId(entry.expressionId))
                 {
                     continue;
                 }
@@ -935,12 +1038,15 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 runtime.AddressPattern = entry.addressPattern;
                 if (entry.mode == OscMappingMode.Gaze_ARKit_8BS || entry.leftRightIndependent)
                 {
-                    runtime.LeftSource = RegisterGazeSource(registry, slug, entry.expressionId + ".left");
-                    runtime.RightSource = RegisterGazeSource(registry, slug, entry.expressionId + ".right");
+                    runtime.LeftSource = RegisterGazeSource(
+                        registry, slug, GazeSourceIdConvention.ComposeSub(entry.expressionId, GazeSide.Left));
+                    runtime.RightSource = RegisterGazeSource(
+                        registry, slug, GazeSourceIdConvention.ComposeSub(entry.expressionId, GazeSide.Right));
                 }
                 else
                 {
-                    runtime.CommonSource = RegisterGazeSource(registry, slug, entry.expressionId);
+                    runtime.CommonSource = RegisterGazeSource(
+                        registry, slug, GazeSourceIdConvention.ComposeSub(entry.expressionId, GazeSide.Shared));
                 }
 
                 if (!runtime.HasAnySource)
@@ -955,6 +1061,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _manualGazeSources = new List<GazeVector2InputSource>(_gazeSources);
             _manualGazeRuntimeEntries = new List<GazeRuntimeEntry>(_gazeRuntimeEntries);
             _manualGazeRoutes = _gazeRoutes;
+            PublishGazeRoutesToReceiver();
         }
 
         private GazeVector2InputSource RegisterGazeSource(
@@ -1041,9 +1148,15 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         private void InitializeGazeBundleState()
         {
             _gazeBundleSync = new object();
-            _readyGazeFrames = new Queue<List<GazeSample>>();
-            _currentGazeBundleValues = new List<GazeSample>();
-            _bareGazeValues = new List<GazeSample>();
+            _readyGazeFrames = new Queue<List<GazeSample>>(InitialGazeFramePoolCapacity);
+            _gazeFramePool = new Stack<List<GazeSample>>(InitialGazeFramePoolCapacity);
+            for (int i = 0; i < InitialGazeFramePoolCapacity; i++)
+            {
+                _gazeFramePool.Push(new List<GazeSample>());
+            }
+
+            _currentGazeBundleValues = RentGazeFrameLocked();
+            _bareGazeValues = RentGazeFrameLocked();
             _currentGazeTimestampKey = 0UL;
             _currentGazeBundleFirstReceivedAtSeconds = 0d;
             _hasCurrentGazeBundle = false;
@@ -1058,9 +1171,26 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
 
             lock (_gazeBundleSync)
             {
-                _readyGazeFrames?.Clear();
-                _currentGazeBundleValues?.Clear();
-                _bareGazeValues?.Clear();
+                if (_readyGazeFrames != null)
+                {
+                    while (_readyGazeFrames.Count > 0)
+                    {
+                        ReturnGazeFrameLocked(_readyGazeFrames.Dequeue());
+                    }
+                }
+
+                if (_currentGazeBundleValues != null)
+                {
+                    ReturnGazeFrameLocked(_currentGazeBundleValues);
+                }
+
+                if (_bareGazeValues != null)
+                {
+                    ReturnGazeFrameLocked(_bareGazeValues);
+                }
+
+                _currentGazeBundleValues = RentGazeFrameLocked();
+                _bareGazeValues = RentGazeFrameLocked();
                 _currentGazeTimestampKey = 0UL;
                 _currentGazeBundleFirstReceivedAtSeconds = 0d;
                 _hasCurrentGazeBundle = false;
@@ -1107,6 +1237,104 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             return true;
         }
 
+        public bool HandleIncomingOscMessage(in OscMessageView view, in OscResolvedMessage resolved)
+        {
+            if (resolved.Control == OscControlKind.SenderId)
+            {
+                HandleSenderIdentity(in resolved);
+                return false;
+            }
+
+            if (!IsAcceptedSender(resolved.TimestampKey)) return false;
+
+            if (resolved.Control == OscControlKind.Heartbeat ||
+                resolved.Control == OscControlKind.Preset ||
+                resolved.Control == OscControlKind.GazeAdvertisement)
+            {
+                if (resolved.Control == OscControlKind.Heartbeat)
+                {
+                    AccumulateHeartbeatBytes(in view);
+                    _helperHost?.Receiver?.Diagnostics?.IncrementHeartbeatArrivals();
+                }
+                else if (resolved.Control == OscControlKind.Preset)
+                {
+                    HandlePresetBytes(in view);
+                }
+                else
+                {
+                    AccumulateGazeAdvertisementBytes(in view);
+                }
+                return false;
+            }
+
+            bool handledGaze = false;
+            if (resolved.GazeRouteSet >= 0 && resolved.HasFloat &&
+                _gazeRouteSets != null && resolved.GazeRouteSet < _gazeRouteSets.Length)
+            {
+                List<GazeRoute> routes = _gazeRouteSets[resolved.GazeRouteSet];
+                BundleInterpretationMode mode = _effectiveSettings != null
+                    ? _effectiveSettings.BundleMode
+                    : BundleInterpretationMode.AtomicSwap;
+                for (int i = 0; i < routes.Count; i++)
+                {
+                    if (mode == BundleInterpretationMode.AtomicSwap)
+                        RecordBufferedGazeMessage(resolved.TimestampKey, routes[i], resolved.FloatValue);
+                    else
+                        routes[i].Runtime.Record(routes[i].AxisIndex, resolved.FloatValue);
+                }
+                handledGaze = true;
+            }
+
+            if (handledGaze || resolved.MappingIndex >= 0) MarkAcceptedPacket();
+            return true;
+        }
+
+        private void HandleSenderIdentity(in OscResolvedMessage resolved)
+        {
+            if (!resolved.SenderIdentityValid)
+            {
+                Debug.LogWarning("[OscReceiverAdapterBinding] sender_id message payload could not be interpreted.");
+                return;
+            }
+
+            if (_zombiePolicy == null) _zombiePolicy = new ZombieEvictionPolicy();
+            bool accepted;
+            try
+            {
+                accepted = _zombiePolicy.Observe(new SenderIdentity(
+                    resolved.SenderUuid, resolved.SenderStartedAtUnixMs));
+            }
+            catch (ArgumentException)
+            {
+                Debug.LogWarning("[OscReceiverAdapterBinding] sender_id message payload could not be interpreted.");
+                return;
+            }
+
+            if (_zombiePolicy.HasCurrentSender)
+            {
+                _currentSenderId = _zombiePolicy.CurrentSender;
+                _hasCurrentSenderId = true;
+            }
+
+            if (OscBundleAccumulator.IsBundleTimestamp(resolved.TimestampKey))
+                RememberBundleSenderDecision(resolved.TimestampKey, accepted);
+            else
+            {
+                _hasBareSenderDecision = true;
+                _bareSenderAccepted = accepted;
+            }
+        }
+
+        private bool IsAcceptedSender(ulong timestampKey)
+        {
+            if (OscBundleAccumulator.IsBundleTimestamp(timestampKey) &&
+                _bundleSenderDecisions != null &&
+                _bundleSenderDecisions.TryGetValue(timestampKey, out bool accepted)) return accepted;
+            if (!OscBundleAccumulator.IsBundleTimestamp(timestampKey) && _hasBareSenderDecision)
+                return _bareSenderAccepted;
+            return true;
+        }
+
         private void HandlePresetMessage(uOSC.Message message)
         {
             if (message.values == null ||
@@ -1121,6 +1349,60 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _currentCustomPrefix = message.values.Length > 1 && message.values[1] is string customPrefix
                 ? customPrefix
                 : null;
+        }
+
+        private void HandlePresetBytes(in OscMessageView view)
+        {
+            if (_presetBytes == null || _customPrefixBytes == null)
+            {
+                return;
+            }
+
+            var reader = view.GetArgumentReader();
+            if (!reader.TryReadNext(out OscArgument preset) || !preset.IsString ||
+                preset.Bytes.Length == 0 || preset.Bytes.Length > PresetScratchBytes ||
+                !reader.TryReadNext(out OscArgument custom) && view.ArgumentCount > 1)
+            {
+                return;
+            }
+
+            bool hasCustom = view.ArgumentCount > 1;
+            if (hasCustom && (!custom.IsString || custom.Bytes.Length > PresetScratchBytes))
+            {
+                return;
+            }
+
+            bool presetChanged = !BytesEqual(_presetBytes, _presetByteCount, preset.Bytes);
+            bool customChanged = hasCustom != _hasCustomPrefixBytes ||
+                (hasCustom && !BytesEqual(_customPrefixBytes, _customPrefixByteCount, custom.Bytes));
+            if (!presetChanged && !customChanged)
+            {
+                return;
+            }
+
+            if (presetChanged)
+            {
+                preset.Bytes.CopyTo(_presetBytes);
+                _presetByteCount = preset.Bytes.Length;
+                _currentPresetName = Encoding.UTF8.GetString(_presetBytes, 0, _presetByteCount);
+            }
+
+            if (customChanged)
+            {
+                _hasCustomPrefixBytes = hasCustom;
+                if (hasCustom)
+                {
+                    custom.Bytes.CopyTo(_customPrefixBytes);
+                    _customPrefixByteCount = custom.Bytes.Length;
+                    _currentCustomPrefix = Encoding.UTF8.GetString(
+                        _customPrefixBytes, 0, _customPrefixByteCount);
+                }
+                else
+                {
+                    _customPrefixByteCount = 0;
+                    _currentCustomPrefix = null;
+                }
+            }
         }
 
         private void HandleSenderIdentityMessage(uOSC.Message message)
@@ -1177,8 +1459,8 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         {
             if (_bundleSenderDecisions == null)
             {
-                _bundleSenderDecisions = new Dictionary<ulong, bool>();
-                _bundleSenderDecisionOrder = new Queue<ulong>();
+                _bundleSenderDecisions = new Dictionary<ulong, bool>(MaxCachedBundleSenderDecisions + 1);
+                _bundleSenderDecisionOrder = new Queue<ulong>(MaxCachedBundleSenderDecisions + 1);
             }
 
             if (!_bundleSenderDecisions.ContainsKey(timestampKey))
@@ -1192,6 +1474,56 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
                 ulong old = _bundleSenderDecisionOrder.Dequeue();
                 _bundleSenderDecisions.Remove(old);
             }
+        }
+
+        private void AccumulateHeartbeatBytes(in OscMessageView view)
+        {
+            if (_heartbeatScratchBytes == null || _heartbeatScratchOffsets == null)
+            {
+                return;
+            }
+
+            lock (_heartbeatSync)
+            {
+                if (!_heartbeatAccumulating || view.TimestampKey != _heartbeatAccumulationTimestamp)
+                {
+                    _heartbeatScratchByteCount = 0;
+                    _heartbeatScratchNameCount = 0;
+                    _heartbeatScratchOffsets[0] = 0;
+                    _heartbeatAccumulationTimestamp = view.TimestampKey;
+                    _heartbeatAccumulating = true;
+                }
+
+                var reader = view.GetArgumentReader();
+                while (reader.TryReadNext(out OscArgument argument))
+                {
+                    if (!argument.IsString || argument.Bytes.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    if (_heartbeatScratchNameCount >= HeartbeatScratchNames ||
+                        argument.Bytes.Length > HeartbeatScratchBytes - _heartbeatScratchByteCount)
+                    {
+                        if (!_warnedHeartbeatScratchOverflow)
+                        {
+                            _warnedHeartbeatScratchOverflow = true;
+                            Debug.LogWarning("[OscReceiverAdapterBinding] heartbeat scratch exceeded 32 KB / 1024 names; remaining names were truncated.");
+                        }
+
+                        break;
+                    }
+
+                    argument.Bytes.CopyTo(new Span<byte>(_heartbeatScratchBytes, _heartbeatScratchByteCount, argument.Bytes.Length));
+                    _heartbeatScratchByteCount += argument.Bytes.Length;
+                    _heartbeatScratchNameCount++;
+                    _heartbeatScratchOffsets[_heartbeatScratchNameCount] = _heartbeatScratchByteCount;
+                }
+            }
+
+            // ProcessPendingHeartbeatMappings は dirty が立っていなければ即 return するため、
+            // chunk を積むたびに必ず立てる（unchanged 判定はバイト列ハッシュ側で行う）。
+            Volatile.Write(ref _heartbeatDirty, 1);
         }
 
         private void HandleHeartbeatMessage(uOSC.Message message)
@@ -1258,11 +1590,54 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             Volatile.Write(ref _gazeAdDirty, 1);
         }
 
+        private void AccumulateGazeAdvertisementBytes(in OscMessageView view)
+        {
+            if (_gazeAdScratchBytes == null || _gazeAdScratchOffsets == null)
+            {
+                return;
+            }
+
+            lock (_gazeAdSync)
+            {
+                if (!_gazeAdAccumulating || view.TimestampKey != _gazeAdAccumulationTimestamp)
+                {
+                    _gazeAdScratchByteCount = 0;
+                    _gazeAdScratchValueCount = 0;
+                    _gazeAdScratchOffsets[0] = 0;
+                    _gazeAdAccumulationTimestamp = view.TimestampKey;
+                    _gazeAdAccumulating = true;
+                }
+
+                var reader = view.GetArgumentReader();
+                while (reader.TryReadNext(out OscArgument argument))
+                {
+                    if (!argument.IsString || _gazeAdScratchValueCount >= GazeAdvertisementScratchValues ||
+                        argument.Bytes.Length > GazeAdvertisementScratchBytes - _gazeAdScratchByteCount)
+                    {
+                        if (!_warnedGazeAdvertisementScratchOverflow)
+                        {
+                            _warnedGazeAdvertisementScratchOverflow = true;
+                            Debug.LogWarning("[OscReceiverAdapterBinding] gaze advertisement scratch exceeded 8 KB / 256 pairs; remaining values were truncated.");
+                        }
+                        break;
+                    }
+
+                    argument.Bytes.CopyTo(new Span<byte>(
+                        _gazeAdScratchBytes, _gazeAdScratchByteCount, argument.Bytes.Length));
+                    _gazeAdScratchByteCount += argument.Bytes.Length;
+                    _gazeAdScratchValueCount++;
+                    _gazeAdScratchOffsets[_gazeAdScratchValueCount] = _gazeAdScratchByteCount;
+                }
+            }
+
+            Volatile.Write(ref _gazeAdDirty, 1);
+        }
+
         private void ProcessPendingGazeAdvertisement()
         {
             if (Interlocked.Exchange(ref _gazeAdDirty, 0) == 0 ||
                 _gazeAdProcessingScratch == null ||
-                _gazeAdScratch == null)
+                _gazeAdScratchBytes == null)
             {
                 return;
             }
@@ -1270,7 +1645,21 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             lock (_gazeAdSync)
             {
                 _gazeAdProcessingScratch.Clear();
-                _gazeAdProcessingScratch.AddRange(_gazeAdScratch);
+                uint bytesHash = ComputeGazeAdvertisementBytesHash();
+                if (_hasProcessedGazeAdvertisementBytes && bytesHash == _lastGazeAdvertisementBytesHash)
+                {
+                    return;
+                }
+
+                _lastGazeAdvertisementBytesHash = bytesHash;
+                _hasProcessedGazeAdvertisementBytes = true;
+                for (int i = 0; i < _gazeAdScratchValueCount; i++)
+                {
+                    int start = _gazeAdScratchOffsets[i];
+                    int length = _gazeAdScratchOffsets[i + 1] - start;
+                    _gazeAdProcessingScratch.Add(Encoding.UTF8.GetString(
+                        _gazeAdScratchBytes, start, length));
+                }
             }
 
             _gazeAdvertisedEntries.Clear();
@@ -1289,6 +1678,37 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             _lastGazeAdvertisementHash = hash;
             _hasProcessedGazeAdvertisement = true;
             RebuildGazeRoutes(_gazeAdvertisedEntries);
+        }
+
+        private uint ComputeGazeAdvertisementBytesHash()
+        {
+            unchecked
+            {
+                uint hash = HeartbeatHashHelper.Fnv1aOffsetBasis;
+                for (int i = 0; i < _gazeAdScratchValueCount; i++)
+                {
+                    int start = _gazeAdScratchOffsets[i];
+                    int end = _gazeAdScratchOffsets[i + 1];
+                    for (int j = start; j < end; j++)
+                    {
+                        hash ^= _gazeAdScratchBytes[j];
+                        hash *= HeartbeatHashHelper.Fnv1aPrime;
+                    }
+                    hash ^= 0;
+                    hash *= HeartbeatHashHelper.Fnv1aPrime;
+                }
+                return hash;
+            }
+        }
+
+        private static bool BytesEqual(byte[] destination, int length, ReadOnlySpan<byte> source)
+        {
+            if (length != source.Length) return false;
+            for (int i = 0; i < length; i++)
+            {
+                if (destination[i] != source[i]) return false;
+            }
+            return true;
         }
 
         private void RebuildGazeRoutes(
@@ -1375,6 +1795,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             // Publish only fully-built immutable snapshots. Readers retain their local dictionary reference.
             Volatile.Write(ref _gazeRuntimeEntries, newRuntimeEntries);
             Volatile.Write(ref _gazeRoutes, newRoutes);
+            PublishGazeRoutesToReceiver(newRoutes);
 
             LogGazeRouteDiagnostics(_manualGazeRuntimeEntries, _autoGazeRuntimeEntriesById);
             WarnForUnmatchedGazeConfigs(_autoGazeRuntimeEntriesById);
@@ -1383,8 +1804,10 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         private void WarnForUnmatchedGazeConfigs(
             IReadOnlyDictionary<string, GazeRuntimeEntry> autoEntries)
         {
-            if (autoEntries == null || autoEntries.Count == 0 ||
-                _receiverGazeConfigExpressionIds == null ||
+            // 注入なしの単体使用では突合をスキップし、広告ごとの誤警告を防ぐ。
+            // これは未注入時に一度警告する送信側とは異なる非対称な責務である。
+            if (!_hasInjectedGazeChannels || autoEntries == null || autoEntries.Count == 0 ||
+                _injectedGazeChannelIds == null ||
                 _warnedUnmatchedGazeConfigIds == null)
             {
                 return;
@@ -1394,7 +1817,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             {
                 string expressionId = entry == null ? null : entry.ExpressionId;
                 if (string.IsNullOrEmpty(expressionId) ||
-                    _receiverGazeConfigExpressionIds.Contains(expressionId) ||
+                    _injectedGazeChannelIds.Contains(expressionId) ||
                     !_warnedUnmatchedGazeConfigIds.Add(expressionId))
                 {
                     continue;
@@ -1477,14 +1900,19 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             string expressionId,
             ISet<string> desiredSourceIds)
         {
-            string sourceId = GazeBindingConfigResolver.ComposeSourceId(_runtimeSlug.Value, expressionId, side);
+            if (!GazeSourceIdConvention.IsValidChannelId(expressionId))
+            {
+                return null;
+            }
+
+            string sourceId = GazeSourceIdConvention.Compose(_runtimeSlug.Value, expressionId, side);
             desiredSourceIds.Add(sourceId);
             if (_autoGazeSourcesById.TryGetValue(sourceId, out GazeVector2InputSource existing))
             {
                 return existing;
             }
 
-            string sub = GazeBindingConfigResolver.ComposeSourceSub(expressionId, side);
+            string sub = GazeSourceIdConvention.ComposeSub(expressionId, side);
             if (!InputSourceId.TryParse(sourceId, out InputSourceId parsed))
             {
                 return null;
@@ -1526,17 +1954,29 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
         {
             if (Interlocked.Exchange(ref _heartbeatDirty, 0) == 0 ||
                 _heartbeatProcessingScratch == null ||
-                _runtimeMeshBlendShapeNames == null)
+                _runtimeMeshBlendShapeNames == null ||
+                _heartbeatScratchBytes == null)
             {
                 return;
             }
 
             lock (_heartbeatSync)
             {
-                _heartbeatProcessingScratch.Clear();
-                for (int i = 0; i < _heartbeatScratch.Count; i++)
+                uint bytesHash = ComputeHeartbeatBytesHash();
+                if (_hasProcessedHeartbeatBytes && bytesHash == _lastHeartbeatBytesHash)
                 {
-                    _heartbeatProcessingScratch.Add(_heartbeatScratch[i]);
+                    return;
+                }
+
+                _lastHeartbeatBytesHash = bytesHash;
+                _hasProcessedHeartbeatBytes = true;
+                _heartbeatProcessingScratch.Clear();
+                for (int i = 0; i < _heartbeatScratchNameCount; i++)
+                {
+                    int start = _heartbeatScratchOffsets[i];
+                    int length = _heartbeatScratchOffsets[i + 1] - start;
+                    _heartbeatProcessingScratch.Add(Encoding.UTF8.GetString(
+                        _heartbeatScratchBytes, start, length));
                 }
             }
 
@@ -1546,11 +1986,6 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             uint heartbeatHash = HeartbeatHashHelper.ComputeFnv1a(_heartbeatProcessingScratch);
-            if (_hasProcessedHeartbeat && heartbeatHash == _lastHeartbeatHash)
-            {
-                return;
-            }
-
             _lastHeartbeatHash = heartbeatHash;
             _hasProcessedHeartbeat = true;
 
@@ -1578,6 +2013,29 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             PublishRuntimeMappings(result);
+        }
+
+        private uint ComputeHeartbeatBytesHash()
+        {
+            unchecked
+            {
+                uint hash = HeartbeatHashHelper.Fnv1aOffsetBasis;
+                for (int i = 0; i < _heartbeatScratchNameCount; i++)
+                {
+                    int start = _heartbeatScratchOffsets[i];
+                    int end = _heartbeatScratchOffsets[i + 1];
+                    for (int j = start; j < end; j++)
+                    {
+                        hash ^= _heartbeatScratchBytes[j];
+                        hash *= HeartbeatHashHelper.Fnv1aPrime;
+                    }
+
+                    hash ^= 0;
+                    hash *= HeartbeatHashHelper.Fnv1aPrime;
+                }
+
+                return hash;
+            }
         }
 
         private void PublishRuntimeMappings(RuntimeMappingResolver.ResolveResult result)
@@ -1715,6 +2173,55 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             return true;
+        }
+
+        private void PublishGazeRoutesToReceiver()
+        {
+            PublishGazeRoutesToReceiver(_gazeRoutes);
+        }
+
+        private void PublishGazeRoutesToReceiver(Dictionary<string, List<GazeRoute>> routes)
+        {
+            if (routes == null)
+            {
+                _gazeRouteSets = Array.Empty<List<GazeRoute>>();
+                _gazeRouteAddresses = Array.Empty<string>();
+            }
+            else
+            {
+                var addresses = new string[routes.Count];
+                var sets = new List<GazeRoute>[routes.Count];
+                int index = 0;
+                foreach (KeyValuePair<string, List<GazeRoute>> pair in routes)
+                {
+                    addresses[index] = pair.Key;
+                    sets[index] = pair.Value;
+                    index++;
+                }
+                _gazeRouteAddresses = addresses;
+                _gazeRouteSets = sets;
+            }
+
+            if (_helperHost != null && _helperHost.Receiver != null)
+                _helperHost.Receiver.SetGazeAddresses(_gazeRouteAddresses);
+        }
+
+        private void RecordBufferedGazeMessage(ulong timestampKey, GazeRoute route, float value)
+        {
+            if (_gazeBundleSync == null)
+            {
+                route.Runtime.Record(route.AxisIndex, value);
+                return;
+            }
+
+            double receivedAtSeconds = GetCurrentTimeSeconds();
+            lock (_gazeBundleSync)
+            {
+                if (OscBundleAccumulator.IsBundleTimestamp(timestampKey))
+                    RecordGazeBundleMessageLocked(timestampKey, route, value, receivedAtSeconds);
+                else
+                    RecordBareGazeMessageLocked(route, value);
+            }
         }
 
         private bool TryHandleGazeMessage(uOSC.Message message)
@@ -1865,7 +2372,7 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             if (_currentGazeBundleValues.Count > 0)
             {
                 _readyGazeFrames.Enqueue(_currentGazeBundleValues);
-                _currentGazeBundleValues = new List<GazeSample>(_currentGazeBundleValues.Count);
+                _currentGazeBundleValues = RentGazeFrameLocked();
             }
 
             _currentGazeTimestampKey = 0UL;
@@ -1881,16 +2388,37 @@ namespace Hidano.FacialControl.Adapters.AdapterBindings
             }
 
             _readyGazeFrames.Enqueue(_bareGazeValues);
-            _bareGazeValues = new List<GazeSample>(_bareGazeValues.Count);
+            _bareGazeValues = RentGazeFrameLocked();
         }
 
         private void ApplyGazeFrame(List<GazeSample> frame)
         {
-            for (int i = 0; i < frame.Count; i++)
+            try
             {
-                GazeSample sample = frame[i];
-                sample.Runtime.Record(sample.AxisIndex, sample.Value);
+                for (int i = 0; i < frame.Count; i++)
+                {
+                    GazeSample sample = frame[i];
+                    sample.Runtime.Record(sample.AxisIndex, sample.Value);
+                }
             }
+            finally
+            {
+                lock (_gazeBundleSync)
+                {
+                    ReturnGazeFrameLocked(frame);
+                }
+            }
+        }
+
+        private List<GazeSample> RentGazeFrameLocked()
+        {
+            return _gazeFramePool.Count > 0 ? _gazeFramePool.Pop() : new List<GazeSample>();
+        }
+
+        private void ReturnGazeFrameLocked(List<GazeSample> frame)
+        {
+            frame.Clear();
+            _gazeFramePool.Push(frame);
         }
 
         private double GetCurrentTimeSeconds()

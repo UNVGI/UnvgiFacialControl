@@ -7,7 +7,8 @@ using UnityEngine;
 namespace Hidano.FacialControl.Adapters.OSC
 {
     /// <summary>
-    /// uOsc サーバーをラップし、OSC メッセージを受信して OscDoubleBuffer に書き込む。
+    /// 自前 UDP 受信ループ・データグラムリング・アドレス解決テーブルを所有し、
+    /// 受信した OSC メッセージをメインスレッドで OscDoubleBuffer に書き込む。
     /// VRChat / ARKit アドレスパターンを解析し、マッピングテーブルに基づいてバッファインデックスに変換する。
     /// </summary>
     public class OscReceiver : MonoBehaviour
@@ -28,19 +29,27 @@ namespace Hidano.FacialControl.Adapters.OSC
         [SerializeField]
         private bool _autoStart = true;
 
-        private uOSC.uOscServer _server;
+        private OscUdpReceiveLoop _receiveLoop;
+        private OscDatagramRing _ring;
+        private OscDrainBuffer _drainBuffer;
+        private OscReceiveDiagnostics _diagnostics;
+        private OscReceiveOptions _receiveOptions = OscReceiveOptions.Default;
+        private OscAddressKeyTable _table = OscAddressKeyTable.Empty;
+        private readonly Dictionary<string, byte[]> _utf8Pool = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        // facade 用: 1 件の uOSC.Message は高々 1 要素のワイヤ形式に直列化される。
+        private const int FacadeRecordCapacity = 4;
+        private byte[] _facadeScratch;
+        private OscResolvedMessage[] _facadeRecords;
+        private IOscResolvedMessageHandler _resolvedMessageHandler;
+        private Action<float>[] _listenerSlots = Array.Empty<Action<float>>();
+        private string[] _listenerAddresses = Array.Empty<string>();
+        private IReadOnlyList<string> _gazeAddresses;
         private int _activePort = -1;
         private OscDoubleBuffer _buffer;
         private OscBundleAccumulator _bundleAccumulator;
         private BundleInterpretationMode _bundleMode;
         private ITimeProvider _timeProvider;
         private bool _initialized;
-
-        // OSC アドレス → バッファインデックスの高速逆引き辞書
-        private Dictionary<string, int> _addressToIndex;
-
-        // BlendShape 名 → バッファインデックスの逆引き（アドレスプレフィックス除去後の名前解決用）
-        private Dictionary<string, int> _blendShapeNameToIndex;
 
         // マッピング情報を保持（レイヤー分配のため）
         private OscMapping[] _mappings;
@@ -64,7 +73,7 @@ namespace Hidano.FacialControl.Adapters.OSC
         /// <summary>
         /// サーバーが稼働中かどうか。
         /// </summary>
-        public bool IsRunning => _server != null && _server.isRunning;
+        public bool IsRunning => _receiveLoop != null && _receiveLoop.IsRunning;
 
         /// <summary>
         /// 実際に待ち受けているポート番号。
@@ -79,6 +88,22 @@ namespace Hidano.FacialControl.Adapters.OSC
         public OscDoubleBuffer Buffer => _buffer;
 
         public OscBundleAccumulator BundleAccumulator => _bundleAccumulator;
+
+        public OscReceiveDiagnostics Diagnostics => _diagnostics;
+        public OscReceiveOptions ReceiveOptions { get => _receiveOptions; set => _receiveOptions = value; }
+
+        public void SetResolvedMessageHandler(IOscResolvedMessageHandler handler)
+        {
+            _resolvedMessageHandler = handler;
+            if (handler != null && _messageFilter != null)
+                Debug.LogWarning("[OscReceiver] resolved handler is set; the legacy message filter is ignored.");
+        }
+
+        public void SetGazeAddresses(IReadOnlyList<string> addresses)
+        {
+            _gazeAddresses = addresses;
+            RebuildTable();
+        }
 
         public void SetMessageFilter(Func<uOSC.Message, bool> filter)
         {
@@ -108,7 +133,14 @@ namespace Hidano.FacialControl.Adapters.OSC
             _bundleMode = bundleMode;
             _timeProvider = timeProvider;
             _mappings = mappings;
-            BuildLookupTables(mappings);
+            RebuildTable();
+            _diagnostics = _diagnostics ?? new OscReceiveDiagnostics();
+            if (_ring == null || _ring.SlotBytes != _receiveOptions.DatagramSlotBytes || _ring.SlotCount != _receiveOptions.DatagramSlotCount)
+            {
+                _ring = new OscDatagramRing(_receiveOptions, _diagnostics);
+                _drainBuffer = new OscDrainBuffer(_receiveOptions);
+                _receiveLoop = new OscUdpReceiveLoop(_ring, _diagnostics) { TableProvider = GetTable };
+            }
             _initialized = true;
         }
 
@@ -165,10 +197,7 @@ namespace Hidano.FacialControl.Adapters.OSC
             }
 
             _activePort = resolvedPort;
-            EnsureServer();
-            _server.port = resolvedPort;
-            _server.autoStart = false;
-            _server.StartServer();
+            _receiveLoop.Start(resolvedPort, _receiveOptions);
         }
 
         /// <summary>
@@ -176,17 +205,94 @@ namespace Hidano.FacialControl.Adapters.OSC
         /// </summary>
         public void StopReceiving()
         {
-            if (_server != null && _server.isRunning)
-            {
-                _server.StopServer();
-            }
+            _receiveLoop?.Stop();
         }
 
         /// <summary>
-        /// OSC メッセージを処理し、バッファに書き込む。
-        /// uOscServer の onDataReceived コールバックから呼ばれる。
+        /// 受信スレッドがコミットしたデータグラムをメインスレッドでドレインし、適用する。
+        /// <see cref="Update"/> から毎フレーム呼ばれる。テストから直接呼んでもよい。
+        /// </summary>
+        public void PumpReceived()
+        {
+            if (!_initialized || _ring == null || _drainBuffer == null) return;
+            _ring.Drain(_drainBuffer);
+            if (_drainBuffer.DatagramCount != 0)
+                _diagnostics.IncrementAppliedDatagramsBy(_drainBuffer.DatagramCount);
+            for (int i = 0; i < _drainBuffer.RecordCount; i++)
+            {
+                ref readonly OscResolvedMessage resolved = ref _drainBuffer.GetRecord(i);
+                Apply(_drainBuffer.GetView(i), in resolved);
+            }
+            WarnDiagnostics();
+            ReportReceiveLoopFault();
+        }
+
+        private void Update()
+        {
+            PumpReceived();
+        }
+
+        private void ReportReceiveLoopFault()
+        {
+            if (_receiveLoop != null && _receiveLoop.TryTakeFault(out Exception fault))
+            {
+                Debug.LogError("[OscReceiver] OSC 受信ポート " + _activePort + " の受信スレッドで例外が発生しました: " + fault);
+            }
+        }
+
+        private OscAddressKeyTable GetTable() => System.Threading.Volatile.Read(ref _table);
+
+        private void Apply(in OscMessageView view, in OscResolvedMessage resolved)
+        {
+            OscAddressKeyTable table = GetTable();
+            if (resolved.TableVersion != table.Version)
+            {
+                _diagnostics.IncrementStaleRecords();
+                return;
+            }
+
+            if (_resolvedMessageHandler != null)
+            {
+                if (!_resolvedMessageHandler.HandleIncomingOscMessage(in view, in resolved)) return;
+            }
+            if (!resolved.HasFloat) return;
+            if (resolved.MappingIndex >= 0)
+            {
+                if (_bundleMode == BundleInterpretationMode.AtomicSwap && _bundleAccumulator != null)
+                    _bundleAccumulator.RecordBundleMessage(resolved.TimestampKey, resolved.MappingIndex,
+                        resolved.FloatValue, GetCurrentTimeSeconds());
+                else
+                    _buffer.Write(resolved.MappingIndex, resolved.FloatValue);
+            }
+            if (resolved.ListenerSlot >= 0 && resolved.ListenerSlot < _listenerSlots.Length)
+            {
+                try { _listenerSlots[resolved.ListenerSlot]?.Invoke(resolved.FloatValue); }
+                catch (Exception ex) { Debug.LogException(ex); }
+            }
+        }
+
+        private void WarnDiagnostics()
+        {
+            if (_diagnostics.DroppedDatagramCount != 0 && _diagnostics.TryMarkWarning(OscDiagnosticWarning.DroppedDatagram))
+                Debug.LogWarning("[OscReceiver] OSC 受信ポート " + _activePort + " でデータグラムを破棄しました。件数: " + _diagnostics.DroppedDatagramCount);
+            if (_diagnostics.OversizedDatagramCount != 0 && _diagnostics.TryMarkWarning(OscDiagnosticWarning.OversizedDatagram))
+                Debug.LogWarning("[OscReceiver] OSC 受信ポート " + _activePort + " で oversized データグラムを破棄しました。件数: " + _diagnostics.OversizedDatagramCount);
+            if (_diagnostics.TruncatedDatagramCount != 0 && _diagnostics.TryMarkWarning(OscDiagnosticWarning.TruncatedDatagram))
+                Debug.LogWarning("[OscReceiver] OSC 受信ポート " + _activePort + " で要素を切り捨てました。件数: " + _diagnostics.TruncatedDatagramCount);
+            if (_diagnostics.MalformedElementCount != 0 && _diagnostics.TryMarkWarning(OscDiagnosticWarning.MalformedElement))
+                Debug.LogWarning("[OscReceiver] OSC 受信ポート " + _activePort + " で不正要素をスキップしました。件数: " + _diagnostics.MalformedElementCount);
+        }
+
+        /// <summary>
+        /// uOSC 互換 facade。<see cref="uOSC.Message"/> をワイヤ形式へ直列化し、
+        /// UDP 経路と同じパーサー・分類器・適用処理を同期的に通す。
         /// テスト用にも public として公開。
         /// </summary>
+        /// <remarks>
+        /// リングは受信スレッドが <c>Socket.Receive</c> 中もスロットを予約し続ける SPSC 構造のため、
+        /// メインスレッドから <see cref="OscDatagramRing.CommitExternal"/> しても予約競合で破棄される。
+        /// facade はリングを経由せず、メインスレッド所有の scratch 上で解析・分類して直接適用する。
+        /// </remarks>
         /// <param name="message">受信した OSC メッセージ。</param>
         public void HandleOscMessage(uOSC.Message message)
         {
@@ -215,42 +321,32 @@ namespace Hidano.FacialControl.Adapters.OSC
                 }
             }
 
-            if (message.values == null || message.values.Length == 0)
+            int requiredLength = OscMessageSerializer.GetRequiredLength(message);
+            if (requiredLength <= 0 || requiredLength > ushort.MaxValue)
                 return;
 
-            // float 値の取得
-            float value;
-            if (message.values[0] is float f)
-            {
-                value = f;
-            }
-            else if (message.values[0] is int i)
-            {
-                // int → float 変換（VRChat は int も送る場合がある）
-                value = i;
-            }
-            else
-            {
+            _facadeScratch ??= new byte[ushort.MaxValue];
+            _facadeRecords ??= new OscResolvedMessage[FacadeRecordCapacity];
+            if (!OscMessageSerializer.TryWrite(message, _facadeScratch, out int length))
                 return;
+
+            OscAddressKeyTable table = GetTable();
+            int count = OscMessageClassifier.ParseAndClassify(
+                new ReadOnlySpan<byte>(_facadeScratch, 0, length), table, _facadeRecords, _diagnostics);
+            for (int i = 0; i < count; i++)
+            {
+                ref readonly OscResolvedMessage resolved = ref _facadeRecords[i];
+                var reader = new OscPacketReader(
+                    new ReadOnlySpan<byte>(_facadeScratch, resolved.ElementOffset, resolved.ElementLength));
+                if (!reader.TryReadNext(out OscMessageView element))
+                    continue;
+
+                var view = new OscMessageView(element.Address, element.TypeTags, element.Arguments,
+                    element.Element, resolved.TimestampKey, resolved.ElementOffset);
+                Apply(in view, in resolved);
             }
 
-            // アドレス完全一致による高速ルックアップ
-            if (_addressToIndex.TryGetValue(message.address, out int index))
-            {
-                WriteValue(message, index, value);
-            }
-            else
-            {
-                // アドレスプレフィックスを除去して BlendShape 名で検索
-                string blendShapeName = ExtractBlendShapeName(message.address);
-                if (blendShapeName != null && _blendShapeNameToIndex.TryGetValue(blendShapeName, out index))
-                {
-                    WriteValue(message, index, value);
-                }
-            }
-
-            // 加算的拡張: analog-input-binding 用任意アドレスリスナー通知 
-            NotifyAnalogListeners(message.address, value);
+            WarnDiagnostics();
         }
 
         /// <summary>
@@ -285,6 +381,7 @@ namespace Hidano.FacialControl.Adapters.OSC
                     _analogListeners[address] = listener;
                 }
             }
+            RebuildListenerSlotsAndTable();
         }
 
         /// <summary>
@@ -316,41 +413,7 @@ namespace Hidano.FacialControl.Adapters.OSC
                     }
                 }
             }
-        }
-
-        private void NotifyAnalogListeners(string address, float value)
-        {
-            Action<float> listener = null;
-            lock (_analogListenersLock)
-            {
-                if (_analogListeners == null)
-                    return;
-                _analogListeners.TryGetValue(address, out listener);
-            }
-
-            if (listener == null)
-                return;
-
-            try
-            {
-                listener.Invoke(value);
-            }
-            catch (Exception ex)
-            {
-                // 受信スレッドで例外が漏れて uOSC サーバが停止しないよう握り潰してログのみ
-                Debug.LogException(ex);
-            }
-        }
-
-        private void WriteValue(uOSC.Message message, int index, float value)
-        {
-            if (_bundleMode == BundleInterpretationMode.AtomicSwap && _bundleAccumulator != null)
-            {
-                _bundleAccumulator.RecordMessage(message, index, value, GetCurrentTimeSeconds());
-                return;
-            }
-
-            _buffer.Write(index, value);
+            RebuildListenerSlotsAndTable();
         }
 
         private double GetCurrentTimeSeconds()
@@ -397,49 +460,41 @@ namespace Hidano.FacialControl.Adapters.OSC
             StopReceiving();
         }
 
-        private void EnsureServer()
+        private void RebuildTable()
         {
-            if (_server != null)
-                return;
-
-            _server = GetComponent<uOSC.uOscServer>();
-            if (_server == null)
-            {
-                _server = gameObject.AddComponent<uOSC.uOscServer>();
-            }
-            _server.autoStart = false;
-            _server.onDataReceived.AddListener(HandleOscMessage);
+            if (_mappings == null) return;
+            int version = GetTable().Version + 1;
+            var builder = new OscAddressKeyTable.Builder(_utf8Pool)
+                .SetMappings(_mappings)
+                .SetGazeAddresses(_gazeAddresses)
+                .SetListenerAddresses(_listenerAddresses);
+            OscAddressKeyTable newTable = builder.Build(version);
+            System.Threading.Volatile.Write(ref _table, newTable);
         }
 
-        private void BuildLookupTables(OscMapping[] mappings)
+        private void RebuildListenerSlotsAndTable()
         {
-            _addressToIndex = new Dictionary<string, int>(mappings.Length, StringComparer.Ordinal);
-            _blendShapeNameToIndex = new Dictionary<string, int>(mappings.Length, StringComparer.Ordinal);
-
-            for (int i = 0; i < mappings.Length; i++)
+            lock (_analogListenersLock)
             {
-                var mapping = mappings[i];
-
-                // OSC アドレス → インデックス
-                if (!string.IsNullOrEmpty(mapping.OscAddress))
+                _listenerAddresses = new string[_analogListeners?.Count ?? 0];
+                _listenerSlots = new Action<float>[_listenerAddresses.Length];
+                if (_analogListeners != null)
                 {
-                    _addressToIndex[mapping.OscAddress] = i;
-                }
-
-                // BlendShape 名 → インデックス（重複時は後勝ち）
-                if (!string.IsNullOrEmpty(mapping.BlendShapeName))
-                {
-                    _blendShapeNameToIndex[mapping.BlendShapeName] = i;
+                    int i = 0;
+                    foreach (var pair in _analogListeners)
+                    {
+                        _listenerAddresses[i] = pair.Key;
+                        _listenerSlots[i++] = pair.Value;
+                    }
                 }
             }
+            RebuildTable();
         }
 
         private void OnDestroy()
         {
-            if (_server != null)
-            {
-                _server.onDataReceived.RemoveListener(HandleOscMessage);
-            }
+            _receiveLoop?.Dispose();
+            _receiveLoop = null;
         }
     }
 }

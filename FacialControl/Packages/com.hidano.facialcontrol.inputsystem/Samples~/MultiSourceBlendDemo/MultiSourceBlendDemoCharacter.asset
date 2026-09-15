@@ -38,7 +38,6 @@ MonoBehaviour:
   - id: smile
     name: Smile
     layer: emotion
-    isGaze: 0
     animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e801, type: 2}
     transitionDuration: 0.1
     transitionCurve:
@@ -72,7 +71,6 @@ MonoBehaviour:
   - id: anger
     name: Anger
     layer: emotion
-    isGaze: 0
     animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e802, type: 2}
     transitionDuration: 0.1
     transitionCurve:
@@ -99,7 +97,6 @@ MonoBehaviour:
   - id: surprise
     name: Surprise
     layer: emotion
-    isGaze: 0
     animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e803, type: 2}
     transitionDuration: 0.1
     transitionCurve:
@@ -123,7 +120,6 @@ MonoBehaviour:
   - id: lipsync_a
     name: Lipsync_A
     layer: emotion
-    isGaze: 0
     animationClip: {fileID: 7400000, guid: 6a1b2c3d4e5f60718293a4b5c6d7e804, type: 2}
     transitionDuration: 0.1
     transitionCurve:
@@ -144,7 +140,6 @@ MonoBehaviour:
   - id: smile_closed_eye
     name: SmileClosedEye
     layer: emotion
-    isGaze: 0
     animationClip: {fileID: 0}
     transitionDuration: 0.1
     transitionCurve:
@@ -178,27 +173,14 @@ MonoBehaviour:
         blendShapes: []
         bones: []
         rendererPaths: []
-  - id: eye_look
-    name: 目線
-    layer: emotion
-    isGaze: 1
-    animationClip: {fileID: 0}
-    transitionDuration: 0.1
-    transitionCurve:
-      type: 0
-      keys: []
-    blendShapeValues: []
-    layerOverrideMask: []
-    cachedSnapshot:
-      transitionDuration: 0.1
-      transitionCurvePreset: Linear
-      blendShapes: []
-      bones: []
-      rendererPaths: []
   _rendererPaths:
   - Body
-  _gazeConfigs:
-  - expressionId: eye_look
+  _gazeChannels:
+  - id: gaze
+    providerSlug: ''
+    useDistinctLeftRight: 0
+    sourceIdLeft:
+    sourceIdRight:
     leftEyeBonePath:
     leftEyeInitialRotation: {x: 0, y: 0, z: 0}
     leftEyeYawAxisLocal: {x: 0, y: 1, z: 0}
@@ -211,14 +193,6 @@ MonoBehaviour:
     lookDownAngle: 9
     outerYawAngle: 15
     innerYawAngle: 18
-    lookLeftClip: {fileID: 0}
-    lookRightClip: {fileID: 0}
-    lookUpClip: {fileID: 0}
-    lookDownClip: {fileID: 0}
-    lookLeftSamples: []
-    lookRightSamples: []
-    lookUpSamples: []
-    lookDownSamples: []
   _slots:
   - blink
   _defaultOverlays:
